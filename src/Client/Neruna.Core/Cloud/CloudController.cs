@@ -27,6 +27,9 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     /// <summary>Where the device key is kept in the credential store (not a mail/DAV connection).</summary>
     public static readonly Guid KeyId = new("6e657275-6e61-436c-6f75-640000000001");
 
+    /// <summary>Language of the server's messages: the app's UI language.</summary>
+    public const string UiLanguage = "de-CH";
+
     private string? _token;
     private DateTimeOffset _tokenExpires;
 
@@ -178,6 +181,8 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         using (request)
         {
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            // The server answers in the language of the UI (German for now; later the UI culture).
+            request.Headers.AcceptLanguage.Add(new StringWithQualityHeaderValue(UiLanguage));
             try
             {
                 return await http.SendAsync(request, cancellationToken);
