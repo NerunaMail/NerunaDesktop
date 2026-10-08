@@ -14,11 +14,11 @@
   </PropertyGroup>
 
   <!--
-    The API contract (repository neruna-api) is shared with the server. It is found as the sibling folder ../api
-    (workspace with all repositories side by side) or as ./api (git submodule, e.g. in CI).
+    The API contract shared with the server lives in the private server repository (contract/). It is found when the
+    server is checked out next to this repository (../server/contract). Without it the app builds normally and only
+    the contract tests are skipped.
   -->
   <PropertyGroup>
-    <NerunaApiDir Condition="'$(NerunaApiDir)' == '' and Exists('$(MSBuildThisFileDirectory)api/fixtures')">$(MSBuildThisFileDirectory)api/</NerunaApiDir>
-    <NerunaApiDir Condition="'$(NerunaApiDir)' == ''">$(MSBuildThisFileDirectory)../api/</NerunaApiDir>
+    <NerunaApiDir Condition="'$(NerunaApiDir)' == ''">$(MSBuildThisFileDirectory)../server/contract/</NerunaApiDir>
   </PropertyGroup>
 </Project>

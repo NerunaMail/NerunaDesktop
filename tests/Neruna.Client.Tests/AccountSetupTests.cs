@@ -13,7 +13,7 @@ namespace Neruna.Client.Tests;
 
 public class AccountSetupTests
 {
-    private static string Fixture(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures", name));
+    private static string Fixture(string name) => ContractFixtures.Read(name);
 
     [Fact]
     public void Registered_providers_claim_their_part_of_the_discovered_config()

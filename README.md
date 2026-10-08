@@ -14,13 +14,13 @@ Architektur, Leitplanken und offene Entscheide: [`docs/architecture.md`](docs/ar
 
 | Repo | Inhalt |
 |---|---|
-| **neruna-desktop** (dieses) | Client, Tests, Testlabor, Werkzeuge |
-| **neruna-api** | API-Vertrag zwischen Client und Server (OpenAPI + Beispieldaten), von beiden Seiten getestet |
-| neruna-server | Neruna Cloud / Control (nicht öffentlich) |
-| neruna-website | Produktwebsite neruna.org |
+| **NerunaDesktop** (dieses, öffentlich) | Client, Tests, Testlabor, Werkzeuge |
+| NerunaServer (privat) | Neruna Cloud / Control, inklusive API-Vertrag (`contract/`) |
+| NerunaWebsite (privat) | Produktwebsite neruna.org |
 
-Die Tests brauchen den API-Vertrag: entweder als Nachbarordner `../api` (alle Repos nebeneinander ausgecheckt)
-oder als Git-Submodul `api/` in diesem Repo (`git submodule add <url-von-neruna-api> api`).
+Bauen und Testen geht mit diesem Repo allein. Die wenigen Vertragstests, die prüfen, dass Client und Server dasselbe
+Format sprechen, brauchen den Vertrag aus dem privaten Server-Repo (`../server/contract`) und werden sonst
+übersprungen.
 
 ## Entwickeln
 

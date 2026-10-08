@@ -5,7 +5,7 @@ namespace Neruna.Shared.Tests;
 public class AutoconfigXmlTests
 {
     // The same fixture is asserted by the Laravel server tests, so both sides agree on the format.
-    private static string Fixture => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures", "autoconfig-example.xml"));
+    private static string Fixture => ContractFixtures.Read("autoconfig-example.xml");
 
     [Fact]
     public void Parse_reads_mail_and_dav_servers_from_contract_fixture()

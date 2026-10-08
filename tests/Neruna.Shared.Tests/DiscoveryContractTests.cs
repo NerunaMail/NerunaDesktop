@@ -13,7 +13,7 @@ public class DiscoveryContractTests
     [Fact]
     public void Client_reads_server_discovery_response()
     {
-        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures", "discovery-example.json"));
+        var json = ContractFixtures.Read("discovery-example.json");
 
         var response = JsonSerializer.Deserialize<DiscoveryResponse>(json, NerunaJson.Options)!;
 
@@ -28,7 +28,7 @@ public class DiscoveryContractTests
     [Fact]
     public void Client_serialization_matches_server_wire_format()
     {
-        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures", "discovery-example.json"));
+        var json = ContractFixtures.Read("discovery-example.json");
         var response = JsonSerializer.Deserialize<DiscoveryResponse>(json, NerunaJson.Options)!;
 
         var roundTripped = JsonSerializer.Serialize(response, NerunaJson.Options);

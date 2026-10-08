@@ -30,7 +30,7 @@ abschaltbares Modul – die einzige mögliche Ausnahme von Leitplanke 1.
 |---|---|
 | Desktop | .NET 10, Avalonia 12 (Fluent), CommunityToolkit.Mvvm, MailKit/MimeKit, Ical.Net, EF Core + SQLite |
 | Server | PHP 8.4, Laravel 13, MariaDB 11.8, FrankenPHP (Docker); Admin-UI voraussichtlich Filament |
-| Vertrag | `api/openapi.yaml` + Beispieldokumente in `api/fixtures/`, gegen die **beide** Seiten testen |
+| Vertrag | `server/contract/openapi.yaml` + Beispieldokumente in `server/contract/fixtures/`, gegen die **beide** Seiten testen (Desktop findet sie als `../server/contract`, sonst werden diese Tests übersprungen) |
 
 ## 3. Repository-Struktur
 
