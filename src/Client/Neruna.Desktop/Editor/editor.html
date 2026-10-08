@@ -18,6 +18,11 @@
   #editor img { max-width: 100%; }
   #editor a { color: #0f6cbd; }
   #editor:empty::before { content: attr(data-placeholder); color: #8a8a8a; }
+  /* Dark theme: the page is shown inverted (so quoted mails with their own colours turn dark too), pictures are turned
+     back. The mail itself is not changed – it is sent as written, dark text on white. */
+  html.dark { filter: invert(1) hue-rotate(180deg); }
+  html.dark, html.dark body { background: #d6d6d6; }
+  html.dark img, html.dark video, html.dark [style*="background-image"] { filter: invert(1) hue-rotate(180deg); }
 </style>
 </head>
 <body>
@@ -207,6 +212,7 @@
 
   window.neruna = {
     /** Loads content and the default font of the user (used for new text and the whole mail). */
+    setDark: function (dark) { document.documentElement.classList.toggle("dark", !!dark); },
     setContent: function (html, font, sizePt, placeholder) {
       editor.style.fontFamily = font ? '"' + font + '", sans-serif' : "";
       editor.style.fontSize = sizePt ? sizePt + "pt" : "";

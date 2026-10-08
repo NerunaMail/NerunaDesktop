@@ -14,6 +14,8 @@
         <ResourceDictionary x:Key="Light">
           <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#F0F0F0" />
           <SolidColorBrush x:Key="PaneBackgroundBrush" Color="#FFFFFF" />
+          <!-- Page behind mail content (editor, previews); MailPaper.DarkBrush matches the dark one -->
+          <SolidColorBrush x:Key="PaperBrush" Color="#FFFFFF" />
           <SolidColorBrush x:Key="RailBackgroundBrush" Color="#E8E8E8" />
           <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="#0F6CBD" />
           <SolidColorBrush x:Key="DividerBrush" Color="#E0E0E0" />
@@ -32,6 +34,7 @@
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="ShellBackgroundBrush" Color="#1F1F1F" />
           <SolidColorBrush x:Key="PaneBackgroundBrush" Color="#292929" />
+          <SolidColorBrush x:Key="PaperBrush" Color="#292929" />
           <SolidColorBrush x:Key="RailBackgroundBrush" Color="#141414" />
           <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="#0C3B5E" />
           <SolidColorBrush x:Key="DividerBrush" Color="#3D3D3D" />

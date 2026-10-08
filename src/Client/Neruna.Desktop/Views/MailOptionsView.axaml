@@ -42,8 +42,8 @@
           </ComboBox>
           <ComboBox ItemsSource="{x:Static ed:FontCatalog.Sizes}" SelectedItem="{Binding ComposeFontSize}" Width="80" MaxDropDownHeight="360" />
         </StackPanel>
-        <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="White" Padding="12,10" Margin="0,4,0,0">
-          <TextBlock Text="Guten Tag – so sehen Ihre neuen Nachrichten aus." Foreground="Black"
+        <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="{DynamicResource PaperBrush}" Padding="12,10" Margin="0,4,0,0">
+          <TextBlock Text="Guten Tag – so sehen Ihre neuen Nachrichten aus."
                      FontFamily="{Binding ComposeFont.Family}"
                      FontSize="{Binding ComposeFontSize, Converter={x:Static vm:MailOptionsViewModel.PointsToPixels}}" />
         </Border>

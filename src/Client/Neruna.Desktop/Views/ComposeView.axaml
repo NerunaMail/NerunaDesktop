@@ -113,8 +113,8 @@
     <!-- Formatting toolbar (hidden without WebView) -->
     <views:FormattingToolbar Grid.Row="6" Grid.ColumnSpan="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
 
-    <!-- Editor: white page, independent of the app theme -->
-    <Border Grid.Row="7" Grid.ColumnSpan="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="White" ClipToBounds="True">
+    <!-- Editor: a page in the app theme (dark: shown inverted; the mail is sent as written) -->
+    <Border Grid.Row="7" Grid.ColumnSpan="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
       <ed:HtmlEditor x:Name="Editor" />
     </Border>
 

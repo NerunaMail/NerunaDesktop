@@ -20,7 +20,7 @@
     </Grid>
 
     <views:FormattingToolbar Grid.Row="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
-    <Border Grid.Row="3" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" Background="White" ClipToBounds="True"
+    <Border Grid.Row="3" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" Background="{DynamicResource PaperBrush}" ClipToBounds="True"
             CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}">
       <ed:HtmlEditor x:Name="Editor" />
     </Border>

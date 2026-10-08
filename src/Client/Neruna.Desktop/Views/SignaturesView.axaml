@@ -2,7 +2,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:core="using:Neruna.Core.Mail"
-             xmlns:html="clr-namespace:TheArtOfDev.HtmlRenderer.Avalonia;assembly=Avalonia.HtmlRenderer"
              x:Class="Neruna.Desktop.Views.SignaturesView"
              x:DataType="vm:SignaturesViewModel">
   <Grid RowDefinitions="Auto,*,Auto" Margin="0,0,0,16">
@@ -32,10 +31,11 @@
       </DockPanel>
 
       <!-- Preview -->
-      <Border Grid.Column="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="White" ClipToBounds="True">
+      <Border Grid.Column="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
         <DockPanel>
           <TextBlock DockPanel.Dock="Top" Text="Vorschau" FontSize="11" Foreground="#707070" Margin="24,10,12,4" />
-          <html:HtmlPanel x:Name="Preview" Background="White" />
+          <!-- The HtmlPanel is created in code-behind (fresh one per theme: the renderer keeps its first stylesheet) -->
+          <Border x:Name="PreviewHost" Margin="24,0,12,12" />
         </DockPanel>
       </Border>
     </Grid>

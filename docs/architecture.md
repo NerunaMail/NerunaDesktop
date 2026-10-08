@@ -216,6 +216,13 @@ Links über der Kalenderliste ein oder zwei Monate (Einstellungen → Kalender) 
 hervorgehoben, die angezeigte Woche hinterlegt, Tage mit Terminen fett. Klick auf Tag oder Kalenderwoche zeigt diese
 Woche; der Navigator folgt der Woche, solange man nicht selbst Monate blättert.
 
+### Dunkles Design und Mailinhalt
+
+`MailPaper` entscheidet, wie Mailinhalt im dunklen Design erscheint: Text- und einfach formatierte Mails dunkel (schwarze
+und graue Schriftfarben fallen weg, dunkle Farben werden aufgehellt), gestaltete Mails mit eigenen Hintergründen
+(Newsletter) bleiben auf hellem Papier. Der Editor zeigt seine Seite im dunklen Design invertiert (Bilder
+zurückinvertiert); die versendete Mail bleibt unverändert dunkle Schrift auf Weiss.
+
 ### Kalendernamen und -farben
 
 Farbe und Anzeigename eines Kalenders lassen sich über das Farbfeld in der Kalenderliste ändern. Beides wird nur in

@@ -160,3 +160,14 @@ def test_a_new_paragraph_stands_apart_from_a_wrapped_line(page):
     # Recipients see the same spacing: it is in the exported HTML, on the paragraphs only.
     html = page.evaluate("neruna.getBodyHtml()")
     assert html.count("margin: 0px 0px 0.5em") == 2 or html.count("margin: 0 0 0.5em") == 2, html
+
+
+def test_dark_theme_inverts_the_page_but_not_the_mail(page):
+    page.click("#editor")
+    page.keyboard.type("Hallo")
+    page.evaluate("neruna.setDark(true)")
+    assert "invert" in page.evaluate("getComputedStyle(document.documentElement).filter")
+    html = page.evaluate("neruna.getHtml()")
+    assert "color: #000000" in html and "invert" not in html
+    page.evaluate("neruna.setDark(false)")
+    assert page.evaluate("getComputedStyle(document.documentElement).filter") == "none"

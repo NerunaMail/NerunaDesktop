@@ -84,6 +84,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
     public HtmlEditor()
     {
+        ActualThemeVariantChanged += (_, _) => _ = ApplyThemeAsync();
         Content = _host;
         Focusable = true;
     }
@@ -129,6 +130,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     public static bool ScreenshotPreview { get; set; }
 
     private TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel? _preview;
+    private Border? _previewBorder;
 
     public bool IsRich => _ready && _fallback is null;
 
@@ -139,7 +141,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         _content = (html, font, sizePt, placeholder);
         if (_preview is not null)
         {
-            _preview.Text = PreviewHtml();
+            ShowPreview();
         }
         else if (_fallback is not null)
         {
@@ -150,6 +152,22 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         {
             _ = PushContentAsync();
         }
+    }
+
+    // Screenshot preview: shown like the reading pane (dark page in the dark theme). A fresh panel each time: the
+    // renderer ignores a changed base stylesheet once it has shown text.
+    private void ShowPreview()
+    {
+        var (html, dark) = Infrastructure.MailPaper.Prepare(PreviewHtml(), Infrastructure.MailPaper.IsDarkTheme);
+        var paper = dark ? Infrastructure.MailPaper.DarkBrush : Avalonia.Media.Brushes.White;
+        _preview = new TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel
+        {
+            Background = paper,
+            BaseStylesheet = dark ? Infrastructure.MailPaper.DarkStylesheet : Infrastructure.MailPaper.LightStylesheet,
+        };
+        _previewBorder!.Background = paper;
+        _previewBorder.Child = _preview;
+        _preview.Text = html;
     }
 
     private string PreviewHtml() => _content is { } c
@@ -207,7 +225,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        if (_web is null && _fallback is null)
+        if (_web is null && _fallback is null && _previewBorder is null)
         {
             Start();
         }
@@ -218,9 +236,9 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         if (ScreenshotPreview)
         {
             // The margin goes on a border: HtmlPanel cuts off text with its own padding (as in the reading pane).
-            _preview = new TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel { Background = Avalonia.Media.Brushes.White };
-            _host.Children.Add(new Border { Padding = new Avalonia.Thickness(12, 10), Background = Avalonia.Media.Brushes.White, Child = _preview });
-            _preview.Text = PreviewHtml();
+            _previewBorder = new Border { Padding = new Avalonia.Thickness(12, 10) };
+            _host.Children.Add(_previewBorder);
+            ShowPreview();
             _ready = true;
             ModeChanged?.Invoke(this, true);
             return;
@@ -318,6 +336,16 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
         var script = $"neruna.setContent({Js(content.Html)}, {Js(content.Font)}, {content.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}, {Js(content.Placeholder)})";
         await _web.InvokeScript(script);
+        await ApplyThemeAsync();
+    }
+
+    // The editor page follows the app theme (dark: shown inverted, the mail itself stays as written).
+    private async Task ApplyThemeAsync()
+    {
+        if (_web is not null && _ready)
+        {
+            await _web.InvokeScript($"neruna.setDark({(Infrastructure.MailPaper.IsDarkTheme ? "true" : "false")})");
+        }
     }
 
     private static string Normalize(string? text) => (text ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal);

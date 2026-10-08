@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using Neruna.Desktop.Infrastructure;
 using Neruna.Desktop.ViewModels;
 using TheArtOfDev.HtmlRenderer.Avalonia;
 using TheArtOfDev.HtmlRenderer.Core.Entities;
@@ -15,10 +16,7 @@ namespace Neruna.Desktop.Views;
 /// </summary>
 internal sealed partial class MessageBodyView : UserControl
 {
-    internal const string BaseStylesheet =
-        "body { font-family: 'Segoe UI', Inter, Arial, sans-serif; font-size: 10.5pt; color: #1b1b1b; margin: 0; }" +
-        " a { color: #0F6CBD; } blockquote { border-left: 2px solid #C8C8C8; margin-left: 4px; padding-left: 10px; color: #424242; }" +
-        " pre, code { font-family: Consolas, 'Cascadia Mono', monospace; }";
+    internal const string BaseStylesheet = MailPaper.LightStylesheet;
 
     private readonly Border _host;
     private string? _shown;
@@ -28,6 +26,11 @@ internal sealed partial class MessageBodyView : UserControl
         InitializeComponent();
         _host = this.FindControl<Border>("Host")!;
         DataContextChanged += (_, _) => ShowWhenVisible();
+        ActualThemeVariantChanged += (_, _) =>
+        {
+            _shown = null;
+            ShowWhenVisible();
+        };
         PropertyChanged += (_, e) =>
         {
             if (e.Property == IsVisibleProperty || e.Property == BoundsProperty)
@@ -48,17 +51,19 @@ internal sealed partial class MessageBodyView : UserControl
         }
 
         _shown = html;
+        var (shown, dark) = MailPaper.Prepare(html, MailPaper.IsDarkTheme);
+        _host.Background = dark ? MailPaper.DarkBrush : Brushes.White;
         var panel = new HtmlPanel
         {
-            Background = Brushes.White,
+            Background = _host.Background,
             IsContextMenuEnabled = true,
-            BaseStylesheet = BaseStylesheet,
+            BaseStylesheet = dark ? MailPaper.DarkStylesheet : MailPaper.LightStylesheet,
         };
         panel.ImageLoad += OnImageLoad;
         panel.StylesheetLoad += OnStylesheetLoad;
         panel.LinkClicked += OnLinkClicked;
         _host.Child = panel;
-        panel.Text = html;
+        panel.Text = shown;
     }
 
     private void OnImageLoad(object? sender, HtmlRendererRoutedEventArgs<HtmlImageLoadEventArgs> e)
