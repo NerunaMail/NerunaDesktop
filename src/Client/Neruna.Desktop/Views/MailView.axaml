@@ -94,7 +94,7 @@
                   <KeyBinding Gesture="Enter" Command="{Binding SearchServerCommand}" />
                 </TextBox.KeyBindings>
               </TextBox>
-              <ToggleButton Grid.Column="1" Classes="command" IsChecked="{Binding IsAdvancedSearchOpen}" Command="{Binding ToggleAdvancedSearchCommand}"
+              <ToggleButton Grid.Column="1" Classes="command" IsChecked="{Binding IsAdvancedSearchOpen}"
                             Margin="4,0,0,0" Padding="8,6" ToolTip.Tip="Erweiterte Suche: Absender, Betreff, Text, Ordner">
                 <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Margin="0" />
               </ToggleButton>

@@ -198,7 +198,8 @@ internal static class Snapshots
         await SaveAsync(window, output, "invitation.png");
 
         // Advanced search across all folders of the account.
-        vm.MailPage.ToggleAdvancedSearchCommand.Execute(null);
+        await ClickAdvancedSearchAsync(window);
+        Console.WriteLine($"Advanced search open after a click on the button: {vm.MailPage.IsAdvancedSearchOpen}");
         vm.MailPage.SearchBody = string.Empty;
         vm.MailPage.SearchSubject = "Offerte";
         vm.MailPage.SearchScopeChoice = vm.MailPage.SearchScopes.First(s => s.IsAccount);
@@ -475,6 +476,18 @@ internal static class Snapshots
                           $"window restored={reopened.Width}x{reopened.Height}");
         grid.ColumnDefinitions[0].Width = new GridLength(240);
         grid.ColumnDefinitions[2].Width = new GridLength(400);
+    }
+
+    /// <summary>A real mouse click on the "Erweiterte Suche" button (not its binding: that hid a button that did nothing).</summary>
+    public static async Task ClickAdvancedSearchAsync(Window window)
+    {
+        var button = window.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ToggleButton>()
+            .First(t => ToolTip.GetTip(t) is string tip && tip.StartsWith("Erweiterte Suche", StringComparison.Ordinal));
+        var point = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(point, Avalonia.Input.MouseButton.Left);
+        window.MouseUp(point, Avalonia.Input.MouseButton.Left);
+        await Task.Delay(50);
+        Dispatcher.UIThread.RunJobs();
     }
 
     public static async Task SaveAsync(Window window, string output, string name)

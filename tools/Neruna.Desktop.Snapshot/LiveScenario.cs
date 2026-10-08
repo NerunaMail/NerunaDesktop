@@ -357,10 +357,11 @@ internal static class LiveScenario
         vm.MailPage.SearchText = word;
         Console.WriteLine($"Quick search (loaded only): {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()} hits, server hint={vm.MailPage.ShowServerSearchHint}");
         await vm.MailPage.SearchServerCommand.ExecuteAsync(null);
-        Console.WriteLine($"Server search '{word}': {vm.MailPage.SearchInfo} | {string.Join(", ", vm.MailPage.Entries.OfType<MessageItemViewModel>().Select(m => m.Subject).Take(3))}");
+        Console.WriteLine($"Server search '{word}': {vm.MailPage.SearchInfo} | {string.Join(", ", vm.MailPage.Entries.OfType<MessageItemViewModel>().Select(m => m.Subject).Take(3))} | search box: '{vm.MailPage.SearchText}'");
 
         // Advanced: from Marco, all folders of Anna's account.
-        vm.MailPage.ToggleAdvancedSearchCommand.Execute(null);
+        await Snapshots.ClickAdvancedSearchAsync(window);
+        Console.WriteLine($"Advanced search open after a click on the button: {vm.MailPage.IsAdvancedSearchOpen}");
         vm.MailPage.SearchBody = string.Empty;
         vm.MailPage.SearchFrom = "marco@example.com";
         vm.MailPage.SearchScopeChoice = vm.MailPage.SearchScopes.First(s => s.IsAccount && s.Account.Account.EmailAddress == user);

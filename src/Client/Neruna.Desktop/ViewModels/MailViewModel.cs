@@ -990,11 +990,11 @@ internal sealed partial class MailViewModel(
     /// <summary>Under a quick search: the loaded messages were filtered; offer the whole folder on the server.</summary>
     public bool ShowServerSearchHint => !IsSearchMode && SearchText.Trim().Length > 0 && CurrentFolder is not null;
 
-    [RelayCommand]
-    private void ToggleAdvancedSearch()
+    // The toggle button sets IsAdvancedSearchOpen itself (it must not also run a toggling command: that closed the
+    // panel again in the same click).
+    partial void OnIsAdvancedSearchOpenChanged(bool value)
     {
-        IsAdvancedSearchOpen = !IsAdvancedSearchOpen;
-        if (IsAdvancedSearchOpen)
+        if (value)
         {
             SearchScopes = SearchScope.For(Accounts);
             SearchScopeChoice = SearchScopes.FirstOrDefault(s => s.Folder is { } f && f == CurrentFolder) ?? SearchScopes.FirstOrDefault();
@@ -1022,14 +1022,18 @@ internal sealed partial class MailViewModel(
     [RelayCommand(CanExecute = nameof(CanSearch))]
     private Task SearchServerAsync() =>
         CurrentFolder is { } folder && SearchText.Trim() is { Length: > 0 } term
-            ? SearchAsync(new MailSearchQuery(Anywhere: term), [folder], folder.Name)
+            ? SearchAsync(new MailSearchQuery(Anywhere: term), [folder], folder.Name, keepTerm: term)
             : Task.CompletedTask;
+
+    // The term the server already searched for: it stays in the search box, but does not filter the results again
+    // (hits found in the message text would vanish). A changed term filters the results as usual.
+    private string? _serverTerm;
 
     private bool CanSearch() => !IsSearching;
 
     private static string? Clean(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private async Task SearchAsync(MailSearchQuery query, IReadOnlyList<MailFolderNode> folders, string where)
+    private async Task SearchAsync(MailSearchQuery query, IReadOnlyList<MailFolderNode> folders, string where, string? keepTerm = null)
     {
         if (query.IsEmpty)
         {
@@ -1059,7 +1063,8 @@ internal sealed partial class MailViewModel(
             {
                 IsSearchMode = true;
                 SearchTitle = $"Suche in {where}";
-                SearchText = string.Empty;
+                _serverTerm = keepTerm;
+                SearchText = keepTerm ?? string.Empty;
                 _allMessages = items;
                 SelectedMessages = [];
                 RebuildEntries();
@@ -1098,6 +1103,12 @@ internal sealed partial class MailViewModel(
     {
         EndSearch();
         IsAdvancedSearchOpen = false;
+        if (_serverTerm is not null && SearchText.Trim() == _serverTerm)
+        {
+            SearchText = string.Empty;
+        }
+
+        _serverTerm = null;
         if (CurrentFolder is { } folder)
         {
             await LoadFolderAsync(folder, null);
@@ -1307,6 +1318,11 @@ internal sealed partial class MailViewModel(
     {
         Entries.Clear();
         var query = SearchText.Trim();
+        if (IsSearchMode && query == _serverTerm)
+        {
+            query = string.Empty;
+        }
+
         var messages = query.Length == 0 ? _allMessages : _allMessages.Where(m => m.Matches(query)).ToList();
 
         foreach (var group in messages.GroupBy(m => DateGroup.Of(m.Summary.Date)))
