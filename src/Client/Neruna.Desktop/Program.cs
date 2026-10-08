@@ -9,6 +9,9 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Velopack first: during install/update/uninstall it runs its hooks and exits; it also applies an update that
+        // was downloaded before the last exit.
+        Velopack.VelopackApp.Build().SetArgs(args).Run();
         App.Options = AppOptions.FromArgs(args);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

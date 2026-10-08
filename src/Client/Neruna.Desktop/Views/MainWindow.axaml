@@ -69,12 +69,21 @@
       <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" Margin="6,6,6,0" />
     </Grid>
 
-    <!-- Status bar -->
+    <!-- Status bar; on the right a downloaded update waiting for a restart -->
     <Border Grid.Row="2" Padding="12,0">
-      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <ProgressBar IsIndeterminate="True" Width="60" Height="4" MinWidth="0" IsVisible="{Binding IsSyncing}" />
-        <TextBlock Classes="subtle" FontSize="12" Text="{Binding StatusText}" />
-      </StackPanel>
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <ProgressBar IsIndeterminate="True" Width="60" Height="4" MinWidth="0" IsVisible="{Binding IsSyncing}" />
+          <TextBlock Classes="subtle" FontSize="12" Text="{Binding StatusText}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding SettingsPage.Updates.IsReady}">
+          <TextBlock FontSize="12" Text="{Binding SettingsPage.Updates.ReadyText}" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" />
+          <Button Classes="command" Command="{Binding SettingsPage.Updates.RestartNowCommand}" Padding="6,1" FontSize="12"
+                  ToolTip.Tip="Neruna schliessen, das Update installieren und wieder starten">
+            <TextBlock Text="Jetzt neu starten" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+          </Button>
+        </StackPanel>
+      </Grid>
     </Border>
 
     <!-- Modal overlay (account setup, ICS subscription) -->

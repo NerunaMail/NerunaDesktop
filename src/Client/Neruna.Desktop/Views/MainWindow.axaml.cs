@@ -7,9 +7,30 @@ internal sealed partial class MainWindow : Window
 {
     private bool _mayClose;
 
+    private bool _restartForUpdate;
+
     public MainWindow()
     {
         InitializeComponent();
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is MainWindowViewModel vm)
+            {
+                // "Jetzt neu starten": close as usual (drafts are asked about), then install and start again.
+                vm.SettingsPage.Updates.RestartRequested += (_, _) =>
+                {
+                    _restartForUpdate = true;
+                    Close();
+                };
+            }
+        };
+        Closed += (_, _) =>
+        {
+            if (_restartForUpdate && DataContext is MainWindowViewModel vm)
+            {
+                vm.SettingsPage.Updates.ApplyAndRestart();
+            }
+        };
     }
 
     // Open drafts with unsaved changes: ask first (Speichern / Nicht speichern / Abbrechen).
@@ -26,6 +47,10 @@ internal sealed partial class MainWindow : Window
         {
             _mayClose = true;
             Close();
+        }
+        else
+        {
+            _restartForUpdate = false;
         }
     }
 

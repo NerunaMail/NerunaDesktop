@@ -8,6 +8,20 @@
       <Image Source="/Assets/app.ico" Width="56" Height="56" HorizontalAlignment="Left" />
       <TextBlock Text="Neruna Desktop" FontSize="22" FontWeight="SemiBold" />
       <TextBlock x:Name="VersionText" Classes="subtle" />
+
+      <!-- Updates (installed version only) -->
+      <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="12,10" Margin="0,4,0,0">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Updates" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding Updates.StatusText}" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Nach Updates suchen" Command="{Binding Updates.CheckNowCommand}" IsVisible="{Binding Updates.CanUpdate}" />
+            <Button Content="Jetzt neu starten" Classes="accent" Command="{Binding Updates.RestartNowCommand}" IsVisible="{Binding Updates.IsReady}" />
+          </StackPanel>
+          <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                     Text="Neruna sucht beim Start und danach alle paar Stunden nach einer neuen Version und lädt sie im Hintergrund. Installiert wird beim nächsten Start – deine Daten und Einstellungen bleiben erhalten." />
+        </StackPanel>
+      </Border>
       <TextBlock TextWrapping="Wrap"
                  Text="E-Mail, Kalender und Kontakte für offene Standards (IMAP/SMTP, CalDAV, CardDAV, ICS). Neruna betreibt kein Daten-Hosting – deine Daten bleiben auf deinem Server." />
 

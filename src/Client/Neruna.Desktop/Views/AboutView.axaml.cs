@@ -1,4 +1,3 @@
-using System.Reflection;
 using Avalonia.Controls;
 
 namespace Neruna.Desktop.Views;
@@ -9,7 +8,6 @@ internal sealed partial class AboutView : UserControl
     public AboutView()
     {
         InitializeComponent();
-        var version = typeof(AboutView).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "?";
-        this.FindControl<TextBlock>("VersionText")!.Text = $"Version {version.Split('+')[0]} (Beta)";
+        this.FindControl<TextBlock>("VersionText")!.Text = $"Version {Infrastructure.UpdateService.AppVersion} (Beta)";
     }
 }

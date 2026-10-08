@@ -3,8 +3,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates) : ViewModelBase
 {
+    /// <summary>Settings → Info: version and updates.</summary>
+    public Neruna.Desktop.Infrastructure.UpdateService Updates => updates;
+
     /// <summary>Settings → Info: where account and certificate passwords are kept.</summary>
     public string CredentialLocation => credentials.Location;
 

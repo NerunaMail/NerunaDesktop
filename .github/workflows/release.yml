@@ -1,0 +1,53 @@
+# Release: a tag like v0.1.2 builds the Windows installer with Velopack and publishes it as a GitHub release.
+# The installed app checks these releases for updates (Infrastructure/UpdateService.cs) and downloads only the
+# changes (delta packages, made from the previous release). Built on Linux – the same way scripts/publish.sh does.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      AVALONIA_TELEMETRY_OPTOUT: 1
+      VPK_VERSION: 1.2.161
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Version from the tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Tests
+        run: dotnet test
+
+      - name: Build
+        run: |
+          dotnet publish src/Client/Neruna.Desktop -c Release -r win-x64 --self-contained true \
+            -p:PublishReadyToRun=true -p:DebugType=none -p:Version="$VERSION" -o publish
+          cp LICENSE publish/LICENSE.txt
+          cp THIRD-PARTY-NOTICES.md publish/THIRD-PARTY-NOTICES.md
+
+      - name: Package
+        run: |
+          dotnet tool install -g vpk --version "$VPK_VERSION"
+          # The previous release, so the update can be a small delta.
+          vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+            --pre --outputDir releases || echo "No previous release."
+          vpk "[win]" pack --packId Neruna --packVersion "$VERSION" --packDir publish --mainExe neruna.exe \
+            --packTitle Neruna --packAuthors Neruna --icon src/Client/Neruna.Desktop/Assets/app.ico --outputDir releases
+
+      - name: Publish
+        run: |
+          vpk upload github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+            --outputDir releases --publish --pre --releaseName "Neruna $VERSION" --tag "v$VERSION"

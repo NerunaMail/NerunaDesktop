@@ -220,6 +220,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         }
 
         _timer.Start();
+        SettingsPage.Updates.Start();
         await SyncAsync();
         await UpdatePushAsync();
         _reminders.Start(OpenReminderAsync);
