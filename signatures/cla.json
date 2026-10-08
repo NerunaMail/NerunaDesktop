@@ -1,3 +1,12 @@
 {
-   "signedContributors": []
+  "signedContributors": [
+    {
+      "name": "sky-base",
+      "id": 50107385,
+      "comment_id": 6059449064,
+      "created_at": "2026-10-08T12:04:26Z",
+      "repoId": 1409404873,
+      "pullRequestNo": 1
+    }
+  ]
 }
