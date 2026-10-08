@@ -21,6 +21,12 @@ public static class SettingKeys
     /// <summary>"true": new mails, replies and forwards open in their own window instead of the reading pane.</summary>
     public const string ComposeInWindow = "compose.openInWindow";
 
+    /// <summary>The agenda (today's and the next days' appointments) is shown beside the mail (default: off).</summary>
+    public const string MailAgendaOpen = "mail.agendaOpen";
+
+    /// <summary>Calendars left out of the agenda, independent of the calendar page (JSON list of "connection|calendar").</summary>
+    public const string MailAgendaHidden = "mail.agendaHidden";
+
     /// <summary>Default font family for new mails.</summary>
     public const string ComposeFont = "compose.font";
 

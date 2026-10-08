@@ -18,7 +18,7 @@
 
   <Grid>
 
-    <Grid x:Name="Columns" ColumnDefinitions="240,6,400,6,*">
+    <Grid x:Name="Columns" ColumnDefinitions="240,6,400,6,*,Auto">
 
       <!-- Folder tree, with "Neue E-Mail" on top -->
       <Border Classes="pane" Grid.Column="0" Padding="4,8">
@@ -234,6 +234,11 @@
             <ContentControl Content="{Binding RightPane}" />
           </Panel>
         </DockPanel>
+      </Border>
+
+      <!-- Tagesansicht (header button): today's and the next days' appointments -->
+      <Border Classes="pane" Grid.Column="5" Width="270" Margin="6,0,0,0" IsVisible="{Binding Agenda.IsOpen}">
+        <views:AgendaView DataContext="{Binding Agenda}" />
       </Border>
     </Grid>
   </Grid>

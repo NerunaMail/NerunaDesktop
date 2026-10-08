@@ -124,11 +124,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
 
         // The new list is built first and swapped in at once: a week load starting meanwhile must never see no calendars.
         var items = new List<CalendarListItem>();
-        var index = 0;
-        foreach (var info in await calendar.GetCalendarsAsync())
+        var calendars = await calendar.GetCalendarsAsync();
+        var colors = await ColorsAsync(settings, calendars);
+        foreach (var info in calendars)
         {
-            // A color chosen in Neruna wins over the server's (stored locally, also for read-only subscriptions).
-            var color = await settings.GetAsync(ColorKey(info)) ?? info.Color ?? Palette[index++ % Palette.Length];
+            var color = colors[(info.ConnectionId, info.RemoteId)];
             var item = new CalendarListItem(info, color) { IsVisible = !hidden.Contains((info.ConnectionId, info.RemoteId)) };
             item.PropertyChanged += async (_, e) =>
             {
@@ -207,6 +207,22 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         ArgumentNullException.ThrowIfNull(item);
         await calendar.SetDisplayNameAsync(item.Info, name);
         await ReloadAsync();
+    }
+
+    /// <summary>
+    /// The colour of each calendar, as the calendar page shows it (also for the agenda beside the mail): one chosen in
+    /// Neruna wins over the server's (stored locally, also for read-only subscriptions), otherwise a palette colour.
+    /// </summary>
+    internal static async Task<Dictionary<(Guid, string), string>> ColorsAsync(ISettingsStore settings, IReadOnlyList<CalendarInfo> calendars)
+    {
+        var result = new Dictionary<(Guid, string), string>();
+        var index = 0;
+        foreach (var info in calendars)
+        {
+            result[(info.ConnectionId, info.RemoteId)] = await settings.GetAsync(ColorKey(info)) ?? info.Color ?? Palette[index++ % Palette.Length];
+        }
+
+        return result;
     }
 
     private static string ColorKey(CalendarInfo info) => $"calendar.color.{info.ConnectionId:N}.{info.RemoteId}";

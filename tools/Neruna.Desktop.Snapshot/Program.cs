@@ -197,6 +197,26 @@ internal static class Snapshots
 
         await SaveAsync(window, output, "invitation.png");
 
+        // Tagesansicht beside the mail: switched on in the header, remembered; its own choice of calendars.
+        vm.MailPage.Agenda.IsOpen = true;
+        await Task.Delay(300);
+        await vm.MailPage.Agenda.ReloadAsync();
+        Console.WriteLine($"Agenda: {string.Join(" | ", vm.MailPage.Agenda.Entries.Select(e => e switch { AgendaDayHeader h => h.Title, AgendaItem i => $"{i.Time} {i.Title}", _ => "?" }).Take(8))}");
+        await SaveAsync(window, output, "mail-agenda.png");
+        var teamChoice = vm.MailPage.Agenda.Calendars.FirstOrDefault(c => c.Info.RemoteId == "team");
+        if (teamChoice is not null)
+        {
+            teamChoice.IsShown = false;
+            await Task.Delay(300);
+            Console.WriteLine($"Agenda without 'Team': {vm.MailPage.Agenda.Entries.OfType<AgendaItem>().Count()} appointments; remembered hidden: {await services.GetRequiredService<Neruna.Core.ISettingsStore>().GetAsync(Neruna.Core.SettingKeys.MailAgendaHidden)}");
+            teamChoice.IsShown = true;
+            await Task.Delay(300);
+        }
+
+        vm.MailPage.Agenda.IsOpen = false;
+        await Task.Delay(100);
+        Console.WriteLine($"Agenda remembered as open: {await services.GetRequiredService<Neruna.Core.ISettingsStore>().GetAsync(Neruna.Core.SettingKeys.MailAgendaOpen)}");
+
         // Advanced search across all folders of the account.
         await ClickAdvancedSearchAsync(window);
         Console.WriteLine($"Advanced search open after a click on the button: {vm.MailPage.IsAdvancedSearchOpen}");

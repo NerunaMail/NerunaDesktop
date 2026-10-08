@@ -26,11 +26,15 @@ internal sealed partial class MailViewModel(
     InvitationService invitations,
     UiPreferences preferences,
     RecipientDirectory recipients,
+    AgendaViewModel agenda,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable
 {
     /// <summary>Drafts with changes not yet stored – in the reading pane or in their own windows.</summary>
     public IReadOnlyList<ComposeViewModel> UnsavedDrafts =>
         [.. new[] { Compose }.Concat(windows.OpenComposes).OfType<ComposeViewModel>().Distinct().Where(c => !c.IsFinished && c.IsDirty)];
+
+    /// <summary>"Tagesansicht": the next appointments beside the mail.</summary>
+    public AgendaViewModel Agenda => agenda;
 
     /// <summary>Display preferences (toolbar with or without text).</summary>
     public UiPreferences Preferences => preferences;

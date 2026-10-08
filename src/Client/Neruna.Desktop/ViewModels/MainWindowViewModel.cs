@@ -83,9 +83,15 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CurrentPage = mailPage;
 
         mailPage.StatusMessage += (_, message) => StatusText = message;
+        mailPage.Agenda.OpenRequested += async (_, occurrence) =>
+        {
+            CurrentPage = CalendarPage;
+            await CalendarPage.OpenOccurrenceAsync(occurrence);
+        };
         mailPage.CalendarChanged += async (_, _) =>
         {
             await CalendarPage.ReloadAsync();
+            await MailPage.Agenda.ReloadAsync();
             await _reminders.CheckAsync();
         };
         mailPage.AccountsReordered += async (_, _) => await SettingsPage.Accounts.ReloadAsync();
@@ -102,6 +108,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         calendarPage.EditorRequested += (_, editor) => ShowEditor(editor, async () =>
         {
             await CalendarPage.ReloadAsync();
+            await MailPage.Agenda.ReloadAsync();
             await _reminders.CheckAsync();
         });
         contactsPage.EditorRequested += (_, editor) => ShowEditor(editor, ContactsPage.ReloadAsync);
@@ -199,6 +206,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     public async Task LoadLocalAsync()
     {
         await RefreshPagesAsync();
+        await MailPage.Agenda.LoadStateAsync();
         HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
     }
 
@@ -322,6 +330,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             // Off the UI thread: SQLite and parsing hundreds of messages, events and cards would freeze the window.
             var reports = await Task.Run(() => Task.WhenAll(_mail.SyncAllAsync(), _calendar.SyncAllAsync(), _contacts.SyncAllAsync()));
             await RefreshPagesAsync();
+            await MailPage.Agenda.ReloadAsync();
             await _reminders.CheckAsync();
 
             var failures = reports.SelectMany(r => r.Failures).ToList();
