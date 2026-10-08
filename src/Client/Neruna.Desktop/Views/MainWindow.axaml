@@ -21,20 +21,11 @@
         <!-- The active section; "Neruna" is already in the window title -->
         <TextBlock Text="{Binding SectionTitle}" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-          <Button Background="Transparent" Foreground="White" Command="{Binding ShowAccountSetupCommand}" ToolTip.Tip="Konto hinzufügen">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="White" />
-              <TextBlock Text="Konto" Foreground="White" />
-            </StackPanel>
-          </Button>
           <!-- Tagesansicht: the next appointments beside the mail (remembered across restarts) -->
           <ToggleButton Classes="header" IsVisible="{Binding IsMail}" IsChecked="{Binding MailPage.Agenda.IsOpen}"
                         ToolTip.Tip="Tagesansicht: Termine von heute und den nächsten Tagen ein- oder ausblenden">
             <PathIcon Data="{StaticResource IconSidebar}" Width="17" Height="17" Foreground="White" />
           </ToggleButton>
-          <Button Background="Transparent" Command="{Binding SyncCommand}" ToolTip.Tip="Synchronisieren (F5)">
-            <PathIcon Data="{StaticResource IconSync}" Width="16" Height="16" Foreground="White" />
-          </Button>
         </StackPanel>
       </Grid>
     </Border>
@@ -43,10 +34,20 @@
       <!-- Navigation rail -->
       <Border Grid.Column="0" Background="{DynamicResource RailBackgroundBrush}">
         <DockPanel>
-        <Button DockPanel.Dock="Bottom" Classes="rail" Classes.active="{Binding IsSettings}" HorizontalAlignment="Center" Margin="0,0,0,10"
-                Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Settings}" ToolTip.Tip="Einstellungen: Konten, Zertifikate, Diagnose">
-          <PathIcon Data="{StaticResource IconSettings}" />
-        </Button>
+        <!-- Bottom of the rail: add an account, synchronize, settings -->
+        <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,0,0,10">
+          <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding ShowAccountSetupCommand}" ToolTip.Tip="Konto hinzufügen">
+            <PathIcon Data="{StaticResource IconAccountAdd}" />
+          </Button>
+          <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding SyncCommand}" ToolTip.Tip="Synchronisieren (F5)">
+            <PathIcon Data="{StaticResource IconSync}" />
+          </Button>
+          <Border Height="1" Width="28" Background="{DynamicResource DividerBrush}" Margin="0,2" />
+          <Button Classes="rail" Classes.active="{Binding IsSettings}" HorizontalAlignment="Center"
+                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Settings}" ToolTip.Tip="Einstellungen: Konten, Zertifikate, Diagnose">
+            <PathIcon Data="{StaticResource IconSettings}" />
+          </Button>
+        </StackPanel>
         <StackPanel Spacing="6" Margin="0,10,0,0">
           <Button Classes="rail" Classes.active="{Binding IsMail}" HorizontalAlignment="Center"
                   Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Mail}" ToolTip.Tip="E-Mail">
