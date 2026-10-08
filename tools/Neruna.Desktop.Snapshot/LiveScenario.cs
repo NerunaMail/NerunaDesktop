@@ -198,6 +198,7 @@ internal static class LiveScenario
         await CheckDraftsAsync(vm, window, output, mailHost, user);
         await CheckPushAsync(vm, window, output, mailHost, user, services.GetRequiredService<NotificationService>());
         await CheckInvitationAsync(vm, window, output, mailHost, user, services);
+        await CheckSearchAsync(vm, window, output, mailHost, user);
 
         vm.NavigateCommand.Execute(Section.Calendar);
         await Snapshots.SaveAsync(window, output, "live-calendar.png");
@@ -316,6 +317,61 @@ internal static class LiveScenario
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.Subject == subject);
         await WaitAsync(() => vm.MailPage.ReadingPane?.Message is not null);
         await Task.Delay(300);
+    }
+
+    // Loading older mail (page size 5 instead of 500), quick search on the server (a word only in the text), and the
+    // advanced search across all folders by sender – then flagging a hit that lies in another folder.
+    private static async Task CheckSearchAsync(MainWindowViewModel vm, MainWindow window, string output, string mailHost, string user)
+    {
+        vm.NavigateCommand.Execute(Section.Mail);
+        var inbox = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
+            .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox && f.Account.Account.EmailAddress == user);
+        MailViewModel.PageSize = 5;
+        vm.MailPage.SelectedTreeItem = vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).First(f => f != inbox);
+        await WaitAsync(() => vm.MailPage.CurrentFolder != inbox);
+        vm.MailPage.SelectedTreeItem = inbox;
+        await WaitAsync(() => vm.MailPage.CurrentFolder == inbox && vm.MailPage.LoadedText is not null);
+        Console.WriteLine($"Paging: {vm.MailPage.LoadedText}, more={vm.MailPage.HasMore}");
+        await vm.MailPage.LoadMoreCommand.ExecuteAsync(null);
+        Console.WriteLine($"After 'Weitere laden': {vm.MailPage.LoadedText}, shown={vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()}");
+        MailViewModel.PageSize = 500;
+
+        // A word that is only in the text of a message (not subject or preview of the loaded ones).
+        var word = "Frage zum Vertrag";
+        vm.MailPage.SearchText = word;
+        Console.WriteLine($"Quick search (loaded only): {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()} hits, server hint={vm.MailPage.ShowServerSearchHint}");
+        await vm.MailPage.SearchServerCommand.ExecuteAsync(null);
+        Console.WriteLine($"Server search '{word}': {vm.MailPage.SearchInfo} | {string.Join(", ", vm.MailPage.Entries.OfType<MessageItemViewModel>().Select(m => m.Subject).Take(3))}");
+
+        // Advanced: from Marco, all folders of Anna's account.
+        vm.MailPage.ToggleAdvancedSearchCommand.Execute(null);
+        vm.MailPage.SearchBody = string.Empty;
+        vm.MailPage.SearchFrom = "marco@example.com";
+        vm.MailPage.SearchScopeChoice = vm.MailPage.SearchScopes.First(s => s.IsAccount && s.Account.Account.EmailAddress == user);
+        await vm.MailPage.RunSearchCommand.ExecuteAsync(null);
+        var hits = vm.MailPage.Entries.OfType<MessageItemViewModel>().ToList();
+        Console.WriteLine($"Advanced search: {vm.MailPage.ListTitle} – {vm.MailPage.SearchInfo}; folders: {string.Join(", ", hits.Select(h => h.FolderText).Distinct())}");
+        await Snapshots.SaveAsync(window, output, "live-search.png");
+
+        // An action on a hit from another folder than the open one goes to that folder.
+        if (hits.FirstOrDefault(h => h.Folder != inbox) is { } elsewhere)
+        {
+            vm.MailPage.SelectedEntry = elsewhere;
+            await WaitAsync(() => vm.MailPage.ReadingPane?.Message is not null);
+            var wasFlagged = elsewhere.IsFlagged;
+            await vm.MailPage.ToggleFlagCommand.ExecuteAsync(null);
+            using var imap = new MailKit.Net.Imap.ImapClient();
+            await imap.ConnectAsync(mailHost, 3143, SecureSocketOptions.None);
+            await imap.AuthenticateAsync(user, "geheim");
+            var folder = await imap.GetFolderAsync(elsewhere.Folder!.Folder.RemoteId);
+            await folder.OpenAsync(MailKit.FolderAccess.ReadOnly);
+            var summary = (await folder.FetchAsync(new List<MailKit.UniqueId> { new(uint.Parse(elsewhere.Summary.RemoteId, System.Globalization.CultureInfo.InvariantCulture)) }, new MailKit.FetchRequest(MailKit.MessageSummaryItems.Flags))).Single();
+            Console.WriteLine($"Flag on hit in '{elsewhere.FolderText}': {wasFlagged} → {summary.Flags?.HasFlag(MailKit.MessageFlags.Flagged)} on the server");
+            await imap.DisconnectAsync(true);
+        }
+
+        await vm.MailPage.CloseSearchCommand.ExecuteAsync(null);
+        Console.WriteLine($"Search closed: back in {vm.MailPage.ListTitle}, {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()} messages");
     }
 
     // Invitations: Marco invites Anna by mail; the bar shows it, "Annehmen" puts it into Anna's calendar (Radicale)

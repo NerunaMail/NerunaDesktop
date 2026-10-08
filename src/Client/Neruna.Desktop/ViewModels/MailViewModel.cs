@@ -40,7 +40,7 @@ internal sealed partial class MailViewModel(
     public event EventHandler? CalendarChanged;
 
     private readonly HttpClient _imageClient = httpClients.CreateClient("neruna");
-    private IReadOnlyList<MessageItemViewModel> _allMessages = [];
+    private List<MessageItemViewModel> _allMessages = [];
     private CancellationTokenSource? _readingCts;
     private OpenedMessage? _opened;
 
@@ -72,7 +72,7 @@ internal sealed partial class MailViewModel(
     public partial MailFolderNode? CurrentFolder { get; set; }
 
     /// <summary>In "Entwürfe" a message opens for editing ("Bearbeiten", double-click).</summary>
-    public bool IsDraftsFolder => CurrentFolder?.Folder.Role == FolderRole.Drafts;
+    public bool IsDraftsFolder => (SelectedMessage?.Folder ?? CurrentFolder)?.Folder.Role == FolderRole.Drafts;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RightPane))]
@@ -97,7 +97,10 @@ internal sealed partial class MailViewModel(
 
     public bool HasMailAccounts => Accounts.Count > 0;
 
-    private MailAccountNode? CurrentAccount => CurrentFolder?.Account ?? Accounts.FirstOrDefault();
+    private MailAccountNode? CurrentAccount => SelectedMessage?.Folder?.Account ?? CurrentFolder?.Account ?? Accounts.FirstOrDefault();
+
+    // The folder a message is in: its own (search results), otherwise the open folder.
+    private MailFolderNode? FolderOf(MessageItemViewModel message) => message.Folder ?? CurrentFolder;
 
     public void Dispose() => _readingCts?.Dispose();
 
@@ -209,7 +212,13 @@ internal sealed partial class MailViewModel(
         }
     }
 
-    partial void OnSearchTextChanged(string value) => RebuildEntries();
+    partial void OnSearchTextChanged(string value)
+    {
+        RebuildEntries();
+        OnPropertyChanged(nameof(ShowServerSearchHint));
+    }
+
+    partial void OnCurrentFolderChanged(MailFolderNode? value) => OnPropertyChanged(nameof(ListTitle));
 
     [RelayCommand]
     private Task NewMailAsync() => StartComposeAsync(ComposeDraft.Empty, ComposeKind.New);
@@ -319,20 +328,23 @@ internal sealed partial class MailViewModel(
     private async Task SetReadAsync(IReadOnlyList<MessageItemViewModel> messages, bool read)
     {
         var changing = messages.Where(m => m.IsUnread == read).ToList();
-        if (CurrentFolder is not { } folder || changing.Count == 0)
-        {
-            return;
-        }
-
         try
         {
-            await mail.SetFlagsAsync(folder.Account.Connection, folder.Folder, changing.Select(m => m.Summary.RemoteId).ToList(), MessageFlags.Seen, read);
-            foreach (var message in changing)
+            foreach (var group in changing.GroupBy(FolderOf))
             {
-                message.IsUnread = !read;
-            }
+                if (group.Key is not { } folder)
+                {
+                    continue;
+                }
 
-            folder.UnreadCount += read ? -changing.Count : changing.Count;
+                await mail.SetFlagsAsync(folder.Account.Connection, folder.Folder, group.Select(m => m.Summary.RemoteId).ToList(), MessageFlags.Seen, read);
+                foreach (var message in group)
+                {
+                    message.IsUnread = !read;
+                }
+
+                folder.UnreadCount += read ? -group.Count() : group.Count();
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -443,7 +455,7 @@ internal sealed partial class MailViewModel(
     public async Task OpenInWindowAsync(MessageItemViewModel message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        if (CurrentFolder is not { } folder)
+        if (FolderOf(message) is not { } folder)
         {
             return;
         }
@@ -501,7 +513,7 @@ internal sealed partial class MailViewModel(
     private async Task<bool> DeleteFromWindowAsync(MessageItemViewModel message, MailFolderNode folder)
     {
         // Still in the list: delete like from the toolbar (the list and counters follow).
-        if (CurrentFolder == folder && _allMessages.Contains(message))
+        if (_allMessages.Contains(message))
         {
             return await RunOnMessagesAsync([message], "Löschen", (connection, f, ids) => mail.DeleteAsync(connection, f, ids), removesMessages: true);
         }
@@ -522,7 +534,7 @@ internal sealed partial class MailViewModel(
     [RelayCommand(CanExecute = nameof(CanEditDraft))]
     private async Task EditDraftAsync()
     {
-        if (CurrentFolder is not { } folder || SelectedMessage is not { } message)
+        if (SelectedMessage is not { } message || FolderOf(message) is not { } folder)
         {
             return;
         }
@@ -569,7 +581,7 @@ internal sealed partial class MailViewModel(
     }
 
     /// <summary>Drag &amp; drop target check: any other folder, also of another account.</summary>
-    public bool CanMoveTo(MailFolderNode target) => CurrentFolder is { } folder && target != folder;
+    public bool CanMoveTo(MailFolderNode target) => IsSearchMode || (CurrentFolder is { } folder && target != folder);
 
     /// <summary>
     /// Moves messages (dragged from the list) into <paramref name="target"/>. Within an account the server moves them
@@ -579,12 +591,14 @@ internal sealed partial class MailViewModel(
     {
         ArgumentNullException.ThrowIfNull(messages);
         ArgumentNullException.ThrowIfNull(target);
-        if (CurrentFolder is not { } source || !CanMoveTo(target) || messages.Count == 0)
+        // Messages already in the target stay where they are (a search may mix folders).
+        messages = messages.Where(m => FolderOf(m) is { } from && from != target).ToList();
+        if (!CanMoveTo(target) || messages.Count == 0)
         {
             return;
         }
 
-        var sameAccount = target.Account.Connection.Id == source.Account.Connection.Id;
+        var sameAccount = messages.All(m => FolderOf(m)!.Account.Connection.Id == target.Account.Connection.Id);
         var unread = messages.Count(m => m.IsUnread);
         var what = messages.Count == 1 ? "Nachricht" : $"{messages.Count} Nachrichten";
         if (!sameAccount)
@@ -594,7 +608,9 @@ internal sealed partial class MailViewModel(
 
         Func<ServiceConnection, MailFolder, IReadOnlyCollection<string>, Task> operation = sameAccount
             ? (connection, folder, ids) => mail.MoveAsync(connection, folder, ids, target.Folder)
-            : (connection, folder, _) => mail.MoveToAccountAsync(connection, folder, messages.Select(m => m.Summary).ToList(), target.Account.Connection, target.Folder);
+            : (connection, folder, ids) => connection.Id == target.Account.Connection.Id
+                ? mail.MoveAsync(connection, folder, ids, target.Folder)
+                : mail.MoveToAccountAsync(connection, folder, messages.Where(m => ids.Contains(m.Summary.RemoteId) && FolderOf(m)!.Folder == folder).Select(m => m.Summary).ToList(), target.Account.Connection, target.Folder);
 
         if (await RunOnMessagesAsync(messages, "Verschieben", operation, removesMessages: true))
         {
@@ -608,7 +624,7 @@ internal sealed partial class MailViewModel(
     /// <returns>True if the operation succeeded.</returns>
     private async Task<bool> RunOnMessagesAsync(IReadOnlyList<MessageItemViewModel> messages, string action, Func<ServiceConnection, MailFolder, IReadOnlyCollection<string>, Task> operation, bool removesMessages)
     {
-        if (CurrentFolder is not { } folder || messages.Count == 0)
+        if (messages.Count == 0 || messages.Any(m => FolderOf(m) is null))
         {
             return false;
         }
@@ -616,13 +632,20 @@ internal sealed partial class MailViewModel(
         try
         {
             var index = messages.Select(m => Entries.IndexOf(m)).Where(i => i >= 0).DefaultIfEmpty(0).Min();
-            await operation(folder.Account.Connection, folder.Folder, messages.Select(m => m.Summary.RemoteId).ToList());
+            foreach (var group in messages.GroupBy(m => FolderOf(m)!))
+            {
+                await operation(group.Key.Account.Connection, group.Key.Folder, group.Select(m => m.Summary.RemoteId).ToList());
+                if (removesMessages)
+                {
+                    group.Key.UnreadCount -= group.Count(m => m.IsUnread);
+                }
+            }
+
             if (!removesMessages)
             {
                 return true;
             }
 
-            folder.UnreadCount -= messages.Count(m => m.IsUnread);
             var wasSelected = SelectedMessage is { } open && messages.Contains(open);
             var removed = messages.ToHashSet();
             _allMessages = _allMessages.Where(m => !removed.Contains(m)).ToList();
@@ -642,7 +665,7 @@ internal sealed partial class MailViewModel(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Report($"{action} fehlgeschlagen", ex);
-            if (removesMessages)
+            if (removesMessages && !IsSearchMode && CurrentFolder is { } folder)
             {
                 // Part of a multi-message move may have succeeded: show what is really there now.
                 await LoadFolderAsync(folder, SelectedMessage?.Summary.RemoteId);
@@ -757,11 +780,19 @@ internal sealed partial class MailViewModel(
             return;
         }
 
-        var summaries = await mail.GetMessagesAsync(folder.Folder, take: 1000);
-        if (CurrentFolder != folder)
+        // A search result list stays until the search is closed.
+        if (IsSearchMode)
         {
             return;
         }
+
+        var summaries = await mail.GetMessagesAsync(folder.Folder, take: Math.Max(PageSize, _allMessages.Count));
+        if (CurrentFolder != folder || IsSearchMode)
+        {
+            return;
+        }
+
+        await UpdateCountsAsync(folder);
 
         var existing = _allMessages.ToDictionary(m => m.Summary.RemoteId, StringComparer.Ordinal);
         var items = new List<MessageItemViewModel>(summaries.Count);
@@ -775,7 +806,7 @@ internal sealed partial class MailViewModel(
             }
             else
             {
-                items.Add(new MessageItemViewModel(summary));
+                items.Add(new MessageItemViewModel(summary, folder));
             }
         }
 
@@ -806,10 +837,12 @@ internal sealed partial class MailViewModel(
 
     private async Task LoadFolderAsync(MailFolderNode folder, string? messageToSelect)
     {
+        EndSearch();
         CurrentFolder = folder;
-        var summaries = await mail.GetMessagesAsync(folder.Folder, take: 1000);
-        _allMessages = summaries.Select(s => new MessageItemViewModel(s)).ToList();
+        var summaries = await mail.GetMessagesAsync(folder.Folder, take: PageSize);
+        _allMessages = summaries.Select(s => new MessageItemViewModel(s, folder)).ToList();
         RebuildEntries();
+        await UpdateCountsAsync(folder);
 
         SelectedEntry = messageToSelect is null ? null : _allMessages.FirstOrDefault(m => m.Summary.RemoteId == messageToSelect);
         if (SelectedEntry is null && Compose is null)
@@ -818,9 +851,256 @@ internal sealed partial class MailViewModel(
         }
     }
 
+    // ---- Loading older mail -------------------------------------------------------------------------------------
+
+    /// <summary>The list shows this many messages at a time; scrolling down loads the next ones (settable for tests).</summary>
+    internal static int PageSize { get; set; } = 500;
+
+    private int _storedCount;
+
+    /// <summary>"1500 von 8200 Nachrichten" below the list.</summary>
+    [ObservableProperty]
+    public partial string? LoadedText { get; set; }
+
+    /// <summary>More messages than shown: in the local store or still on the server.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoadMoreCommand))]
+    public partial bool HasMore { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoadMoreCommand))]
+    public partial bool IsLoadingMore { get; set; }
+
+    private async Task UpdateCountsAsync(MailFolderNode folder)
+    {
+        _storedCount = await mail.CountStoredAsync(folder.Folder);
+        var total = (await mail.GetFoldersAsync(folder.Folder.ConnectionId)).FirstOrDefault(f => f.RemoteId == folder.Folder.RemoteId)?.TotalCount ?? 0;
+        total = Math.Max(total, _storedCount);
+        HasMore = !IsSearchMode && (_allMessages.Count < _storedCount || _storedCount < total);
+        LoadedText = IsSearchMode || total == 0 ? null : $"{_allMessages.Count:N0} von {total:N0} Nachrichten";
+    }
+
+    /// <summary>The next messages: from the local store first, then older ones from the server.</summary>
+    [RelayCommand(CanExecute = nameof(CanLoadMore))]
+    private async Task LoadMoreAsync()
+    {
+        if (CurrentFolder is not { } folder || IsSearchMode)
+        {
+            return;
+        }
+
+        IsLoadingMore = true;
+        try
+        {
+            if (_allMessages.Count >= _storedCount)
+            {
+                await mail.LoadOlderAsync(folder.Account.Connection, folder.Folder, PageSize);
+            }
+
+            var more = await mail.GetMessagesAsync(folder.Folder, _allMessages.Count, PageSize);
+            if (CurrentFolder != folder || IsSearchMode)
+            {
+                return;
+            }
+
+            var known = _allMessages.Select(m => m.Summary.RemoteId).ToHashSet(StringComparer.Ordinal);
+            var selected = SelectedEntry;
+            _refreshing = true;
+            try
+            {
+                _allMessages = [.. _allMessages, .. more.Where(m => known.Add(m.RemoteId)).Select(m => new MessageItemViewModel(m, folder))];
+                RebuildEntries();
+                SelectedEntry = selected;
+            }
+            finally
+            {
+                _refreshing = false;
+            }
+
+            await UpdateCountsAsync(folder);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report("Ältere Nachrichten konnten nicht geladen werden", ex);
+        }
+        finally
+        {
+            IsLoadingMore = false;
+        }
+    }
+
+    private bool CanLoadMore() => HasMore && !IsLoadingMore;
+
+    // ---- Search -----------------------------------------------------------------------------------------------
+
+    /// <summary>The list shows search results (from the server), not a folder.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ListTitle), nameof(ShowServerSearchHint))]
+    public partial bool IsSearchMode { get; set; }
+
+    /// <summary>"Erweiterte Suche" is open above the list.</summary>
+    [ObservableProperty]
+    public partial bool IsAdvancedSearchOpen { get; set; }
+
+    [ObservableProperty]
+    public partial string SearchFrom { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string SearchSubject { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string SearchBody { get; set; } = string.Empty;
+
+    /// <summary>Where to search: a folder, or all folders of an account.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<SearchScope> SearchScopes { get; set; } = [];
+
+    [ObservableProperty]
+    public partial SearchScope? SearchScopeChoice { get; set; }
+
+    [ObservableProperty]
+    public partial bool SearchSubfolders { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunSearchCommand), nameof(SearchServerCommand))]
+    public partial bool IsSearching { get; set; }
+
+    /// <summary>"23 Treffer in Posteingang und Unterordnern" above the results.</summary>
+    [ObservableProperty]
+    public partial string? SearchInfo { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ListTitle))]
+    public partial string? SearchTitle { get; set; }
+
+    public string ListTitle => IsSearchMode ? SearchTitle ?? "Suchergebnisse" : CurrentFolder?.Name ?? string.Empty;
+
+    /// <summary>Under a quick search: the loaded messages were filtered; offer the whole folder on the server.</summary>
+    public bool ShowServerSearchHint => !IsSearchMode && SearchText.Trim().Length > 0 && CurrentFolder is not null;
+
+    [RelayCommand]
+    private void ToggleAdvancedSearch()
+    {
+        IsAdvancedSearchOpen = !IsAdvancedSearchOpen;
+        if (IsAdvancedSearchOpen)
+        {
+            SearchScopes = SearchScope.For(Accounts);
+            SearchScopeChoice = SearchScopes.FirstOrDefault(s => s.Folder is { } f && f == CurrentFolder) ?? SearchScopes.FirstOrDefault();
+            if (SearchBody.Length == 0 && SearchFrom.Length == 0 && SearchSubject.Length == 0)
+            {
+                SearchBody = SearchText.Trim();
+            }
+        }
+    }
+
+    /// <summary>"Suchen" in the advanced search: sender, subject and text in the chosen folders, on the server.</summary>
+    [RelayCommand(CanExecute = nameof(CanSearch))]
+    private Task RunSearchAsync()
+    {
+        if (SearchScopeChoice is not { } scope)
+        {
+            return Task.CompletedTask;
+        }
+
+        var query = new MailSearchQuery(Clean(SearchFrom), Clean(SearchSubject), Clean(SearchBody));
+        return SearchAsync(query, scope.Folders(SearchSubfolders), scope.Describe(SearchSubfolders));
+    }
+
+    /// <summary>The quick search term in the whole open folder on the server (also the text of messages).</summary>
+    [RelayCommand(CanExecute = nameof(CanSearch))]
+    private Task SearchServerAsync() =>
+        CurrentFolder is { } folder && SearchText.Trim() is { Length: > 0 } term
+            ? SearchAsync(new MailSearchQuery(Anywhere: term), [folder], folder.Name)
+            : Task.CompletedTask;
+
+    private bool CanSearch() => !IsSearching;
+
+    private static string? Clean(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task SearchAsync(MailSearchQuery query, IReadOnlyList<MailFolderNode> folders, string where)
+    {
+        if (query.IsEmpty)
+        {
+            StatusMessage?.Invoke(this, "Bitte mindestens einen Suchbegriff eingeben.");
+            return;
+        }
+
+        IsSearching = true;
+        SearchInfo = "Suche läuft …";
+        try
+        {
+            var nodes = folders.ToDictionary(f => (f.Folder.ConnectionId, f.Folder.RemoteId));
+            var result = await mail.SearchAsync(folders.Select(f => f.Folder).ToList(), query);
+            var several = folders.Select(f => f.Folder.ConnectionId).Distinct().Count() > 1;
+            var items = result.Hits.Select(hit =>
+            {
+                var node = nodes[(hit.Folder.ConnectionId, hit.Folder.RemoteId)];
+                return new MessageItemViewModel(hit.Message, node)
+                {
+                    FolderText = folders.Count > 1 ? (several ? $"{node.Name} · {node.Account.Title}" : node.Name) : null,
+                };
+            }).ToList();
+
+            _refreshing = true;
+            try
+            {
+                IsSearchMode = true;
+                SearchTitle = $"Suche in {where}";
+                SearchText = string.Empty;
+                _allMessages = items;
+                SelectedMessages = [];
+                RebuildEntries();
+                SelectedEntry = null;
+            }
+            finally
+            {
+                _refreshing = false;
+            }
+
+            if (Compose is null)
+            {
+                ReadingPane = null;
+            }
+
+            HasMore = false;
+            LoadedText = null;
+            SearchInfo = (items.Count == 1 ? "1 Treffer" : $"{items.Count} Treffer")
+                         + (result.IsTruncated ? " – nur die neuesten pro Ordner, bitte genauer suchen" : string.Empty)
+                         + (result.FailedFolders.Count > 0 ? $" – {result.FailedFolders.Count} Ordner konnten nicht durchsucht werden" : string.Empty);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report("Suche fehlgeschlagen", ex);
+            SearchInfo = "Suche fehlgeschlagen: " + ex.Message;
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    /// <summary>Back from the results to the folder.</summary>
+    [RelayCommand]
+    private async Task CloseSearchAsync()
+    {
+        EndSearch();
+        IsAdvancedSearchOpen = false;
+        if (CurrentFolder is { } folder)
+        {
+            await LoadFolderAsync(folder, null);
+        }
+    }
+
+    private void EndSearch()
+    {
+        IsSearchMode = false;
+        SearchTitle = null;
+        SearchInfo = null;
+    }
+
     private async Task OpenMessageAsync(MessageItemViewModel message)
     {
-        if (CurrentFolder is not { } folder)
+        if (FolderOf(message) is not { } folder)
         {
             return;
         }
@@ -888,7 +1168,7 @@ internal sealed partial class MailViewModel(
         {
             ReadingPane.Invitation = shown.Banner;
         }
-        else if (CurrentFolder is { } folder && ITip.FromMessage(opened.Readable) is { } invitation)
+        else if ((SelectedMessage is { } open ? FolderOf(open) : CurrentFolder) is { } folder && ITip.FromMessage(opened.Readable) is { } invitation)
         {
             _ = ShowInvitationAsync(summary, invitation, folder.Account.Account, ReadingPane);
         }
@@ -1116,9 +1396,17 @@ internal sealed class MessageGroupHeader(string title) : MessageListEntry
     public override bool IsSelectable => false;
 }
 
-internal sealed partial class MessageItemViewModel(MessageSummary summary) : MessageListEntry
+internal sealed partial class MessageItemViewModel(MessageSummary summary, MailFolderNode? folder = null) : MessageListEntry
 {
     public MessageSummary Summary { get; } = summary;
+
+    /// <summary>The folder the message is in – for search results from several folders, each its own.</summary>
+    public MailFolderNode? Folder { get; } = folder;
+
+    /// <summary>Shown in search results: "Posteingang · anna@example.com".</summary>
+    public string? FolderText { get; init; }
+
+    public bool ShowFolder => FolderText is not null;
 
     public override bool IsSelectable => true;
 
@@ -1189,4 +1477,45 @@ internal static class DateGroup
             ? local.ToString("ddd HH:mm", CultureInfo.CurrentCulture)
             : local.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture);
     }
+}
+
+/// <summary>Where the advanced search looks: one folder (with or without its subfolders) or all folders of an account.</summary>
+internal sealed record SearchScope(string Label, MailAccountNode Account, MailFolderNode? Folder)
+{
+    public bool IsAccount => Folder is null;
+
+    public IReadOnlyList<MailFolderNode> Folders(bool withSubfolders) =>
+        Folder is null ? Account.AllFolders().ToList()
+        : withSubfolders ? [Folder, .. Descendants(Folder)]
+        : [Folder];
+
+    public string Describe(bool withSubfolders) =>
+        Folder is null ? $"allen Ordnern von {Account.Title}"
+        : withSubfolders && Folder.Children.Count > 0 ? $"{Folder.Name} und Unterordnern"
+        : Folder.Name;
+
+    /// <summary>Per account: "Alle Ordner", then its folders indented by depth.</summary>
+    public static IReadOnlyList<SearchScope> For(IEnumerable<MailAccountNode> accounts)
+    {
+        var result = new List<SearchScope>();
+        foreach (var account in accounts)
+        {
+            result.Add(new SearchScope($"Alle Ordner – {account.Title}", account, null));
+            void Add(IEnumerable<MailFolderNode> folders, int depth)
+            {
+                foreach (var folder in folders)
+                {
+                    result.Add(new SearchScope(new string(' ', 4 * depth) + folder.Name, account, folder));
+                    Add(folder.Children, depth + 1);
+                }
+            }
+
+            Add(account.Folders, 1);
+        }
+
+        return result;
+    }
+
+    private static IEnumerable<MailFolderNode> Descendants(MailFolderNode folder) =>
+        folder.Children.SelectMany(c => (IEnumerable<MailFolderNode>)[c, .. Descendants(c)]);
 }

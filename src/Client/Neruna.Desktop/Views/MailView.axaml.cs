@@ -36,6 +36,26 @@ internal sealed partial class MailView : UserControl
         list.AddHandler(PointerPressedEvent, OnListPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         list.AddHandler(PointerMovedEvent, OnListPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         list.AddHandler(PointerReleasedEvent, OnListPointerReleased, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        // Near the end of the list the next messages load by themselves.
+        list.AddHandler(ScrollViewer.ScrollChangedEvent, (_, e) =>
+        {
+            if (e.Source is ScrollViewer viewer && viewer.Extent.Height - viewer.Offset.Y - viewer.Viewport.Height < 200
+                && ViewModel is { } vm && vm.LoadMoreCommand.CanExecute(null))
+            {
+                vm.LoadMoreCommand.Execute(null);
+            }
+        });
+
+        // Ctrl+E: into the quick search.
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.E && e.KeyModifiers == KeyModifiers.Control)
+            {
+                this.FindControl<TextBox>("QuickSearch")?.Focus();
+                e.Handled = true;
+            }
+        };
+
         // Double-click opens the message in its own window; in "Entwürfe" it continues the draft.
         list.DoubleTapped += async (_, e) =>
         {

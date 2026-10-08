@@ -351,8 +351,15 @@ Logdateien pro Tag unter `<Datenordner>/logs`. `--protocol-log` schreibt zusätz
 - Nach einem Abgleich aktualisiert die Mail-Seite Zähler und Liste an Ort und Stelle (`RefreshAfterSyncAsync`):
   Auswahl, Lesebereich und ein angefangener Entwurf bleiben; der Baum wird nur neu aufgebaut, wenn sich Konten oder
   Ordner geändert haben.
-- Ausbau: CONDSTORE/QRESYNC (RFC 7162), Verbindungs-Pooling (heute eine Verbindung pro Aktion), Nachladen älterer
-  Nachrichten.
+- Erstsync: die neuesten 2000 Nachrichten pro Ordner. Ältere lädt `MailController.LoadOlderAsync` in Portionen
+  (`IMailProvider.FetchOlderAsync`; der Anbieter entscheidet anhand der bekannten IDs, was «älter» ist), ohne den
+  Sync-Stand zu ändern. Die Liste zeigt 500 auf einmal und lädt am Ende selbst nach («x von y Nachrichten»).
+- Suche: Die Schnellsuche filtert sofort, was geladen ist; Enter bzw. «Im ganzen Ordner auf dem Server suchen» sucht
+  per IMAP SEARCH (TEXT: Kopf und Text). Die erweiterte Suche (Von, Betreff, Text, Ordner oder alle Ordner eines Kontos,
+  mit/ohne Unterordner) läuft auf dem Server (`MailController.SearchAsync`, je Ordner die neuesten 300 Treffer);
+  Anbieter ohne Server-Suche durchsuchen die gespeicherten Kopfdaten. Treffer kennen ihren Ordner – Aktionen darauf
+  wirken im jeweiligen Ordner. Hinweis: GreenMail (Testlabor) vergleicht FROM nur mit ganzen Adressen.
+- Ausbau: CONDSTORE/QRESYNC (RFC 7162), Verbindungs-Pooling (heute eine Verbindung pro Aktion).
 
 ### CalDAV / CardDAV
 

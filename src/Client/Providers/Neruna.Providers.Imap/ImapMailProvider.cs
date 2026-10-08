@@ -28,10 +28,11 @@ public sealed class ImapMailProvider(
     ImapSettings settings,
     ICredentialStore credentials,
     ILogger<ImapMailProvider> logger,
-    string? protocolLogDirectory = null) : IMailProvider
+    string? protocolLogDirectory = null,
+    int maxInitialMessages = ImapMailProvider.DefaultMaxInitialMessages) : IMailProvider
 {
-    /// <summary>On first sync only the newest messages are fetched; older ones can be loaded on demand later.</summary>
-    internal const int MaxInitialMessages = 2000;
+    /// <summary>On first sync only the newest messages are fetched; older ones are loaded on demand (scrolling down).</summary>
+    public const int DefaultMaxInitialMessages = 2000;
 
     private const int FetchBatchSize = 250;
 
@@ -94,7 +95,7 @@ public sealed class ImapMailProvider(
 
         if (isFull)
         {
-            toFetch = allUids.Skip(Math.Max(0, allUids.Count - MaxInitialMessages)).ToList();
+            toFetch = allUids.Skip(Math.Max(0, allUids.Count - maxInitialMessages)).ToList();
         }
         else
         {
@@ -200,6 +201,62 @@ public sealed class ImapMailProvider(
         }
 
         await destination.AppendAsync(request, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MessageSummary>> FetchOlderAsync(MailFolder folder, IReadOnlyCollection<string> knownRemoteIds, int count, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(knownRemoteIds);
+        var oldest = knownRemoteIds.Select(id => uint.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out var uid) ? uid : uint.MaxValue).DefaultIfEmpty(uint.MaxValue).Min();
+        var imapFolder = await OpenAsync(folder.RemoteId, FolderAccess.ReadOnly, cancellationToken);
+        var older = (await imapFolder.SearchAsync(SearchQuery.NotDeleted, cancellationToken)).Where(u => u.Id < oldest).ToList();
+        return await FetchSummariesAsync(imapFolder, older.Skip(Math.Max(0, older.Count - count)).ToList(), cancellationToken);
+    }
+
+    public async Task<(IReadOnlyList<MessageSummary> Hits, bool IsTruncated)> SearchAsync(MailFolder folder, MailSearchQuery query, int limit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(query);
+        SearchQuery search = SearchQuery.NotDeleted;
+        if (!string.IsNullOrWhiteSpace(query.From))
+        {
+            search = search.And(SearchQuery.FromContains(query.From.Trim()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Subject))
+        {
+            search = search.And(SearchQuery.SubjectContains(query.Subject.Trim()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Text))
+        {
+            search = search.And(SearchQuery.BodyContains(query.Text.Trim()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Anywhere))
+        {
+            // IMAP TEXT: header and body – sender, recipients, subject and text in one go.
+            search = search.And(SearchQuery.MessageContains(query.Anywhere.Trim()));
+        }
+
+        var imapFolder = await OpenAsync(folder.RemoteId, FolderAccess.ReadOnly, cancellationToken);
+        var uids = await imapFolder.SearchAsync(search, cancellationToken);
+        var newest = uids.Skip(Math.Max(0, uids.Count - limit)).ToList();
+        return (await FetchSummariesAsync(imapFolder, newest, cancellationToken), uids.Count > limit);
+    }
+
+    private static async Task<IReadOnlyList<MessageSummary>> FetchSummariesAsync(IMailFolder folder, List<UniqueId> uids, CancellationToken cancellationToken)
+    {
+        var result = new List<MessageSummary>(uids.Count);
+        foreach (var batch in uids.Chunk(FetchBatchSize))
+        {
+            foreach (var summary in await folder.FetchAsync(batch, SummaryItems, cancellationToken))
+            {
+                result.Add(MapSummary(summary));
+            }
+        }
+
+        return result.OrderByDescending(m => m.Date).ToList();
     }
 
     /// <summary>Servers without IDLE are asked this often.</summary>

@@ -129,6 +129,13 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider
     public Task<MailFolder> CreateFolderAsync(string name, FolderRole role, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException("The demo account is read-only.");
 
+    // The demo has all its messages from the start; searching works on the stored ones (no ServerSearch).
+    public Task<IReadOnlyList<MessageSummary>> FetchOlderAsync(MailFolder folder, IReadOnlyCollection<string> knownRemoteIds, int count, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<MessageSummary>>([]);
+
+    public Task<(IReadOnlyList<MessageSummary> Hits, bool IsTruncated)> SearchAsync(MailFolder folder, MailSearchQuery query, int limit, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("The demo account cannot search on a server.");
+
     // Nothing ever arrives in the demo account.
     public Task WaitForChangesAsync(MailFolder folder, CancellationToken cancellationToken) => Task.Delay(Timeout.Infinite, cancellationToken);
 

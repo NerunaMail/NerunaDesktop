@@ -173,6 +173,95 @@ public sealed class MailController(
     public async Task<MailFolder?> FindFolderAsync(Guid connectionId, FolderRole role, CancellationToken cancellationToken = default) =>
         (await store.GetFoldersAsync(connectionId, cancellationToken)).FirstOrDefault(f => f.Role == role);
 
+    /// <summary>
+    /// Loads up to <paramref name="count"/> messages older than the stored ones from the server (the first sync only
+    /// takes the newest). They are added to the store; the folder's sync state stays as it is.
+    /// </summary>
+    /// <returns>How many were added (0: nothing older on the server).</returns>
+    public async Task<int> LoadOlderAsync(ServiceConnection connection, MailFolder folder, int count = 500, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(folder);
+        await using var provider = providers.CreateMail(connection);
+        var gate = _folderLocks.GetOrAdd($"{folder.ConnectionId:N}|{folder.RemoteId}", _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            var current = await CurrentAsync(folder, cancellationToken);
+            var known = await store.GetMessageIdsAsync(folder.ConnectionId, folder.RemoteId, cancellationToken);
+            var older = await provider.FetchOlderAsync(current, known, count, cancellationToken);
+            if (older.Count > 0)
+            {
+                await store.ApplySyncResultAsync(current, new FolderSyncResult(
+                    current.SyncState ?? string.Empty, false, older, new Dictionary<string, MessageFlags>(), [], current.TotalCount, current.UnreadCount), cancellationToken);
+            }
+
+            return older.Count;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <summary>How many messages of the folder are stored locally (the list can show "1500 of 8200").</summary>
+    public async Task<int> CountStoredAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        return (await store.GetMessageIdsAsync(folder.ConnectionId, folder.RemoteId, cancellationToken)).Count;
+    }
+
+    /// <summary>
+    /// Searches the given folders – on the server where the provider can (IMAP SEARCH: also messages never downloaded),
+    /// otherwise in the stored summaries. Newest first; a folder that fails is reported, the others still count.
+    /// </summary>
+    public async Task<MailSearchResult> SearchAsync(IReadOnlyList<MailFolder> folders, MailSearchQuery query, int limitPerFolder = 300, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folders);
+        ArgumentNullException.ThrowIfNull(query);
+        var hits = new List<MailSearchHit>();
+        var failed = new List<MailFolder>();
+        var truncated = false;
+        var connections = (await accounts.GetAccountsAsync(cancellationToken)).SelectMany(a => a.Connections).ToDictionary(c => c.Id);
+
+        foreach (var group in folders.GroupBy(f => f.ConnectionId))
+        {
+            if (!connections.TryGetValue(group.Key, out var connection))
+            {
+                failed.AddRange(group);
+                continue;
+            }
+
+            await using var provider = providers.CreateMail(connection);
+            foreach (var folder in group)
+            {
+                try
+                {
+                    if (provider.Capabilities.HasFlag(MailProviderCapabilities.ServerSearch))
+                    {
+                        var (found, more) = await provider.SearchAsync(folder, query, limitPerFolder, cancellationToken);
+                        hits.AddRange(found.Select(m => new MailSearchHit(folder, m)));
+                        truncated |= more;
+                    }
+                    else
+                    {
+                        var stored = await store.GetMessagesAsync(folder.ConnectionId, folder.RemoteId, 0, int.MaxValue, cancellationToken);
+                        var found = stored.Where(query.Matches).ToList();
+                        hits.AddRange(found.Take(limitPerFolder).Select(m => new MailSearchHit(folder, m)));
+                        truncated |= found.Count > limitPerFolder;
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Searching {Folder} failed", folder.RemoteId);
+                    failed.Add(folder);
+                }
+            }
+        }
+
+        return new MailSearchResult(hits.OrderByDescending(h => h.Message.Date).ToList(), failed, truncated);
+    }
+
     /// <summary>Syncs a single folder, e.g. right after opening it.</summary>
     public async Task SyncFolderAsync(ServiceConnection connection, MailFolder folder, CancellationToken cancellationToken = default)
     {

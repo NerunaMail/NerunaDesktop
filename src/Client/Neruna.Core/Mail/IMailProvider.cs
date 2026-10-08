@@ -55,6 +55,14 @@ public interface IMailProvider : IAsyncDisposable
     /// <exception cref="NotSupportedException">The provider lacks <see cref="MailProviderCapabilities.Append"/>.</exception>
     Task AppendAsync(MailFolder folder, MimeMessage message, MessageFlags flags, DateTimeOffset? receivedAt, CancellationToken cancellationToken = default);
 
+    /// <summary>Messages older than everything in <paramref name="knownRemoteIds"/>, newest first (loading older mail).</summary>
+    Task<IReadOnlyList<MessageSummary>> FetchOlderAsync(MailFolder folder, IReadOnlyCollection<string> knownRemoteIds, int count, CancellationToken cancellationToken = default);
+
+    /// <summary>Searches the whole folder on the server, newest first, at most <paramref name="limit"/> hits.</summary>
+    /// <returns>The hits and whether there were more.</returns>
+    /// <exception cref="NotSupportedException">The provider lacks <see cref="MailProviderCapabilities.ServerSearch"/>.</exception>
+    Task<(IReadOnlyList<MessageSummary> Hits, bool IsTruncated)> SearchAsync(MailFolder folder, MailSearchQuery query, int limit, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Returns when the server reports a change in <paramref name="folder"/> (new, removed or changed messages – IMAP
     /// IDLE) or after a while without one; the caller then syncs the folder. Without push support it simply waits a

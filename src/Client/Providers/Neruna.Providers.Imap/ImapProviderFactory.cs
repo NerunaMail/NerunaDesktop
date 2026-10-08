@@ -8,7 +8,12 @@ using Neruna.Core.Security;
 namespace Neruna.Providers.Imap;
 
 /// <param name="protocolLogDirectory">If set, raw IMAP/SMTP traces (passwords redacted) are written there.</param>
-public sealed class ImapProviderFactory(ICredentialStore credentials, ILoggerFactory loggerFactory, string? protocolLogDirectory = null) : IProviderFactory<IMailProvider>
+/// <param name="maxInitialMessages">How many of the newest messages the first sync of a folder fetches.</param>
+public sealed class ImapProviderFactory(
+    ICredentialStore credentials,
+    ILoggerFactory loggerFactory,
+    string? protocolLogDirectory = null,
+    int maxInitialMessages = ImapMailProvider.DefaultMaxInitialMessages) : IProviderFactory<IMailProvider>
 {
     public string ProviderId => ProviderIds.Imap;
 
@@ -22,7 +27,8 @@ public sealed class ImapProviderFactory(ICredentialStore credentials, ILoggerFac
             ImapSettings.FromDictionary(connection.Settings),
             credentials,
             loggerFactory.CreateLogger<ImapMailProvider>(),
-            protocolLogDirectory);
+            protocolLogDirectory,
+            maxInitialMessages);
     }
 
     public IReadOnlyDictionary<string, string>? SettingsFromDiscovery(MailProviderConfig config, string emailAddress) =>

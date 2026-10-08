@@ -61,7 +61,21 @@ internal sealed class FakeMailProviderFactory(FakeMailServer server) : IProvider
 
 internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server) : IMailProvider
 {
-    public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags | MailProviderCapabilities.Send | MailProviderCapabilities.Append;
+    public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags | MailProviderCapabilities.Send | MailProviderCapabilities.Append | MailProviderCapabilities.ServerSearch;
+
+    public Task<IReadOnlyList<MessageSummary>> FetchOlderAsync(MailFolder folder, IReadOnlyCollection<string> knownRemoteIds, int count, CancellationToken cancellationToken = default)
+    {
+        var oldest = knownRemoteIds.Select(int.Parse).DefaultIfEmpty(int.MaxValue).Min();
+        var older = server.Folders[folder.RemoteId].Where(m => int.Parse(m.RemoteId, CultureInfo.InvariantCulture) < oldest)
+            .OrderBy(m => int.Parse(m.RemoteId, CultureInfo.InvariantCulture)).ToList();
+        return Task.FromResult<IReadOnlyList<MessageSummary>>(older.Skip(Math.Max(0, older.Count - count)).OrderByDescending(m => m.Date).ToList());
+    }
+
+    public Task<(IReadOnlyList<MessageSummary> Hits, bool IsTruncated)> SearchAsync(MailFolder folder, MailSearchQuery query, int limit, CancellationToken cancellationToken = default)
+    {
+        var hits = server.Folders[folder.RemoteId].Where(query.Matches).OrderByDescending(m => m.Date).ToList();
+        return Task.FromResult<(IReadOnlyList<MessageSummary>, bool)>((hits.Take(limit).ToList(), hits.Count > limit));
+    }
 
     public Task TestConnectionAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
