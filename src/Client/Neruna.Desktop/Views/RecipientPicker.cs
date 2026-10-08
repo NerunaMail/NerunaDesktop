@@ -44,7 +44,7 @@ internal static class RecipientPicker
         var list = new ListBox
         {
             SelectionMode = SelectionMode.Multiple | SelectionMode.Toggle,
-            ItemTemplate = new FuncDataTemplate<RecipientEntry>((entry, _) => Row()),
+            ItemTemplate = new FuncDataTemplate<RecipientEntry?>((_, _) => Row()),
         };
         var empty = new TextBlock
         {
@@ -171,7 +171,7 @@ internal static class RecipientPicker
         grid.Children.Add(check);
         var text = new ContentControl();
         text.Bind(ContentControl.ContentProperty, new Binding("."));
-        text.ContentTemplate = new FuncDataTemplate<RecipientEntry>((entry, _) => RecipientBox.SuggestionRow(entry));
+        text.ContentTemplate = new FuncDataTemplate<RecipientEntry?>((entry, _) => RecipientBox.SuggestionRow(entry));
         Grid.SetColumn(text, 1);
         grid.Children.Add(text);
         return grid;

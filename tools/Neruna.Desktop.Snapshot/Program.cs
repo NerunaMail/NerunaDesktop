@@ -124,6 +124,17 @@ internal static class Snapshots
 
         // An: typing suggests contacts and groups; the "An …" button opens the picker (several at once).
         var toBox = window.GetVisualDescendants().OfType<Neruna.Desktop.Controls.RecipientBox>().First();
+        // Letter by letter (each one replaces the suggestions; the first versions crashed here on Windows).
+        foreach (var typed in new[] { "l", "le", "l", "", "m", "ma", "marco", "x" })
+        {
+            await toBox.TypeAsync(typed);
+            await Task.Delay(60);
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        }
+
+        await toBox.TypeAsync("Marco Bernasconi <marco@bernasconi.example>, l");
+        await Task.Delay(60);
         await toBox.TypeAsync("Marco Bernasconi <marco@bernasconi.example>, le");
         await Task.Delay(200);
         Console.WriteLine($"Suggestions open: {toBox.IsSuggesting}");

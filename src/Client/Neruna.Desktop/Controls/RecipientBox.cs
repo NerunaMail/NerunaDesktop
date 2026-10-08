@@ -43,7 +43,8 @@ internal sealed class RecipientBox : UserControl
         {
             MaxHeight = 320,
             Focusable = false,
-            ItemTemplate = new FuncDataTemplate<RecipientEntry>((entry, _) => SuggestionRow(entry)),
+            // The template is also asked for an empty row while a recycled container is cleared (new suggestions).
+            ItemTemplate = new FuncDataTemplate<RecipientEntry?>((entry, _) => SuggestionRow(entry)),
         };
         _popup = new Popup
         {
@@ -64,7 +65,19 @@ internal sealed class RecipientBox : UserControl
         border.Bind(Border.BorderBrushProperty, border.GetResourceObservable("DividerBrush"));
         Content = new Panel { Children = { _box, _popup } };
 
-        _box.TextChanged += async (_, _) => await OnTypedAsync();
+        _box.TextChanged += async (_, _) =>
+        {
+            // Suggestions are a convenience: whatever goes wrong there must never take the window down.
+            try
+            {
+                await OnTypedAsync();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                _popup.IsOpen = false;
+                System.Diagnostics.Trace.TraceWarning($"Recipient suggestions failed: {ex}");
+            }
+        };
         _box.AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         _box.LostFocus += (_, _) => Avalonia.Threading.DispatcherTimer.RunOnce(() =>
         {
@@ -215,7 +228,7 @@ internal sealed class RecipientBox : UserControl
         _box.Focus();
     }
 
-    internal static Control SuggestionRow(RecipientEntry entry) => new StackPanel
+    internal static Control SuggestionRow(RecipientEntry? entry) => entry is null ? new Panel() : new StackPanel
     {
         Margin = new Thickness(2, 1),
         Children =
