@@ -12,7 +12,7 @@
       <!-- Not connected: server, code and PIN from the portal -->
       <StackPanel Spacing="10" IsVisible="{Binding IsNotConnected}" Margin="0,8,0,0">
         <TextBlock Text="Server" FontWeight="SemiBold" />
-        <TextBox Text="{Binding Server}" PlaceholderText="https://cloud.neruna.org" />
+        <TextBox Text="{Binding Server}" PlaceholderText="https://neruna.cloud" />
         <TextBlock Text="Verbindungscode" FontWeight="SemiBold" Margin="0,6,0,0" />
         <TextBox Text="{Binding Code}" PlaceholderText="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" FontFamily="Consolas, Cascadia Mono, monospace" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="Aus der Mail «Neruna Desktop verbinden» oder direkt von deiner Administratorin bzw. deinem Administrator." />

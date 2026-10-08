@@ -13,7 +13,7 @@ namespace Neruna.Desktop.ViewModels;
 /// </summary>
 internal sealed partial class CloudViewModel(CloudController cloud, AccountDiscovery discovery) : ViewModelBase
 {
-    public const string DefaultServer = "https://cloud.neruna.org";
+    public const string DefaultServer = "https://neruna.cloud";
 
     /// <summary>"AM" for "Anna Muster" (shown until the photo is there).</summary>
     public static readonly Avalonia.Data.Converters.IValueConverter Initials = new Avalonia.Data.Converters.FuncValueConverter<string?, string>(name =>

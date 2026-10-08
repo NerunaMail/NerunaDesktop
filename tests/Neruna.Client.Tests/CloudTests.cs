@@ -42,7 +42,7 @@ public class CloudTests
     }
 
     [Theory]
-    [InlineData("cloud.neruna.org", "https://cloud.neruna.org/")]
+    [InlineData("neruna.cloud", "https://neruna.cloud/")]
     [InlineData("https://portal.example.ch/neruna/", "https://portal.example.ch/neruna/")]
     [InlineData("http://localhost:8080", "http://localhost:8080/")]
     public void Server_addresses_are_normalised(string typed, string expected) =>
