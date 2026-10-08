@@ -24,3 +24,8 @@ Thumbs.db
 
 # dotnet ef design-time database
 design-time.db
+
+# Python caches and core dumps (editor tests run in a container)
+__pycache__/
+*.pyc
+/core
