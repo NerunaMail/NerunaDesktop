@@ -177,10 +177,10 @@
                   <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="Anzeigen" />
                   <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
                   <Button Grid.Column="1" Width="16" Height="16" MinWidth="0" Padding="0" CornerRadius="3" Background="{Binding Brush}"
-                          BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="Farbe ändern">
+                          BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="Farbe und Name ändern">
                     <Button.Flyout>
                       <Flyout Placement="RightEdgeAlignedTop">
-                        <StackPanel Spacing="8" Width="176">
+                        <StackPanel Spacing="8" Width="220">
                           <TextBlock Text="Kalenderfarbe" FontWeight="SemiBold" FontSize="12" />
                           <ItemsControl ItemsSource="{x:Static vm:CalendarViewModel.ColorChoices}">
                             <ItemsControl.ItemsPanel>
@@ -196,6 +196,16 @@
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                           <Button Content="Farbe vom Server" FontSize="12" Click="OnColorPicked" Tag="{x:Null}" />
+
+                          <!-- Own display name: stored in Neruna, the server keeps its name -->
+                          <TextBlock Text="Anzeigename" FontWeight="SemiBold" FontSize="12" Margin="0,6,0,0" />
+                          <TextBox Text="{Binding EditName}" KeyDown="OnRenameKey" />
+                          <TextBlock Text="{Binding ServerNameText}" Classes="subtle" FontSize="11" TextWrapping="Wrap"
+                                     IsVisible="{Binding IsRenamed}" />
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button Content="Übernehmen" FontSize="12" Classes="accent" Click="OnRename" />
+                            <Button Content="Originalname" FontSize="12" Click="OnRename" Tag="reset" IsVisible="{Binding IsRenamed}" />
+                          </StackPanel>
                         </StackPanel>
                       </Flyout>
                     </Button.Flyout>

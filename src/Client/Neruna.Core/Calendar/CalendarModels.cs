@@ -1,14 +1,17 @@
 namespace Neruna.Core.Calendar;
 
 /// <param name="RemoteId">Provider-owned id (CalDAV: collection URL; ICS: subscription URL).</param>
+/// <param name="Name">Shown name: the user's own one (set in Neruna), otherwise the server's.</param>
 /// <param name="Color">Hex color like <c>#3A87AD</c>, if the server provides one.</param>
+/// <param name="ServerName">The server's name when the user gave the calendar an own one; otherwise null.</param>
 public sealed record CalendarInfo(
     Guid ConnectionId,
     string RemoteId,
     string Name,
     string? Color,
     bool IsReadOnly,
-    string? SyncState = null);
+    string? SyncState = null,
+    string? ServerName = null);
 
 /// <summary>
 /// One calendar resource: an event or task together with its recurrence overrides, i.e. everything sharing one UID.

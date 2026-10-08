@@ -178,6 +178,15 @@ internal static class Snapshots
         await SaveSplashAsync(output);
 
         vm.NavigateCommand.Execute(Section.Calendar);
+        await vm.CalendarPage.ReloadAsync();
+
+        // An own display name for a calendar: in the list and in the event editor, the server keeps its name.
+        var team = vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "team");
+        await vm.CalendarPage.RenameAsync(team, "Team Bernasconi");
+        var renamedItem = vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "team");
+        Console.WriteLine($"Renamed calendar: list shows '{renamedItem.Name}', {renamedItem.ServerNameText}");
+        await vm.CalendarPage.RenameAsync(renamedItem, null);
+        Console.WriteLine($"Reset: list shows '{vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "team").Name}'");
         await SaveAsync(window, output, "calendar.png");
         vm.CalendarPage.NavigatorMonthCount = 2;
         await SaveAsync(window, output, "calendar-2-months.png");

@@ -216,6 +216,13 @@ Links über der Kalenderliste ein oder zwei Monate (Einstellungen → Kalender) 
 hervorgehoben, die angezeigte Woche hinterlegt, Tage mit Terminen fett. Klick auf Tag oder Kalenderwoche zeigt diese
 Woche; der Navigator folgt der Woche, solange man nicht selbst Monate blättert.
 
+### Kalendernamen und -farben
+
+Farbe und Anzeigename eines Kalenders lassen sich über das Farbfeld in der Kalenderliste ändern. Beides wird nur in
+Neruna gespeichert (Einstellungen `calendar.color.*`, `calendar.name.*`); der Server behält seine Angaben.
+`CalendarController.GetCalendarsAsync` liefert den eigenen Namen (`CalendarInfo.ServerName` = Name auf dem Server),
+damit er überall gleich erscheint (Liste, Termin-Editor, «Eintragen in» bei Einladungen).
+
 ### Wochenansicht
 
 Einstellung «Kalender → Darstellung»: Liste (Termine pro Tag untereinander) oder Zeitraster

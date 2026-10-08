@@ -47,6 +47,39 @@ internal sealed partial class CalendarView : UserControl
 
     // A swatch (or "Farbe vom Server") in a calendar's color flyout. The flyout content inherits the calendar as
     // data context; the swatch itself carries the color in Tag.
+    // "Übernehmen" / "Originalname" in the colour/name flyout.
+    private async void OnRename(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Control control)
+        {
+            await RenameAsync(control, reset: Equals(control.Tag, "reset"));
+        }
+    }
+
+    private async void OnRenameKey(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == Avalonia.Input.Key.Enter && sender is Control control)
+        {
+            e.Handled = true;
+            await RenameAsync(control, reset: false);
+        }
+    }
+
+    private async Task RenameAsync(Control control, bool reset)
+    {
+        if (DataContext is not CalendarViewModel vm || control.DataContext is not CalendarListItem item)
+        {
+            return;
+        }
+
+        if (control.FindLogicalAncestorOfType<Popup>() is { } popup)
+        {
+            popup.IsOpen = false;
+        }
+
+        await vm.RenameAsync(item, reset ? null : item.EditName);
+    }
+
     private async void OnColorPicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is not Button swatch || DataContext is not CalendarViewModel vm)

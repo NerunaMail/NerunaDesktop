@@ -187,6 +187,14 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         await ReloadAsync();
     }
 
+    /// <summary>Gives a calendar an own display name (null: the server's again).</summary>
+    public async Task RenameAsync(CalendarListItem item, string? name)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        await calendar.SetDisplayNameAsync(item.Info, name);
+        await ReloadAsync();
+    }
+
     private static string ColorKey(CalendarInfo info) => $"calendar.color.{info.ConnectionId:N}.{info.RemoteId}";
 
     [RelayCommand]
@@ -358,6 +366,15 @@ internal sealed partial class CalendarListItem(CalendarInfo info, string color) 
     public IBrush Brush { get; } = Avalonia.Media.Brush.Parse(color);
 
     public string Name => Info.Name;
+
+    /// <summary>The name being edited in the colour/name flyout.</summary>
+    [ObservableProperty]
+    public partial string EditName { get; set; } = info.Name;
+
+    /// <summary>"Auf dem Server: Personal" when the calendar has an own name.</summary>
+    public string? ServerNameText => Info.ServerName is { } server ? "Auf dem Server: " + server : null;
+
+    public bool IsRenamed => Info.ServerName is not null;
 
     [ObservableProperty]
     public partial bool IsVisible { get; set; } = true;

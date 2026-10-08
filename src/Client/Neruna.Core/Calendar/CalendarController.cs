@@ -182,8 +182,32 @@ public sealed class CalendarController(
 
     private static string ExtraKey(Guid connectionId) => $"calendars.extra.{connectionId:N}";
 
-    public Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default) =>
-        store.GetCalendarsAsync(null, cancellationToken);
+    /// <summary>All calendars, with the user's own display names where set.</summary>
+    public async Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new List<CalendarInfo>();
+        foreach (var info in await store.GetCalendarsAsync(null, cancellationToken))
+        {
+            result.Add(await settings.GetAsync(DisplayNameKey(info), cancellationToken) is { Length: > 0 } own
+                ? info with { Name = own, ServerName = info.Name }
+                : info);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// The user's own name for a calendar (kept in Neruna; the server and other programs keep theirs).
+    /// Null or empty restores the server's name.
+    /// </summary>
+    public Task SetDisplayNameAsync(CalendarInfo calendar, string? name, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        var own = name?.Trim();
+        return settings.SetAsync(DisplayNameKey(calendar), string.IsNullOrEmpty(own) || own == (calendar.ServerName ?? calendar.Name) ? null : own, cancellationToken);
+    }
+
+    private static string DisplayNameKey(CalendarInfo calendar) => $"calendar.name.{calendar.ConnectionId:N}.{calendar.RemoteId}";
 
     public async Task<CalendarObject?> GetObjectAsync(CalendarInfo calendar, string remoteId, CancellationToken cancellationToken = default)
     {
