@@ -13,6 +13,8 @@ internal sealed partial class SplashWindow : Window
     public SplashWindow()
     {
         InitializeComponent();
+        // The version of this build (e.g. "Beta 0.1.1"), not a fixed text.
+        this.FindControl<TextBlock>("VersionText")!.Text = "Beta " + Infrastructure.UpdateService.AppVersion;
     }
 
     public string Status

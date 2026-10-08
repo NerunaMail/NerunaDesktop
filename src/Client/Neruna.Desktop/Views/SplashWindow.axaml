@@ -59,7 +59,7 @@
                 <GradientStop Color="#408B5CF6" Offset="1" />
               </LinearGradientBrush>
             </Border.Background>
-            <TextBlock Text="Beta 0.1" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+            <TextBlock x:Name="VersionText" Text="Beta" Foreground="White" FontSize="11" FontWeight="SemiBold" />
           </Border>
         </Grid>
       </Grid>
