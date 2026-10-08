@@ -116,4 +116,4 @@ Verwendete Bibliotheken und ihre Lizenzen: [`THIRD-PARTY-NOTICES.md`](THIRD-PART
 **Name und Logo sind nicht Teil der Lizenz:** «Neruna» und das Neruna-Logo sind Marken von Patrik Zimmermann. Forks
 sind willkommen, brauchen aber einen eigenen Namen und ein eigenes Logo – siehe [`TRADEMARKS.md`](TRADEMARKS.md).
 
-Mitwirken: [`CONTRIBUTING.md`](CONTRIBUTING.md) · Sicherheitslücken melden: [`SECURITY.md`](SECURITY.md)
+Mitwirken: [`CONTRIBUTING.md`](CONTRIBUTING.md) (mit [CLA](CLA.md)) · Sicherheitslücken melden: [`SECURITY.md`](SECURITY.md)

@@ -1,0 +1,45 @@
+# Contributor License Agreement: a pull request can only be merged once its author has accepted CLA.md, by commenting
+# "I have read the CLA Document and I hereby sign the CLA". Signatures are stored in this repository (branch
+# cla-signatures, file signatures/cla.json) – no external service.
+name: CLA
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+# Only what the check needs: comment on the pull request, set its status, write the signature file.
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CLA Assistant
+        if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
+        # contributor-assistant/github-action v2.6.1, pinned to its commit (the workflow runs with write access).
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path-to-signatures: 'signatures/cla.json'
+          path-to-document: 'https://github.com/NerunaMail/NerunaDesktop/blob/main/CLA.md'
+          branch: 'cla-signatures'
+          # The project itself and bots do not sign; contributors of companies with a Corporate CLA are added here.
+          allowlist: 'NerunaMail,dependabot[bot],github-actions[bot]'
+          lock-pullrequest-aftermerge: false
+          custom-notsigned-prcomment: >-
+            Thank you for your contribution! Before we can merge it, please read our
+            [Contributor License Agreement](https://github.com/NerunaMail/NerunaDesktop/blob/main/CLA.md)
+            (you keep your copyright) and accept it by commenting below with the sentence shown.
+            Contributing for your employer? Then your company needs the
+            [Corporate CLA](https://github.com/NerunaMail/NerunaDesktop/blob/main/CLA-CORPORATE.md) first.
+            / Danke für deinen Beitrag! Bitte lies vor dem Zusammenführen unsere Lizenzvereinbarung (CLA, du behältst
+            dein Urheberrecht) und stimme ihr mit dem folgenden Kommentar zu.
+          custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
+          custom-allsigned-prcomment: 'All contributors have signed the CLA. Thank you! / Alle haben die CLA unterzeichnet – danke!'
