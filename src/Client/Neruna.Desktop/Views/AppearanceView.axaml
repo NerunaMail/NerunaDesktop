@@ -19,6 +19,10 @@
     </StackPanel>
     <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="Bei «Nur Symbol» erscheint der Text, wenn die Maus auf der Schaltfläche ruht." />
 
+    <TextBlock Text="Navigationsleiste" FontSize="16" FontWeight="SemiBold" />
+    <CheckBox Content="Schaltfläche «Konto hinzufügen» anzeigen" IsChecked="{Binding ShowAddAccountButton}" />
+    <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="Ausgeblendet lassen sich Konten weiterhin unter Einstellungen → Konten hinzufügen." />
+
     <TextBlock Text="Farbschema" FontSize="16" FontWeight="SemiBold" />
     <ItemsControl ItemsSource="{Binding Schemes}">
       <ItemsControl.ItemsPanel>

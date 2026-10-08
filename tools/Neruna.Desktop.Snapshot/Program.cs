@@ -354,6 +354,14 @@ internal static class Snapshots
         await SaveAsync(window, output, "settings-signatures.png");
         vm.SettingsPage.SelectedTab = 5;
         await SaveAsync(window, output, "settings-design.png");
+        var preferences = services.GetRequiredService<UiPreferences>();
+        preferences.ShowAddAccountButton = false;
+        await Task.Delay(100);
+        Dispatcher.UIThread.RunJobs();
+        var addAccount = window.GetVisualDescendants().OfType<Button>().First(b => ToolTip.GetTip(b) as string == "Konto hinzufügen");
+        Console.WriteLine($"'Konto hinzufügen' hidden: {!addAccount.IsVisible}, remembered: {await services.GetRequiredService<Neruna.Core.ISettingsStore>().GetAsync(Neruna.Core.SettingKeys.ShowAddAccountButton)}");
+        await SaveAsync(window, output, "settings-design-no-add-account.png");
+        preferences.ShowAddAccountButton = true;
         vm.SettingsPage.SelectedTab = 6;
         await SaveAsync(window, output, "settings-about.png");
 

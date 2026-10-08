@@ -36,7 +36,8 @@
         <DockPanel>
         <!-- Bottom of the rail: add an account, synchronize, settings -->
         <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,0,0,10">
-          <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding ShowAccountSetupCommand}" ToolTip.Tip="Konto hinzufügen">
+          <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding ShowAccountSetupCommand}" ToolTip.Tip="Konto hinzufügen"
+                  IsVisible="{Binding MailPage.Preferences.ShowAddAccountButton}">
             <PathIcon Data="{StaticResource IconAccountAdd}" />
           </Button>
           <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding SyncCommand}" ToolTip.Tip="Synchronisieren (F5)">

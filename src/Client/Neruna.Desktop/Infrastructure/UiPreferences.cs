@@ -12,12 +12,17 @@ internal sealed partial class UiPreferences(ISettingsStore settings) : Observabl
     [ObservableProperty]
     public partial bool ToolbarLabels { get; set; } = true;
 
+    /// <summary>"Konto hinzufügen" at the bottom of the navigation rail.</summary>
+    [ObservableProperty]
+    public partial bool ShowAddAccountButton { get; set; } = true;
+
     public async Task LoadAsync()
     {
         _loading = true;
         try
         {
             ToolbarLabels = await settings.GetBoolAsync(SettingKeys.ToolbarLabels, fallback: true);
+            ShowAddAccountButton = await settings.GetBoolAsync(SettingKeys.ShowAddAccountButton, fallback: true);
         }
         finally
         {
@@ -30,6 +35,14 @@ internal sealed partial class UiPreferences(ISettingsStore settings) : Observabl
         if (!_loading)
         {
             _ = settings.SetBoolAsync(SettingKeys.ToolbarLabels, value);
+        }
+    }
+
+    partial void OnShowAddAccountButtonChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = settings.SetBoolAsync(SettingKeys.ShowAddAccountButton, value);
         }
     }
 }

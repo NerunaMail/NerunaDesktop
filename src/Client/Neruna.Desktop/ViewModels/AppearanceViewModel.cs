@@ -20,6 +20,17 @@ internal sealed partial class AppearanceViewModel(ISettingsStore settings, Nerun
         }
     }
 
+    /// <summary>"Konto hinzufügen" in the navigation rail.</summary>
+    public bool ShowAddAccountButton
+    {
+        get => preferences.ShowAddAccountButton;
+        set
+        {
+            preferences.ShowAddAccountButton = value;
+            OnPropertyChanged();
+        }
+    }
+
     public bool ToolbarIconsOnly
     {
         get => !ToolbarWithText;

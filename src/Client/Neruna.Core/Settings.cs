@@ -69,6 +69,9 @@ public static class SettingKeys
     /// <summary>Toolbar buttons with text below the icon (default) or icon only.</summary>
     public const string ToolbarLabels = "ui.toolbarLabels";
 
+    /// <summary>"Konto hinzufügen" in the navigation rail (default: shown; accounts can always be added in Einstellungen → Konten).</summary>
+    public const string ShowAddAccountButton = "ui.showAddAccountButton";
+
     /// <summary>"System", "Light" or "Dark".</summary>
     public const string ThemeMode = "appearance.theme";
 
