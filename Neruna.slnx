@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/Client/">
+    <Project Path="src/Client/Neruna.Core/Neruna.Core.csproj" />
+    <Project Path="src/Client/Neruna.Desktop/Neruna.Desktop.csproj" />
+    <Project Path="src/Client/Neruna.Storage/Neruna.Storage.csproj" />
+    <Project Path="src/Client/Providers/Neruna.Providers.Demo/Neruna.Providers.Demo.csproj" />
+  </Folder>
+  <Folder Name="/Client/Providers/">
+    <Project Path="src/Client/Providers/Neruna.Providers.Dav/Neruna.Providers.Dav.csproj" />
+    <Project Path="src/Client/Providers/Neruna.Providers.Ics/Neruna.Providers.Ics.csproj" />
+    <Project Path="src/Client/Providers/Neruna.Providers.Imap/Neruna.Providers.Imap.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="src/Shared/Neruna.Contracts/Neruna.Contracts.csproj" />
+    <Project Path="src/Shared/Neruna.Vault/Neruna.Vault.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Neruna.Client.Tests/Neruna.Client.Tests.csproj" />
+    <Project Path="tests/Neruna.Shared.Tests/Neruna.Shared.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Neruna.Desktop.Snapshot/Neruna.Desktop.Snapshot.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Domain model, provider abstractions and controllers of Neruna Desktop. No UI, no protocol code.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MimeKit" />
+    <PackageReference Include="Ical.Net" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Neruna.Contracts\Neruna.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Neruna.Client.Tests" />
+  </ItemGroup>
+</Project>

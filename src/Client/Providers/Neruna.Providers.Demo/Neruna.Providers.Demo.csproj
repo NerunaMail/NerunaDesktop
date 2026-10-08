@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>In-memory demo data for mail, calendar and contacts (neruna --demo, screenshots, UI development).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Neruna.Core\Neruna.Core.csproj" />
+  </ItemGroup>
+</Project>

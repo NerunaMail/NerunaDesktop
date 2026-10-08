@@ -1,0 +1,179 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using MimeKit;
+using Neruna.Contracts.Discovery;
+using Neruna.Core;
+using Neruna.Core.Accounts;
+using Neruna.Core.Mail;
+using Neruna.Core.Providers;
+using Neruna.Core.Security;
+using Neruna.Providers.Imap;
+
+namespace Neruna.Client.Tests;
+
+/// <summary>
+/// Runs the real IMAP/SMTP provider against GreenMail. Skipped unless NERUNA_TEST_IMAP_HOST is set, e.g.:
+/// <code>
+/// docker run -d --rm -p 3025:3025 -p 3143:3143 -e GREENMAIL_OPTS='-Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap
+///   -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=anna:geheim@example.com -Dgreenmail.users.login=email' greenmail/standalone:2.1.5
+/// NERUNA_TEST_IMAP_HOST=127.0.0.1 dotnet test
+/// </code>
+/// </summary>
+public class ImapIntegrationTests
+{
+    private static readonly string? Host = Environment.GetEnvironmentVariable("NERUNA_TEST_IMAP_HOST");
+
+    [Fact]
+    public async Task Send_sync_read_and_flag_against_real_server()
+    {
+        Assert.SkipWhen(Host is null, "NERUNA_TEST_IMAP_HOST not set");
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+
+        var credentials = env.Get<ICredentialStore>();
+        var factory = new ImapProviderFactory(credentials, NullLoggerFactory.Instance);
+        var registry = new ProviderRegistry([factory], [], []);
+        var controller = new MailController(env.Accounts, env.MailStore, registry, NullLogger<MailController>.Instance);
+
+        var settings = new ImapSettings(Host!, 3143, SocketSecurity.None, Host!, 3025, SocketSecurity.None, "anna@example.com");
+        var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, ProviderIds.Imap, settings.ToDictionary());
+        await credentials.SetSecretAsync(connection.Id, "geheim", ct);
+        await env.Accounts.SaveAccountAsync(new Account(Guid.NewGuid(), "Anna", "anna@example.com", [connection]), ct);
+
+        var subject = "Integration " + Guid.NewGuid().ToString("N")[..8];
+        var message = new MimeMessage { Subject = subject, Body = new TextPart("plain") { Text = "Grüezi aus dem Test" } };
+        message.From.Add(new MailboxAddress("Anna", "anna@example.com"));
+        message.To.Add(new MailboxAddress("Anna", "anna@example.com"));
+        await controller.SendAsync(connection, message, ct);
+
+        var report = await controller.SyncAllAsync(ct);
+        Assert.Empty(report.Failures);
+
+        var inbox = Assert.Single(await controller.GetFoldersAsync(connection.Id, ct), f => f.Role == FolderRole.Inbox);
+        var summary = Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+        Assert.Equal("anna@example.com", summary.From?.Address);
+        Assert.False(summary.Flags.HasFlag(MessageFlags.Seen));
+
+        var full = await controller.GetMessageAsync(connection, inbox, summary.RemoteId, ct);
+        Assert.Equal("Grüezi aus dem Test", full.TextBody?.Trim());
+
+        await controller.SetFlagsAsync(connection, inbox, [summary.RemoteId], MessageFlags.Seen, add: true, ct);
+        await controller.SyncAllAsync(ct);
+
+        var after = Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+        Assert.True(after.Flags.HasFlag(MessageFlags.Seen));
+    }
+
+    [Fact]
+    public async Task Messages_move_to_another_account_with_flags_and_content()
+    {
+        Assert.SkipWhen(Host is null, "NERUNA_TEST_IMAP_HOST not set");
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+
+        var credentials = env.Get<ICredentialStore>();
+        var registry = new ProviderRegistry([new ImapProviderFactory(credentials, NullLoggerFactory.Instance)], [], []);
+        var controller = new MailController(env.Accounts, env.MailStore, registry, NullLogger<MailController>.Instance);
+
+        async Task<ServiceConnection> AccountAsync(string address)
+        {
+            var settings = new ImapSettings(Host!, 3143, SocketSecurity.None, Host!, 3025, SocketSecurity.None, address);
+            var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, ProviderIds.Imap, settings.ToDictionary());
+            await credentials.SetSecretAsync(connection.Id, "geheim", ct);
+            await env.Accounts.SaveAccountAsync(new Account(Guid.NewGuid(), address, address, [connection]), ct);
+            return connection;
+        }
+
+        var anna = await AccountAsync("anna@example.com");
+        var lea = await AccountAsync("lea@example.com");
+
+        // Two messages for Anna; one of them read and flagged.
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        foreach (var n in new[] { 1, 2 })
+        {
+            var message = new MimeMessage { Subject = $"Umzug {tag} #{n}", Body = new TextPart("plain") { Text = $"Inhalt {n}" } };
+            message.From.Add(new MailboxAddress("Anna", "anna@example.com"));
+            message.To.Add(new MailboxAddress("Anna", "anna@example.com"));
+            await controller.SendAsync(anna, message, ct);
+        }
+
+        await controller.SyncAllAsync(ct);
+        var annaInbox = Assert.Single(await controller.GetFoldersAsync(anna.Id, ct), f => f.Role == FolderRole.Inbox);
+        var leaInbox = Assert.Single(await controller.GetFoldersAsync(lea.Id, ct), f => f.Role == FolderRole.Inbox);
+        var moving = (await controller.GetMessagesAsync(annaInbox, cancellationToken: ct)).Where(m => m.Subject.Contains(tag, StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, moving.Count);
+        var first = moving.Single(m => m.Subject.EndsWith("#1", StringComparison.Ordinal));
+        await controller.SetFlagsAsync(anna, annaInbox, [first.RemoteId], MessageFlags.Seen | MessageFlags.Flagged, add: true, ct);
+        moving = (await controller.GetMessagesAsync(annaInbox, cancellationToken: ct)).Where(m => m.Subject.Contains(tag, StringComparison.Ordinal)).ToList();
+
+        var moved = await controller.MoveToAccountAsync(anna, annaInbox, moving, lea, leaInbox, ct);
+
+        Assert.Equal(2, moved);
+        await controller.SyncAllAsync(ct);
+        Assert.DoesNotContain(await controller.GetMessagesAsync(annaInbox, cancellationToken: ct), m => m.Subject.Contains(tag, StringComparison.Ordinal));
+        var arrived = (await controller.GetMessagesAsync(leaInbox, cancellationToken: ct)).Where(m => m.Subject.Contains(tag, StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, arrived.Count);
+        var flagged = arrived.Single(m => m.Subject.EndsWith("#1", StringComparison.Ordinal));
+        Assert.True(flagged.Flags.HasFlag(MessageFlags.Seen) && flagged.Flags.HasFlag(MessageFlags.Flagged));
+        Assert.False(arrived.Single(m => m.Subject.EndsWith("#2", StringComparison.Ordinal)).Flags.HasFlag(MessageFlags.Seen));
+        Assert.Equal("Inhalt 1", (await controller.GetMessageAsync(lea, leaInbox, flagged.RemoteId, ct)).TextBody?.Trim());
+    }
+
+    [Fact]
+    public async Task Messages_marked_deleted_elsewhere_disappear_and_come_back_when_restored()
+    {
+        Assert.SkipWhen(Host is null, "NERUNA_TEST_IMAP_HOST not set");
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+
+        var credentials = env.Get<ICredentialStore>();
+        var registry = new ProviderRegistry([new ImapProviderFactory(credentials, NullLoggerFactory.Instance)], [], []);
+        var controller = new MailController(env.Accounts, env.MailStore, registry, NullLogger<MailController>.Instance);
+        var settings = new ImapSettings(Host!, 3143, SocketSecurity.None, Host!, 3025, SocketSecurity.None, "marco@example.com");
+        var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, ProviderIds.Imap, settings.ToDictionary());
+        await credentials.SetSecretAsync(connection.Id, "geheim", ct);
+        await env.Accounts.SaveAccountAsync(new Account(Guid.NewGuid(), "Marco", "marco@example.com", [connection]), ct);
+
+        var subject = "Woanders gelöscht " + Guid.NewGuid().ToString("N")[..8];
+        var message = new MimeMessage { Subject = subject, Body = new TextPart("plain") { Text = "x" } };
+        message.From.Add(new MailboxAddress("Marco", "marco@example.com"));
+        message.To.Add(new MailboxAddress("Marco", "marco@example.com"));
+        await controller.SendAsync(connection, message, ct);
+
+        // SMTP delivery into the mailbox takes a moment.
+        MailFolder inbox = null!;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await controller.SyncAllAsync(ct);
+            inbox = Assert.Single(await controller.GetFoldersAsync(connection.Id, ct), f => f.Role == FolderRole.Inbox);
+            if ((await controller.GetMessagesAsync(inbox, cancellationToken: ct)).Any(m => m.Subject == subject))
+            {
+                break;
+            }
+
+            await Task.Delay(250, ct);
+        }
+
+        Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+
+        // Another program marks it \Deleted without expunging (deferred purge).
+        async Task SetDeletedAsync(bool deleted)
+        {
+            using var imap = new MailKit.Net.Imap.ImapClient();
+            await imap.ConnectAsync(Host!, 3143, MailKit.Security.SecureSocketOptions.None, ct);
+            await imap.AuthenticateAsync("marco@example.com", "geheim", ct);
+            await imap.Inbox.OpenAsync(MailKit.FolderAccess.ReadWrite, ct);
+            var uids = await imap.Inbox.SearchAsync(MailKit.Search.SearchQuery.SubjectContains(subject), ct);
+            var request = new MailKit.StoreFlagsRequest(deleted ? MailKit.StoreAction.Add : MailKit.StoreAction.Remove, MailKit.MessageFlags.Deleted) { Silent = true };
+            await imap.Inbox.StoreAsync(uids, request, ct);
+            await imap.DisconnectAsync(true, ct);
+        }
+
+        await SetDeletedAsync(true);
+        await controller.SyncAllAsync(ct);
+        Assert.DoesNotContain(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+
+        await SetDeletedAsync(false);
+        await controller.SyncAllAsync(ct);
+        Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+    }
+}

@@ -1,0 +1,121 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:contacts="using:Neruna.Core.Contacts"
+             x:Class="Neruna.Desktop.Views.ContactEditorView"
+             x:DataType="vm:ContactEditorViewModel">
+
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:FieldKind">
+      <TextBlock Text="{Binding Label}" />
+    </DataTemplate>
+    <DataTemplate DataType="contacts:AddressBookInfo">
+      <TextBlock Text="{Binding Name}" />
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <StackPanel>
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <!-- Contact picture -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+        <Border Width="64" Height="64" CornerRadius="32" ClipToBounds="True" Background="{DynamicResource InfoBackgroundBrush}">
+          <Panel>
+            <Image Source="{Binding Photo}" Stretch="UniformToFill" IsVisible="{Binding HasPhoto}" />
+            <PathIcon Data="{StaticResource IconPeople}" Width="28" Height="28" Foreground="{DynamicResource SubtleTextBrush}" IsVisible="{Binding !HasPhoto}" />
+          </Panel>
+        </Border>
+        <StackPanel VerticalAlignment="Center" Spacing="2" IsVisible="{Binding !IsReadOnly}">
+          <Button Classes="command" Content="Bild wählen …" Command="{Binding ChoosePhotoCommand}" Padding="6,2" FontSize="12" />
+          <Button Classes="command" Content="Bild entfernen" Command="{Binding RemovePhotoCommand}" Padding="6,2" FontSize="12" IsVisible="{Binding HasPhoto}" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+    <TextBlock Classes="error" Margin="0,8,0,0" IsVisible="{Binding NoAddressBook}"
+               Text="Kein beschreibbares Adressbuch vorhanden. Bitte ein Konto mit CardDAV hinzufügen." />
+
+    <Grid ColumnDefinitions="*,12,*">
+      <StackPanel>
+        <TextBlock Classes="label" Text="Vorname" />
+        <TextBox Text="{Binding GivenName}" IsReadOnly="{Binding IsReadOnly}" />
+      </StackPanel>
+      <StackPanel Grid.Column="2">
+        <TextBlock Classes="label" Text="Nachname" />
+        <TextBox Text="{Binding FamilyName}" IsReadOnly="{Binding IsReadOnly}" />
+      </StackPanel>
+    </Grid>
+
+    <Grid ColumnDefinitions="*,12,*">
+      <StackPanel>
+        <TextBlock Classes="label" Text="Firma" />
+        <TextBox Text="{Binding Organization}" IsReadOnly="{Binding IsReadOnly}" />
+      </StackPanel>
+      <StackPanel Grid.Column="2">
+        <TextBlock Classes="label" Text="Funktion" />
+        <TextBox Text="{Binding Title}" IsReadOnly="{Binding IsReadOnly}" />
+      </StackPanel>
+    </Grid>
+
+    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+      <TextBlock Classes="label" Text="E-Mail" />
+      <Button Grid.Column="1" Classes="command" Content="+ E-Mail" Command="{Binding AddEmailCommand}" Padding="6,2" FontSize="12" />
+    </Grid>
+    <ItemsControl ItemsSource="{Binding Emails}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:EditableField">
+          <Grid ColumnDefinitions="*,8,140,Auto" Margin="0,0,0,4">
+            <TextBox Text="{Binding Value}" />
+            <ComboBox Grid.Column="2" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" />
+            <Button Grid.Column="3" Classes="command" Padding="6" ToolTip.Tip="Entfernen"
+                    Command="{Binding $parent[UserControl].((vm:ContactEditorViewModel)DataContext).RemoveFieldCommand}" CommandParameter="{Binding}">
+              <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
+            </Button>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+      <TextBlock Classes="label" Text="Telefon" />
+      <Button Grid.Column="1" Classes="command" Content="+ Telefon" Command="{Binding AddPhoneCommand}" Padding="6,2" FontSize="12" />
+    </Grid>
+    <ItemsControl ItemsSource="{Binding Phones}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:EditableField">
+          <Grid ColumnDefinitions="*,8,140,Auto" Margin="0,0,0,4">
+            <TextBox Text="{Binding Value}" />
+            <ComboBox Grid.Column="2" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" />
+            <Button Grid.Column="3" Classes="command" Padding="6" ToolTip.Tip="Entfernen"
+                    Command="{Binding $parent[UserControl].((vm:ContactEditorViewModel)DataContext).RemoveFieldCommand}" CommandParameter="{Binding}">
+              <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
+            </Button>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <TextBlock Classes="label" Text="Notiz" />
+    <TextBox Text="{Binding Note}" AcceptsReturn="True" TextWrapping="Wrap" Height="70" IsReadOnly="{Binding IsReadOnly}" />
+
+    <TextBlock Classes="label" Text="Adressbuch" />
+    <ComboBox ItemsSource="{Binding AddressBooks}" SelectedItem="{Binding SelectedAddressBook}" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}" />
+
+    <TextBlock Classes="label" Margin="0,8,0,0" FontSize="11"
+               Text="Felder wie Adresse oder Geburtstag bleiben beim Speichern unverändert erhalten." />
+
+    <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0"
+               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,20,0,0">
+      <Button Command="{Binding DeleteCommand}" IsVisible="{Binding IsExisting}">
+        <Panel>
+          <TextBlock Text="Löschen" IsVisible="{Binding !ConfirmDelete}" />
+          <TextBlock Text="Wirklich löschen?" IsVisible="{Binding ConfirmDelete}" />
+        </Panel>
+      </Button>
+      <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="60" MinWidth="0" Height="4" Margin="12,0" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+      <Button Grid.Column="3" Content="Abbrechen" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="4" Classes="accent" Content="Speichern" Command="{Binding SaveCommand}" IsVisible="{Binding !IsReadOnly}" />
+    </Grid>
+  </StackPanel>
+</UserControl>

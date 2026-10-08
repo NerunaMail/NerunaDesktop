@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.AboutView"
+             x:DataType="vm:SettingsViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="10" MaxWidth="680" HorizontalAlignment="Left" Margin="0,0,0,20">
+      <Image Source="/Assets/app.ico" Width="56" Height="56" HorizontalAlignment="Left" />
+      <TextBlock Text="Neruna Desktop" FontSize="22" FontWeight="SemiBold" />
+      <TextBlock x:Name="VersionText" Classes="subtle" />
+      <TextBlock TextWrapping="Wrap"
+                 Text="E-Mail, Kalender und Kontakte für offene Standards (IMAP/SMTP, CalDAV, CardDAV, ICS). Neruna betreibt kein Daten-Hosting – deine Daten bleiben auf deinem Server." />
+
+      <TextBlock Text="Passwörter" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <TextBlock TextWrapping="Wrap">
+        <Run Text="Konto- und Zertifikatspasswörter liegen hier:" />
+        <Run Text="{Binding CredentialLocation}" FontWeight="SemiBold" />
+        <Run Text="– nie in der Neruna-Datenbank und nie in den Protokolldateien." />
+      </TextBlock>
+
+      <TextBlock Text="Lizenz" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <TextBlock TextWrapping="Wrap"
+                 Text="Neruna Desktop ist Open Source unter der Mozilla Public License 2.0 (MPL 2.0). Du darfst die App nutzen, verändern und weitergeben; Änderungen an Neruna-Dateien bleiben unter der MPL offen. Die App wird ohne Gewährleistung bereitgestellt." />
+      <HyperlinkButton Content="Lizenztext (mozilla.org/MPL/2.0)" NavigateUri="https://www.mozilla.org/MPL/2.0/" Padding="0" />
+
+      <TextBlock Text="Verwendete Bibliotheken" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <TextBlock TextWrapping="Wrap"
+                 Text="Avalonia, MailKit, MimeKit, BouncyCastle, Ical.Net, Entity Framework Core mit SQLite, SkiaSharp, CommunityToolkit.Mvvm, Konscious Argon2 und weitere – unter MIT-, Apache-2.0- bzw. BSD-Lizenz. Vollständige Liste: THIRD-PARTY-NOTICES.md im Quellcode." />
+
+      <TextBlock Text="Name und Logo" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <TextBlock TextWrapping="Wrap" Text="«Neruna», das Neruna-Logo und das App-Symbol sind Marken von Patrik Zimmermann und werden durch die Softwarelizenz nicht freigegeben. Forks brauchen einen eigenen Namen und ein eigenes Logo." />
+
+      <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,12,0,0">
+        <HyperlinkButton Content="neruna.org" NavigateUri="https://neruna.org" Padding="0" />
+        <HyperlinkButton Content="info@neruna.org" NavigateUri="mailto:info@neruna.org" Padding="0" />
+      </StackPanel>
+      <TextBlock Classes="subtle" FontSize="12" Text="Copyright © 2026 Neruna contributors · Licensed under the Mozilla Public License 2.0" Margin="0,8,0,0" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

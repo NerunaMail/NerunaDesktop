@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Neruna.Desktop.ViewModels"
+        x:Class="Neruna.Desktop.Views.NotificationWindow"
+        x:DataType="vm:NotificationViewModel"
+        Title="{Binding Title}"
+        Icon="/Assets/app.ico"
+        Width="360" SizeToContent="Height"
+        WindowDecorations="None" CanResize="False" Topmost="True" ShowInTaskbar="False" ShowActivated="False"
+        WindowStartupLocation="Manual"
+        Background="{DynamicResource PaneBackgroundBrush}"
+        Cursor="Hand">
+  <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+    <Grid ColumnDefinitions="4,Auto,*,Auto">
+      <Border Background="{DynamicResource HeaderBackgroundBrush}" />
+      <Image Grid.Column="1" Source="/Assets/app.ico" Width="32" Height="32" Margin="12,14,0,0" VerticalAlignment="Top" />
+      <StackPanel Grid.Column="2" Margin="12,10,4,12" Spacing="1">
+        <TextBlock Text="{Binding Title}" Classes="subtle" FontSize="11" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Sender}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Subject}" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Preview}" Classes="subtle" FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasPreview}" />
+      </StackPanel>
+      <Button x:Name="CloseButton" Grid.Column="3" Classes="command" Padding="6" Margin="0,4,4,0" VerticalAlignment="Top"
+              Cursor="Arrow" ToolTip.Tip="Schliessen">
+        <PathIcon Data="{StaticResource IconClose}" Width="9" Height="9" Margin="0" />
+      </Button>
+    </Grid>
+  </Border>
+</Window>

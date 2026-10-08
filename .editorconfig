@@ -1,0 +1,28 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{csproj,props,targets,axaml,xml,json,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = true
+dotnet_sort_system_directives_first = true
+# Libraries are consumed by a UI app, not by arbitrary hosts; ConfigureAwait noise is not worth it.
+dotnet_diagnostic.CA2007.severity = none
+# Logging via source-generated LoggerMessage is preferred but not enforced during bootstrap.
+dotnet_diagnostic.CA1848.severity = suggestion
+dotnet_diagnostic.CA1873.severity = suggestion
+# Domain names like MessageFlags mirror established mail terminology (MailKit, RFC 3501).
+dotnet_diagnostic.CA1711.severity = none
+# FirstOrDefault() on lists reads better than index checks; the gain is negligible here.
+dotnet_diagnostic.CA1826.severity = none
+# Domain terms like "Signed" are fine even if they match type names in other .NET languages.
+dotnet_diagnostic.CA1720.severity = none

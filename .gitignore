@@ -1,0 +1,26 @@
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+*.user
+.vs/
+.idea/
+
+# Local databases and test data
+*.db
+*.db-shm
+*.db-wal
+tools/testlab/certs/
+
+# API contract when cloned next to this repo is not part of it (as submodule it is tracked by git itself)
+/api/
+
+# NAS/OS metadata
+@eaDir/
+Thumbs.db
+.DS_Store
+.pytest_cache/
+
+# dotnet ef design-time database
+design-time.db

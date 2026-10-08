@@ -1,0 +1,186 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ed="using:Neruna.Desktop.Editor"
+             xmlns:app="using:Neruna.Desktop"
+             x:Class="Neruna.Desktop.Views.FormattingToolbar"
+             x:DataType="ed:FormattingViewModel"
+             KeyboardNavigation.TabNavigation="None">
+  <!-- Not in the tab order: from the subject, Tab goes straight into the text. -->
+
+  <UserControl.Styles>
+    <!-- Formatting buttons: compact, square -->
+    <Style Selector="ToggleButton.fmt, Button.fmt">
+      <Setter Property="MinWidth" Value="30" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="Margin" Value="1,0" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.fmt">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ToggleButton.fmt:unchecked">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector=":is(Button).fmt PathIcon">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+    </Style>
+    <Style Selector="Border.group-separator">
+      <Setter Property="Width" Value="1" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Margin" Value="6,0" />
+      <Setter Property="Background" Value="{DynamicResource DividerBrush}" />
+    </Style>
+    <Style Selector="Button.swatch">
+      <Setter Property="Width" Value="20" />
+      <Setter Property="Height" Value="20" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="1" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#30000000" />
+    </Style>
+    <Style Selector="ComboBoxItem" x:DataType="ed:FontChoice">
+      <Setter Property="IsEnabled" Value="{Binding IsFont}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1,1,1,0" CornerRadius="4,4,0,0" Padding="6,4">
+    <WrapPanel Orientation="Horizontal">
+      <ComboBox ItemsSource="{x:Static ed:FontCatalog.Fonts}" SelectedItem="{Binding SelectedFont}" PlaceholderText="{Binding CurrentFontName}"
+                Width="200" MaxDropDownHeight="440" ToolTip.Tip="Schriftart" Margin="0,0,4,0">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="ed:FontChoice">
+            <Panel>
+              <!-- Each font is shown in itself. -->
+              <TextBlock Text="{Binding Name}" FontFamily="{Binding Family}" FontSize="15" IsVisible="{Binding IsFont}" TextTrimming="CharacterEllipsis" />
+              <Border IsVisible="{Binding IsSeparator}" Height="1" Background="{DynamicResource DividerBrush}" Margin="0,4" />
+            </Panel>
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <ComboBox ItemsSource="{x:Static ed:FontCatalog.Sizes}" SelectedItem="{Binding SelectedSize}" PlaceholderText="{Binding CurrentSizeText}"
+                Width="72" MaxDropDownHeight="360" ToolTip.Tip="Schriftgrad" />
+
+      <Border Classes="group-separator" />
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsBold, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="bold" ToolTip.Tip="Fett (Ctrl+B)">
+        <TextBlock Text="F" FontWeight="Bold" FontSize="15" />
+      </ToggleButton>
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsItalic, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="italic" ToolTip.Tip="Kursiv (Ctrl+I)">
+        <TextBlock Text="K" FontStyle="Italic" FontSize="15" FontFamily="Georgia, Times New Roman, serif" />
+      </ToggleButton>
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsUnderline, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="underline" ToolTip.Tip="Unterstrichen (Ctrl+U)">
+        <TextBlock Text="U" TextDecorations="Underline" FontSize="15" />
+      </ToggleButton>
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsStrikethrough, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="strikeThrough" ToolTip.Tip="Durchgestrichen">
+        <TextBlock Text="abc" TextDecorations="Strikethrough" FontSize="14" />
+      </ToggleButton>
+
+      <Border Classes="group-separator" />
+      <!-- Text color: click applies the last color, the arrow opens the palette -->
+      <SplitButton x:Name="TextColorButton" Classes="fmt" Command="{Binding ApplyTextColorCommand}" CommandParameter="{Binding LastTextColor}" ToolTip.Tip="Schriftfarbe" Padding="6,0">
+        <StackPanel Spacing="1">
+          <TextBlock Text="A" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
+          <Border Height="3" Width="16" Background="{Binding LastTextColor, Converter={x:Static app:Converters.ColorBrush}}" />
+        </StackPanel>
+        <SplitButton.Flyout>
+          <Flyout Placement="BottomEdgeAlignedLeft">
+            <StackPanel Spacing="6">
+              <TextBlock Text="Schriftfarbe" FontWeight="SemiBold" FontSize="12" />
+              <ItemsControl ItemsSource="{x:Static ed:FormattingViewModel.TextColors}" Width="220" Button.Click="OnTextColorPicked">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <Button Classes="swatch" Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{Binding}"
+                            Command="{Binding $parent[UserControl].((ed:FormattingViewModel)DataContext).ApplyTextColorCommand}" CommandParameter="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Flyout>
+        </SplitButton.Flyout>
+      </SplitButton>
+      <SplitButton x:Name="HighlightButton" Classes="fmt" Command="{Binding ApplyHighlightCommand}" CommandParameter="{Binding LastHighlightColor}" ToolTip.Tip="Texthervorhebungsfarbe" Padding="6,0">
+        <StackPanel Spacing="1">
+          <TextBlock Text="ab" FontSize="14" HorizontalAlignment="Center" />
+          <Border Height="3" Width="16" Background="{Binding LastHighlightColor, Converter={x:Static app:Converters.ColorBrush}}" />
+        </StackPanel>
+        <SplitButton.Flyout>
+          <Flyout Placement="BottomEdgeAlignedLeft">
+            <StackPanel Spacing="6">
+              <TextBlock Text="Hervorheben" FontWeight="SemiBold" FontSize="12" />
+              <ItemsControl ItemsSource="{x:Static ed:FormattingViewModel.HighlightColors}" Width="176" Button.Click="OnHighlightPicked">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <Button Classes="swatch" Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{Binding}"
+                            Command="{Binding $parent[UserControl].((ed:FormattingViewModel)DataContext).ApplyHighlightCommand}" CommandParameter="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Button Content="Keine Farbe" FontSize="12" Click="OnHighlightPicked"
+                      Command="{Binding ApplyHighlightCommand}" CommandParameter="{x:Null}" />
+            </StackPanel>
+          </Flyout>
+        </SplitButton.Flyout>
+      </SplitButton>
+
+      <Border Classes="group-separator" />
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsBulletList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertUnorderedList" ToolTip.Tip="Aufzählungszeichen">
+        <PathIcon Data="{StaticResource IconBullets}" />
+      </ToggleButton>
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsNumberedList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertOrderedList" ToolTip.Tip="Nummerierung">
+        <PathIcon Data="{StaticResource IconNumbering}" />
+      </ToggleButton>
+      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="outdent" ToolTip.Tip="Einzug verkleinern (Shift+Tab)">
+        <PathIcon Data="{StaticResource IconOutdent}" />
+      </Button>
+      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="indent" ToolTip.Tip="Einzug vergrössern">
+        <PathIcon Data="{StaticResource IconIndent}" />
+      </Button>
+
+      <Border Classes="group-separator" />
+      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyLeft" ToolTip.Tip="Linksbündig">
+        <PathIcon Data="{StaticResource IconAlignLeft}" />
+      </Button>
+      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyCenter" ToolTip.Tip="Zentriert">
+        <PathIcon Data="{StaticResource IconAlignCenter}" />
+      </Button>
+      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyRight" ToolTip.Tip="Rechtsbündig">
+        <PathIcon Data="{StaticResource IconAlignRight}" />
+      </Button>
+
+      <Border Classes="group-separator" />
+      <Button Classes="fmt" ToolTip.Tip="Link einfügen">
+        <PathIcon Data="{StaticResource IconLink}" />
+        <Button.Flyout>
+          <Flyout Placement="BottomEdgeAlignedLeft">
+            <StackPanel Spacing="8" Width="320">
+              <TextBlock Text="Link für den markierten Text" FontWeight="SemiBold" FontSize="12" />
+              <TextBox Text="{Binding LinkUrl}" />
+              <Button Classes="accent" Content="Einfügen" HorizontalAlignment="Right" Command="{Binding InsertLinkCommand}" />
+            </StackPanel>
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+      <Button Classes="fmt" Command="{Binding InsertImageCommand}" ToolTip.Tip="Bild einfügen (z. B. Logo)">
+        <PathIcon Data="{StaticResource IconImage}" />
+      </Button>
+      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="removeFormat" ToolTip.Tip="Formatierung löschen">
+        <PathIcon Data="{StaticResource IconClearFormat}" />
+      </Button>
+    </WrapPanel>
+  </Border>
+</UserControl>

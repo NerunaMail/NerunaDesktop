@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>neruna</AssemblyName>
+    <RootNamespace>Neruna.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <Description>Neruna Desktop – mail, calendar and contacts for open standards.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+    <EmbeddedResource Include="Editor\editor.html" LogicalName="Neruna.Desktop.Editor.editor.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Avalonia.HtmlRenderer" />
+    <PackageReference Include="Avalonia.Controls.WebView" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Neruna.Core\Neruna.Core.csproj" />
+    <ProjectReference Include="..\Neruna.Storage\Neruna.Storage.csproj" />
+    <ProjectReference Include="..\Providers\Neruna.Providers.Imap\Neruna.Providers.Imap.csproj" />
+    <ProjectReference Include="..\Providers\Neruna.Providers.Ics\Neruna.Providers.Ics.csproj" />
+    <ProjectReference Include="..\Providers\Neruna.Providers.Dav\Neruna.Providers.Dav.csproj" />
+    <ProjectReference Include="..\Providers\Neruna.Providers.Demo\Neruna.Providers.Demo.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Neruna.Desktop.Snapshot" />
+  </ItemGroup>
+</Project>

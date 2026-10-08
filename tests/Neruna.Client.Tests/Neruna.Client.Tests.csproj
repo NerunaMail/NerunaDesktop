@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Client\Neruna.Core\Neruna.Core.csproj" />
+    <ProjectReference Include="..\..\src\Client\Neruna.Storage\Neruna.Storage.csproj" />
+    <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Imap\Neruna.Providers.Imap.csproj" />
+    <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Ics\Neruna.Providers.Ics.csproj" />
+    <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Dav\Neruna.Providers.Dav.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(NerunaApiDir)fixtures\**" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

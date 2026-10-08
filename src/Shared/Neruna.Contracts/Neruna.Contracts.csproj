@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Shared wire contracts between Neruna Desktop and Neruna Cloud/Control.</Description>
+  </PropertyGroup>
+</Project>

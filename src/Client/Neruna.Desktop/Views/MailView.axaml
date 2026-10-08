@@ -1,0 +1,177 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:app="using:Neruna.Desktop"
+             xmlns:views="using:Neruna.Desktop.Views"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
+             x:Class="Neruna.Desktop.Views.MailView"
+             x:DataType="vm:MailViewModel">
+
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Ctrl+N" Command="{Binding NewMailCommand}" />
+    <KeyBinding Gesture="Ctrl+R" Command="{Binding ReplyCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" />
+    <KeyBinding Gesture="Ctrl+F" Command="{Binding ForwardCommand}" />
+    <KeyBinding Gesture="Delete" Command="{Binding DeleteCommand}" />
+    <KeyBinding Gesture="Ctrl+Q" Command="{Binding ToggleReadCommand}" />
+  </UserControl.KeyBindings>
+
+  <Grid>
+
+    <Grid x:Name="Columns" ColumnDefinitions="240,6,400,6,*">
+
+      <!-- Folder tree, with "Neue E-Mail" on top -->
+      <Border Classes="pane" Grid.Column="0" Padding="4,8">
+        <DockPanel>
+          <Button DockPanel.Dock="Top" Classes="accent" Command="{Binding NewMailCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  Padding="12,7" Margin="6,0,6,8" ToolTip.Tip="Neue E-Mail (Ctrl+N)">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+              <TextBlock Text="Neue E-Mail" />
+            </StackPanel>
+          </Button>
+        <Panel>
+          <TextBlock Classes="subtle" Text="Kein E-Mail-Konto" IsVisible="{Binding !HasMailAccounts}" Margin="12" />
+          <TreeView x:Name="FolderTree" ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedTreeItem}" DragDrop.AllowDrop="True">
+            <TreeView.Styles>
+              <!-- Drag & drop: the folder under the pointer is highlighted -->
+              <Style Selector="TreeViewItem.drop-target /template/ Border#PART_LayoutRoot">
+                <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+              </Style>
+              <!-- Expanded/collapsed per account and folder is remembered (MailViewModel) -->
+              <Style Selector="TreeViewItem">
+                <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
+              </Style>
+            </TreeView.Styles>
+            <TreeView.DataTemplates>
+              <TreeDataTemplate DataType="vm:MailAccountNode" ItemsSource="{Binding Folders}">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Background="Transparent">
+                  <TextBlock.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Konto nach oben" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MoveAccountUpCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="Konto nach unten" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MoveAccountDownCommand}" CommandParameter="{Binding}" />
+                    </ContextMenu>
+                  </TextBlock.ContextMenu>
+                </TextBlock>
+              </TreeDataTemplate>
+              <TreeDataTemplate DataType="vm:MailFolderNode" ItemsSource="{Binding Children}">
+                <!-- Icon + "Posteingang (3)": system folders have their own icon, name bold while there is unread mail -->
+                <Grid ColumnDefinitions="Auto,*">
+                  <PathIcon Data="{Binding Folder.Role, Converter={x:Static app:Converters.FolderIcon}}" Width="14" Height="14" Margin="0,0,8,0"
+                            Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontWeight="{Binding HasUnread, Converter={x:Static app:Converters.BoldIf}}">
+                    <Run Text="{Binding Name}" />
+                    <Run Text="{Binding UnreadText}" Foreground="{DynamicResource AccentTextBrush}" />
+                  </TextBlock>
+                </Grid>
+              </TreeDataTemplate>
+            </TreeView.DataTemplates>
+          </TreeView>
+        </Panel>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" />
+
+      <!-- Message list -->
+      <Border Classes="pane" Grid.Column="2">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Margin="12,10,12,6" Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="{Binding CurrentFolder.Name, FallbackValue=''}" FontSize="16" FontWeight="SemiBold" />
+              <!-- Multi-selection (Ctrl/Shift-click): actions and drag & drop apply to all selected messages -->
+              <TextBlock Grid.Column="1" Text="{Binding SelectionText}" Classes="subtle" FontSize="12" VerticalAlignment="Center"
+                         IsVisible="{Binding SelectionText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </Grid>
+            <TextBox Text="{Binding SearchText}" PlaceholderText="Suchen">
+              <TextBox.InnerLeftContent>
+                <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
+              </TextBox.InnerLeftContent>
+            </TextBox>
+          </StackPanel>
+
+          <TextBlock Grid.Row="1" Classes="subtle" Text="Keine Nachrichten" IsVisible="{Binding !HasMessages}"
+                     HorizontalAlignment="Center" Margin="0,40,0,0" />
+
+          <ListBox x:Name="MessageList" Grid.Row="1" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}" Background="Transparent"
+                   SelectionMode="Multiple">
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem" x:DataType="vm:MessageListEntry">
+                <Setter Property="IsEnabled" Value="{Binding IsSelectable}" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="4,0" />
+                <Setter Property="CornerRadius" Value="4" />
+              </Style>
+              <Style Selector="Grid.unread TextBlock.sender">
+                <Setter Property="FontWeight" Value="SemiBold" />
+              </Style>
+              <Style Selector="Grid.unread TextBlock.subject">
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+              </Style>
+            </ListBox.Styles>
+            <ListBox.DataTemplates>
+              <DataTemplate DataType="vm:MessageGroupHeader">
+                <!-- "Heute", "Gestern" …: a shaded band, clearly apart from the messages -->
+                <Border Background="{DynamicResource GroupHeaderBackgroundBrush}" CornerRadius="4" Margin="0,8,0,2" Padding="10,4">
+                  <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource GroupHeaderBrush}" />
+                </Border>
+              </DataTemplate>
+              <DataTemplate DataType="vm:MessageItemViewModel">
+                <Grid ColumnDefinitions="3,*" Classes.unread="{Binding IsUnread}">
+                  <Border Background="{DynamicResource UnreadBarBrush}" IsVisible="{Binding IsUnread}" CornerRadius="2" Margin="0,6" />
+                  <Grid Grid.Column="1" Margin="10,7,10,7" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="sender" Text="{Binding Sender}" TextTrimming="CharacterEllipsis" />
+                    <!-- Status icons and time right-aligned, whatever is wider of the two -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
+                      <PathIcon Data="{StaticResource IconCertificate}" Width="14" Height="14" Foreground="{DynamicResource AccentTextBrush}"
+                                IsVisible="{Binding IsSigned}" ToolTip.Tip="Digital signiert (S/MIME)" />
+                      <PathIcon Data="{StaticResource IconLock}" Width="14" Height="14" Foreground="#B8860B"
+                                IsVisible="{Binding IsEncrypted}" ToolTip.Tip="Verschlüsselt (S/MIME)" />
+                      <PathIcon Data="{StaticResource IconAttach}" Width="12" Height="12" IsVisible="{Binding HasAttachments}" />
+                      <PathIcon Data="{StaticResource IconFlag}" Width="12" Height="12" Foreground="#C50F1F" IsVisible="{Binding IsFlagged}" />
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Classes="subject" Text="{Binding Subject}" TextTrimming="CharacterEllipsis" FontSize="13" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="subtle" Text="{Binding TimeText}" FontSize="12" Margin="8,0,0,0" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Classes="subtle" Text="{Binding Preview}" FontSize="12"
+                               TextTrimming="CharacterEllipsis" MaxLines="1" />
+                  </Grid>
+                </Grid>
+              </DataTemplate>
+            </ListBox.DataTemplates>
+          </ListBox>
+        </Grid>
+      </Border>
+
+      <GridSplitter Grid.Column="3" Background="Transparent" ResizeDirection="Columns" />
+
+      <!-- Reading pane / inline compose; the message actions on top of the message -->
+      <Border Classes="pane" Grid.Column="4">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" IsVisible="{Binding ShowMessageActions}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="12,6">
+            <WrapPanel Orientation="Horizontal" ItemSpacing="2" LineSpacing="2">
+              <ctl:ToolButton Icon="{StaticResource IconEdit}" Label="Bearbeiten" Command="{Binding EditDraftCommand}" IsVisible="{Binding IsDraftsFolder}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+              <ctl:ToolButton Icon="{StaticResource IconReply}" Label="Antworten" Shortcut="Ctrl+R" Command="{Binding ReplyCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+              <ctl:ToolButton Icon="{StaticResource IconReplyAll}" Label="Allen antworten" Shortcut="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+              <ctl:ToolButton Icon="{StaticResource IconForward}" Label="Weiterleiten" Shortcut="Ctrl+F" Command="{Binding ForwardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+              <Separator Width="1" Height="28" Margin="6,0" VerticalAlignment="Center" Background="{DynamicResource DividerBrush}" />
+              <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="Löschen" Shortcut="Entf" Command="{Binding DeleteCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+              <ctl:ToolButton Icon="{StaticResource IconArchive}" Label="Archivieren" Command="{Binding ArchiveCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+              <ctl:ToolButton Icon="{StaticResource IconFlag}" Label="Kennzeichnen" Command="{Binding ToggleFlagCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+              <ctl:ToolButton Icon="{StaticResource IconMail}" Label="Gelesen" Shortcut="Ctrl+Q" Command="{Binding ToggleReadCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}"
+                              ToolTip.Tip="Als gelesen / ungelesen markieren (Ctrl+Q)" />
+            </WrapPanel>
+          </Border>
+          <Panel>
+            <TextBlock Classes="subtle" Text="Wählen Sie ein Element zum Lesen aus"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding RightPane, Converter={x:Static ObjectConverters.IsNull}}" />
+            <ContentControl Content="{Binding RightPane}" />
+          </Panel>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

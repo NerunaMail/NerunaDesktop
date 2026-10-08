@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:ed="using:Neruna.Desktop.Editor"
+             xmlns:views="using:Neruna.Desktop.Views"
+             xmlns:app="using:Neruna.Desktop"
+             x:Class="Neruna.Desktop.Views.ComposeView"
+             x:DataType="vm:ComposeViewModel">
+
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
+
+    <!-- Actions -->
+    <Grid Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+      <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
+        <Button Classes="accent" Command="{Binding SendCommand}" Padding="14,6" HotKey="Ctrl+Enter" ToolTip.Tip="Senden (Ctrl+Enter)">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconSend}" Width="14" Height="14" />
+            <TextBlock Text="Senden" />
+          </StackPanel>
+        </Button>
+        <Button Classes="command" Command="{Binding AddAttachmentCommand}">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconAttach}" />
+            <TextBlock Text="Datei anhängen" />
+          </StackPanel>
+        </Button>
+        <ToggleButton IsChecked="{Binding Sign}" IsEnabled="{Binding CanSign}" ToolTip.Tip="{Binding SignHint}" ToolTip.ShowOnDisabled="True" Padding="10,6">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconCertificate}" Width="14" Height="14" />
+            <TextBlock Text="Signieren" />
+          </StackPanel>
+        </ToggleButton>
+        <ToggleButton IsChecked="{Binding Encrypt}" ToolTip.Tip="{Binding EncryptHint}" Padding="10,6">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconLock}" Width="14" Height="14" />
+            <TextBlock Text="Verschlüsseln" />
+          </StackPanel>
+        </ToggleButton>
+        <!-- Signatur: swap or remove the signature in the text -->
+        <Button Classes="command" IsVisible="{Binding Formatting.IsRichText}" ToolTip.Tip="Signatur einfügen oder wechseln">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconSignature}" />
+            <TextBlock Text="Signatur" />
+          </StackPanel>
+          <Button.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding SignatureMenu}">
+              <MenuFlyout.ItemContainerTheme>
+                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SignatureMenuItem">
+                  <Setter Property="Header" Value="{Binding Title}" />
+                  <Setter Property="Command" Value="{Binding Command}" />
+                  <Setter Property="CommandParameter" Value="{Binding Signature}" />
+                </ControlTheme>
+              </MenuFlyout.ItemContainerTheme>
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+        <Button Classes="command" Command="{Binding SaveDraftCommand}" HotKey="Ctrl+S" ToolTip.Tip="Als Entwurf speichern (Ctrl+S) – geschieht auch automatisch">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconEdit}" />
+            <TextBlock Text="Speichern" />
+          </StackPanel>
+        </Button>
+        <Button Classes="command" Command="{Binding DiscardCommand}" ToolTip.Tip="Nachricht verwerfen (auch den gespeicherten Entwurf)">
+          <Panel>
+            <TextBlock Text="Verwerfen" IsVisible="{Binding !ConfirmDiscard}" />
+            <TextBlock Text="Wirklich verwerfen?" IsVisible="{Binding ConfirmDiscard}" Foreground="#C42B1C" />
+          </Panel>
+        </Button>
+        <ProgressBar IsIndeterminate="True" Width="60" MinWidth="0" Height="4" IsVisible="{Binding IsSending}" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding DraftStatus}" Classes="subtle" FontSize="12" VerticalAlignment="Center"
+                   IsVisible="{Binding DraftStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </WrapPanel>
+      <!-- Pop-out, icon-only ("In neuem Fenster öffnen") -->
+      <Button Grid.Column="1" Classes="command" Command="{Binding PopOutCommand}" IsVisible="{Binding CanPopOut}" ToolTip.Tip="Loslösen – in eigenem Fenster weiterschreiben" Margin="8,0,0,0" VerticalAlignment="Top">
+        <PathIcon Data="{StaticResource IconPopOut}" Margin="0" />
+      </Button>
+    </Grid>
+
+    <TextBlock Grid.Row="1" Classes="subtle" Text="Von" VerticalAlignment="Center" />
+    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FromText}" Margin="0,6" />
+
+    <TextBlock Grid.Row="2" Classes="subtle" Text="An" VerticalAlignment="Center" />
+    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding To}" Margin="0,3" PlaceholderText="name@example.com, …" />
+
+    <TextBlock Grid.Row="3" Classes="subtle" Text="Cc" VerticalAlignment="Center" />
+    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Cc}" Margin="0,3" />
+
+    <TextBox x:Name="SubjectBox" Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding Subject}" PlaceholderText="Betreff hinzufügen" Margin="0,10,0,6" FontWeight="SemiBold" />
+
+    <ItemsControl Grid.Row="5" Grid.ColumnSpan="2" ItemsSource="{Binding Attachments}" Margin="0,0,0,4">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <WrapPanel />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ComposeAttachment">
+          <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="8,2,2,2" Margin="0,0,6,6">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconAttach}" Width="12" Height="12" />
+              <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
+              <Button Classes="command" Padding="4" ToolTip.Tip="Entfernen"
+                      Command="{Binding $parent[UserControl].((vm:ComposeViewModel)DataContext).RemoveAttachmentCommand}" CommandParameter="{Binding}">
+                <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
+              </Button>
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- Formatting toolbar (hidden without WebView) -->
+    <views:FormattingToolbar Grid.Row="6" Grid.ColumnSpan="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
+
+    <!-- Editor: white page, independent of the app theme -->
+    <Border Grid.Row="7" Grid.ColumnSpan="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="White" ClipToBounds="True">
+      <ed:HtmlEditor x:Name="Editor" />
+    </Border>
+
+    <TextBlock Grid.Row="6" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Margin="0,0,0,6" TextWrapping="Wrap" IsVisible="{Binding Formatting.IsPlainTextFallback}"
+               Text="Formatierung nicht verfügbar (keine WebView-Laufzeit gefunden) – die Nachricht wird als reiner Text gesendet." />
+
+    <TextBlock Grid.Row="8" Grid.ColumnSpan="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
+  </Grid>
+</UserControl>

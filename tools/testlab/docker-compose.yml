@@ -1,0 +1,31 @@
+# Neruna Testlabor: Mail- und DAV-Server zum Ausprobieren des Clients.
+#
+#   docker-compose -f tools/testlab/docker-compose.yml up -d
+#   tools/testlab/seed.sh            # Kalender, Adressbuch und Beispielmails anlegen
+#
+# Konten (Passwort jeweils "geheim"): anna@example.com, lea@example.com, marco@example.com
+#   IMAP  <host>:3143  unverschlüsselt      SMTP <host>:3025 unverschlüsselt
+#   CalDAV/CardDAV  http://<host>:5232/     (Radicale; akzeptiert jedes Passwort, alle sehen alle Kalender per URL)
+# Nur für Tests im lokalen Netz – keine Verschlüsselung, keine echte Authentifizierung beim DAV-Server.
+services:
+  mail:
+    image: greenmail/standalone:2.1.5
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=anna:geheim@example.com,lea:geheim@example.com,marco:geheim@example.com
+        -Dgreenmail.users.login=email
+    ports:
+      - "3025:3025"
+      - "3143:3143"
+
+  dav:
+    image: tomsquest/docker-radicale
+    ports:
+      - "5232:5232"
+    volumes:
+      - dav-data:/data
+      - ./radicale.conf:/config/config:ro
+
+volumes:
+  dav-data:

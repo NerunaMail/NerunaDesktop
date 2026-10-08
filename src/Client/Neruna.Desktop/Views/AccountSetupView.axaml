@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:app="using:Neruna.Desktop"
+             xmlns:dc="using:Neruna.Contracts.Discovery"
+             x:Class="Neruna.Desktop.Views.AccountSetupView"
+             x:DataType="vm:AccountSetupViewModel">
+
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="dc:SocketSecurity">
+      <TextBlock Text="{Binding Converter={x:Static app:Converters.SecurityLabel}}" />
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <StackPanel>
+    <TextBlock Text="Konto hinzufügen" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,8"
+               Text="E-Mail (IMAP/SMTP), Kalender (CalDAV) und Kontakte (CardDAV) – z. B. SOGo, Nextcloud, Mailcow oder Ihr Provider. Die Servereinstellungen werden automatisch gesucht." />
+
+    <TextBlock Classes="label" Text="Ihr Name" />
+    <TextBox Text="{Binding DisplayName}" PlaceholderText="Anna Muster" />
+
+    <TextBlock Classes="label" Text="E-Mail-Adresse" />
+    <TextBox Text="{Binding Email}" PlaceholderText="anna.muster@example.com" />
+
+    <TextBlock Classes="label" Text="Passwort" />
+    <TextBox Text="{Binding Password}" PasswordChar="●" />
+
+    <!-- Server settings, prefilled by discovery -->
+    <StackPanel IsVisible="{Binding ShowServerSettings}" Margin="0,12,0,0">
+      <TextBlock Text="{Binding DiscoverySource}" Foreground="{DynamicResource AccentTextBrush}" TextWrapping="Wrap"
+                 IsVisible="{Binding DiscoverySource, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <Grid ColumnDefinitions="80,*,8,80,8,170" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,8,0,0">
+        <TextBlock Grid.Column="1" Classes="label" Text="Server" />
+        <TextBlock Grid.Column="3" Classes="label" Text="Port" />
+        <TextBlock Grid.Column="5" Classes="label" Text="Verschlüsselung" />
+
+        <TextBlock Grid.Row="1" Text="IMAP" VerticalAlignment="Center" />
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ImapHost}" PlaceholderText="leer = kein E-Mail" />
+        <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding ImapPort}" />
+        <ComboBox Grid.Row="1" Grid.Column="5" HorizontalAlignment="Stretch"
+                  ItemsSource="{x:Static vm:AccountSetupViewModel.SecurityOptions}" SelectedItem="{Binding ImapSecurity}" />
+
+        <TextBlock Grid.Row="2" Text="SMTP" VerticalAlignment="Center" />
+        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SmtpHost}" Margin="0,6,0,0" />
+        <TextBox Grid.Row="2" Grid.Column="3" Text="{Binding SmtpPort}" Margin="0,6,0,0" />
+        <ComboBox Grid.Row="2" Grid.Column="5" HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  ItemsSource="{x:Static vm:AccountSetupViewModel.SecurityOptions}" SelectedItem="{Binding SmtpSecurity}" />
+
+        <TextBlock Grid.Row="3" Text="Benutzer" VerticalAlignment="Center" />
+        <TextBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="5" Text="{Binding Username}" Margin="0,6,0,0" />
+      </Grid>
+
+      <Grid ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto" Margin="0,12,0,0">
+        <TextBlock Grid.Row="0" Grid.Column="1" Classes="label" Text="Adresse (Server, /.well-known oder direkte Sammlung)" />
+        <TextBlock Grid.Row="1" Text="CalDAV" VerticalAlignment="Center" />
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CalDavUrl}" PlaceholderText="z. B. https://mail.example.com/SOGo/dav/ – leer = keine Kalender" />
+        <TextBlock Grid.Row="2" Text="CardDAV" VerticalAlignment="Center" />
+        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CardDavUrl}" Margin="0,6,0,0" PlaceholderText="leer = keine Kontakte" />
+      </Grid>
+    </StackPanel>
+
+    <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0"
+               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,20,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsBusy}" VerticalAlignment="Center">
+        <ProgressBar IsIndeterminate="True" Width="60" MinWidth="0" Height="4" />
+        <TextBlock Text="{Binding BusyText}" Classes="subtle" FontSize="12" />
+      </StackPanel>
+      <Button Grid.Column="2" Content="Abbrechen" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Classes="accent" Content="Weiter" Command="{Binding DiscoverCommand}" IsVisible="{Binding !ShowServerSettings}" />
+      <Button Grid.Column="3" Classes="accent" Content="Konto hinzufügen" Command="{Binding CreateCommand}" IsVisible="{Binding ShowServerSettings}" />
+    </Grid>
+  </StackPanel>
+</UserControl>

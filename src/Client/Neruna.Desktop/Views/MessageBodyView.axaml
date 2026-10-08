@@ -1,0 +1,9 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Neruna.Desktop.Views.MessageBodyView">
+  <!-- Mail HTML assumes a light page; the renderer runs no scripts.
+       The side margin is layout padding around the renderer – not CSS (mails set body { margin: 0 }) and not the
+       renderer's own Padding (it shifted plain-text mails to the left). -->
+  <!-- A fresh HtmlPanel per message is created in code-behind. -->
+  <Border x:Name="Host" Background="White" Padding="24,8,24,24" />
+</UserControl>

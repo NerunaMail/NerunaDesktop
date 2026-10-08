@@ -1,0 +1,116 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:cal="using:Neruna.Core.Calendar"
+             xmlns:app="using:Neruna.Desktop"
+             xmlns:views="using:Neruna.Desktop.Views"
+             x:Class="Neruna.Desktop.Views.ReadingPaneView"
+             x:DataType="vm:ReadingPaneViewModel">
+  <!-- A message: header, security, attachments, body. Used in the mail page and in the message window. -->
+  <Panel>
+    <TextBlock IsVisible="{Binding IsInfo}" Text="{Binding InfoText}" Classes="subtle"
+               HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24" />
+    <Grid IsVisible="{Binding IsMessage}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*">
+      <SelectableTextBlock Text="{Binding Subject}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="24,20,24,0" />
+      <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="24,16,24,8">
+        <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentTextBrush}" VerticalAlignment="Top">
+          <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+        <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+          <SelectableTextBlock Text="{Binding From}" FontWeight="SemiBold" />
+          <TextBlock Classes="subtle" FontSize="12" Text="{Binding To, StringFormat='An: {0}'}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Classes="subtle" FontSize="12" Text="{Binding Cc, StringFormat='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
+          <TextBlock Classes="subtle" FontSize="12" Text="{Binding Date}" />
+        </StackPanel>
+      </Grid>
+
+      <!-- S/MIME status -->
+      <Border Grid.Row="2" IsVisible="{Binding HasSecurity}" CornerRadius="4" Padding="10,6" Margin="24,0,24,8"
+              Classes.good="{Binding IsSecurityGood}" Classes.warn="{Binding IsSecurityWarning}" Classes.bad="{Binding IsSecurityBad}">
+        <Border.Styles>
+          <Style Selector="Border.good"><Setter Property="Background" Value="{DynamicResource GoodBackgroundBrush}" /></Style>
+          <Style Selector="Border.warn"><Setter Property="Background" Value="{DynamicResource WarnBackgroundBrush}" /></Style>
+          <Style Selector="Border.bad"><Setter Property="Background" Value="{DynamicResource BadBackgroundBrush}" /></Style>
+          <Style Selector="Border.good PathIcon"><Setter Property="Foreground" Value="#107C10" /></Style>
+          <Style Selector="Border.warn PathIcon"><Setter Property="Foreground" Value="#BC4B09" /></Style>
+          <Style Selector="Border.bad PathIcon"><Setter Property="Foreground" Value="#C50F1F" /></Style>
+        </Border.Styles>
+        <Grid ColumnDefinitions="Auto,*">
+          <PathIcon Data="{StaticResource IconCertificate}" Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0" />
+          <StackPanel Grid.Column="1">
+            <TextBlock Text="{Binding SecurityText}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding SecurityDetail}" TextWrapping="Wrap" FontSize="11" Classes="subtle" IsVisible="{Binding HasSecurityDetail}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- Blocked remote content -->
+      <!-- Invitation / answer / cancellation in this mail -->
+      <Border Grid.Row="3" IsVisible="{Binding Invitation, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="24,0,24,8"
+              BorderBrush="{DynamicResource HeaderBackgroundBrush}" BorderThickness="3,0,0,0" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="12,8">
+        <StackPanel Spacing="3" DataContext="{Binding Invitation}" x:DataType="vm:InvitationBannerViewModel">
+          <TextBlock Text="{Binding Heading}" Classes="subtle" FontSize="12" />
+          <TextBlock Text="{Binding Summary}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding When}" />
+          <TextBlock Text="{Binding Location}" IsVisible="{Binding HasLocation}" Classes="subtle" />
+          <TextBlock Text="{Binding Status}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Text="{Binding Conflicts}" FontSize="12" TextWrapping="Wrap" Foreground="#C42B1C" IsVisible="{Binding Conflicts, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0" IsVisible="{Binding ShowCalendarChoice}">
+            <TextBlock Text="Eintragen in" VerticalAlignment="Center" FontSize="12" />
+            <ComboBox ItemsSource="{Binding Calendars}" SelectedItem="{Binding SelectedCalendar}" MinWidth="200">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="cal:CalendarInfo">
+                  <TextBlock Text="{Binding Name}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0" IsVisible="{Binding CanRespond}">
+            <Button Classes="accent" Content="Annehmen" Command="{Binding AcceptCommand}" />
+            <Button Content="Vorläufig" Command="{Binding TentativeCommand}" />
+            <Button Content="Ablehnen" Command="{Binding DeclineCommand}" />
+            <ProgressBar IsIndeterminate="True" Width="50" MinWidth="0" Height="4" VerticalAlignment="Center" IsVisible="{Binding IsBusy}" />
+          </StackPanel>
+          <Button Content="Aus dem Kalender entfernen" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" Margin="0,6,0,0" />
+          <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="4" IsVisible="{Binding HasBlockedRemoteContent}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,4" Margin="24,0,24,8">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <PathIcon Data="{StaticResource IconImage}" Width="16" Height="16" Margin="0,0,8,0" />
+          <TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
+                     Text="Externe Bilder wurden zum Schutz Ihrer Privatsphäre nicht geladen." />
+          <Button Grid.Column="2" Classes="command" Content="Bilder laden" FontSize="12" Command="{Binding LoadRemoteContentCommand}" />
+        </Grid>
+      </Border>
+
+      <!-- Attachments -->
+      <ItemsControl Grid.Row="5" ItemsSource="{Binding Attachments}" IsVisible="{Binding HasAttachments}" Margin="24,0,24,8">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AttachmentViewModel">
+            <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,6,6">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <PathIcon Data="{StaticResource IconAttach}" Width="14" Height="14" />
+                <Button Classes="command" Padding="0" Command="{Binding OpenCommand}" ToolTip.Tip="Öffnen">
+                  <TextBlock Text="{Binding FileName}" TextDecorations="Underline" />
+                </Button>
+                <TextBlock Classes="subtle" FontSize="11" Text="{Binding SizeText}" VerticalAlignment="Center" />
+                <Button Classes="command" Padding="4,0" Command="{Binding SaveCommand}" Content="Speichern" FontSize="12" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Grid.Row="6" Text="Wird geladen …" Classes="subtle" Margin="24,8" IsVisible="{Binding IsLoading}" />
+      <views:MessageBodyView Grid.Row="6" IsVisible="{Binding HasBody}" />
+    </Grid>
+  </Panel>
+</UserControl>

@@ -1,0 +1,78 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.AccountsView"
+             x:DataType="vm:AccountsViewModel">
+
+  <ScrollViewer>
+      <StackPanel Spacing="8" MaxWidth="900" HorizontalAlignment="Left">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <TextBlock Text="Konten" FontSize="22" FontWeight="SemiBold" />
+          <Button Grid.Column="1" Classes="command" Command="{Binding SubscribeCommand}" Margin="0,0,8,0">
+            <StackPanel Orientation="Horizontal">
+              <PathIcon Data="{StaticResource IconRss}" />
+              <TextBlock Text="Internet-Kalender abonnieren" />
+            </StackPanel>
+          </Button>
+          <Button Grid.Column="2" Classes="accent" Command="{Binding AddAccountCommand}" Padding="12,6">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+              <TextBlock Text="Konto hinzufügen" />
+            </StackPanel>
+          </Button>
+        </Grid>
+
+        <TextBlock Classes="subtle" Text="Noch keine Konten eingerichtet." IsVisible="{Binding !HasAccounts}" Margin="0,12" />
+
+        <ItemsControl ItemsSource="{Binding Items}" Margin="0,8,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:AccountItem">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,0,0,10">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                  <StackPanel>
+                    <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Email}" Classes="subtle" IsVisible="{Binding HasEmail}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+                    <!-- Order in the folder tree and everywhere else -->
+                    <Button Classes="command" Padding="6" ToolTip.Tip="Nach oben" IsEnabled="{Binding CanMoveUp}"
+                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
+                      <PathIcon Data="{StaticResource IconChevronUp}" Width="12" Height="12" Margin="0" />
+                    </Button>
+                    <Button Classes="command" Padding="6" ToolTip.Tip="Nach unten" IsEnabled="{Binding CanMoveDown}"
+                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
+                      <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" Margin="0" />
+                    </Button>
+                    <Button Content="{Binding RemoveText}" Margin="4,0,0,0"
+                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                  </StackPanel>
+                  <ItemsControl Grid.Row="1" Grid.ColumnSpan="2" ItemsSource="{Binding Connections}" Margin="0,10,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ConnectionLine">
+                        <Grid ColumnDefinitions="90,80,*" Margin="0,2">
+                          <TextBlock Text="{Binding Kind}" FontWeight="SemiBold" />
+                          <TextBlock Grid.Column="1" Text="{Binding Provider}" Classes="subtle" />
+                          <SelectableTextBlock Grid.Column="2" Text="{Binding Detail}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Text="Diagnose" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
+        <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
+          <TextBlock Text="Datenordner" Classes="subtle" VerticalAlignment="Center" />
+          <SelectableTextBlock Grid.Column="1" Text="{Binding DataDirectory}" VerticalAlignment="Center" />
+          <Button Grid.Column="2" Classes="command" Content="Öffnen" Command="{Binding OpenDataFolderCommand}" />
+          <TextBlock Grid.Row="1" Text="Logs" Classes="subtle" VerticalAlignment="Center" />
+          <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LogDirectory}" VerticalAlignment="Center" />
+          <Button Grid.Row="1" Grid.Column="2" Classes="command" Content="Öffnen" Command="{Binding OpenLogFolderCommand}" />
+        </Grid>
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding ProtocolLogText}" />
+      </StackPanel>
+  </ScrollViewer>
+</UserControl>

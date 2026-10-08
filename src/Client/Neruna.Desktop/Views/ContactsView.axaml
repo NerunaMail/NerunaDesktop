@@ -1,0 +1,234 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:app="using:Neruna.Desktop"
+             x:Class="Neruna.Desktop.Views.ContactsView"
+             x:DataType="vm:ContactsViewModel">
+
+  <Grid RowDefinitions="Auto,*">
+
+    <!-- Command bar -->
+    <Border Classes="pane" Padding="8,6" Margin="0,0,0,6">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button Classes="accent" Command="{Binding NewContactCommand}" Padding="12,6" Margin="0,0,4,0">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+            <TextBlock Text="Neuer Kontakt" />
+          </StackPanel>
+        </Button>
+        <Button Classes="command" Command="{Binding NewGroupCommand}" Margin="0,0,8,0">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconGroup}" />
+            <TextBlock Text="Neue Gruppe" />
+          </StackPanel>
+        </Button>
+        <Button Classes="command" Command="{Binding EditCommand}">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconEdit}" />
+            <TextBlock Text="Bearbeiten" />
+          </StackPanel>
+        </Button>
+        <Button Classes="command" Command="{Binding WriteMailCommand}" ToolTip.Tip="An den Kontakt bzw. an alle Mitglieder der Gruppe">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconMail}" />
+            <TextBlock Text="E-Mail schreiben" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <Grid x:Name="Columns" Grid.Row="1" ColumnDefinitions="220,6,340,6,*">
+
+      <!-- Address books -->
+      <Border Classes="pane" Padding="12,12">
+        <StackPanel Spacing="6">
+          <TextBlock Text="Adressbücher" FontWeight="SemiBold" Margin="0,0,0,4" />
+          <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasAddressBooks}"
+                     Text="Noch keine Adressbücher. Konto mit CardDAV hinzufügen." />
+          <ItemsControl ItemsSource="{Binding AddressBooks}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AddressBookItem">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,2">
+                  <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="Anzeigen" />
+                  <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
+                  <Button Grid.Column="1" Width="16" Height="16" MinWidth="0" Padding="0" CornerRadius="3" Background="{Binding Brush}"
+                          BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="Farbe ändern">
+                    <Button.Flyout>
+                      <Flyout Placement="RightEdgeAlignedTop">
+                        <StackPanel Spacing="8" Width="176">
+                          <TextBlock Text="Farbe des Adressbuchs" FontWeight="SemiBold" FontSize="12" />
+                          <ItemsControl ItemsSource="{x:Static vm:ContactsViewModel.ColorChoices}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <WrapPanel />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="x:String">
+                                <Button Width="20" Height="20" MinWidth="0" Padding="0" Margin="1" CornerRadius="3" BorderThickness="0"
+                                        Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" Click="OnColorPicked" Tag="{Binding}" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <Button Content="Standardfarbe" FontSize="12" Click="OnColorPicked" Tag="{x:Null}" />
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Owner}" Classes="subtle" FontSize="11" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding Owner, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="3" Text="{Binding Count}" Classes="subtle" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Classes="command" Command="{Binding ManageCommand}" Margin="0,4,0,0"
+                  ToolTip.Tip="Server erneut nach Adressbüchern fragen und auswählen, welche angezeigt werden">
+            <StackPanel Orientation="Horizontal">
+              <PathIcon Data="{StaticResource IconSync}" />
+              <TextBlock Text="Adressbücher verwalten" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Border>
+
+      <!-- List -->
+      <Border Classes="pane" Grid.Column="2">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Margin="12,12,12,6" Spacing="8">
+            <TextBlock Text="Kontakte und Gruppen" FontSize="16" FontWeight="SemiBold" />
+            <TextBox Text="{Binding SearchText}" PlaceholderText="Name, Firma oder E-Mail suchen">
+              <TextBox.InnerLeftContent>
+                <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
+              </TextBox.InnerLeftContent>
+            </TextBox>
+          </StackPanel>
+
+          <ListBox Grid.Row="1" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent"
+                   DoubleTapped="OnContactDoubleTapped">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ContactItem">
+                <!-- Colored stripe and avatar: the address book the contact comes from -->
+                <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,2">
+                  <Border Width="3" CornerRadius="2" Background="{Binding Brush}" Margin="0,0,8,0" />
+                  <Border Grid.Column="1" Width="34" Height="34" CornerRadius="17" Background="{Binding Brush}" ClipToBounds="True">
+                    <Panel>
+                      <Image Source="{Binding Photo}" Stretch="UniformToFill" IsVisible="{Binding HasPhoto}" />
+                      <TextBlock Text="{Binding Initials}" Foreground="White" FontSize="12" FontWeight="SemiBold" IsVisible="{Binding ShowInitials}"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <PathIcon Data="{StaticResource IconGroup}" Width="18" Height="18" Foreground="White" IsVisible="{Binding IsGroup}" />
+                    </Panel>
+                  </Border>
+                  <StackPanel Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding PrimaryEmail}" Classes="subtle" FontSize="12" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+
+      <!-- Details -->
+      <Border Classes="pane" Grid.Column="4" Padding="28,24">
+        <ScrollViewer>
+          <StackPanel>
+            <!-- Contact -->
+            <ContentControl Content="{Binding Selected}" IsVisible="{Binding IsContactSelected}">
+              <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:ContactItem">
+                  <StackPanel Spacing="4">
+                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+                      <Border Width="72" Height="72" CornerRadius="36" Background="{Binding Brush}" ClipToBounds="True">
+                        <Panel>
+                          <Image Source="{Binding Photo}" Stretch="UniformToFill" IsVisible="{Binding HasPhoto}" />
+                          <TextBlock Text="{Binding Initials}" Foreground="White" FontSize="24" FontWeight="SemiBold" IsVisible="{Binding ShowInitials}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Panel>
+                      </Border>
+                      <StackPanel VerticalAlignment="Center">
+                        <SelectableTextBlock Text="{Binding Name}" FontSize="22" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Subtitle}" Classes="subtle" />
+                      </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Classes="label" Text="E-Mail" />
+                    <ItemsControl ItemsSource="{Binding Emails}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LabeledValue">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SelectableTextBlock Text="{Binding Value}" Foreground="{DynamicResource AccentTextBrush}" />
+                            <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Classes="label" Text="Telefon" />
+                    <ItemsControl ItemsSource="{Binding Phones}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LabeledValue">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <SelectableTextBlock Text="{Binding Value}" />
+                            <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Classes="label" Text="Notiz" IsVisible="{Binding HasNote}" />
+                    <SelectableTextBlock Text="{Binding Note}" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
+
+                    <TextBlock Classes="label" Text="Adressbuch" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Border Width="10" Height="10" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding AddressBook}" />
+                    </StackPanel>
+                  </StackPanel>
+                </DataTemplate>
+              </ContentControl.ContentTemplate>
+            </ContentControl>
+
+            <!-- Group -->
+            <StackPanel Spacing="4" IsVisible="{Binding IsGroupSelected}">
+              <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+                <Border Width="72" Height="72" CornerRadius="36" Background="{Binding Selected.Brush, FallbackValue={x:Null}}">
+                  <PathIcon Data="{StaticResource IconGroup}" Width="34" Height="34" Foreground="White" />
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                  <SelectableTextBlock Text="{Binding Selected.Name, FallbackValue={x:Null}}" FontSize="22" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Selected.Subtitle, FallbackValue={x:Null}}" Classes="subtle" />
+                </StackPanel>
+              </StackPanel>
+
+              <TextBlock Classes="label" Text="Mitglieder und verwendete Adresse" />
+              <ItemsControl ItemsSource="{Binding SelectedMembers}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:MemberItem">
+                    <Grid ColumnDefinitions="220,*" Margin="0,3">
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <SelectableTextBlock Text="{Binding Address}" Foreground="{DynamicResource AccentTextBrush}" />
+                        <TextBlock Text="{Binding Hint}" Classes="subtle" FontSize="12" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <TextBlock Classes="label" Text="Adressbuch" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Width="10" Height="10" CornerRadius="2" Background="{Binding Selected.Brush, FallbackValue={x:Null}}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Selected.AddressBook, FallbackValue={x:Null}}" />
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

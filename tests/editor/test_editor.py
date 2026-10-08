@@ -1,0 +1,137 @@
+"""
+Browser tests for src/Client/Neruna.Desktop/Editor/editor.html in the engines behind the desktop WebView:
+Chromium (= WebView2 on Windows) and WebKit (= macOS / Linux).
+
+    docker run --rm -v "$PWD":/work -w /work mcr.microsoft.com/playwright/python:v1.55.0-noble \
+        sh -c "pip install -q pytest pytest-playwright playwright==1.55.0 && pytest -q tests/editor"
+"""
+import pathlib
+import pytest
+
+EDITOR = pathlib.Path(__file__).resolve().parents[2] / "src/Client/Neruna.Desktop/Editor/editor.html"
+
+
+@pytest.fixture(params=["chromium", "webkit"])
+def page(request, playwright):
+    browser = getattr(playwright, request.param).launch()
+    page = browser.new_page()
+    page.add_init_script("window.__nerunaMessages = []; window.__nerunaTestSink = m => window.__nerunaMessages.push(m);")
+    page.goto(EDITOR.as_uri())
+    page.evaluate("neruna.setContent('', 'Arial', 11, 'Nachricht schreiben')")
+    yield page
+    browser.close()
+
+
+def last_state(page):
+    page.wait_for_timeout(120)
+    return page.evaluate("window.__nerunaMessages.filter(m => m.type === 'state').slice(-1)[0]")
+
+
+def select_all(page):
+    page.evaluate("""() => { const r = document.createRange(); r.selectNodeContents(document.getElementById('editor'));
+                     const s = getSelection(); s.removeAllRanges(); s.addRange(r); }""")
+
+
+def test_ready_and_default_font_is_exported(page):
+    page.keyboard.type("Hallo Anna")
+    html = page.evaluate("neruna.getHtml()")
+    assert "font-family: Arial" in html and "font-size: 11pt" in html
+    assert "Hallo Anna" in html
+    assert page.evaluate("window.__nerunaMessages.some(m => m.type === 'ready')")
+
+
+def test_bold_italic_underline_strikethrough(page):
+    page.keyboard.type("Wichtig")
+    select_all(page)
+    for command in ["bold", "italic", "underline", "strikeThrough"]:
+        page.evaluate(f"neruna.exec('{command}')")
+    state = last_state(page)
+    assert state["bold"] and state["italic"] and state["underline"] and state["strikethrough"]
+    html = page.evaluate("neruna.getHtml()").lower()
+    assert "bold" in html or "<b>" in html
+    assert "italic" in html or "<i>" in html
+    assert "underline" in html or "<u>" in html
+    assert "line-through" in html or "<strike>" in html or "<s>" in html
+
+
+def test_font_family_size_and_color_on_selection(page):
+    page.keyboard.type("Text in Georgia")
+    select_all(page)
+    page.evaluate("neruna.font('Georgia')")
+    page.evaluate("neruna.size(18)")
+    page.evaluate("neruna.color('#c50f1f')")
+    state = last_state(page)
+    assert state["font"] == "Georgia"
+    assert state["size"] == 18
+    assert state["color"] == "#c50f1f"
+    html = page.evaluate("neruna.getHtml()")
+    assert "18pt" in html and "Georgia" in html
+    assert "xx-large" not in html
+
+
+def test_size_at_caret_applies_to_typed_text(page):
+    page.keyboard.type("klein ")
+    page.evaluate("neruna.size(24)")
+    page.keyboard.type("GROSS")
+    html = page.evaluate("neruna.getHtml()")
+    assert "font-size: 24pt" in html and "GROSS" in html
+    assert "​" not in html
+    assert last_state(page)["size"] == 24
+
+
+def test_lists_and_state(page):
+    page.keyboard.type("Punkt")
+    page.evaluate("neruna.exec('insertUnorderedList')")
+    assert last_state(page)["bulletList"]
+    assert "<ul>" in page.evaluate("neruna.getHtml()")
+
+
+def test_ctrl_enter_requests_send(page):
+    page.keyboard.type("x")
+    page.keyboard.press("Control+Enter")
+    assert page.evaluate("window.__nerunaMessages.some(m => m.type === 'send')")
+
+
+def test_quoted_html_keeps_formatting_and_cannot_run_scripts(page):
+    page.evaluate("""neruna.setContent('<div><br></div><blockquote><b>Original</b><img src="x" onerror="window.__pwned=1"></blockquote>', 'Arial', 11, '')""")
+    page.wait_for_timeout(200)
+    assert page.evaluate("window.__pwned === undefined")
+    assert "<b>Original</b>" in page.evaluate("neruna.getHtml()")
+
+
+def test_empty_detection(page):
+    assert page.evaluate("neruna.isEmpty()")
+    page.keyboard.type("a")
+    assert not page.evaluate("neruna.isEmpty()")
+
+
+def test_signature_is_replaced_above_the_quote_not_in_it(page):
+    page.evaluate("""neruna.setContent('<div><br></div><div><br></div><div id="neruna-signature"><b>Anna</b></div><div><br></div><div>Von: Lea</div><div>Zitat</div>', 'Arial', 11, '')""")
+    page.keyboard.type("Hallo Lea")
+    page.evaluate("neruna.setSignature('<i>Anna Muster</i><br>Example AG')")
+    html = page.evaluate("neruna.getHtml()")
+    assert "<i>Anna Muster</i><br>Example AG" in html
+    assert "<b>Anna</b>" not in html
+    assert html.index("Hallo Lea") < html.index("Anna Muster") < html.index("Zitat")
+
+    page.evaluate("neruna.setSignature('')")
+    html = page.evaluate("neruna.getHtml()")
+    assert "Anna Muster" not in html and "Zitat" in html and "Hallo Lea" in html
+
+
+def test_signature_container_is_created_when_missing(page):
+    page.evaluate("neruna.setContent('<div>Text</div>', 'Arial', 11, '')")
+    page.evaluate("neruna.setSignature('Gruss')")
+    assert page.evaluate("document.querySelector('#neruna-signature').textContent") == "Gruss"
+
+
+def test_insert_image(page):
+    page.evaluate("neruna.setContent('', 'Arial', 11, '')")
+    page.evaluate("neruna.insertImage('data:image/png;base64,iVBORw0KGgo=')")
+    assert 'src="data:image/png;base64,iVBORw0KGgo="' in page.evaluate("neruna.getHtml()")
+
+
+def test_body_html_has_no_font_wrapper(page):
+    page.keyboard.type("Anna Muster")
+    body = page.evaluate("neruna.getBodyHtml()")
+    assert "Anna Muster" in body and "font-family" not in body

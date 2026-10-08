@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Shared\Neruna.Contracts\Neruna.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Shared\Neruna.Vault\Neruna.Vault.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Contract fixtures shared with the Laravel server tests. -->
+    <Content Include="$(NerunaApiDir)fixtures\**" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

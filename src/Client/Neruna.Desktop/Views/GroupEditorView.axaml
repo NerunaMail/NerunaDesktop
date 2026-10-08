@@ -1,0 +1,131 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:contacts="using:Neruna.Core.Contacts"
+             x:Class="Neruna.Desktop.Views.GroupEditorView"
+             x:DataType="vm:GroupEditorViewModel">
+
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="contacts:AddressBookInfo">
+      <TextBlock Text="{Binding Name}" />
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <StackPanel>
+    <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" />
+
+    <Grid ColumnDefinitions="*,20,*">
+      <StackPanel>
+        <TextBlock Classes="label" Text="Name der Gruppe" />
+        <TextBox Text="{Binding Name}" IsReadOnly="{Binding IsReadOnly}" PlaceholderText="z. B. Projektteam, Vorstand, Newsletter" />
+      </StackPanel>
+      <StackPanel Grid.Column="2">
+        <TextBlock Classes="label" Text="Adressbuch" />
+        <ComboBox ItemsSource="{Binding AddressBooks}" SelectedItem="{Binding SelectedAddressBook}" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}" />
+      </StackPanel>
+    </Grid>
+
+    <!-- Left the members (with the address this group uses), right the contacts that are not yet in it -->
+    <Grid ColumnDefinitions="*,20,*" Margin="0,8,0,0">
+      <StackPanel Grid.ColumnSpan="{Binding MembersColumnSpan}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="label" Text="Mitglieder" />
+          <TextBlock Grid.Column="1" Classes="subtle" FontSize="12" Text="{Binding MemberCountText}" VerticalAlignment="Bottom" />
+        </Grid>
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"
+                   Text="Hat ein Kontakt mehrere Adressen, wählen Sie die, die diese Gruppe verwenden soll." />
+        <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Height="360">
+          <Panel>
+            <TextBlock Classes="subtle" Text="Noch keine Mitglieder – rechts Kontakte hinzufügen." TextWrapping="Wrap"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16" IsVisible="{Binding HasNoMembers}" />
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding Members}" Margin="8,4">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:GroupMemberRow">
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,4">
+                      <StackPanel Spacing="3">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Hint}" Classes="subtle" FontSize="11" VerticalAlignment="Center" IsVisible="{Binding HasHint}" />
+                        </StackPanel>
+                        <ComboBox ItemsSource="{Binding Addresses}" SelectedItem="{Binding SelectedAddress}" HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Adresse, die diese Gruppe verwendet"
+                                  IsVisible="{Binding HasChoice}" IsEnabled="{Binding !$parent[UserControl].((vm:GroupEditorViewModel)DataContext).IsReadOnly}" />
+                        <TextBlock Text="{Binding SingleAddress}" Classes="subtle" FontSize="12" IsVisible="{Binding HasSingleAddress}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="command" Padding="6" ToolTip.Tip="Aus der Gruppe entfernen" Margin="6,0,0,0" VerticalAlignment="Center"
+                              IsVisible="{Binding !$parent[UserControl].((vm:GroupEditorViewModel)DataContext).IsReadOnly}"
+                              Command="{Binding $parent[UserControl].((vm:GroupEditorViewModel)DataContext).RemoveMemberCommand}" CommandParameter="{Binding}">
+                        <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
+                      </Button>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Panel>
+        </Border>
+
+        <StackPanel IsVisible="{Binding !IsReadOnly}">
+          <TextBlock Classes="label" Text="Adresse ohne Kontakt hinzufügen" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Text="{Binding ExternalAddress}" PlaceholderText="name@example.com" />
+            <Button Grid.Column="1" Content="Hinzufügen" Command="{Binding AddExternalCommand}" Margin="6,0,0,0" />
+          </Grid>
+        </StackPanel>
+      </StackPanel>
+
+      <StackPanel Grid.Column="2" IsVisible="{Binding !IsReadOnly}">
+        <TextBlock Classes="label" Text="Kontakte" />
+        <TextBox Text="{Binding SearchText}" PlaceholderText="Name, Firma oder E-Mail suchen" Margin="0,0,0,6" />
+        <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Height="378">
+          <Panel>
+            <TextBlock Classes="subtle" Text="{Binding AvailableHint}" TextWrapping="Wrap"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16" IsVisible="{Binding HasNoAvailable}" />
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding Available}" Margin="4">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ContactChoice">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,3">
+                      <Border Width="30" Height="30" CornerRadius="15" Background="{DynamicResource HeaderBackgroundBrush}" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Initials}" Foreground="White" FontSize="11" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Addresses}" Classes="subtle" FontSize="12" TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding Addresses}" />
+                      </StackPanel>
+                      <Button Grid.Column="2" Classes="command" VerticalAlignment="Center" ToolTip.Tip="Zur Gruppe hinzufügen"
+                              Command="{Binding $parent[UserControl].((vm:GroupEditorViewModel)DataContext).AddContactCommand}" CommandParameter="{Binding}">
+                        <StackPanel Orientation="Horizontal">
+                          <PathIcon Data="{StaticResource IconAdd}" Width="10" Height="10" />
+                          <TextBlock Text="Hinzufügen" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Panel>
+        </Border>
+      </StackPanel>
+    </Grid>
+
+    <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0" TextWrapping="Wrap"
+               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,20,0,0">
+      <Button Command="{Binding DeleteCommand}" IsVisible="{Binding IsExisting}">
+        <Panel>
+          <TextBlock Text="Löschen" IsVisible="{Binding !ConfirmDelete}" />
+          <TextBlock Text="Wirklich löschen?" IsVisible="{Binding ConfirmDelete}" />
+        </Panel>
+      </Button>
+      <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="60" MinWidth="0" Height="4" Margin="12,0" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+      <Button Grid.Column="3" Content="Abbrechen" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="4" Classes="accent" Content="Speichern" Command="{Binding SaveCommand}" IsVisible="{Binding !IsReadOnly}" />
+    </Grid>
+  </StackPanel>
+</UserControl>

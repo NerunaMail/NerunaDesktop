@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>CalDAV (RFC 4791) and CardDAV (RFC 6352) providers for Neruna Desktop, incl. WebDAV sync (RFC 6578).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Neruna.Core\Neruna.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Neruna.Client.Tests" />
+  </ItemGroup>
+</Project>

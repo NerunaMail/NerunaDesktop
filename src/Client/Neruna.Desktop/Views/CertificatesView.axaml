@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.CertificatesView"
+             x:DataType="vm:CertificatesViewModel">
+
+  <UserControl.Resources>
+    <!-- One row of the overview: status · name/e-mail · validity · usage · actions -->
+    <DataTemplate x:Key="CertificateRow" x:DataType="vm:CertificateItem">
+      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="4,10">
+        <Grid ColumnDefinitions="150,*,170,200,Auto">
+          <Border Background="{Binding StatusBrush}" CornerRadius="10" Padding="10,2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,2,0,0">
+            <TextBlock Text="{Binding StatusText}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+          </Border>
+
+          <StackPanel Grid.Column="1" Spacing="1" Margin="0,0,12,0">
+            <SelectableTextBlock Text="{Binding Emails}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" IsVisible="{Binding HasSecondaryName}" />
+            <TextBlock Text="{Binding Issuer}" Classes="subtle" FontSize="11" TextWrapping="Wrap" />
+            <SelectableTextBlock Text="{Binding Fingerprint}" Classes="subtle" FontSize="10" FontFamily="Consolas, Cascadia Mono, monospace" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Spacing="1">
+            <TextBlock Text="Gültig bis" Classes="subtle" FontSize="11" />
+            <TextBlock Text="{Binding ValidUntil}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding RemainingText}" Classes="subtle" FontSize="11" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="3" Spacing="1">
+            <TextBlock Text="Verwendung" Classes="subtle" FontSize="11" />
+            <TextBlock Text="{Binding UsageText}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding SourceText}" Classes="subtle" FontSize="11" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+            <Button Classes="command" Content="Exportieren" FontSize="12" ToolTip.Tip="Öffentliches Zertifikat (.cer) speichern, z. B. um es weiterzugeben"
+                    Command="{Binding $parent[UserControl].((vm:CertificatesViewModel)DataContext).ExportCommand}" CommandParameter="{Binding}" />
+            <Button Content="{Binding RemoveText}" FontSize="12"
+                    Command="{Binding $parent[UserControl].((vm:CertificatesViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <ScrollViewer>
+    <StackPanel Spacing="6" Margin="0,4,0,24">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel>
+          <TextBlock Text="S/MIME-Zertifikate" FontSize="22" FontWeight="SemiBold" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"
+                     Text="Eigene Zertifikate (.p12/.pfx mit privatem Schlüssel) zum Signieren und Entschlüsseln, öffentliche Zertifikate von Kontakten (.cer/.crt/.pem) zum Verschlüsseln. Zertifikate aus gültig signierten Nachrichten werden automatisch übernommen." />
+        </StackPanel>
+        <Button Grid.Column="1" Classes="accent" Command="{Binding ImportCommand}" Padding="12,6" VerticalAlignment="Top">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconImport}" Width="14" Height="14" />
+            <TextBlock Text="Zertifikat importieren …" />
+          </StackPanel>
+        </Button>
+      </Grid>
+
+      <!-- Password prompt for .p12/.pfx -->
+      <Border IsVisible="{Binding IsPasswordPromptVisible}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,12" Margin="0,8,0,0">
+        <StackPanel Spacing="8">
+          <TextBlock FontWeight="SemiBold" Text="{Binding PendingFileName, StringFormat='Passwort für «{0}»'}" />
+          <Grid ColumnDefinitions="300,Auto,Auto">
+            <TextBox Text="{Binding ImportPassword}" PasswordChar="●" PlaceholderText="Passwort des Zertifikats" />
+            <Button Grid.Column="1" Classes="accent" Content="Importieren" Command="{Binding ConfirmImportCommand}" Margin="8,0" IsDefault="True" />
+            <Button Grid.Column="2" Content="Abbrechen" Command="{Binding CancelImportCommand}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,4,0,0"
+                 IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}"
+                 Classes.error="{Binding MessageIsError}" Foreground="{DynamicResource AccentTextBrush}" />
+
+      <StackPanel Spacing="4" Margin="0,8,0,0">
+        <CheckBox Content="Automatisch signieren, wenn ein eigenes Zertifikat für den Absender vorhanden ist" IsChecked="{Binding AutoSign}" />
+        <CheckBox Content="Automatisch verschlüsseln, wenn für alle Empfänger ein Zertifikat bekannt ist" IsChecked="{Binding AutoEncrypt}" />
+      </StackPanel>
+
+      <TextBlock Text="Eigene Zertifikate" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
+      <TextBlock Classes="subtle" IsVisible="{Binding !HasOwn}" TextWrapping="Wrap"
+                 Text="Noch kein eigenes Zertifikat. Importieren Sie Ihre .p12- oder .pfx-Datei, um Nachrichten zu signieren und verschlüsselte Nachrichten zu lesen." />
+      <ItemsControl ItemsSource="{Binding Own}" ItemTemplate="{StaticResource CertificateRow}" />
+
+      <TextBlock Text="Zertifikate von Kontakten" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
+      <TextBlock Classes="subtle" IsVisible="{Binding !HasContacts}" TextWrapping="Wrap"
+                 Text="Noch keine. Sie werden aus signierten Nachrichten übernommen oder können importiert werden." />
+      <ItemsControl ItemsSource="{Binding Contacts}" ItemTemplate="{StaticResource CertificateRow}" />
+
+      <TextBlock Text="Vertrauenswürdige Zertifizierungsstellen" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap"
+                 Text="Zusätzlich zu den Stammzertifizierungsstellen des Betriebssystems, z. B. die interne CA Ihrer Firma." />
+      <ItemsControl ItemsSource="{Binding Authorities}" ItemTemplate="{StaticResource CertificateRow}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

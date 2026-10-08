@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:core="using:Neruna.Core.Mail"
+             xmlns:html="clr-namespace:TheArtOfDev.HtmlRenderer.Avalonia;assembly=Avalonia.HtmlRenderer"
+             x:Class="Neruna.Desktop.Views.SignaturesView"
+             x:DataType="vm:SignaturesViewModel">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="0,0,0,16">
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,0,0,12" MaxWidth="900" HorizontalAlignment="Left"
+               Text="Signaturen werden beim Verfassen über dem zitierten Text eingefügt. Beim Schreiben lässt sich die Signatur über «Signatur» wechseln oder entfernen." />
+
+    <Grid Grid.Row="1" ColumnDefinitions="260,16,*" MinHeight="260">
+      <!-- List -->
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+          <Button Classes="accent" Content="Neu" Command="{Binding NewCommand}" />
+          <Button Content="Bearbeiten" Command="{Binding EditCommand}" />
+          <Button Content="Löschen" Command="{Binding DeleteCommand}" />
+        </StackPanel>
+        <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4">
+          <Panel>
+            <TextBlock Classes="subtle" Text="Noch keine Signatur – «Neu» erstellt eine." TextWrapping="Wrap" Margin="12" IsVisible="{Binding !HasSignatures}" />
+            <ListBox ItemsSource="{Binding Signatures}" SelectedItem="{Binding Selected}" Background="Transparent" DoubleTapped="OnDoubleTapped">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="core:Signature">
+                  <TextBlock Text="{Binding Name}" Margin="0,2" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Panel>
+        </Border>
+      </DockPanel>
+
+      <!-- Preview -->
+      <Border Grid.Column="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="White" ClipToBounds="True">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="Vorschau" FontSize="11" Foreground="#707070" Margin="24,10,12,4" />
+          <html:HtmlPanel x:Name="Preview" Background="White" />
+        </DockPanel>
+      </Border>
+    </Grid>
+
+    <!-- Defaults per account -->
+    <StackPanel Grid.Row="2" Spacing="8" Margin="0,22,0,0">
+      <TextBlock Text="Standardsignatur pro Konto" FontSize="16" FontWeight="SemiBold" />
+      <Grid ColumnDefinitions="260,16,240,16,240" IsVisible="{Binding Accounts.Count}">
+        <TextBlock Classes="subtle" Text="Konto" />
+        <TextBlock Grid.Column="2" Classes="subtle" Text="Neue Nachrichten" />
+        <TextBlock Grid.Column="4" Classes="subtle" Text="Antworten/Weiterleitungen" />
+      </Grid>
+      <ItemsControl ItemsSource="{Binding Accounts}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AccountSignatureRow">
+            <Grid ColumnDefinitions="260,16,240,16,240" Margin="0,3">
+              <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <ComboBox Grid.Column="2" ItemsSource="{Binding Choices}" SelectedItem="{Binding NewMessages}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SignatureChoice">
+                    <TextBlock Text="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <ComboBox Grid.Column="4" ItemsSource="{Binding Choices}" SelectedItem="{Binding RepliesAndForwards}" HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SignatureChoice">
+                    <TextBlock Text="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Classes="subtle" Text="Kein E-Mail-Konto eingerichtet." IsVisible="{Binding !Accounts.Count}" />
+    </StackPanel>
+  </Grid>
+</UserControl>

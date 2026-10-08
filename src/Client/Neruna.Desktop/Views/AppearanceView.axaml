@@ -1,0 +1,50 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:app="using:Neruna.Desktop"
+             x:Class="Neruna.Desktop.Views.AppearanceView"
+             x:DataType="vm:AppearanceViewModel">
+  <StackPanel Spacing="8" MaxWidth="640" HorizontalAlignment="Left">
+    <TextBlock Text="Darstellung" FontSize="16" FontWeight="SemiBold" />
+    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,14">
+      <RadioButton GroupName="ThemeMode" Content="Wie System" IsChecked="{Binding IsSystem}" />
+      <RadioButton GroupName="ThemeMode" Content="Hell" IsChecked="{Binding IsLight}" />
+      <RadioButton GroupName="ThemeMode" Content="Dunkel" IsChecked="{Binding IsDark}" />
+    </StackPanel>
+
+    <TextBlock Text="Schaltflächen im Lesebereich" FontSize="16" FontWeight="SemiBold" />
+    <StackPanel Orientation="Horizontal" Spacing="16">
+      <RadioButton GroupName="Toolbar" Content="Symbol und Text" IsChecked="{Binding ToolbarWithText}" />
+      <RadioButton GroupName="Toolbar" Content="Nur Symbol" IsChecked="{Binding ToolbarIconsOnly}" />
+    </StackPanel>
+    <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="Bei «Nur Symbol» erscheint der Text, wenn die Maus auf der Schaltfläche ruht." />
+
+    <TextBlock Text="Farbschema" FontSize="16" FontWeight="SemiBold" />
+    <ItemsControl ItemsSource="{Binding Schemes}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="12" />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:SchemeChoice">
+          <Button Padding="0" Background="Transparent" BorderThickness="0"
+                  Command="{Binding $parent[UserControl].((vm:AppearanceViewModel)DataContext).ChooseSchemeCommand}" CommandParameter="{Binding}">
+            <Border Width="120" CornerRadius="6" BorderThickness="2" Padding="4"
+                    BorderBrush="{DynamicResource DividerBrush}" Classes.selected="{Binding IsSelected}">
+              <Border.Styles>
+                <Style Selector="Border.selected">
+                  <Setter Property="BorderBrush" Value="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" />
+                </Style>
+              </Border.Styles>
+              <StackPanel Spacing="6">
+                <Border Height="40" CornerRadius="4" Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" />
+                <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" Margin="0,0,0,2" />
+              </StackPanel>
+            </Border>
+          </Button>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

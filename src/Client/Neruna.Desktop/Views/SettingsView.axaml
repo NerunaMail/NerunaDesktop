@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:views="using:Neruna.Desktop.Views"
+             x:Class="Neruna.Desktop.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <Border Classes="pane" Padding="20,12,20,0">
+    <TabControl SelectedIndex="{Binding SelectedTab}">
+      <!-- Six tabs: smaller headers so all fit on one line -->
+      <TabControl.Styles>
+        <Style Selector="TabItem">
+          <Setter Property="FontSize" Value="18" />
+          <Setter Property="Padding" Value="10,4" />
+          <Setter Property="MinHeight" Value="40" />
+        </Style>
+      </TabControl.Styles>
+      <TabItem Header="Konten">
+        <ContentControl Content="{Binding Accounts}" Margin="0,12,0,0" />
+      </TabItem>
+      <TabItem Header="E-Mail">
+        <ContentControl Content="{Binding MailOptions}" Margin="0,12,0,0" />
+      </TabItem>
+      <TabItem Header="Kalender">
+        <ContentControl Content="{Binding CalendarOptions}" Margin="0,12,0,0" />
+      </TabItem>
+      <TabItem Header="Signaturen">
+        <ContentControl Content="{Binding Signatures}" Margin="0,12,0,0" />
+      </TabItem>
+      <TabItem Header="Zertifikate (S/MIME)">
+        <ContentControl Content="{Binding Certificates}" Margin="0,12,0,0" />
+      </TabItem>
+      <TabItem Header="Design">
+        <ContentControl Content="{Binding Appearance}" Margin="0,12,0,0" />
+      </TabItem>
+      <TabItem Header="Info">
+        <views:AboutView Margin="0,12,0,0" />
+      </TabItem>
+    </TabControl>
+  </Border>
+</UserControl>

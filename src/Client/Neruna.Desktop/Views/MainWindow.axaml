@@ -1,0 +1,83 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Neruna.Desktop.ViewModels"
+        x:Class="Neruna.Desktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Neruna"
+        Icon="/Assets/app.ico"
+        Width="1440" Height="880" MinWidth="960" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource ShellBackgroundBrush}">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="F5" Command="{Binding SyncCommand}" />
+  </Window.KeyBindings>
+
+  <Grid RowDefinitions="44,*,26">
+
+    <!-- Header bar -->
+    <Border Grid.Row="0" Background="{DynamicResource HeaderBackgroundBrush}">
+      <Grid ColumnDefinitions="Auto,*,Auto" Margin="16,0,8,0">
+        <!-- The active section; "Neruna" is already in the window title -->
+        <TextBlock Text="{Binding SectionTitle}" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <Button Background="Transparent" Foreground="White" Command="{Binding ShowAccountSetupCommand}" ToolTip.Tip="Konto hinzufügen">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="White" />
+              <TextBlock Text="Konto" Foreground="White" />
+            </StackPanel>
+          </Button>
+          <Button Background="Transparent" Command="{Binding SyncCommand}" ToolTip.Tip="Synchronisieren (F5)">
+            <PathIcon Data="{StaticResource IconSync}" Width="16" Height="16" Foreground="White" />
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="60,*">
+      <!-- Navigation rail -->
+      <Border Grid.Column="0" Background="{DynamicResource RailBackgroundBrush}">
+        <DockPanel>
+        <Button DockPanel.Dock="Bottom" Classes="rail" Classes.active="{Binding IsSettings}" HorizontalAlignment="Center" Margin="0,0,0,10"
+                Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Settings}" ToolTip.Tip="Einstellungen: Konten, Zertifikate, Diagnose">
+          <PathIcon Data="{StaticResource IconSettings}" />
+        </Button>
+        <StackPanel Spacing="6" Margin="0,10,0,0">
+          <Button Classes="rail" Classes.active="{Binding IsMail}" HorizontalAlignment="Center"
+                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Mail}" ToolTip.Tip="E-Mail">
+            <PathIcon Data="{StaticResource IconMail}" />
+          </Button>
+          <Button Classes="rail" Classes.active="{Binding IsCalendar}" HorizontalAlignment="Center"
+                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Calendar}" ToolTip.Tip="Kalender">
+            <PathIcon Data="{StaticResource IconCalendar}" />
+          </Button>
+          <Button Classes="rail" Classes.active="{Binding IsContacts}" HorizontalAlignment="Center"
+                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Contacts}" ToolTip.Tip="Kontakte">
+            <PathIcon Data="{StaticResource IconPeople}" />
+          </Button>
+        </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" Margin="6,6,6,0" />
+    </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="2" Padding="12,0">
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <ProgressBar IsIndeterminate="True" Width="60" Height="4" MinWidth="0" IsVisible="{Binding IsSyncing}" />
+        <TextBlock Classes="subtle" FontSize="12" Text="{Binding StatusText}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Modal overlay (account setup, ICS subscription) -->
+    <Border Grid.RowSpan="3" IsVisible="{Binding HasOverlay}" Background="#80000000">
+      <Border Classes="pane" Width="{Binding OverlayWidth}" MaxWidth="{Binding $parent[Window].Bounds.Width}" Margin="0,24" HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 8 32 0 #40000000">
+        <ScrollViewer>
+          <ContentControl Content="{Binding Overlay}" Margin="28" />
+        </ScrollViewer>
+      </Border>
+    </Border>
+  </Grid>
+</Window>

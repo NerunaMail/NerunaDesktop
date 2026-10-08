@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<!-- Scripts only with our nonce: inline event handlers in quoted or pasted HTML can never run. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob: https: http:; style-src 'unsafe-inline'; font-src data:; script-src 'nonce-neruna-editor'">
+<style>
+  html, body { margin: 0; height: 100%; background: #ffffff; }
+  #editor {
+    min-height: 100%; box-sizing: border-box; padding: 14px 18px 40px; outline: none;
+    color: #000000; word-wrap: break-word; overflow-wrap: anywhere; line-height: 1.3;
+  }
+  #editor div, #editor p { margin: 0; }
+  #editor blockquote { margin: 0 0 0 4px; padding-left: 10px; border-left: 2px solid #c8c8c8; }
+  #editor img { max-width: 100%; }
+  #editor a { color: #0f6cbd; }
+  #editor:empty::before { content: attr(data-placeholder); color: #8a8a8a; }
+</style>
+</head>
+<body>
+<div id="editor" contenteditable="true" spellcheck="true" data-placeholder=""></div>
+<script nonce="neruna-editor">
+(function () {
+  "use strict";
+  var editor = document.getElementById("editor");
+  var lastState = "";
+  var stateTimer = 0;
+
+  function post(message) {
+    if (typeof window.invokeCSharpAction === "function") {
+      window.invokeCSharpAction(JSON.stringify(message));
+    } else if (typeof window.__nerunaTestSink === "function") {
+      window.__nerunaTestSink(message);
+    }
+  }
+
+  function selectionElement() {
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return editor;
+    var node = selection.getRangeAt(0).startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    return editor.contains(node) ? node : editor;
+  }
+
+  function toHex(rgb) {
+    var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb || "");
+    if (!m) return "#000000";
+    return "#" + [m[1], m[2], m[3]].map(function (v) { return ("0" + parseInt(v, 10).toString(16)).slice(-2); }).join("");
+  }
+
+  function firstFamily(family) {
+    return (family || "").split(",")[0].trim().replace(/^["']|["']$/g, "");
+  }
+
+  function reportState() {
+    var el = selectionElement();
+    var style = window.getComputedStyle(el);
+    var state = {
+      type: "state",
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      underline: document.queryCommandState("underline"),
+      strikethrough: document.queryCommandState("strikeThrough"),
+      bulletList: document.queryCommandState("insertUnorderedList"),
+      numberedList: document.queryCommandState("insertOrderedList"),
+      font: firstFamily(style.fontFamily),
+      size: Math.round(parseFloat(style.fontSize) * 0.75 * 2) / 2,
+      color: toHex(style.color)
+    };
+    var json = JSON.stringify(state);
+    if (json !== lastState) {
+      lastState = json;
+      post(state);
+    }
+  }
+
+  function scheduleState() {
+    clearTimeout(stateTimer);
+    stateTimer = setTimeout(reportState, 40);
+  }
+
+  // Wraps the selection (or, at a caret, the text typed next) in a span with one inline style.
+  function applyStyle(property, value) {
+    editor.focus();
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    var range = selection.getRangeAt(0);
+
+    if (range.collapsed) {
+      var span = document.createElement("span");
+      span.style.setProperty(property, value);
+      span.appendChild(document.createTextNode("​"));
+      range.insertNode(span);
+      var caret = document.createRange();
+      caret.setStart(span.firstChild, 1);
+      caret.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(caret);
+    } else {
+      // execCommand keeps undo working; the marker size is then replaced by the real value.
+      document.execCommand("styleWithCSS", false, true);
+      document.execCommand("fontSize", false, "7");
+      var marked = editor.querySelectorAll('span[style*="xx-large"], font[size="7"]');
+      for (var i = 0; i < marked.length; i++) {
+        var el = marked[i];
+        if (el.tagName === "FONT") {
+          var replacement = document.createElement("span");
+          while (el.firstChild) replacement.appendChild(el.firstChild);
+          el.parentNode.replaceChild(replacement, el);
+          el = replacement;
+        }
+        el.style.removeProperty("font-size");
+        el.style.setProperty(property, value);
+      }
+    }
+    scheduleState();
+    post({ type: "changed" });
+  }
+
+  function exec(command, value) {
+    editor.focus();
+    document.execCommand("styleWithCSS", false, true);
+    document.execCommand(command, false, value === undefined ? null : value);
+    scheduleState();
+    post({ type: "changed" });
+  }
+
+  function cleanHtml() {
+    var clone = editor.cloneNode(true);
+    // Zero-width placeholders from caret formatting and empty styling spans are not part of the mail.
+    var walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, null);
+    var texts = [];
+    while (walker.nextNode()) texts.push(walker.currentNode);
+    texts.forEach(function (t) { t.nodeValue = t.nodeValue.replace(/​/g, ""); });
+    Array.prototype.slice.call(clone.querySelectorAll("span")).forEach(function (s) {
+      if (!s.textContent && !s.querySelector("img,br")) s.parentNode.removeChild(s);
+    });
+    return clone.innerHTML;
+  }
+
+  editor.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      post({ type: "send" });
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
+      e.preventDefault();
+      post({ type: "save" });
+    } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      exec(e.shiftKey ? "outdent" : "insertText", e.shiftKey ? undefined : "    ");
+    }
+  });
+
+  // Pasted bitmaps become inline images (sent as embedded attachments).
+  editor.addEventListener("paste", function (e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === "file" && /^image\//.test(items[i].type)) {
+        e.preventDefault();
+        var reader = new FileReader();
+        reader.onload = function () { exec("insertHTML", '<img src="' + reader.result + '">'); };
+        reader.readAsDataURL(items[i].getAsFile());
+        return;
+      }
+    }
+  });
+
+  editor.addEventListener("input", function () { post({ type: "changed" }); scheduleState(); });
+  document.addEventListener("selectionchange", scheduleState);
+
+  // Links are never followed inside the editor.
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a");
+    if (a) e.preventDefault();
+  });
+
+  window.neruna = {
+    /** Loads content and the default font of the user (used for new text and the whole mail). */
+    setContent: function (html, font, sizePt, placeholder) {
+      editor.style.fontFamily = font ? '"' + font + '", sans-serif' : "";
+      editor.style.fontSize = sizePt ? sizePt + "pt" : "";
+      editor.setAttribute("data-placeholder", placeholder || "");
+      editor.innerHTML = html || "";
+      document.execCommand("defaultParagraphSeparator", false, "div");
+      var range = document.createRange();
+      range.setStart(editor, 0);
+      range.collapse(true);
+      var selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      editor.focus();
+      reportState();
+      return "ok";
+    },
+    /** The body HTML, wrapped in the default font so recipients see what the user saw. */
+    getHtml: function () {
+      return '<div style="font-family: ' + editor.style.fontFamily.replace(/"/g, "'") + "; font-size: " + editor.style.fontSize + '; color: #000000;">' + cleanHtml() + "</div>";
+    },
+    /** Just the content, without the default-font wrapper (signatures: unformatted text follows the mail's font). */
+    getBodyHtml: function () { return cleanHtml(); },
+    isEmpty: function () { return editor.textContent.replace(/​/g, "").trim().length === 0 && !editor.querySelector("img"); },
+    exec: exec,
+    font: function (family) { exec("fontName", family); },
+    size: function (pt) { applyStyle("font-size", pt + "pt"); },
+    color: function (hex) { exec("foreColor", hex); },
+    highlight: function (hex) { exec("hiliteColor", hex); },
+    link: function (url) { exec("createLink", url); },
+    /** Inserts an image (data: URI) at the caret, e.g. a logo for a signature. */
+    insertImage: function (url) { exec("insertImage", url); },
+    /** Replaces the signature (the first #neruna-signature, always above a quote); empty html removes it. */
+    setSignature: function (html) {
+      var el = editor.querySelector("#neruna-signature");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "neruna-signature";
+        var spacer = document.createElement("div");
+        spacer.innerHTML = "<br>";
+        editor.insertBefore(el, editor.firstChild);
+        editor.insertBefore(spacer, el);
+      }
+      el.innerHTML = html || "";
+      post({ type: "changed" });
+      return "ok";
+    },
+    focus: function () { editor.focus(); return "ok"; },
+    state: function () { lastState = ""; reportState(); return "ok"; }
+  };
+
+  post({ type: "ready" });
+})();
+</script>
+</body>
+</html>
