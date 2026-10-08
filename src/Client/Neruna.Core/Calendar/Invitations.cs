@@ -477,6 +477,36 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         return attendees.Count;
     }
 
+    /// <summary>
+    /// Before an attendee deletes a meeting from their calendar: tells the organizer "abgelehnt", as the decline
+    /// button in the invitation would. Nothing if it is the own meeting, if one is not among the attendees or has
+    /// declined already, or if the server sends the answer itself.
+    /// </summary>
+    /// <returns>True if a decline was sent.</returns>
+    public async Task<bool> SendDeclineAsync(CalendarInfo calendar, string data, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        var account = await AccountOfAsync(calendar.ConnectionId, cancellationToken);
+        if (account.EmailAddress is not { } me || ITip.Parse(AsRequest(data)) is not { } evt || IsMine(evt, me)
+            || evt.AttendeeFor(me) is not { Status: not Participation.Declined }
+            || evt.Organizer is null
+            || await calendars.SchedulesItselfAsync(calendar, cancellationToken))
+        {
+            return false;
+        }
+
+        var message = ITip.Mail(
+            new MailboxAddress(account.DisplayName, me),
+            [new MailboxAddress(evt.OrganizerName, evt.Organizer)],
+            $"Abgelehnt: {evt.Summary}",
+            $"{account.DisplayName} nimmt nicht teil.\n\n{evt.Summary}\n{ITip.When(evt.Start, evt.End, evt.IsAllDay)}",
+            ITip.Reply(evt, me, account.DisplayName, Participation.Declined),
+            "REPLY");
+        await mail.SendAsync(MailConnection(account), message, cancellationToken);
+        logger.LogInformation("Declined {Uid} on deleting it", evt.Uid);
+        return true;
+    }
+
     /// <summary>Is <paramref name="me"/> the organizer of this event (or nobody is)?</summary>
     public static bool IsMine(Invitation evt, string? me) =>
         evt.Organizer is null || string.Equals(evt.Organizer, me, StringComparison.OrdinalIgnoreCase);

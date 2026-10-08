@@ -129,6 +129,19 @@ internal static class Snapshots
         await SaveAsync(window, output, "reply.png");
         vm.MailPage.Compose = null;
 
+        // The question when closing with a changed draft open.
+        var question = ChoiceDialog.ShowAsync(window, "Neruna beenden",
+            "Der Entwurf «Offerte Netzwerk-Erneuerung Q4» hat ungespeicherte Änderungen. Vor dem Beenden speichern?",
+            ("Speichern", 1, true), ("Nicht speichern", 2, false), ("Abbrechen", 0, false));
+        Dispatcher.UIThread.RunJobs();
+        if (ChoiceDialog.Open is { } dialog)
+        {
+            await SaveAsync(dialog, output, "close-question.png");
+            dialog.Close();
+        }
+
+        await question;
+
         // An invitation in a mail: the bar with Annehmen / Vorläufig / Ablehnen.
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.Subject.StartsWith("Einladung:", StringComparison.Ordinal));
         for (var i = 0; i < 50 && vm.MailPage.ReadingPane?.Invitation?.Status is null; i++)

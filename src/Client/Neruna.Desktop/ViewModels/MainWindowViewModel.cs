@@ -341,6 +341,50 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private bool CanSync() => !IsSyncing;
 
+    /// <summary>
+    /// Closing Neruna: open drafts with unsaved changes are saved or dropped as the user says.
+    /// </summary>
+    /// <param name="ask">Shows the question; gets the draft titles, returns the choice.</param>
+    /// <returns>True if Neruna may close.</returns>
+    public async Task<bool> PrepareCloseAsync(Func<IReadOnlyList<string>, Task<CloseChoice>> ask)
+    {
+        ArgumentNullException.ThrowIfNull(ask);
+        var drafts = MailPage.UnsavedDrafts;
+        if (drafts.Count == 0)
+        {
+            return true;
+        }
+
+        switch (await ask(drafts.Select(d => d.Title).ToList()))
+        {
+            case CloseChoice.Save:
+                StatusText = drafts.Count == 1 ? "Entwurf wird gespeichert …" : "Entwürfe werden gespeichert …";
+                var saved = true;
+                foreach (var draft in drafts)
+                {
+                    saved &= await draft.SaveBeforeExitAsync();
+                }
+
+                if (!saved)
+                {
+                    StatusText = "Nicht alle Entwürfe konnten gespeichert werden – Neruna bleibt offen.";
+                }
+
+                return saved;
+
+            case CloseChoice.Discard:
+                foreach (var draft in drafts)
+                {
+                    draft.DiscardOnExit();
+                }
+
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
     // "Element öffnen" in the reminder window: the event in the calendar's editor.
     private async Task OpenReminderAsync(Neruna.Core.Calendar.CalendarOccurrence occurrence)
     {
@@ -450,4 +494,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         await ContactsPage.ReloadAsync();
         await SettingsPage.ReloadAsync();
     }
+}
+
+/// <summary>The answer to "Entwurf speichern?" when Neruna closes.</summary>
+internal enum CloseChoice
+{
+    Cancel,
+    Save,
+    Discard,
 }

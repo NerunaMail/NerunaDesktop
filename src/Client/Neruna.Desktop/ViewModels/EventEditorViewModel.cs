@@ -127,6 +127,12 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     public bool CanEditAttendees => CanEdit && IsOrganizer;
 
+    /// <summary>The second click on "Löschen" says whether mail goes out.</summary>
+    public string DeleteConfirmText =>
+        !IsOrganizer ? "Löschen und absagen?"
+        : _attendees.Any(a => !string.Equals(a.Email, Organizer, StringComparison.OrdinalIgnoreCase)) ? "Löschen und Absage an alle?"
+        : "Wirklich löschen?";
+
     public string OrganizerText => $"Organisiert von {Organizer} – Ihre Antwort geben Sie in der Einladungsmail.";
 
     /// <summary>Raised with true when something was saved or deleted.</summary>
@@ -300,6 +306,22 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
         await RunAsync(async () =>
         {
+            // An attendee who deletes a meeting tells the organizer "abgelehnt".
+            if (!IsOrganizer && (await _calendar.GetObjectAsync(existing.Calendar, existing.RemoteId)) is { } invited)
+            {
+                try
+                {
+                    ResultMessage = await _invitations.SendDeclineAsync(existing.Calendar, invited.ICalendarData)
+                        ? $"Gelöscht – Absage an {Organizer} gesendet."
+                        : null;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Error = "Die Absage an den Organisator konnte nicht gesendet werden: " + ex.Message;
+                    return false;
+                }
+            }
+
             // The organizer of a meeting tells the attendees it is cancelled.
             if (IsOrganizer && (await _calendar.GetObjectAsync(existing.Calendar, existing.RemoteId)) is { } current)
             {

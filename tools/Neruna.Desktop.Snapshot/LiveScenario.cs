@@ -196,6 +196,7 @@ internal static class LiveScenario
         vm.MailPage.Compose = null;
 
         await CheckDraftsAsync(vm, window, output, mailHost, user);
+        await CheckCloseWithDraftAsync(vm, mailHost, user);
         await CheckPushAsync(vm, window, output, mailHost, user, services.GetRequiredService<NotificationService>());
         await CheckInvitationAsync(vm, window, output, mailHost, user, services);
         await CheckSearchAsync(vm, window, output, mailHost, user);
@@ -526,6 +527,34 @@ internal static class LiveScenario
                 open.Close();
             }
         }
+    }
+
+    // Closing Neruna with an open, changed draft: "Abbrechen" keeps it open, "Speichern" stores it on the server before
+    // closing, "Nicht speichern" stores nothing.
+    private static async Task CheckCloseWithDraftAsync(MainWindowViewModel vm, string mailHost, string user)
+    {
+        var subject = "Beim Beenden " + Guid.NewGuid().ToString("N")[..6];
+        await vm.MailPage.NewMailCommand.ExecuteAsync(null);
+        var compose = vm.MailPage.Compose!;
+        compose.To = "lea@example.com";
+        compose.Subject = subject;
+        IReadOnlyList<string>? asked = null;
+
+        var mayClose = await vm.PrepareCloseAsync(titles => { asked = titles; return Task.FromResult(CloseChoice.Cancel); });
+        Console.WriteLine($"Close, 'Abbrechen': asked about [{string.Join(", ", asked ?? [])}], may close={mayClose}, draft still open={!compose.IsFinished}");
+
+        mayClose = await vm.PrepareCloseAsync(_ => Task.FromResult(CloseChoice.Save));
+        Console.WriteLine($"Close, 'Speichern': may close={mayClose}, on server right away: {(await DraftSubjectsAsync(mailHost, user, subject)).Count}");
+
+        vm.MailPage.Compose = null;
+        await vm.MailPage.NewMailCommand.ExecuteAsync(null);
+        var other = vm.MailPage.Compose!;
+        other.Subject = subject + " verworfen";
+        mayClose = await vm.PrepareCloseAsync(_ => Task.FromResult(CloseChoice.Discard));
+        await Task.Delay(1000);
+        Console.WriteLine($"Close, 'Nicht speichern': may close={mayClose}, on server: {(await DraftSubjectsAsync(mailHost, user, subject + " verworfen")).Count}, " +
+                          $"asked again={vm.MailPage.UnsavedDrafts.Count > 0}");
+        vm.MailPage.Compose = null;
     }
 
     // Drafts: save (GreenMail has no "Drafts" folder – it is created), change and leave by opening another message

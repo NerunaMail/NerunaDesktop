@@ -443,6 +443,47 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Closing Neruna with this draft open, "Speichern": stores it now and waits until it is on the server.
+    /// </summary>
+    /// <returns>False if it could not be stored (the reason is in <see cref="Error"/>).</returns>
+    public async Task<bool> SaveBeforeExitAsync()
+    {
+        if (_finished)
+        {
+            return true;
+        }
+
+        Finish();
+        while (_saving)
+        {
+            await Task.Delay(50);
+        }
+
+        if (!IsDirty)
+        {
+            return true;
+        }
+
+        try
+        {
+            await StoreDraftAsync(await SnapshotAsync(), _changes);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Error = "Entwurf nicht gespeichert: " + ex.Message;
+            _finished = false;
+            return false;
+        }
+    }
+
+    /// <summary>Closing Neruna with this draft open, "Nicht speichern": the latest changes are dropped.</summary>
+    public void DiscardOnExit() => Finish();
+
+    /// <summary>"Offerte Netzwerk" or "(ohne Betreff)" for the question on closing.</summary>
+    public string Title => string.IsNullOrWhiteSpace(Subject) ? "(ohne Betreff)" : Subject.Trim();
+
     private void Finish()
     {
         _finished = true;

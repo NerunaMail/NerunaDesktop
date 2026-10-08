@@ -110,9 +110,17 @@ public class InvitationTests
         var leasCopy = (await lea.Env.Calendar.FindByUidAsync(request.Uid, ct))!.Value;
         Assert.Equal(16, EventDraft.FromICalendar(leasCopy.Item.ICalendarData).Start.Hour);
 
-        // Anna cancels; Lea's copy goes.
-        Assert.Equal(1, await anna.Invitations.SendCancellationAsync(annaCalendar, resaved.ICalendarData, ct));
-        await anna.Env.Calendar.DeleteEventAsync(annaCalendar, resaved.RemoteId, ct);
+        // Lea deletes it from her calendar after all: Anna is told "abgelehnt" and records it.
+        Assert.True(await lea.Invitations.SendDeclineAsync(leasCopy.Calendar, leasCopy.Item.ICalendarData, ct));
+        await lea.Env.Calendar.DeleteEventAsync(leasCopy.Calendar, leasCopy.Item.RemoteId, ct);
+        var declined = await WaitForInvitationAsync(anna, "Abgelehnt: " + subject, ct);
+        Assert.True(await anna.Invitations.ApplyReplyAsync(declined, ct));
+        var annasNow = (await anna.Env.Calendar.FindByUidAsync(request.Uid, ct))!.Value;
+        Assert.Equal(Participation.Declined, EventDraft.FromICalendar(annasNow.Item.ICalendarData).Attendees!.Single().Status);
+
+        // Anna cancels the meeting anyway; Lea has nothing left to remove.
+        Assert.Equal(1, await anna.Invitations.SendCancellationAsync(annaCalendar, annasNow.Item.ICalendarData, ct));
+        await anna.Env.Calendar.DeleteEventAsync(annaCalendar, annasNow.Item.RemoteId, ct);
         var cancel = await WaitForInvitationAsync(lea, "Abgesagt: " + subject, ct);
         Assert.Equal(InvitationMethod.Cancel, cancel.Method);
         await lea.Invitations.ApplyCancelAsync(cancel, ct);

@@ -144,6 +144,8 @@ IMailStore      ICalendarStore      IContactStore            ← SQLite (Neruna.
   öffnen, Fenster schliessen): der Text wird sofort übernommen, das Speichern läuft im Hintergrund. Geändert heisst:
   vom Benutzer getippt (Editor-Ereignis `ContentChanged`), nicht nur geöffnet.
 - «Verwerfen» fragt einmal nach und löscht auch den gespeicherten Entwurf; nach dem Senden wird er gelöscht.
+- Beim Beenden mit ungespeicherten Entwürfen (Lesebereich oder eigene Fenster) fragt Neruna «Speichern / Nicht
+  speichern / Abbrechen»; «Speichern» wartet, bis die Entwürfe auf dem Server liegen (`PrepareCloseAsync`).
 - In «Entwürfe» öffnet «Bearbeiten» oder Doppelklick den Entwurf wieder (`MessageComposer.FromDraft`: Empfänger,
   Text mit Bildern, Anhänge). Derselbe Entwurf ist höchstens einmal offen.
 
@@ -169,6 +171,8 @@ ebenfalls ein eigenes Fenster. Das Fenster lädt die Nachricht selbst und bleibt
 
 - Termin-Editor: Teilnehmer per E-Mail-Adresse; der eigene Kontoname wird Organisator. Beim Speichern gehen
   Einladungen bzw. Aktualisierungen an alle, Absagen an Ausgeladene; beim Löschen eine Absage (`InvitationService`).
+  Löscht ein Teilnehmer eine Besprechung, erhält der Organisator «abgelehnt» (`SendDeclineAsync`); die Rückfrage
+  sagt jeweils, dass Mail verschickt wird («Löschen und absagen?»).
 - Server mit eigener Terminplanung (DAV-Header `calendar-auto-schedule`, z. B. SOGo, Nextcloud) verschicken das selbst;
   Neruna ändert dann nur den Kalender, sonst (Radicale …) sendet Neruna die Mails über die Mail-Verbindung des Kontos.
 - Mails mit `text/calendar` und METHOD zeigen über dem Text einen Balken: Einladung (Annehmen/Vorläufig/Ablehnen,

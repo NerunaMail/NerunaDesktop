@@ -10,6 +10,9 @@ internal interface IWindowService
 {
     void ShowCompose(ComposeViewModel compose);
 
+    /// <summary>Drafts open in their own windows (asked about when Neruna closes).</summary>
+    IReadOnlyList<ComposeViewModel> OpenComposes { get; }
+
     void ShowMessage(MessageWindowViewModel message);
 
     /// <returns>The edited signature, or null when cancelled.</returns>
@@ -18,10 +21,16 @@ internal interface IWindowService
 
 internal sealed class WindowService(UiLayout layout) : IWindowService
 {
+    private readonly List<ComposeViewModel> _composes = [];
+
+    public IReadOnlyList<ComposeViewModel> OpenComposes => _composes;
+
     public void ShowCompose(ComposeViewModel compose)
     {
         ArgumentNullException.ThrowIfNull(compose);
         var window = new ComposeWindow { DataContext = compose };
+        _composes.Add(compose);
+        window.Closed += (_, _) => _composes.Remove(compose);
         layout.TrackWindow(window, "window.compose", withPosition: false);
         compose.Closed += (_, _) => window.Close();
 

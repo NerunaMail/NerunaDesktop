@@ -27,6 +27,10 @@ internal sealed partial class MailViewModel(
     UiPreferences preferences,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable
 {
+    /// <summary>Drafts with changes not yet stored – in the reading pane or in their own windows.</summary>
+    public IReadOnlyList<ComposeViewModel> UnsavedDrafts =>
+        [.. new[] { Compose }.Concat(windows.OpenComposes).OfType<ComposeViewModel>().Distinct().Where(c => !c.IsFinished && c.IsDirty)];
+
     /// <summary>Display preferences (toolbar with or without text).</summary>
     public UiPreferences Preferences => preferences;
 
