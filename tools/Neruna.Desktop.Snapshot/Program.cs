@@ -70,6 +70,8 @@ internal static class Snapshots
 {
     public static async Task RunAsync(string output)
     {
+        // Screenshots of the compose editor: formatted preview instead of the plain-text fallback (no WebView here).
+        HtmlEditor.ScreenshotPreview = true;
         var dataDir = Path.Combine(Path.GetTempPath(), "neruna-snapshot-" + Guid.NewGuid().ToString("N"));
         await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: true));
         var vm = services.GetRequiredService<MainWindowViewModel>();
@@ -113,18 +115,50 @@ internal static class Snapshots
         var demoAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync()).First();
         await signatures.SetAssignmentAsync(demoAccount.Id, new Neruna.Core.Mail.SignatureAssignment(signature.Id, null));
 
+        // The editor shows a formatted preview here (no WebView headless): toolbar, text and signature as on Windows.
         await vm.MailPage.NewMailCommand.ExecuteAsync(null);
-        await SaveAsync(window, output, "compose-fallback.png");
-
-        // How the toolbar looks with a real WebView (the editor area itself stays empty headless).
-        vm.MailPage.Compose!.Formatting.IsRichText = true;
+        vm.MailPage.Compose!.To = "Marco Bernasconi <marco@bernasconi.example>";
+        vm.MailPage.Compose.Subject = "Offerte Netzwerk-Erneuerung Q4";
+        await Task.Delay(300);
         await SaveAsync(window, output, "compose.png");
         vm.MailPage.Compose = null;
 
         // Reply to the opened message: HTML quote with reply header (shown as text in the headless fallback).
         await vm.MailPage.ReplyCommand.ExecuteAsync(null);
+        await Task.Delay(300);
         await SaveAsync(window, output, "reply.png");
         vm.MailPage.Compose = null;
+
+        // An invitation in a mail: the bar with Annehmen / Vorläufig / Ablehnen.
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.Subject.StartsWith("Einladung:", StringComparison.Ordinal));
+        for (var i = 0; i < 50 && vm.MailPage.ReadingPane?.Invitation?.Status is null; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await SaveAsync(window, output, "invitation.png");
+
+        // Advanced search across all folders of the account.
+        vm.MailPage.ToggleAdvancedSearchCommand.Execute(null);
+        vm.MailPage.SearchBody = string.Empty;
+        vm.MailPage.SearchSubject = "Offerte";
+        vm.MailPage.SearchScopeChoice = vm.MailPage.SearchScopes.First(s => s.IsAccount);
+        await vm.MailPage.RunSearchCommand.ExecuteAsync(null);
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault();
+        await Task.Delay(400);
+        await SaveAsync(window, output, "search.png");
+        Console.WriteLine($"Demo search: {vm.MailPage.SearchInfo}");
+        await vm.MailPage.CloseSearchCommand.ExecuteAsync(null);
+
+        // A desktop notification (shown on its own; the website puts it onto the main window).
+        var toast = new NotificationWindow
+        {
+            DataContext = new NotificationViewModel("Neue E-Mail · anna.muster@example.com", "Marco Bernasconi", "Offerte Netzwerk-Erneuerung Q4",
+                "Hallo Anna, anbei wie besprochen unsere Offerte …", () => Task.CompletedTask),
+        };
+        toast.Show();
+        await SaveAsync(toast, output, "notification-window.png");
+        toast.Close();
 
         // The font dropdown opens in a popup that headless capture does not include, so render its items on their own.
         await SaveFontListAsync(output);
@@ -137,6 +171,38 @@ internal static class Snapshots
         vm.CalendarPage.NavigatorMonthCount = 1;
         vm.CalendarPage.IsTimeGrid = true;
         await SaveAsync(window, output, "calendar-timegrid.png");
+
+        // A meeting with attendees, their answers and a reminder.
+        var calendarController = services.GetRequiredService<Neruna.Core.Calendar.CalendarController>();
+        var personal = (await calendarController.GetCalendarsAsync()).First(c => c.RemoteId == "personal") with { IsReadOnly = false };
+        var thursday = DateTime.Today.AddDays(-(((int)DateTime.Today.DayOfWeek + 6) % 7)).AddDays(3).AddHours(14);
+        var meeting = Neruna.Core.Calendar.EventDraft.New(thursday) with
+        {
+            Summary = "Quartalsplanung",
+            Location = "Sitzungszimmer Pilatus",
+            End = thursday.AddMinutes(90),
+            Organizer = "anna.muster@example.com",
+            Attendees =
+            [
+                new Neruna.Core.Calendar.EventAttendee("lea.keller@example.com", "Lea Keller", Neruna.Core.Calendar.Participation.Accepted),
+                new Neruna.Core.Calendar.EventAttendee("marco@bernasconi.example", "Marco Bernasconi", Neruna.Core.Calendar.Participation.Tentative),
+                new Neruna.Core.Calendar.EventAttendee("nadia.rossi@example.com", "Nadia Rossi"),
+            ],
+        };
+        vm.Overlay = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal], meeting,
+            (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com");
+        await SaveAsync(window, output, "event-attendees.png");
+        vm.Overlay = null;
+
+        // The reminder window with the next events of the demo week.
+        var upcoming = (await calendarController.GetOccurrencesAsync(await calendarController.GetCalendarsAsync(), DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now.AddDays(4)))
+            .Where(o => !o.IsAllDay).Take(3).ToList();
+        var reminderModel = new ReminderWindowViewModel(_ => Task.CompletedTask, (_, _) => Task.CompletedTask, _ => Task.CompletedTask, TimeProvider.System);
+        reminderModel.Show(upcoming.Select(o => new Neruna.Core.Calendar.Reminder(o.Uid + o.Start, o, o.Start.AddMinutes(-15))).ToList());
+        var reminderWindow = new ReminderWindow { DataContext = reminderModel };
+        reminderWindow.Show();
+        await SaveAsync(reminderWindow, output, "reminder-window.png");
+        reminderWindow.Close();
         vm.CalendarPage.IsWorkWeek = true;
         await Task.Delay(300);
         await SaveAsync(window, output, "calendar-workweek.png");

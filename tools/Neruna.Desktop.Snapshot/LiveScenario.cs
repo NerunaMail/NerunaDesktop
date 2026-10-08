@@ -458,6 +458,23 @@ internal static class LiveScenario
                 await model.DismissAllCommand.ExecuteAsync(null);
             }
         }
+
+        // Leave the calendar as it was (later screenshots show it).
+        foreach (var uid in new[] { Neruna.Core.Calendar.EventDraft.UidOf(data)!, Neruna.Core.Calendar.EventDraft.UidOf(newDraft.ToICalendar(null)) })
+        {
+            if (await calendar.FindByUidAsync(uid!) is { } leftover)
+            {
+                await calendar.DeleteEventAsync(leftover.Calendar, leftover.Item.RemoteId);
+            }
+        }
+
+        foreach (var left in await calendar.GetOccurrencesAsync(await calendar.GetCalendarsAsync(), new DateTimeOffset(DateTime.Today.AddDays(-1)), new DateTimeOffset(DateTime.Today.AddDays(3))))
+        {
+            if (left.Summary.EndsWith(tag, StringComparison.Ordinal) && !left.Calendar.IsReadOnly)
+            {
+                await calendar.DeleteEventAsync(left.Calendar, left.ObjectRemoteId);
+            }
+        }
     }
 
     // Push: a mail sent from outside appears without any manual sync, a notification shows it, a reply being written

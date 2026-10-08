@@ -122,6 +122,14 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     /// <summary>Set by the snapshot tool and tests: headless rendering has no native WebView.</summary>
     public static bool ForcePlainText { get; set; }
 
+    /// <summary>
+    /// Snapshot tool only: without a WebView, show the content read-only with the HTML renderer of the reading pane
+    /// and report "rich", so screenshots look like the real editor (formatting toolbar, formatted text).
+    /// </summary>
+    public static bool ScreenshotPreview { get; set; }
+
+    private TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel? _preview;
+
     public bool IsRich => _ready && _fallback is null;
 
     public bool IsPlainText => _fallback is not null;
@@ -129,7 +137,11 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     public void Load(string html, string font, double sizePt, string placeholder)
     {
         _content = (html, font, sizePt, placeholder);
-        if (_fallback is not null)
+        if (_preview is not null)
+        {
+            _preview.Text = PreviewHtml();
+        }
+        else if (_fallback is not null)
         {
             _loadedText = PlainTextOf(html);
             _fallback.Text = _loadedText;
@@ -140,8 +152,17 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         }
     }
 
+    private string PreviewHtml() => _content is { } c
+        ? $"<div style=\"font-family:{c.Font};font-size:{c.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}pt\">{c.Html}</div>"
+        : string.Empty;
+
     public async Task<string?> GetHtmlAsync()
     {
+        if (_preview is not null)
+        {
+            return PreviewHtml();
+        }
+
         if (!IsRich || _web is null)
         {
             return null;
@@ -194,6 +215,17 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
     private void Start()
     {
+        if (ScreenshotPreview)
+        {
+            // The margin goes on a border: HtmlPanel cuts off text with its own padding (as in the reading pane).
+            _preview = new TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel { Background = Avalonia.Media.Brushes.White };
+            _host.Children.Add(new Border { Padding = new Avalonia.Thickness(12, 10), Background = Avalonia.Media.Brushes.White, Child = _preview });
+            _preview.Text = PreviewHtml();
+            _ready = true;
+            ModeChanged?.Invoke(this, true);
+            return;
+        }
+
         if (ForcePlainText)
         {
             UseFallback();

@@ -106,8 +106,28 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider
         var message = new MimeMessage { Subject = m.Subject, Date = DateTimeOffset.Now.AddMinutes(-m.MinutesAgo) };
         message.From.Add(new MailboxAddress(m.FromName, m.FromAddress));
         message.To.Add(new MailboxAddress("Anna Muster", "anna.muster@example.com"));
-        message.Body = new TextPart("plain") { Text = m.Body };
+        message.Body = m.Subject.StartsWith("Einladung:", StringComparison.Ordinal)
+            ? new MultipartAlternative { new TextPart("plain") { Text = m.Body }, InvitationPart() }
+            : new TextPart("plain") { Text = m.Body };
         return Task.FromResult(message);
+    }
+
+    // The demo invitation is a real one (iTIP): the "Quartalsplanung" of the demo calendar, organized by Thomas Frei.
+    private static TextPart InvitationPart()
+    {
+        var monday = DateTime.Today.AddDays(-(((int)DateTime.Today.DayOfWeek + 6) % 7));
+        var start = monday.AddDays(3).AddHours(14);
+        var ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Neruna//Demo//DE\r\nMETHOD:REQUEST\r\nBEGIN:VEVENT\r\n" +
+                  "UID:personal-2@demo.neruna\r\nSEQUENCE:0\r\nDTSTAMP:20260101T000000Z\r\n" +
+                  $"DTSTART:{start:yyyyMMdd'T'HHmmss}\r\nDTEND:{start.AddMinutes(90):yyyyMMdd'T'HHmmss}\r\n" +
+                  "SUMMARY:Quartalsplanung\r\nLOCATION:Sitzungszimmer Pilatus\r\n" +
+                  "ORGANIZER;CN=Thomas Frei:mailto:thomas.frei@example.com\r\n" +
+                  "ATTENDEE;CN=Anna Muster;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:anna.muster@example.com\r\n" +
+                  "ATTENDEE;CN=Lea Keller;PARTSTAT=ACCEPTED:mailto:lea.keller@example.com\r\n" +
+                  "END:VEVENT\r\nEND:VCALENDAR\r\n";
+        var part = new TextPart("calendar") { Text = ics };
+        part.ContentType.Parameters.Add("method", "REQUEST");
+        return part;
     }
 
     // Flags are kept in the local store only; the next demo sync restores the original state.
