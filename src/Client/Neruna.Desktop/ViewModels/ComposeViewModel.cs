@@ -8,6 +8,7 @@ using MimeKit;
 using MimeKit.Utils;
 using Neruna.Core;
 using Neruna.Core.Accounts;
+using Neruna.Core.Contacts;
 using Neruna.Core.Mail;
 using Neruna.Core.Security;
 using Neruna.Desktop.Editor;
@@ -104,6 +105,38 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             }
         };
         _autosave.Start();
+    }
+
+    /// <summary>The address books, for completing An/Cc and the contact picker (none in tests).</summary>
+    public RecipientDirectory? Recipients { get; init; }
+
+    /// <summary>Adds chosen contacts/groups to An or Cc; addresses already in the field are not added twice.</summary>
+    public void AddRecipients(bool cc, IEnumerable<RecipientEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        var field = (cc ? Cc : To) ?? string.Empty;
+        var present = InternetAddressList.TryParse(field, out var parsed)
+            ? parsed.Mailboxes.Select(m => m.Address).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var added = entries.SelectMany(e => e.Addresses)
+            .Where(a => present.Add(a.Address))
+            .Select(RecipientEntry.Format)
+            .ToList();
+        if (added.Count == 0)
+        {
+            return;
+        }
+
+        var head = field.TrimEnd().TrimEnd(',', ';').TrimEnd();
+        var text = (head.Length == 0 ? string.Empty : head + ", ") + string.Join(", ", added);
+        if (cc)
+        {
+            Cc = text;
+        }
+        else
+        {
+            To = text;
+        }
     }
 
     /// <summary>A draft was stored in or removed from "Entwürfe" (the mail page refreshes that folder).</summary>

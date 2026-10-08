@@ -121,14 +121,28 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         _loadingSettings = false;
         GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
         var hidden = Calendars.Where(c => !c.IsVisible).Select(c => (c.Info.ConnectionId, c.Info.RemoteId)).ToHashSet();
-        Calendars.Clear();
+
+        // The new list is built first and swapped in at once: a week load starting meanwhile must never see no calendars.
+        var items = new List<CalendarListItem>();
         var index = 0;
         foreach (var info in await calendar.GetCalendarsAsync())
         {
             // A color chosen in Neruna wins over the server's (stored locally, also for read-only subscriptions).
             var color = await settings.GetAsync(ColorKey(info)) ?? info.Color ?? Palette[index++ % Palette.Length];
             var item = new CalendarListItem(info, color) { IsVisible = !hidden.Contains((info.ConnectionId, info.RemoteId)) };
-            item.PropertyChanged += async (_, _) => await LoadWeekAsync(dataChanged: true);
+            item.PropertyChanged += async (_, e) =>
+            {
+                if (e.PropertyName == nameof(CalendarListItem.IsVisible))
+                {
+                    await LoadWeekAsync(dataChanged: true);
+                }
+            };
+            items.Add(item);
+        }
+
+        Calendars.Clear();
+        foreach (var item in items)
+        {
             Calendars.Add(item);
         }
 
@@ -246,13 +260,20 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     }
 
     /// <param name="dataChanged">Calendars, their visibility or events changed: busy days are recomputed.</param>
+    private int _weekVersion;
+
     private async Task LoadWeekAsync(bool dataChanged = false)
     {
         var visible = Calendars.Where(c => c.IsVisible).ToList();
         var colors = visible.ToDictionary(c => (c.Info.ConnectionId, c.Info.RemoteId), c => c.Color);
         var from = new DateTimeOffset(WeekStart);
         var shown = visible.Select(c => c.Info).ToList();
+        var version = ++_weekVersion;
         var occurrences = await Task.Run(() => calendar.GetOccurrencesAsync(shown, from, from.AddDays(7)));
+        if (version != _weekVersion)
+        {
+            return; // A newer load (other week, calendars changed) is under way; an older result must not overwrite it.
+        }
 
         Days.Clear();
         for (var i = 0; i < DayCount; i++)
@@ -262,7 +283,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
                 .Where(o => o.Start.LocalDateTime.Date <= day && (o.End.LocalDateTime > day || o.Start.LocalDateTime.Date == day))
                 .OrderByDescending(o => o.IsAllDay)
                 .ThenBy(o => o.Start)
-                .Select(o => new CalendarEventItem(o, colors[(o.Calendar.ConnectionId, o.Calendar.RemoteId)]))
+                .Select(o => new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0]))
                 .ToList();
             Days.Add(new CalendarDay(day, events));
         }

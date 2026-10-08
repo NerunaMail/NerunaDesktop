@@ -4,6 +4,7 @@
              xmlns:ed="using:Neruna.Desktop.Editor"
              xmlns:views="using:Neruna.Desktop.Views"
              xmlns:app="using:Neruna.Desktop"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              x:Class="Neruna.Desktop.Views.ComposeView"
              x:DataType="vm:ComposeViewModel">
 
@@ -80,11 +81,14 @@
     <TextBlock Grid.Row="1" Classes="subtle" Text="Von" VerticalAlignment="Center" />
     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FromText}" Margin="0,6" />
 
-    <TextBlock Grid.Row="2" Classes="subtle" Text="An" VerticalAlignment="Center" />
-    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding To}" Margin="0,3" PlaceholderText="name@example.com, …" />
+    <!-- An / Cc: the button opens the contact picker; typing suggests contacts and groups from the address books -->
+    <Button x:Name="ToButton" Grid.Row="2" Content="An …" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3"
+            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="Kontakte auswählen" />
+    <ctl:RecipientBox Grid.Row="2" Grid.Column="1" Text="{Binding To}" Directory="{Binding Recipients}" Margin="0,3" PlaceholderText="Name oder Adresse eingeben, mehrere mit Komma trennen" />
 
-    <TextBlock Grid.Row="3" Classes="subtle" Text="Cc" VerticalAlignment="Center" />
-    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Cc}" Margin="0,3" />
+    <Button x:Name="CcButton" Grid.Row="3" Content="Cc …" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3"
+            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="Kontakte auswählen" />
+    <ctl:RecipientBox Grid.Row="3" Grid.Column="1" Text="{Binding Cc}" Directory="{Binding Recipients}" Margin="0,3" />
 
     <TextBox x:Name="SubjectBox" Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding Subject}" PlaceholderText="Betreff hinzufügen" Margin="0,10,0,6" FontWeight="SemiBold" />
 

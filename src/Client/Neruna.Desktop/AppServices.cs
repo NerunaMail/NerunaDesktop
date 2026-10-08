@@ -92,6 +92,7 @@ internal static class AppServices
         services.AddSingleton<IWindowService, WindowService>();
         services.AddSingleton<UiLayout>();
         services.AddSingleton<UiPreferences>();
+        services.AddSingleton<RecipientDirectory>();
         services.AddSingleton<NotificationService>();
         services.AddSingleton<ReminderScheduler>();
         services.AddSingleton(TimeProvider.System);

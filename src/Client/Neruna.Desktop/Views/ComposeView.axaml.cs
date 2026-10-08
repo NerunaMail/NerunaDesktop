@@ -23,4 +23,17 @@ internal sealed partial class ComposeView : UserControl
             }
         };
     }
+
+    // "An …" / "Cc …": choose one or more contacts or groups.
+    private async void OnPickRecipients(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not ComposeViewModel { Recipients: { } directory } vm || TopLevel.GetTopLevel(this) is not Window owner)
+        {
+            return;
+        }
+
+        var cc = sender == this.FindControl<Button>("CcButton");
+        var chosen = await RecipientPicker.ShowAsync(owner, cc ? "Cc" : "An", directory);
+        vm.AddRecipients(cc, chosen);
+    }
 }

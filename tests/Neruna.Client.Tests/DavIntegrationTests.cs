@@ -255,6 +255,14 @@ public sealed class DavIntegrationTests : IDisposable
         var members = await env.Contacts.ResolveMembersAsync(group.Card, ct);
         Assert.Equal(["lea@home.example", "marco@example.com", "gast@example.org"], members.Select(m => m.Address));
         Assert.Equal("\"Lea Keller\" <lea@home.example>", members[0].Recipient);
+
+        // For An/Cc: each of Lea's addresses, Marco, and the group with all three addresses.
+        var recipients = await env.Contacts.GetRecipientsAsync(ct);
+        Assert.Equal(2, recipients.Count(r => r.Name == "Lea Keller"));
+        var party = Assert.Single(RecipientEntry.Find(recipients, "grill"));
+        Assert.True(party.IsGroup);
+        Assert.Equal("Gruppe · 3 Mitglieder", party.Detail);
+        Assert.Equal(["Lea Keller <lea@home.example>", "Marco <marco@example.com>", "gast@example.org"], party.FieldTexts);
     }
 
     [Fact]

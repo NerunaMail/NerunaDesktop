@@ -25,6 +25,7 @@ internal sealed partial class MailViewModel(
     IHttpClientFactory httpClients,
     InvitationService invitations,
     UiPreferences preferences,
+    RecipientDirectory recipients,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable
 {
     /// <summary>Drafts with changes not yet stored – in the reading pane or in their own windows.</summary>
@@ -381,7 +382,10 @@ internal sealed partial class MailViewModel(
 
     private ComposeViewModel CreateCompose(Account account, ServiceConnection connection, ComposeDraft draft, ComposeKind kind, bool encrypt, bool inWindow)
     {
-        var compose = new ComposeViewModel(mail, account, connection, draft, files, secureMime, settings, signatures, kind, encrypt, inWindow);
+        var compose = new ComposeViewModel(mail, account, connection, draft, files, secureMime, settings, signatures, kind, encrypt, inWindow)
+        {
+            Recipients = recipients,
+        };
         compose.Closed += async (_, sent) =>
         {
             if (Compose == compose)

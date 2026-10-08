@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Neruna.Core.Accounts;
+using Neruna.Core.Mail;
 using Neruna.Core.Providers;
 
 namespace Neruna.Core.Contacts;
@@ -232,6 +233,56 @@ public sealed class ContactController(
         }
 
         result.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Card.DisplayName, b.Card.DisplayName));
+        return result;
+    }
+
+    /// <summary>
+    /// Everything to send to: each address of each contact (one entry per address) and each group with an address for
+    /// every member. For An/Cc autocompletion and the contact picker.
+    /// </summary>
+    public async Task<IReadOnlyList<RecipientEntry>> GetRecipientsAsync(CancellationToken cancellationToken = default)
+    {
+        var entries = await SearchAsync(null, cancellationToken);
+        var byUid = new Dictionary<string, ContactEntry>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in entries)
+        {
+            byUid.TryAdd(entry.Card.MemberUid, entry);
+        }
+
+        var result = new List<RecipientEntry>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (_, _, card) in entries)
+        {
+            if (card.IsGroup)
+            {
+                var members = card.Members.Select(member => member.ContactUid is null
+                        ? member.Email is { } external ? new MailAddress(null, external) : null
+                        : byUid.GetValueOrDefault(member.ContactUid) is { } contact
+                            ? (member.Email is { } chosen && contact.Card.EmailAddresses.Contains(chosen, StringComparer.OrdinalIgnoreCase) ? chosen : contact.Card.EmailAddresses.FirstOrDefault()) is { } address
+                                ? new MailAddress(contact.Card.DisplayName, address)
+                                : null
+                            : member.Email is { } email ? new MailAddress(null, email) : null)
+                    .OfType<MailAddress>()
+                    .DistinctBy(a => a.Address, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (members.Count > 0)
+                {
+                    result.Add(new RecipientEntry(card.DisplayName, members, members.Count == 1 ? "Gruppe · 1 Mitglied" : $"Gruppe · {members.Count} Mitglieder", IsGroup: true));
+                }
+
+                continue;
+            }
+
+            foreach (var email in card.EmailAddresses)
+            {
+                // The same person in two address books is offered once.
+                if (seen.Add(card.DisplayName + "\n" + email))
+                {
+                    result.Add(new RecipientEntry(card.DisplayName, [new MailAddress(card.DisplayName, email)], card.Organization, IsGroup: false));
+                }
+            }
+        }
+
         return result;
     }
 

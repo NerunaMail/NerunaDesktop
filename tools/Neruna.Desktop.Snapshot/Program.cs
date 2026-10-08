@@ -121,6 +121,41 @@ internal static class Snapshots
         vm.MailPage.Compose.Subject = "Offerte Netzwerk-Erneuerung Q4";
         await Task.Delay(300);
         await SaveAsync(window, output, "compose.png");
+
+        // An: typing suggests contacts and groups; the "An …" button opens the picker (several at once).
+        var toBox = window.GetVisualDescendants().OfType<Neruna.Desktop.Controls.RecipientBox>().First();
+        await toBox.TypeAsync("Marco Bernasconi <marco@bernasconi.example>, le");
+        await Task.Delay(200);
+        Console.WriteLine($"Suggestions open: {toBox.IsSuggesting}");
+        await SaveAsync(window, output, "compose-autocomplete.png");
+        await toBox.TypeAsync(string.Empty);
+
+        var picking = RecipientPicker.ShowAsync(window, "An", vm.MailPage.Compose!.Recipients!);
+        for (var i = 0; i < 20 && RecipientPicker.Open is null; i++)
+        {
+            await Task.Delay(50);
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        if (RecipientPicker.Open is { } picker)
+        {
+            picker.Width = 560;
+            var pickList = picker.GetVisualDescendants().OfType<ListBox>().First();
+            var entries = pickList.ItemsSource!.Cast<Neruna.Core.Contacts.RecipientEntry>().ToList();
+            Console.WriteLine($"Picker: {entries.Count} entries: {string.Join(", ", entries.Select(e => e.Name))}");
+            foreach (var entry in entries.Where((_, i) => i is 1 or 3))
+            {
+                pickList.SelectedItems!.Add(entry);
+            }
+
+            await SaveAsync(picker, output, "recipient-picker.png");
+            var take = picker.GetVisualDescendants().OfType<Button>().First(b => b.IsDefault);
+            take.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            var picked = await picking;
+            vm.MailPage.Compose!.AddRecipients(cc: false, picked);
+            Console.WriteLine($"Picked into An: {vm.MailPage.Compose.To}");
+        }
+
         vm.MailPage.Compose = null;
 
         // Reply to the opened message: HTML quote with reply header (shown as text in the headless fallback).
