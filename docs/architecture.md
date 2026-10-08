@@ -421,10 +421,11 @@ Kontaktliste mit Detailansicht. Screenshots: `docs/screenshots/` (erzeugt mit `t
 | Mandanten, Domains, Server-Profile | ✔ Datenmodell (ULIDs), Domain-Verifikation per TXT-Token vorbereitet |
 | Discovery-API `/api/v1/discovery` | ✔ inkl. Vertragstest |
 | Thunderbird-Autoconfig (beide Pfade) | ✔ inkl. Vertragstest |
-| Admin-Portal | offen (Vorschlag: Filament) |
+| Admin und Kundenportal | ✔ Filament 5: `/admin` (Mandanten, Lizenz, Limits, Addons, Logins), `/portal` (Firmendaten, Benutzer, Verbindungscodes, Geräte) |
 | Signaturvorlagen, Kalender-Abos, Richtlinien | offen |
 | Config-Tresor-Ablage | offen (Server speichert nur `VaultEnvelope`-JSON) |
-| Benutzer-Authentifizierung | offen (siehe Entscheide) |
+| Geräte verbinden | ✔ Einmal-Code + separate PIN, Geräteschlüssel (ECDSA P-256), signierte Anmeldung, Tokens; Geräte im Portal sperrbar |
+| Betrieb | ✔ Shared Hosting (PHP 8.4+, MySQL/MariaDB, ohne Worker/Redis/Node), Paket per `scripts/package-shared-hosting.sh` |
 
 Server-Profile beschreiben die Endpunkte beim Kunden (IMAP/SMTP/CalDAV/CardDAV). Für EWS & Co. wird das Profil
 später um weitere Diensttypen ergänzt – analog zu den Client-Providern.
@@ -449,11 +450,11 @@ DEK (256 bit, zufällig)
 
 | # | Thema | Optionen |
 |---|---|---|
-| 1 | Lizenz Client/Shared | GPLv3 · MPL 2.0 · Apache 2.0 |
-| 2 | Endbenutzer-Auth gegenüber Cloud | Geräte-Code · OIDC · IMAP-Login |
+| 1 | Lizenz Client/Shared | ✔ MPL 2.0 (Beiträge mit CLA) |
+| 2 | Endbenutzer-Auth gegenüber Cloud | ✔ Geräte-Code aus dem Portal + PIN, danach Geräteschlüssel |
 | 3 | Admin-Escrow für Tresor | ja/nein, optional pro Mandant |
 | 4 | Preismodell | pro User · pro Domain · Staffeln |
 | 5 | UI-Sprachen | heute nur Deutsch; `.resx` de/en vor Release |
 | 6 | HTML-Darstellung von Mails | ✔ Lesen: Avalonia.HtmlRenderer; Verfassen: native WebView (WebView2/WebKit). Avalonias RichTextEditor ist kommerziell → nicht verwendet |
-| 7 | Admin-UI Server | Filament · Livewire · SPA |
-| 8 | Produkt-Domain | Platzhalter `neruna.example` |
+| 7 | Admin-UI Server | ✔ Filament 5 |
+| 8 | Produkt-Domain | ✔ neruna.org |
