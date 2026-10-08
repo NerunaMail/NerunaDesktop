@@ -223,6 +223,17 @@ und graue Schriftfarben fallen weg, dunkle Farben werden aufgehellt), gestaltete
 (Newsletter) bleiben auf hellem Papier. Der Editor zeigt seine Seite im dunklen Design invertiert (Bilder
 zurückinvertiert); die versendete Mail bleibt unverändert dunkle Schrift auf Weiss.
 
+### Neruna Cloud verbinden
+
+Einstellungen → Cloud: Server, Verbindungscode und PIN aus dem Portal. `CloudController` (Neruna.Core/Cloud) erzeugt dabei
+ein Schlüsselpaar (ECDSA P-256); der private Schlüssel liegt im Schlüsselbund des Betriebssystems (`ICredentialStore`,
+Schlüssel `CloudController.KeyId`), der Server kennt nur den öffentlichen Teil. Mitgeschickt werden Gerätename,
+Betriebssystem und -version, angemeldeter Benutzer und Neruna-Version (im Portal pro Gerät sichtbar). Danach meldet sich
+die App mit einer signierten JWT-Assertion (ES256, wie OAuth private_key_jwt) an und erhält ein 15-Minuten-Token.
+Verbindung (Server, Geräte-ID, Organisation) steht in den Einstellungen `cloud.connection`; ist sie gesetzt, fragt auch
+die Kontoeinrichtung zuerst den Server der Organisation (`AccountDiscovery.OrganizationServer`). Nur HTTPS, ausser
+`localhost` zum Entwickeln. Vertrag: `server/contract/openapi.yaml` (enrollment, token, me).
+
 ### Kalendernamen und -farben
 
 Farbe und Anzeigename eines Kalenders lassen sich über das Farbfeld in der Kalenderliste ändern. Beides wird nur in

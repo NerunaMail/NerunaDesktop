@@ -22,6 +22,9 @@ public static class SettingKeys
     public const string ComposeInWindow = "compose.openInWindow";
 
     /// <summary>The agenda (today's and the next days' appointments) is shown beside the mail (default: off).</summary>
+    /// <summary>Connection to a Neruna Cloud/Control server (JSON of CloudConnection; the device key is in the keychain).</summary>
+    public const string CloudConnection = "cloud.connection";
+
     public const string MailAgendaOpen = "mail.agendaOpen";
 
     /// <summary>Calendars left out of the agenda, independent of the calendar page (JSON list of "connection|calendar").</summary>

@@ -29,6 +29,7 @@ internal sealed class ViewLocator : IDataTemplate
         CalendarOptionsViewModel => new CalendarOptionsView(),
         SignaturesViewModel => new SignaturesView(),
         AppearanceViewModel => new AppearanceView(),
+        CloudViewModel => new CloudView(),
         null => null,
         _ => new TextBlock { Text = "Keine Ansicht für " + param.GetType().Name },
     };

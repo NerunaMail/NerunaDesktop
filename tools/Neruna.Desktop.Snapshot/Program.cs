@@ -362,7 +362,22 @@ internal static class Snapshots
         Console.WriteLine($"'Konto hinzufügen' hidden: {!addAccount.IsVisible}, remembered: {await services.GetRequiredService<Neruna.Core.ISettingsStore>().GetAsync(Neruna.Core.SettingKeys.ShowAddAccountButton)}");
         await SaveAsync(window, output, "settings-design-no-add-account.png");
         preferences.ShowAddAccountButton = true;
+        // Einstellungen → Cloud: not connected; connected when a code for a running server is given
+        // (NERUNA_SNAPSHOT_CLOUD=<url> NERUNA_SNAPSHOT_CLOUD_CODE=… NERUNA_SNAPSHOT_CLOUD_PIN=…).
         vm.SettingsPage.SelectedTab = 6;
+        vm.SettingsPage.Cloud.DeviceName = "Anna – Notebook";
+        await SaveAsync(window, output, "settings-cloud.png");
+        if (Environment.GetEnvironmentVariable("NERUNA_SNAPSHOT_CLOUD") is { Length: > 0 } cloudUrl)
+        {
+            vm.SettingsPage.Cloud.Server = cloudUrl;
+            vm.SettingsPage.Cloud.Code = Environment.GetEnvironmentVariable("NERUNA_SNAPSHOT_CLOUD_CODE") ?? string.Empty;
+            vm.SettingsPage.Cloud.Pin = Environment.GetEnvironmentVariable("NERUNA_SNAPSHOT_CLOUD_PIN") ?? string.Empty;
+            await vm.SettingsPage.Cloud.ConnectCommand.ExecuteAsync(null);
+            Console.WriteLine($"Cloud: {vm.SettingsPage.Cloud.ConnectedText ?? vm.SettingsPage.Cloud.Error}");
+            await SaveAsync(window, output, "settings-cloud-connected.png");
+        }
+
+        vm.SettingsPage.SelectedTab = 7;
         await SaveAsync(window, output, "settings-about.png");
 
         // Color schemes and dark mode applied to the running app.
