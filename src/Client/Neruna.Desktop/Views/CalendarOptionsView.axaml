@@ -15,6 +15,11 @@
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,14"
                Text="Gilt für neue Termine und angenommene Einladungen; im Termin lässt sie sich einzeln ändern. Termine aus dem Webmail oder anderen Programmen behalten ihre eigene Erinnerung." />
 
+    <TextBlock Text="Einladungen" FontSize="16" FontWeight="SemiBold" />
+    <CheckBox IsChecked="{Binding DeleteAnsweredInvitations}" Content="Beantwortete Einladungen in den Papierkorb verschieben" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,14"
+               Text="Nach «Annehmen», «Vorläufig» oder «Ablehnen» – und nach «Aus dem Kalender entfernen» bei einer Absage – verschwindet die Mail aus dem Posteingang. Hat ein Konto keinen Papierkorb, bleibt sie liegen." />
+
     <TextBlock Text="Darstellung der Woche" FontSize="16" FontWeight="SemiBold" />
     <StackPanel Spacing="4" Margin="0,0,0,14">
       <RadioButton GroupName="CalendarLayout" Content="Liste – Termine pro Tag untereinander" IsChecked="{Binding ListLayout}" />

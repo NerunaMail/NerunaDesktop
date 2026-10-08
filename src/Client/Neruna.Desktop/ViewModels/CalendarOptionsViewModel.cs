@@ -83,6 +83,18 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         _ = settings.SetAsync(SettingKeys.CalendarLayout, value ? "timegrid" : "list");
     }
 
+    /// <summary>"Beantwortete Einladungen in den Papierkorb verschieben" (default on).</summary>
+    [ObservableProperty]
+    public partial bool DeleteAnsweredInvitations { get; set; } = true;
+
+    partial void OnDeleteAnsweredInvitationsChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = settings.SetBoolAsync(SettingKeys.DeleteAnsweredInvitations, value);
+        }
+    }
+
     /// <summary>"Standard-Erinnerung": for new events and accepted invitations.</summary>
     public static IReadOnlyList<ReminderOption> ReminderOptions => ReminderOption.Standard;
 
@@ -102,6 +114,7 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         _loading = true;
         try
         {
+            DeleteAnsweredInvitations = await settings.GetBoolAsync(SettingKeys.DeleteAnsweredInvitations, fallback: true);
             var reminder = await settings.GetDefaultReminderAsync();
             DefaultReminder = ReminderOption.Standard.FirstOrDefault(o => o.Minutes == reminder) ?? ReminderOption.Standard.First(o => o.Minutes == EventDraft.DefaultReminderMinutes);
             TwoMonths = await settings.GetAsync(SettingKeys.CalendarNavigatorMonths) == "2";

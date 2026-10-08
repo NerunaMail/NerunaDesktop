@@ -57,6 +57,9 @@ public static class SettingKeys
     /// <summary>Reminder for new events and accepted invitations, minutes before the start; "none" for none. Default: 15.</summary>
     public const string CalendarDefaultReminder = "calendar.defaultReminder";
 
+    /// <summary>After answering an invitation (or removing a cancelled event), its mail goes to the trash. Default: on.</summary>
+    public const string DeleteAnsweredInvitations = "calendar.deleteAnsweredInvitations";
+
     /// <summary>Toolbar buttons with text below the icon (default) or icon only.</summary>
     public const string ToolbarLabels = "ui.toolbarLabels";
 

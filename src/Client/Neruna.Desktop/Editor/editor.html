@@ -10,7 +10,10 @@
     min-height: 100%; box-sizing: border-box; padding: 14px 18px 40px; outline: none;
     color: #000000; word-wrap: break-word; overflow-wrap: anywhere; line-height: 1.3;
   }
+  /* Lines inside a block (signature, quoted original) stay together; a paragraph of its own (Enter) gets half a line
+     more, so it stands apart from lines that merely wrap. cleanHtml puts the same margin into the sent mail. */
   #editor div, #editor p { margin: 0; }
+  #editor > div, #editor > p { margin: 0 0 0.5em 0; }
   #editor blockquote { margin: 0 0 0 4px; padding-left: 10px; border-left: 2px solid #c8c8c8; }
   #editor img { max-width: 100%; }
   #editor a { color: #0f6cbd; }
@@ -135,6 +138,12 @@
     Array.prototype.slice.call(clone.querySelectorAll("span")).forEach(function (s) {
       if (!s.textContent && !s.querySelector("img,br")) s.parentNode.removeChild(s);
     });
+    // The paragraph spacing travels with the mail (inline, which every mail program understands).
+    Array.prototype.slice.call(clone.children).forEach(function (el) {
+      if ((el.tagName === "DIV" || el.tagName === "P") && !el.style.margin && !el.style.marginBottom) {
+        el.style.margin = "0 0 0.5em 0";
+      }
+    });
     return clone.innerHTML;
   }
 
@@ -165,7 +174,29 @@
     }
   });
 
-  editor.addEventListener("input", function () { post({ type: "changed" }); scheduleState(); });
+  // Text typed into an empty editor lands outside any block; wrap such runs in a div, so the first line is a
+  // paragraph like the others (spacing in the editor and in the sent mail). The caret stays where it was.
+  var BLOCKS = /^(DIV|P|BLOCKQUOTE|UL|OL|TABLE|PRE|H[1-6]|HR)$/;
+  function ensureBlocks() {
+    var loose = Array.prototype.filter.call(editor.childNodes, function (n) {
+      return n.nodeType === 3 ? n.nodeValue.length > 0 : n.nodeType === 1 && !BLOCKS.test(n.tagName);
+    });
+    if (loose.length === 0) return;
+    var selection = window.getSelection();
+    var anchor = selection.rangeCount ? { node: selection.anchorNode, offset: selection.anchorOffset } : null;
+    var block = null;
+    Array.prototype.slice.call(editor.childNodes).forEach(function (n) {
+      if (loose.indexOf(n) >= 0) {
+        if (!block) { block = document.createElement("div"); editor.insertBefore(block, n); }
+        block.appendChild(n);
+      } else {
+        block = null;
+      }
+    });
+    if (anchor && anchor.node && editor.contains(anchor.node)) selection.collapse(anchor.node, anchor.offset);
+  }
+
+  editor.addEventListener("input", function () { ensureBlocks(); post({ type: "changed" }); scheduleState(); });
   document.addEventListener("selectionchange", scheduleState);
 
   // Links are never followed inside the editor.

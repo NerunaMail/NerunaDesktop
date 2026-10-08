@@ -59,7 +59,7 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     {
         _hidden = await LoadHiddenAsync();
         var books = await contacts.GetAddressBooksAsync();
-        _all = await contacts.SearchAsync(null);
+        _all = await Task.Run(() => contacts.SearchAsync(null));
 
         // With several accounts the account is shown below each address book: two "Domain Address Book" stay apart.
         var sources = await contacts.GetSourcesAsync();

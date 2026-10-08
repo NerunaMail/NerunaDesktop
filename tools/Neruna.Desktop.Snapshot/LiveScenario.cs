@@ -37,6 +37,7 @@ internal static class LiveScenario
         var user = "anna@example.com";
         await SeedDavAsync(davUrl, user);
         await EnsureFolderAsync(mailHost, "Projekte");
+        await EnsureFolderAsync(mailHost, "Trash");
         await SeedMailAsync(mailHost);
         await SeedRichMailAsync(mailHost);
 
@@ -73,7 +74,21 @@ internal static class LiveScenario
         var vm = services.GetRequiredService<MainWindowViewModel>();
         var window = new MainWindow { DataContext = vm, Width = 1440, Height = 880 };
         window.Show();
+        // How long the UI thread is blocked at a stretch while the first sync runs (a timer ticks every 20 ms).
+        var lastTick = System.Diagnostics.Stopwatch.StartNew();
+        var longestPause = TimeSpan.Zero;
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var probe = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
+        probe.Tick += (_, _) =>
+        {
+            longestPause = lastTick.Elapsed > longestPause ? lastTick.Elapsed : longestPause;
+            lastTick.Restart();
+        };
+        probe.Start();
+        started.Restart();
         await vm.InitializeAsync();
+        probe.Stop();
+        Console.WriteLine($"Start-up sync: {started.ElapsedMilliseconds} ms, longest UI pause {longestPause.TotalMilliseconds:0} ms");
         Console.WriteLine("Status: " + vm.StatusText);
 
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.HasAttachments);
@@ -412,6 +427,17 @@ internal static class LiveScenario
         await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetDefaultReminderAsync(30);
         await banner!.AcceptCommand.ExecuteAsync(null);
         Console.WriteLine($"Accepted: {banner.Status} {banner.Error} | status bar: {vm.StatusText}");
+        Console.WriteLine($"Invitation after answering: in the list={vm.MailPage.Entries.OfType<MessageItemViewModel>().Any(m => m.Subject.EndsWith(tag, StringComparison.Ordinal))}, " +
+                          $"now open: {vm.MailPage.SelectedMessage?.Subject}");
+        using (var trash = new MailKit.Net.Imap.ImapClient())
+        {
+            await trash.ConnectAsync(mailHost, 3143, SecureSocketOptions.None);
+            await trash.AuthenticateAsync(user, "geheim");
+            var folder = await trash.GetFolderAsync("Trash");
+            await folder.OpenAsync(MailKit.FolderAccess.ReadOnly);
+            Console.WriteLine($"In the trash on the server: {(await folder.SearchAsync(MailKit.Search.SearchQuery.SubjectContains(tag))).Count}");
+            await trash.DisconnectAsync(true);
+        }
         var calendar = services.GetRequiredService<Neruna.Core.Calendar.CalendarController>();
         var stored = await calendar.FindByUidAsync(Neruna.Core.Calendar.EventDraft.UidOf(data)!);
         Console.WriteLine($"In Anna's calendar: {stored?.Calendar.Name} – {(stored?.Item.ICalendarData.Contains("PARTSTAT=ACCEPTED", StringComparison.Ordinal) == true ? "zugesagt" : "?")}, " +

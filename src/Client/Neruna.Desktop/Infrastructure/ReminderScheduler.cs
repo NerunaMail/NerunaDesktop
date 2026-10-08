@@ -44,7 +44,8 @@ internal sealed class ReminderScheduler(ReminderService reminders, UiLayout layo
     {
         try
         {
-            var due = await reminders.GetDueAsync();
+            // Expanding every event's alarms is real work; the window is only updated on the UI thread.
+            var due = await Task.Run(() => reminders.GetDueAsync());
             var model = _model ??= CreateModel();
             model.Show(due);
 

@@ -319,7 +319,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         try
         {
             // The three areas are independent; one failing never blocks the others.
-            var reports = await Task.WhenAll(_mail.SyncAllAsync(), _calendar.SyncAllAsync(), _contacts.SyncAllAsync());
+            // Off the UI thread: SQLite and parsing hundreds of messages, events and cards would freeze the window.
+            var reports = await Task.Run(() => Task.WhenAll(_mail.SyncAllAsync(), _calendar.SyncAllAsync(), _contacts.SyncAllAsync()));
             await RefreshPagesAsync();
             await _reminders.CheckAsync();
 
@@ -487,13 +488,47 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Overlay = editor;
     }
 
+    // Pages not on screen are only marked; they reload when opened (rebuilding them all froze the window after a sync).
+    private readonly HashSet<ViewModelBase> _stalePages = [];
+
     private async Task RefreshPagesAsync()
     {
-        await MailPage.RefreshAfterSyncAsync();
-        await CalendarPage.ReloadAsync();
-        await ContactsPage.ReloadAsync();
-        await SettingsPage.ReloadAsync();
+        _stalePages.UnionWith([MailPage, CalendarPage, ContactsPage, SettingsPage]);
+        await RefreshIfStaleAsync(CurrentPage);
     }
+
+    private async Task RefreshIfStaleAsync(ViewModelBase page)
+    {
+        if (!_stalePages.Remove(page))
+        {
+            return;
+        }
+
+        try
+        {
+            switch (page)
+            {
+                case MailViewModel mail:
+                    await mail.RefreshAfterSyncAsync();
+                    break;
+                case CalendarViewModel calendar:
+                    await calendar.ReloadAsync();
+                    break;
+                case ContactsViewModel contacts:
+                    await contacts.ReloadAsync();
+                    break;
+                case SettingsViewModel settings:
+                    await settings.ReloadAsync();
+                    break;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Reloading {Page} failed", page.GetType().Name);
+        }
+    }
+
+    partial void OnCurrentPageChanged(ViewModelBase value) => _ = RefreshIfStaleAsync(value);
 }
 
 /// <summary>The answer to "Entwurf speichern?" when Neruna closes.</summary>

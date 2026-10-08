@@ -243,7 +243,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var visible = Calendars.Where(c => c.IsVisible).ToList();
         var colors = visible.ToDictionary(c => (c.Info.ConnectionId, c.Info.RemoteId), c => c.Color);
         var from = new DateTimeOffset(WeekStart);
-        var occurrences = await calendar.GetOccurrencesAsync(visible.Select(c => c.Info), from, from.AddDays(7));
+        var shown = visible.Select(c => c.Info).ToList();
+        var occurrences = await Task.Run(() => calendar.GetOccurrencesAsync(shown, from, from.AddDays(7)));
 
         Days.Clear();
         for (var i = 0; i < DayCount; i++)
@@ -316,7 +317,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var from = StartOfWeek(fromMonth);
         var to = toMonth.AddDays(7);
         var visible = Calendars.Where(c => c.IsVisible).Select(c => c.Info).ToList();
-        var occurrences = visible.Count == 0 ? [] : await calendar.GetOccurrencesAsync(visible, new DateTimeOffset(from), new DateTimeOffset(to));
+        var occurrences = visible.Count == 0 ? [] : await Task.Run(() => calendar.GetOccurrencesAsync(visible, new DateTimeOffset(from), new DateTimeOffset(to)));
 
         var busy = await Task.Run(() =>
         {

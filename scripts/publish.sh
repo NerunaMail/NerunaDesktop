@@ -10,7 +10,8 @@ export DOTNET_CLI_TELEMETRY_OPTOUT=1 AVALONIA_TELEMETRY_OPTOUT=1
 
 rm -rf "$OUT" "$OUT.zip"
 dotnet publish "$ROOT/src/Client/Neruna.Desktop" -c Release -r "$RID" --self-contained true \
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o "$OUT"
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none \
+  -p:PublishReadyToRun=true -o "$OUT"
 rm -f "$OUT"/*.pdb
 # Licence texts must ship with the app (MPL 2.0 and the third-party notices required by MIT/BSD/Apache).
 cp "$ROOT/LICENSE" "$OUT/LICENSE.txt"

@@ -46,16 +46,26 @@ public sealed class SqliteCertificateStore(IDbContextFactory<NerunaDbContext> co
     }
 }
 
+/// <summary>
+/// Settings, read from the database once and then answered from memory (the UI asks for many of them on every
+/// page load); writes go to the database right away.
+/// </summary>
 public sealed class SqliteSettingsStore(IDbContextFactory<NerunaDbContext> contexts) : ISettingsStore
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string?> _values = new(StringComparer.Ordinal);
+    private readonly Lock _gate = new();
+    private Task? _loaded;
+
     public async Task<string?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
-        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
-        return (await db.Settings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == key, cancellationToken))?.Value;
+        await LoadedAsync().WaitAsync(cancellationToken);
+        return _values.TryGetValue(key, out var value) ? value : null;
     }
 
     public async Task SetAsync(string key, string? value, CancellationToken cancellationToken = default)
     {
+        await LoadedAsync().WaitAsync(cancellationToken);
+        _values[key] = value;
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var row = await db.Settings.FindAsync([key], cancellationToken);
         if (row is null)
@@ -68,5 +78,22 @@ public sealed class SqliteSettingsStore(IDbContextFactory<NerunaDbContext> conte
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private Task LoadedAsync()
+    {
+        lock (_gate)
+        {
+            return _loaded ??= LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        await using var db = await contexts.CreateDbContextAsync();
+        foreach (var row in await db.Settings.AsNoTracking().ToListAsync())
+        {
+            _values.TryAdd(row.Key, row.Value);
+        }
     }
 }

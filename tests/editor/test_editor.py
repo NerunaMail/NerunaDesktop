@@ -135,3 +135,28 @@ def test_body_html_has_no_font_wrapper(page):
     page.keyboard.type("Anna Muster")
     body = page.evaluate("neruna.getBodyHtml()")
     assert "Anna Muster" in body and "font-family" not in body
+
+
+def test_a_new_paragraph_stands_apart_from_a_wrapped_line(page):
+    # (Typing into the empty editor must already create a paragraph block, not loose text.)
+    # A line long enough to wrap, Enter, then a second paragraph.
+    page.evaluate("document.getElementById('editor').style.width = '300px'")
+    page.click("#editor")
+    page.keyboard.type("Diese Zeile ist so lang, dass sie im schmalen Editor automatisch umbricht und weiterläuft.")
+    page.keyboard.press("Enter")
+    page.keyboard.type("Zweiter Absatz")
+    gaps = page.evaluate("""() => {
+        const blocks = [...document.getElementById('editor').children];
+        const r1 = document.createRange(); r1.selectNodeContents(blocks[0]);
+        const lines = [...r1.getClientRects()];
+        const tops = [...new Set(lines.map(l => Math.round(l.top)))].sort((a, b) => a - b);
+        const lineStep = tops[1] - tops[0];
+        const r2 = document.createRange(); r2.selectNodeContents(blocks[1]);
+        const paragraphStep = Math.round(r2.getClientRects()[0].top) - tops[tops.length - 1];
+        return { lineStep, paragraphStep };
+    }""")
+    assert gaps["paragraphStep"] > gaps["lineStep"] * 1.3, gaps
+
+    # Recipients see the same spacing: it is in the exported HTML, on the paragraphs only.
+    html = page.evaluate("neruna.getBodyHtml()")
+    assert html.count("margin: 0px 0px 0.5em") == 2 or html.count("margin: 0 0 0.5em") == 2, html

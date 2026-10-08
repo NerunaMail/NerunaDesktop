@@ -188,6 +188,8 @@ internal sealed partial class MailViewModel(
             return;
         }
 
+        // The new tree node is the folder already open: selecting it must not load (and sync) it a second time.
+        CurrentFolder = folderToSelect;
         SelectedTreeItem = folderToSelect;
         await LoadFolderAsync(folderToSelect, selectedMessage);
     }
@@ -686,7 +688,7 @@ internal sealed partial class MailViewModel(
         // Opening a folder refreshes it from the server in the background.
         try
         {
-            await mail.SyncFolderAsync(folder.Account.Connection, folder.Folder);
+            await Task.Run(() => mail.SyncFolderAsync(folder.Account.Connection, folder.Folder));
             if (CurrentFolder == folder)
             {
                 var updated = (await mail.GetFoldersAsync(folder.Folder.ConnectionId)).FirstOrDefault(f => f.RemoteId == folder.Folder.RemoteId);
@@ -790,7 +792,8 @@ internal sealed partial class MailViewModel(
             return;
         }
 
-        var summaries = await mail.GetMessagesAsync(folder.Folder, take: Math.Max(PageSize, _allMessages.Count));
+        var take = Math.Max(PageSize, _allMessages.Count);
+        var summaries = await Task.Run(() => mail.GetMessagesAsync(folder.Folder, take: take));
         if (CurrentFolder != folder || IsSearchMode)
         {
             return;
@@ -843,7 +846,7 @@ internal sealed partial class MailViewModel(
     {
         EndSearch();
         CurrentFolder = folder;
-        var summaries = await mail.GetMessagesAsync(folder.Folder, take: PageSize);
+        var summaries = await Task.Run(() => mail.GetMessagesAsync(folder.Folder, take: PageSize));
         _allMessages = summaries.Select(s => new MessageItemViewModel(s, folder)).ToList();
         RebuildEntries();
         await UpdateCountsAsync(folder);
@@ -877,7 +880,7 @@ internal sealed partial class MailViewModel(
 
     private async Task UpdateCountsAsync(MailFolderNode folder)
     {
-        _storedCount = await mail.CountStoredAsync(folder.Folder);
+        _storedCount = await Task.Run(() => mail.CountStoredAsync(folder.Folder));
         var total = (await mail.GetFoldersAsync(folder.Folder.ConnectionId)).FirstOrDefault(f => f.RemoteId == folder.Folder.RemoteId)?.TotalCount ?? 0;
         total = Math.Max(total, _storedCount);
         HasMore = !IsSearchMode && (_allMessages.Count < _storedCount || _storedCount < total);
@@ -898,10 +901,11 @@ internal sealed partial class MailViewModel(
         {
             if (_allMessages.Count >= _storedCount)
             {
-                await mail.LoadOlderAsync(folder.Account.Connection, folder.Folder, PageSize);
+                await Task.Run(() => mail.LoadOlderAsync(folder.Account.Connection, folder.Folder, PageSize));
             }
 
-            var more = await mail.GetMessagesAsync(folder.Folder, _allMessages.Count, PageSize);
+            var skip = _allMessages.Count;
+            var more = await Task.Run(() => mail.GetMessagesAsync(folder.Folder, skip, PageSize));
             if (CurrentFolder != folder || IsSearchMode)
             {
                 return;
@@ -1034,7 +1038,8 @@ internal sealed partial class MailViewModel(
         try
         {
             var nodes = folders.ToDictionary(f => (f.Folder.ConnectionId, f.Folder.RemoteId));
-            var result = await mail.SearchAsync(folders.Select(f => f.Folder).ToList(), query);
+            var searched = folders.Select(f => f.Folder).ToList();
+            var result = await Task.Run(() => mail.SearchAsync(searched, query));
             var several = folders.Select(f => f.Folder.ConnectionId).Distinct().Count() > 1;
             var items = result.Hits.Select(hit =>
             {
@@ -1186,21 +1191,21 @@ internal sealed partial class MailViewModel(
             async answer =>
             {
                 await invitations.RespondAsync(invitation, answer, account, banner!.IsInCalendar ? null : banner.SelectedCalendar);
-                StatusMessage?.Invoke(this, answer switch
+                CalendarChanged?.Invoke(this, EventArgs.Empty);
+                await UpdateInvitationAsync(banner!, account);
+                await TidyAnsweredInvitationAsync(summary, answer switch
                 {
                     Participation.Accepted => "Zugesagt – der Termin steht im Kalender.",
                     Participation.Tentative => "Mit Vorbehalt zugesagt – der Termin steht im Kalender.",
                     _ => "Abgesagt.",
                 });
-                CalendarChanged?.Invoke(this, EventArgs.Empty);
-                await UpdateInvitationAsync(banner!, account);
             },
             async () =>
             {
                 await invitations.ApplyCancelAsync(invitation);
-                StatusMessage?.Invoke(this, "Der abgesagte Termin wurde aus dem Kalender entfernt.");
                 CalendarChanged?.Invoke(this, EventArgs.Empty);
                 await UpdateInvitationAsync(banner!, account);
+                await TidyAnsweredInvitationAsync(summary, "Der abgesagte Termin wurde aus dem Kalender entfernt.");
             });
         _invitation = (summary.RemoteId, banner);
         pane.Invitation = banner;
@@ -1219,6 +1224,26 @@ internal sealed partial class MailViewModel(
         {
             logger.LogWarning(ex, "Checking the invitation {Uid} failed", invitation.Uid);
             banner.Error = "Der Kalender konnte nicht geprüft werden: " + ex.Message;
+        }
+    }
+
+    // Once answered, the invitation mail goes to the trash (Einstellungen → Kalender) and the list moves on.
+    private async Task TidyAnsweredInvitationAsync(MessageSummary summary, string done)
+    {
+        var message = _allMessages.FirstOrDefault(m => ReferenceEquals(m.Summary, summary));
+
+        // Only into a trash folder: without one, deleting would be for good.
+        if (message is null || FolderOf(message) is not { } folder || folder.Folder.Role == FolderRole.Trash
+            || !await settings.GetBoolAsync(SettingKeys.DeleteAnsweredInvitations, fallback: true)
+            || await mail.FindFolderAsync(folder.Folder.ConnectionId, FolderRole.Trash) is null)
+        {
+            StatusMessage?.Invoke(this, done);
+            return;
+        }
+
+        if (await RunOnMessagesAsync([message], "Einladung in den Papierkorb verschieben", (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true))
+        {
+            StatusMessage?.Invoke(this, done + " Die Einladung liegt im Papierkorb.");
         }
     }
 
