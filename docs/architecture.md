@@ -478,6 +478,19 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 - Grenze: Die Portalseite selbst kommt vom Server – ein kompromittierter Server könnte veränderten Code ausliefern.
 - Vertragstest: Die Fixtures erzeugt das Browser-Modul (Node), die App muss sie öffnen.
 
+## 6c. E-Mail-Konten aus dem Portal (Zero-Knowledge)
+
+- Gleiches Schema wie 6b, eigene Kontexte (`neruna-account-key-v1|…`, `neruna-account-payload-v1|…`,
+  Signatur über `neruna-account-v1|id|payload`): Konto samt Servern, Login, optionalem Passwort und Aliasen im Browser
+  verschlüsselt und signiert – die Servereinstellungen sind mitsigniert, damit niemand Passwörter umleiten kann.
+- Server stammen aus einem Serverprofil (Portal → Serverprofile); ändert sich das Profil, signiert «Freigeben und
+  zustellen» die betroffenen Konten mit demselben Schlüssel neu (Umschläge der Geräte bleiben gültig).
+- Eine Gerätefreigabe stellt Zertifikate und Konten zusammen zu (`DeliversToDevices`).
+- Client (`CloudAccountSync`): richtet ein, aktualisiert (Konto- und Verbindungs-IDs bleiben, Bezeichnung gehört dem
+  Benutzer), entfernt nicht mehr zugeordnete. Ohne Passwort fragt er den Benutzer; dieses Passwort liegt nur lokal
+  und geht in die persönliche Sicherung, die Cloud-Konten selbst nicht.
+- Kalender und Adressbücher findet der Client mit den Zugangsdaten selbst (der Server kennt das Passwort nicht).
+
 ## 7. Offene Entscheide
 
 | # | Thema | Optionen |
