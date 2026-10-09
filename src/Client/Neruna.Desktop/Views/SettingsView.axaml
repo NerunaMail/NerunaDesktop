@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:views="using:Neruna.Desktop.Views"
@@ -14,31 +15,31 @@
           <Setter Property="MinHeight" Value="40" />
         </Style>
       </TabControl.Styles>
-      <TabItem Header="Konten">
+      <TabItem Header="{l:T 'Konten'}">
         <ContentControl Content="{Binding Accounts}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="E-Mail">
+      <TabItem Header="{l:T 'E-Mail'}">
         <ContentControl Content="{Binding MailOptions}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="Kalender">
+      <TabItem Header="{l:T 'Kalender'}">
         <ContentControl Content="{Binding CalendarOptions}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="Signaturen">
+      <TabItem Header="{l:T 'Signaturen'}">
         <ContentControl Content="{Binding Signatures}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="Textvorlagen">
+      <TabItem Header="{l:T 'Textvorlagen'}">
         <ContentControl Content="{Binding TextTemplates}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="Zertifikate (S/MIME)">
+      <TabItem Header="{l:T 'Zertifikate (S/MIME)'}">
         <ContentControl Content="{Binding Certificates}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="Design">
+      <TabItem Header="{l:T 'Design'}">
         <ContentControl Content="{Binding Appearance}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="Cloud">
+      <TabItem Header="{l:T 'Cloud'}">
         <ContentControl Content="{Binding Cloud}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="Info">
+      <TabItem Header="{l:T 'Info'}">
         <views:AboutView Margin="0,12,0,0" />
       </TabItem>
     </TabControl>

@@ -1,15 +1,16 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              x:Class="Neruna.Desktop.Views.AddressBookSelectionView"
              x:DataType="vm:AddressBookSelectionViewModel">
   <StackPanel>
-    <TextBlock Text="Adressbücher verwalten" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Adressbücher verwalten'}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,12"
-               Text="Neruna fragt den Server erneut nach allen Adressbüchern. Abgewählte Adressbücher verschwinden aus der Liste und werden nicht mehr synchronisiert – auf dem Server bleiben sie unverändert. Praktisch, wenn zwei Konten derselben Firma dasselbe Domain-Adressbuch anbieten." />
+               Text="{l:T 'Neruna fragt den Server erneut nach allen Adressbüchern. Abgewählte Adressbücher verschwinden aus der Liste und werden nicht mehr synchronisiert – auf dem Server bleiben sie unverändert. Praktisch, wenn zwei Konten derselben Firma dasselbe Domain-Adressbuch anbieten.'}" />
 
     <ProgressBar IsIndeterminate="True" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
-    <TextBlock Classes="subtle" Text="Kein CardDAV-Konto eingerichtet." IsVisible="{Binding HasNoSources}" />
+    <TextBlock Classes="subtle" Text="{l:T 'Kein CardDAV-Konto eingerichtet.'}" IsVisible="{Binding HasNoSources}" />
 
     <ItemsControl ItemsSource="{Binding Sources}">
       <ItemsControl.ItemTemplate>
@@ -26,9 +27,9 @@
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                       <Border IsVisible="{Binding IsNew}" Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="3" Padding="5,0" VerticalAlignment="Center">
-                        <TextBlock Text="neu" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock Text="{l:T 'neu'}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
                       </Border>
-                      <TextBlock IsVisible="{Binding IsReadOnly}" Classes="subtle" Text="schreibgeschützt" FontSize="12" VerticalAlignment="Center" />
+                      <TextBlock IsVisible="{Binding IsReadOnly}" Classes="subtle" Text="{l:T 'schreibgeschützt'}" FontSize="12" VerticalAlignment="Center" />
                     </StackPanel>
                   </CheckBox>
                 </DataTemplate>
@@ -43,14 +44,14 @@
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,16,0,0">
-      <Button Classes="command" Command="{Binding RefreshCommand}" ToolTip.Tip="Server erneut abfragen">
+      <Button Classes="command" Command="{Binding RefreshCommand}" ToolTip.Tip="{l:T 'Server erneut abfragen'}">
         <StackPanel Orientation="Horizontal">
           <PathIcon Data="{StaticResource IconSync}" />
-          <TextBlock Text="Erneut suchen" />
+          <TextBlock Text="{l:T 'Erneut suchen'}" />
         </StackPanel>
       </Button>
-      <Button Grid.Column="2" Content="Abbrechen" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="3" Classes="accent" Content="Übernehmen" Command="{Binding ApplyCommand}" />
+      <Button Grid.Column="2" Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Classes="accent" Content="{l:T 'Übernehmen'}" Command="{Binding ApplyCommand}" />
     </Grid>
   </StackPanel>
 </UserControl>

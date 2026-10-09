@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Neruna.Desktop.ViewModels"
         xmlns:app="using:Neruna.Desktop"
@@ -24,7 +25,7 @@
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
           <!-- Own online status for the chat, from every page (only with a chat) -->
           <Button x:Name="PresenceButton" Classes="header" IsVisible="{Binding ChatPage.ShowPresence}" Padding="8,4" Margin="0,0,4,0"
-                  ToolTip.Tip="Online-Status im Chat">
+                  ToolTip.Tip="{l:T 'Online-Status im Chat'}">
             <StackPanel Orientation="Horizontal" Spacing="7">
               <Ellipse Width="10" Height="10" Fill="{Binding ChatPage.PresenceBrush}" Stroke="White" StrokeThickness="1" VerticalAlignment="Center" />
               <TextBlock Text="{Binding ChatPage.PresenceLabel}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
@@ -51,7 +52,7 @@
           </Button>
           <!-- Tagesansicht: the next appointments beside the mail (remembered across restarts) -->
           <ToggleButton Classes="header" IsVisible="{Binding IsMail}" IsChecked="{Binding MailPage.Agenda.IsOpen}"
-                        ToolTip.Tip="Tagesansicht: Termine von heute und den nächsten Tagen ein- oder ausblenden">
+                        ToolTip.Tip="{l:T 'Tagesansicht: Termine von heute und den nächsten Tagen ein- oder ausblenden'}">
             <PathIcon Data="{StaticResource IconSidebar}" Width="17" Height="17" Foreground="White" />
           </ToggleButton>
         </StackPanel>
@@ -64,16 +65,16 @@
         <DockPanel>
         <!-- Bottom of the rail: add an account, synchronize, settings -->
         <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,0,0,10">
-          <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding ShowAccountSetupCommand}" ToolTip.Tip="Konto hinzufügen"
+          <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding ShowAccountSetupCommand}" ToolTip.Tip="{l:T 'Konto hinzufügen'}"
                   IsVisible="{Binding MailPage.Preferences.ShowAddAccountButton}">
             <PathIcon Data="{StaticResource IconAccountAdd}" />
           </Button>
-          <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding SyncCommand}" ToolTip.Tip="Synchronisieren (F5)">
+          <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding SyncCommand}" ToolTip.Tip="{l:T 'Synchronisieren (F5)'}">
             <PathIcon Data="{StaticResource IconSync}" />
           </Button>
           <Border Height="1" Width="28" Background="{DynamicResource DividerBrush}" Margin="0,2" />
           <Button Classes="rail" Classes.active="{Binding IsSettings}" HorizontalAlignment="Center"
-                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Settings}" ToolTip.Tip="Einstellungen: Konten, Zertifikate, Diagnose">
+                  Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Settings}" ToolTip.Tip="{l:T 'Einstellungen: Konten, Zertifikate, Diagnose'}">
             <PathIcon Data="{StaticResource IconSettings}" />
           </Button>
         </StackPanel>
@@ -117,19 +118,19 @@
         </StackPanel>
         <!-- Personal settings changed since the last backup -->
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,16,0" IsVisible="{Binding ShowBackupHint}">
-          <TextBlock FontSize="12" Text="Einstellungen geändert – neue Sicherung erstellen?" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" />
-          <Button Classes="command" Command="{Binding BackupNowCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="Einstellungen → Cloud → Sicherung">
-            <TextBlock Text="Sichern" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+          <TextBlock FontSize="12" Text="{l:T 'Einstellungen geändert – neue Sicherung erstellen?'}" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" />
+          <Button Classes="command" Command="{Binding BackupNowCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="{l:T 'Einstellungen → Cloud → Sicherung'}">
+            <TextBlock Text="{l:T 'Sichern'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
           </Button>
-          <Button Classes="command" Command="{Binding BackupLaterCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="Erst nach der nächsten Änderung wieder fragen">
-            <TextBlock Text="Später" Classes="subtle" TextDecorations="Underline" />
+          <Button Classes="command" Command="{Binding BackupLaterCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="{l:T 'Erst nach der nächsten Änderung wieder fragen'}">
+            <TextBlock Text="{l:T 'Später'}" Classes="subtle" TextDecorations="Underline" />
           </Button>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding SettingsPage.Updates.IsReady}">
           <TextBlock FontSize="12" Text="{Binding SettingsPage.Updates.ReadyText}" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" />
           <Button Classes="command" Command="{Binding SettingsPage.Updates.RestartNowCommand}" Padding="6,1" FontSize="12"
-                  ToolTip.Tip="Neruna schliessen, das Update installieren und wieder starten">
-            <TextBlock Text="Jetzt neu starten" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+                  ToolTip.Tip="{l:T 'Neruna schliessen, das Update installieren und wieder starten'}">
+            <TextBlock Text="{l:T 'Jetzt neu starten'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
           </Button>
         </StackPanel>
       </Grid>

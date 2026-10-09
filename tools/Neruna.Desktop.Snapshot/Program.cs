@@ -26,7 +26,8 @@ var backup = Array.IndexOf(args, "--backup") is var bk and >= 0 ? args[(bk + 1).
 var firstStart = Array.IndexOf(args, "--first-start") is var fs and >= 0 ? args[fs + 1] : null;
 var live = Array.IndexOf(args, "--live") is var i and >= 0 ? (Host: args[i + 1], Dav: new Uri(args[i + 2])) : ((string Host, Uri Dav)?)null;
 Directory.CreateDirectory(output);
-CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo("de-CH");
+// Language of the pictures: NERUNA_SNAPSHOT_LANG=en|fr|it (German by default).
+Neruna.Core.Localization.Texts.Use(Environment.GetEnvironmentVariable("NERUNA_SNAPSHOT_LANG") ?? "de");
 
 AppBuilder.Configure<App>()
     .UseSkia()
@@ -434,7 +435,7 @@ internal static class Snapshots
         preferences.ShowAddAccountButton = false;
         await Task.Delay(100);
         Dispatcher.UIThread.RunJobs();
-        var addAccount = window.GetVisualDescendants().OfType<Button>().First(b => ToolTip.GetTip(b) as string == "Konto hinzufügen");
+        var addAccount = window.GetVisualDescendants().OfType<Button>().First(b => ToolTip.GetTip(b) as string == Neruna.Core.Localization.Texts.T("Konto hinzufügen"));
         Console.WriteLine($"'Konto hinzufügen' hidden: {!addAccount.IsVisible}, remembered: {await services.GetRequiredService<Neruna.Core.ISettingsStore>().GetAsync(Neruna.Core.SettingKeys.ShowAddAccountButton)}");
         await SaveAsync(window, output, "settings-design-no-add-account.png");
         preferences.ShowAddAccountButton = true;
@@ -729,7 +730,7 @@ internal static class Snapshots
     public static async Task ClickAdvancedSearchAsync(Window window)
     {
         var button = window.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ToggleButton>()
-            .First(t => ToolTip.GetTip(t) is string tip && tip.StartsWith("Erweiterte Suche", StringComparison.Ordinal));
+            .First(t => ToolTip.GetTip(t) is string tip && tip == Neruna.Core.Localization.Texts.T("Erweiterte Suche: Absender, Betreff, Text, Ordner"));
         var point = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
         window.MouseDown(point, Avalonia.Input.MouseButton.Left);
         window.MouseUp(point, Avalonia.Input.MouseButton.Left);

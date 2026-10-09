@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:cal="using:Neruna.Core.Calendar"
@@ -19,8 +20,8 @@
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
           <SelectableTextBlock Text="{Binding From}" FontWeight="SemiBold" />
-          <TextBlock Classes="subtle" FontSize="12" Text="{Binding To, StringFormat='An: {0}'}" TextTrimming="CharacterEllipsis" />
-          <TextBlock Classes="subtle" FontSize="12" Text="{Binding Cc, StringFormat='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
+          <TextBlock Classes="subtle" FontSize="12" Text="{Binding To, Converter={x:Static l:Fmt.Instance}, ConverterParameter='An: {0}'}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Classes="subtle" FontSize="12" Text="{Binding Cc, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding Date}" />
         </StackPanel>
       </Grid>
@@ -57,7 +58,7 @@
           <TextBlock Text="{Binding Status}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <TextBlock Text="{Binding Conflicts}" FontSize="12" TextWrapping="Wrap" Foreground="#C42B1C" IsVisible="{Binding Conflicts, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0" IsVisible="{Binding ShowCalendarChoice}">
-            <TextBlock Text="Eintragen in" VerticalAlignment="Center" FontSize="12" />
+            <TextBlock Text="{l:T 'Eintragen in'}" VerticalAlignment="Center" FontSize="12" />
             <ComboBox ItemsSource="{Binding Calendars}" SelectedItem="{Binding SelectedCalendar}" MinWidth="200">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="cal:CalendarInfo">
@@ -67,12 +68,12 @@
             </ComboBox>
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0" IsVisible="{Binding CanRespond}">
-            <Button Classes="accent" Content="Annehmen" Command="{Binding AcceptCommand}" />
-            <Button Content="Vorläufig" Command="{Binding TentativeCommand}" />
-            <Button Content="Ablehnen" Command="{Binding DeclineCommand}" />
+            <Button Classes="accent" Content="{l:T 'Annehmen'}" Command="{Binding AcceptCommand}" />
+            <Button Content="{l:T 'Vorläufig'}" Command="{Binding TentativeCommand}" />
+            <Button Content="{l:T 'Ablehnen'}" Command="{Binding DeclineCommand}" />
             <ProgressBar IsIndeterminate="True" Width="50" MinWidth="0" Height="4" VerticalAlignment="Center" IsVisible="{Binding IsBusy}" />
           </StackPanel>
-          <Button Content="Aus dem Kalender entfernen" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" Margin="0,6,0,0" />
+          <Button Content="{l:T 'Aus dem Kalender entfernen'}" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" Margin="0,6,0,0" />
           <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
       </Border>
@@ -81,8 +82,8 @@
         <Grid ColumnDefinitions="Auto,*,Auto">
           <PathIcon Data="{StaticResource IconImage}" Width="16" Height="16" Margin="0,0,8,0" />
           <TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
-                     Text="Externe Bilder wurden zum Schutz Ihrer Privatsphäre nicht geladen." />
-          <Button Grid.Column="2" Classes="command" Content="Bilder laden" FontSize="12" Command="{Binding LoadRemoteContentCommand}" />
+                     Text="{l:T 'Externe Bilder wurden zum Schutz Ihrer Privatsphäre nicht geladen.'}" />
+          <Button Grid.Column="2" Classes="command" Content="{l:T 'Bilder laden'}" FontSize="12" Command="{Binding LoadRemoteContentCommand}" />
         </Grid>
       </Border>
 
@@ -98,18 +99,18 @@
             <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,6,6">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource IconAttach}" Width="14" Height="14" />
-                <Button Classes="command" Padding="0" Command="{Binding OpenCommand}" ToolTip.Tip="Öffnen">
+                <Button Classes="command" Padding="0" Command="{Binding OpenCommand}" ToolTip.Tip="{l:T 'Öffnen'}">
                   <TextBlock Text="{Binding FileName}" TextDecorations="Underline" />
                 </Button>
                 <TextBlock Classes="subtle" FontSize="11" Text="{Binding SizeText}" VerticalAlignment="Center" />
-                <Button Classes="command" Padding="4,0" Command="{Binding SaveCommand}" Content="Speichern" FontSize="12" />
+                <Button Classes="command" Padding="4,0" Command="{Binding SaveCommand}" Content="{l:T 'Speichern'}" FontSize="12" />
               </StackPanel>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <TextBlock Grid.Row="6" Text="Wird geladen …" Classes="subtle" Margin="24,8" IsVisible="{Binding IsLoading}" />
+      <TextBlock Grid.Row="6" Text="{l:T 'Wird geladen …'}" Classes="subtle" Margin="24,8" IsVisible="{Binding IsLoading}" />
       <views:MessageBodyView Grid.Row="6" IsVisible="{Binding HasBody}" />
     </Grid>
   </Panel>

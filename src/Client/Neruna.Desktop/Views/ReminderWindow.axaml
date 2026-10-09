@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Neruna.Desktop.ViewModels"
         xmlns:app="using:Neruna.Desktop"
@@ -16,7 +17,7 @@
   <DockPanel Margin="12">
     <!-- Snooze: "Erneut erinnern in [5 Minuten]" – like office calendars -->
     <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" Margin="0,10,0,0">
-      <TextBlock Grid.ColumnSpan="3" Classes="subtle" FontSize="12" Text="Erneut erinnern in:" Margin="0,0,0,4" />
+      <TextBlock Grid.ColumnSpan="3" Classes="subtle" FontSize="12" Text="{l:T 'Erneut erinnern in:'}" Margin="0,0,0,4" />
       <ComboBox Grid.Row="1" ItemsSource="{Binding SnoozeOptions}" SelectedItem="{Binding SnoozeChoice}" Width="220" IsEnabled="{Binding HasSelection}">
         <ComboBox.ItemTemplate>
           <DataTemplate x:DataType="vm:SnoozeOption">
@@ -24,12 +25,12 @@
           </DataTemplate>
         </ComboBox.ItemTemplate>
       </ComboBox>
-      <Button Grid.Row="1" Grid.Column="2" Content="Erneut erinnern" Command="{Binding SnoozeCommand}" />
+      <Button Grid.Row="1" Grid.Column="2" Content="{l:T 'Erneut erinnern'}" Command="{Binding SnoozeCommand}" />
     </Grid>
     <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,0">
-      <Button Content="Alle schliessen" Command="{Binding DismissAllCommand}" />
-      <Button Grid.Column="2" Content="Element öffnen" Command="{Binding OpenCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="3" Classes="accent" Content="Schliessen" Command="{Binding DismissCommand}" ToolTip.Tip="Erinnerung schliessen (Entf)" />
+      <Button Content="{l:T 'Alle schliessen'}" Command="{Binding DismissAllCommand}" />
+      <Button Grid.Column="2" Content="{l:T 'Element öffnen'}" Command="{Binding OpenCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Classes="accent" Content="{l:T 'Schliessen'}" Command="{Binding DismissCommand}" ToolTip.Tip="{l:T 'Erinnerung schliessen (Entf)'}" />
     </Grid>
     <Border Classes="pane">
       <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent">

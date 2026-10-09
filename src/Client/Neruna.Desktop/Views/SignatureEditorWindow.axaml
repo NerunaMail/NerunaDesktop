@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Neruna.Desktop.ViewModels"
         xmlns:ed="using:Neruna.Desktop.Editor"
@@ -15,12 +16,12 @@
     <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
 
     <Grid Grid.Row="1" ColumnDefinitions="70,*,Auto,Auto" Margin="0,0,0,10">
-      <TextBlock Classes="subtle" Text="Name" VerticalAlignment="Center" />
+      <TextBlock Classes="subtle" Text="{l:T 'Name'}" VerticalAlignment="Center" />
       <TextBox x:Name="NameBox" Grid.Column="1" Text="{Binding Name}" PlaceholderText="{Binding NamePlaceholder}" />
       <!-- Text templates: a shortcut, typed with "::" while writing -->
-      <TextBlock Grid.Column="2" Classes="subtle" Text="Kürzel" VerticalAlignment="Center" Margin="16,0,8,0" IsVisible="{Binding IsTextTemplate}" />
-      <TextBox Grid.Column="3" Width="150" Text="{Binding Shortcut}" PlaceholderText="z. B. tel" IsVisible="{Binding IsTextTemplate}"
-               ToolTip.Tip="Beim Schreiben «kürzel::» tippen – z. B. «tel::» – fügt die Vorlage ein." />
+      <TextBlock Grid.Column="2" Classes="subtle" Text="{l:T 'Kürzel'}" VerticalAlignment="Center" Margin="16,0,8,0" IsVisible="{Binding IsTextTemplate}" />
+      <TextBox Grid.Column="3" Width="150" Text="{Binding Shortcut}" PlaceholderText="{l:T 'z. B. tel'}" IsVisible="{Binding IsTextTemplate}"
+               ToolTip.Tip="{l:T 'Beim Schreiben «kürzel::» tippen – z. B. «tel::» – fügt die Vorlage ein.'}" />
     </Grid>
 
     <views:FormattingToolbar Grid.Row="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
@@ -32,8 +33,8 @@
     <TextBlock Grid.Row="4" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" TextWrapping="Wrap" />
 
     <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,14,0,0">
-      <Button Content="Abbrechen" Command="{Binding CancelCommand}" IsCancel="True" />
-      <Button Classes="accent" Content="Speichern" Command="{Binding SaveCommand}" />
+      <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" IsCancel="True" />
+      <Button Classes="accent" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" />
     </StackPanel>
   </Grid>
 </Window>

@@ -31,7 +31,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public static readonly Guid EncryptionKeyId = new("6e657275-6e61-436c-6f75-640000000002");
 
     /// <summary>Language of the server's messages: the app's UI language.</summary>
-    public const string UiLanguage = "de-CH";
+    public static string UiLanguage => Localization.Texts.Culture.Name;
 
     private string? _token;
     private DateTimeOffset _tokenExpires;

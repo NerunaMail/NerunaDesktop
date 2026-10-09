@@ -521,7 +521,7 @@ internal sealed partial class BackupItem(BackupEntry entry) : ObservableObject
 {
     public BackupEntry Entry { get; } = entry;
 
-    public string When => Entry.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.GetCultureInfo("de-CH"));
+    public string When => Entry.CreatedAt.ToLocalTime().ToString("g", Neruna.Core.Localization.Texts.Culture);
 
     public string Details => $"{Entry.DeviceName ?? "Unbekanntes Gerät"} · {Entry.Size / 1024.0:0.#} KB";
 

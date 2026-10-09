@@ -6,8 +6,34 @@ using Neruna.Desktop.Infrastructure;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Settings → Design: light/dark mode and color scheme; applied immediately.</summary>
-internal sealed partial class AppearanceViewModel(ISettingsStore settings, Neruna.Desktop.Infrastructure.UiPreferences preferences) : ViewModelBase
+internal sealed partial class AppearanceViewModel(ISettingsStore settings, Neruna.Desktop.Infrastructure.UiPreferences preferences, AppOptions options) : ViewModelBase
 {
+    /// <summary>"Automatisch" (the system's language) and the four languages, each in its own language.</summary>
+    public IReadOnlyList<LanguageChoice> LanguageChoices { get; } =
+        [new("auto", Neruna.Core.Localization.Texts.T("Automatisch (Systemsprache)")), .. Neruna.Core.Localization.Texts.Languages.Select(l => new LanguageChoice(l.Code, l.Name))];
+
+    [ObservableProperty]
+    public partial LanguageChoice? Language { get; set; }
+
+    /// <summary>The language was changed: it applies after a restart.</summary>
+    [ObservableProperty]
+    public partial bool RestartNeeded { get; set; }
+
+    partial void OnLanguageChanged(LanguageChoice? value)
+    {
+        if (_loading || value is null)
+        {
+            return;
+        }
+
+        _ = settings.SetAsync(SettingKeys.UiLanguage, value.Code);
+        LanguageFile.Write(options.DataDirectory, value.Code);
+        RestartNeeded = true;
+    }
+
+    [RelayCommand]
+    private static void Restart() => LanguageFile.Restart();
+
     /// <summary>Symbolleiste im Lesebereich: Symbol und Text, or only the symbol (text as tooltip).</summary>
     public bool ToolbarWithText
     {
@@ -87,6 +113,8 @@ internal sealed partial class AppearanceViewModel(ISettingsStore settings, Nerun
         {
             Mode = Enum.TryParse<ThemeMode>(await settings.GetAsync(SettingKeys.ThemeMode), out var m) ? m : ThemeMode.System;
             Scheme = Enum.TryParse<ColorScheme>(await settings.GetAsync(SettingKeys.ColorScheme), out var s) ? s : ColorScheme.Blue;
+            var language = await settings.GetAsync(SettingKeys.UiLanguage) ?? "auto";
+            Language = LanguageChoices.FirstOrDefault(l => l.Code == language) ?? LanguageChoices[0];
             UpdateSelection();
         }
         finally
@@ -144,4 +172,9 @@ internal sealed partial class SchemeChoice(ColorScheme scheme, string name, stri
 
     [ObservableProperty]
     public partial bool IsSelected { get; set; }
+}
+
+internal sealed record LanguageChoice(string Code, string Name)
+{
+    public override string ToString() => Name;
 }

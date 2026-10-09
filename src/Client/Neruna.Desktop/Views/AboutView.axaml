@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              x:Class="Neruna.Desktop.Views.AboutView"
@@ -7,49 +8,49 @@
     <StackPanel Spacing="10" MaxWidth="680" HorizontalAlignment="Left" Margin="0,0,0,20">
       <!-- The big logo, as on the splash screen -->
       <Image Source="/Assets/logo.png" Width="270" HorizontalAlignment="Left" />
-      <TextBlock Text="Neruna Desktop" FontSize="22" FontWeight="SemiBold" />
+      <TextBlock Text="{l:T 'Neruna Desktop'}" FontSize="22" FontWeight="SemiBold" />
       <TextBlock x:Name="VersionText" Classes="subtle" />
 
       <!-- Updates (installed version only) -->
       <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="12,10" Margin="0,4,0,0">
         <StackPanel Spacing="8">
-          <TextBlock Text="Updates" FontWeight="SemiBold" />
+          <TextBlock Text="{l:T 'Updates'}" FontWeight="SemiBold" />
           <TextBlock Text="{Binding Updates.StatusText}" TextWrapping="Wrap" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Nach Updates suchen" Command="{Binding Updates.CheckNowCommand}" IsVisible="{Binding Updates.CanUpdate}" />
-            <Button Content="Jetzt neu starten" Classes="accent" Command="{Binding Updates.RestartNowCommand}" IsVisible="{Binding Updates.IsReady}" />
+            <Button Content="{l:T 'Nach Updates suchen'}" Command="{Binding Updates.CheckNowCommand}" IsVisible="{Binding Updates.CanUpdate}" />
+            <Button Content="{l:T 'Jetzt neu starten'}" Classes="accent" Command="{Binding Updates.RestartNowCommand}" IsVisible="{Binding Updates.IsReady}" />
           </StackPanel>
           <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
-                     Text="Neruna sucht beim Start und danach alle paar Stunden nach einer neuen Version und lädt sie im Hintergrund. Installiert wird beim nächsten Start – deine Daten und Einstellungen bleiben erhalten." />
+                     Text="{l:T 'Neruna sucht beim Start und danach alle paar Stunden nach einer neuen Version und lädt sie im Hintergrund. Installiert wird beim nächsten Start – deine Daten und Einstellungen bleiben erhalten.'}" />
         </StackPanel>
       </Border>
       <TextBlock TextWrapping="Wrap"
-                 Text="E-Mail, Kalender und Kontakte für offene Standards (IMAP/SMTP, CalDAV, CardDAV, ICS). Neruna betreibt kein Daten-Hosting – deine Daten bleiben auf deinem Server." />
+                 Text="{l:T 'E-Mail, Kalender und Kontakte für offene Standards (IMAP/SMTP, CalDAV, CardDAV, ICS). Neruna betreibt kein Daten-Hosting – deine Daten bleiben auf deinem Server.'}" />
 
-      <TextBlock Text="Passwörter" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <TextBlock Text="{l:T 'Passwörter'}" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
       <TextBlock TextWrapping="Wrap">
-        <Run Text="Konto- und Zertifikatspasswörter liegen hier:" />
+        <Run Text="{l:T 'Konto- und Zertifikatspasswörter liegen hier:'}" />
         <Run Text="{Binding CredentialLocation}" FontWeight="SemiBold" />
-        <Run Text="– nie in der Neruna-Datenbank und nie in den Protokolldateien." />
+        <Run Text="{l:T '– nie in der Neruna-Datenbank und nie in den Protokolldateien.'}" />
       </TextBlock>
 
-      <TextBlock Text="Lizenz" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <TextBlock Text="{l:T 'Lizenz'}" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
       <TextBlock TextWrapping="Wrap"
-                 Text="Neruna Desktop ist Open Source unter der Mozilla Public License 2.0 (MPL 2.0). Du darfst die App nutzen, verändern und weitergeben; Änderungen an Neruna-Dateien bleiben unter der MPL offen. Die App wird ohne Gewährleistung bereitgestellt." />
-      <HyperlinkButton Content="Lizenztext (mozilla.org/MPL/2.0)" NavigateUri="https://www.mozilla.org/MPL/2.0/" Padding="0" />
+                 Text="{l:T 'Neruna Desktop ist Open Source unter der Mozilla Public License 2.0 (MPL 2.0). Du darfst die App nutzen, verändern und weitergeben; Änderungen an Neruna-Dateien bleiben unter der MPL offen. Die App wird ohne Gewährleistung bereitgestellt.'}" />
+      <HyperlinkButton Content="{l:T 'Lizenztext (mozilla.org/MPL/2.0)'}" NavigateUri="https://www.mozilla.org/MPL/2.0/" Padding="0" />
 
-      <TextBlock Text="Verwendete Bibliotheken" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <TextBlock Text="{l:T 'Verwendete Bibliotheken'}" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
       <TextBlock TextWrapping="Wrap"
-                 Text="Avalonia, MailKit, MimeKit, BouncyCastle, Ical.Net, Entity Framework Core mit SQLite, SkiaSharp, CommunityToolkit.Mvvm, Konscious Argon2 und weitere – unter MIT-, Apache-2.0- bzw. BSD-Lizenz. Vollständige Liste: THIRD-PARTY-NOTICES.md im Quellcode." />
+                 Text="{l:T 'Avalonia, MailKit, MimeKit, BouncyCastle, Ical.Net, Entity Framework Core mit SQLite, SkiaSharp, CommunityToolkit.Mvvm, Konscious Argon2 und weitere – unter MIT-, Apache-2.0- bzw. BSD-Lizenz. Vollständige Liste: THIRD-PARTY-NOTICES.md im Quellcode.'}" />
 
-      <TextBlock Text="Name und Logo" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
-      <TextBlock TextWrapping="Wrap" Text="«Neruna», das Neruna-Logo und das App-Symbol sind Marken von Patrik Zimmermann und werden durch die Softwarelizenz nicht freigegeben. Forks brauchen einen eigenen Namen und ein eigenes Logo." />
+      <TextBlock Text="{l:T 'Name und Logo'}" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <TextBlock TextWrapping="Wrap" Text="{l:T '«Neruna», das Neruna-Logo und das App-Symbol sind Marken von Patrik Zimmermann und werden durch die Softwarelizenz nicht freigegeben. Forks brauchen einen eigenen Namen und ein eigenes Logo.'}" />
 
       <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,12,0,0">
-        <HyperlinkButton Content="neruna.org" NavigateUri="https://neruna.org" Padding="0" />
-        <HyperlinkButton Content="info@neruna.org" NavigateUri="mailto:info@neruna.org" Padding="0" />
+        <HyperlinkButton Content="{l:T 'neruna.org'}" NavigateUri="https://neruna.org" Padding="0" />
+        <HyperlinkButton Content="{l:T 'info@neruna.org'}" NavigateUri="mailto:info@neruna.org" Padding="0" />
       </StackPanel>
-      <TextBlock Classes="subtle" FontSize="12" Text="Copyright © 2026 Neruna contributors · Licensed under the Mozilla Public License 2.0" Margin="0,8,0,0" />
+      <TextBlock Classes="subtle" FontSize="12" Text="{l:T 'Copyright © 2026 Neruna contributors · Licensed under the Mozilla Public License 2.0'}" Margin="0,8,0,0" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

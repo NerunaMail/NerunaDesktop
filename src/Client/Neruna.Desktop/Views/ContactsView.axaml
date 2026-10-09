@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
@@ -13,25 +14,25 @@
         <Button Classes="accent" Command="{Binding NewContactCommand}" Padding="12,6" Margin="0,0,4,0">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
-            <TextBlock Text="Neuer Kontakt" />
+            <TextBlock Text="{l:T 'Neuer Kontakt'}" />
           </StackPanel>
         </Button>
         <Button Classes="command" Command="{Binding NewGroupCommand}" Margin="0,0,8,0">
           <StackPanel Orientation="Horizontal">
             <PathIcon Data="{StaticResource IconGroup}" />
-            <TextBlock Text="Neue Gruppe" />
+            <TextBlock Text="{l:T 'Neue Gruppe'}" />
           </StackPanel>
         </Button>
         <Button Classes="command" Command="{Binding EditCommand}">
           <StackPanel Orientation="Horizontal">
             <PathIcon Data="{StaticResource IconEdit}" />
-            <TextBlock Text="Bearbeiten" />
+            <TextBlock Text="{l:T 'Bearbeiten'}" />
           </StackPanel>
         </Button>
-        <Button Classes="command" Command="{Binding WriteMailCommand}" ToolTip.Tip="An den Kontakt bzw. an alle Mitglieder der Gruppe">
+        <Button Classes="command" Command="{Binding WriteMailCommand}" ToolTip.Tip="{l:T 'An den Kontakt bzw. an alle Mitglieder der Gruppe'}">
           <StackPanel Orientation="Horizontal">
             <PathIcon Data="{StaticResource IconMail}" />
-            <TextBlock Text="E-Mail schreiben" />
+            <TextBlock Text="{l:T 'E-Mail schreiben'}" />
           </StackPanel>
         </Button>
       </StackPanel>
@@ -42,21 +43,21 @@
       <!-- Address books -->
       <Border Classes="pane" Padding="12,12">
         <StackPanel Spacing="6">
-          <TextBlock Text="Adressbücher" FontWeight="SemiBold" Margin="0,0,0,4" />
+          <TextBlock Text="{l:T 'Adressbücher'}" FontWeight="SemiBold" Margin="0,0,0,4" />
           <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasAddressBooks}"
-                     Text="Noch keine Adressbücher. Konto mit CardDAV hinzufügen." />
+                     Text="{l:T 'Noch keine Adressbücher. Konto mit CardDAV hinzufügen.'}" />
           <ItemsControl ItemsSource="{Binding AddressBooks}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AddressBookItem">
                 <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,2">
-                  <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="Anzeigen" />
+                  <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Anzeigen'}" />
                   <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
                   <Button Grid.Column="1" Width="16" Height="16" MinWidth="0" Padding="0" CornerRadius="3" Background="{Binding Brush}"
-                          BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="Farbe ändern">
+                          BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="{l:T 'Farbe ändern'}">
                     <Button.Flyout>
                       <Flyout Placement="RightEdgeAlignedTop">
                         <StackPanel Spacing="8" Width="176">
-                          <TextBlock Text="Farbe des Adressbuchs" FontWeight="SemiBold" FontSize="12" />
+                          <TextBlock Text="{l:T 'Farbe des Adressbuchs'}" FontWeight="SemiBold" FontSize="12" />
                           <ItemsControl ItemsSource="{x:Static vm:ContactsViewModel.ColorChoices}">
                             <ItemsControl.ItemsPanel>
                               <ItemsPanelTemplate>
@@ -70,7 +71,7 @@
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
-                          <Button Content="Standardfarbe" FontSize="12" Click="OnColorPicked" Tag="{x:Null}" />
+                          <Button Content="{l:T 'Standardfarbe'}" FontSize="12" Click="OnColorPicked" Tag="{x:Null}" />
                         </StackPanel>
                       </Flyout>
                     </Button.Flyout>
@@ -86,10 +87,10 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           <Button Classes="command" Command="{Binding ManageCommand}" Margin="0,4,0,0"
-                  ToolTip.Tip="Server erneut nach Adressbüchern fragen und auswählen, welche angezeigt werden">
+                  ToolTip.Tip="{l:T 'Server erneut nach Adressbüchern fragen und auswählen, welche angezeigt werden'}">
             <StackPanel Orientation="Horizontal">
               <PathIcon Data="{StaticResource IconSync}" />
-              <TextBlock Text="Adressbücher verwalten" />
+              <TextBlock Text="{l:T 'Adressbücher verwalten'}" />
             </StackPanel>
           </Button>
         </StackPanel>
@@ -99,8 +100,8 @@
       <Border Classes="pane" Grid.Column="2">
         <Grid RowDefinitions="Auto,*">
           <StackPanel Margin="12,12,12,6" Spacing="8">
-            <TextBlock Text="Kontakte und Gruppen" FontSize="16" FontWeight="SemiBold" />
-            <TextBox Text="{Binding SearchText}" PlaceholderText="Name, Firma oder E-Mail suchen">
+            <TextBlock Text="{l:T 'Kontakte und Gruppen'}" FontSize="16" FontWeight="SemiBold" />
+            <TextBox Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}">
               <TextBox.InnerLeftContent>
                 <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
               </TextBox.InnerLeftContent>
@@ -156,7 +157,7 @@
                       </StackPanel>
                     </StackPanel>
 
-                    <TextBlock Classes="label" Text="E-Mail" />
+                    <TextBlock Classes="label" Text="{l:T 'E-Mail'}" />
                     <ItemsControl ItemsSource="{Binding Emails}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LabeledValue">
@@ -168,7 +169,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBlock Classes="label" Text="Telefon" />
+                    <TextBlock Classes="label" Text="{l:T 'Telefon'}" />
                     <ItemsControl ItemsSource="{Binding Phones}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LabeledValue">
@@ -180,10 +181,10 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBlock Classes="label" Text="Notiz" IsVisible="{Binding HasNote}" />
+                    <TextBlock Classes="label" Text="{l:T 'Notiz'}" IsVisible="{Binding HasNote}" />
                     <SelectableTextBlock Text="{Binding Note}" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
 
-                    <TextBlock Classes="label" Text="Adressbuch" />
+                    <TextBlock Classes="label" Text="{l:T 'Adressbuch'}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Border Width="10" Height="10" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center" />
                       <TextBlock Text="{Binding AddressBook}" />
@@ -205,7 +206,7 @@
                 </StackPanel>
               </StackPanel>
 
-              <TextBlock Classes="label" Text="Mitglieder und verwendete Adresse" />
+              <TextBlock Classes="label" Text="{l:T 'Mitglieder und verwendete Adresse'}" />
               <ItemsControl ItemsSource="{Binding SelectedMembers}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:MemberItem">
@@ -220,7 +221,7 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
 
-              <TextBlock Classes="label" Text="Adressbuch" />
+              <TextBlock Classes="label" Text="{l:T 'Adressbuch'}" />
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Border Width="10" Height="10" CornerRadius="2" Background="{Binding Selected.Brush, FallbackValue={x:Null}}" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding Selected.AddressBook, FallbackValue={x:Null}}" />

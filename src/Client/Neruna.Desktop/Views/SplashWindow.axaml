@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Neruna.Desktop.Views.SplashWindow"
         Title="Neruna"
@@ -35,8 +36,8 @@
       <Grid RowDefinitions="*,Auto" Margin="36,30,32,24">
         <StackPanel VerticalAlignment="Center" Spacing="10">
           <Image Source="/Assets/logo.png" Width="270" HorizontalAlignment="Left" />
-          <TextBlock Text="Mail · Kalender · Kontakte" FontSize="15" Foreground="#D9E6F0FF" Margin="4,2,0,0" />
-          <TextBlock Text="Groupware by Patrik" FontSize="12" Foreground="#8CA9B8E0" Margin="4,0,0,0" />
+          <TextBlock Text="{l:T 'Mail · Kalender · Kontakte'}" FontSize="15" Foreground="#D9E6F0FF" Margin="4,2,0,0" />
+          <TextBlock Text="{l:T 'Groupware by Patrik'}" FontSize="12" Foreground="#8CA9B8E0" Margin="4,0,0,0" />
         </StackPanel>
 
         <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
@@ -51,7 +52,7 @@
               </LinearGradientBrush>
             </Path.Stroke>
           </Path>
-          <TextBlock x:Name="StatusText" Grid.Column="1" Text="Wird gestartet …" Foreground="#B3E6F0FF" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />
+          <TextBlock x:Name="StatusText" Grid.Column="1" Text="{l:T 'Wird gestartet …'}" Foreground="#B3E6F0FF" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />
           <Border Grid.Column="2" CornerRadius="999" Padding="10,3" VerticalAlignment="Center">
             <Border.Background>
               <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
@@ -59,7 +60,7 @@
                 <GradientStop Color="#408B5CF6" Offset="1" />
               </LinearGradientBrush>
             </Border.Background>
-            <TextBlock x:Name="VersionText" Text="Beta" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+            <TextBlock x:Name="VersionText" Text="{l:T 'Beta'}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
           </Border>
         </Grid>
       </Grid>

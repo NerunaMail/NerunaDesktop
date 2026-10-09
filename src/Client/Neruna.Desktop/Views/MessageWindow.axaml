@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Neruna.Desktop.ViewModels"
         xmlns:ctl="using:Neruna.Desktop.Controls"
@@ -19,11 +20,11 @@
   <DockPanel Margin="8">
     <Border DockPanel.Dock="Top" Classes="pane" Padding="8,6" Margin="0,0,0,6">
       <StackPanel Orientation="Horizontal" Spacing="2">
-        <ctl:ToolButton Icon="{StaticResource IconReply}" Label="Antworten" Shortcut="Ctrl+R" Command="{Binding ReplyCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
-        <ctl:ToolButton Icon="{StaticResource IconReplyAll}" Label="Allen antworten" Shortcut="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
-        <ctl:ToolButton Icon="{StaticResource IconForward}" Label="Weiterleiten" Shortcut="Ctrl+F" Command="{Binding ForwardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+        <ctl:ToolButton Icon="{StaticResource IconReply}" Label="{l:T 'Antworten'}" Shortcut="Ctrl+R" Command="{Binding ReplyCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+        <ctl:ToolButton Icon="{StaticResource IconReplyAll}" Label="{l:T 'Allen antworten'}" Shortcut="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+        <ctl:ToolButton Icon="{StaticResource IconForward}" Label="{l:T 'Weiterleiten'}" Shortcut="Ctrl+F" Command="{Binding ForwardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
         <Separator Width="1" Height="28" Margin="6,0" VerticalAlignment="Center" Background="{DynamicResource DividerBrush}" />
-        <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="Löschen" Shortcut="Entf" Command="{Binding DeleteCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+        <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{l:T 'Löschen'}" Shortcut="Entf" Command="{Binding DeleteCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
       </StackPanel>
     </Border>
     <Border Classes="pane">

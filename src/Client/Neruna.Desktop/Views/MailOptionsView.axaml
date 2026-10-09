@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:ed="using:Neruna.Desktop.Editor"
@@ -8,27 +9,27 @@
     <StackPanel Spacing="22" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,20">
 
       <StackPanel Spacing="8">
-        <TextBlock Text="Neue E-Mails" FontSize="16" FontWeight="SemiBold" />
-        <CheckBox IsChecked="{Binding Push}" Content="Neue E-Mails sofort abrufen" />
+        <TextBlock Text="{l:T 'Neue E-Mails'}" FontSize="16" FontWeight="SemiBold" />
+        <CheckBox IsChecked="{Binding Push}" Content="{l:T 'Neue E-Mails sofort abrufen'}" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
-                   Text="Der Server meldet neue Nachrichten im Posteingang sofort (IMAP IDLE). Server ohne diese Funktion werden alle 2 Minuten abgefragt; alle anderen Ordner alle 5 Minuten." />
-        <CheckBox IsChecked="{Binding Notifications}" Content="Desktop-Benachrichtigung bei neuen E-Mails" />
+                   Text="{l:T 'Der Server meldet neue Nachrichten im Posteingang sofort (IMAP IDLE). Server ohne diese Funktion werden alle 2 Minuten abgefragt; alle anderen Ordner alle 5 Minuten.'}" />
+        <CheckBox IsChecked="{Binding Notifications}" Content="{l:T 'Desktop-Benachrichtigung bei neuen E-Mails'}" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
-                   Text="Unten rechts mit Absender und Betreff – ausser du schaust in Neruna gerade genau diesen Posteingang an. Ein Klick öffnet die Nachricht." />
-        <Button Content="Test-Benachrichtigung anzeigen" Command="{Binding TestNotificationCommand}" Margin="28,0,0,0" />
+                   Text="{l:T 'Unten rechts mit Absender und Betreff – ausser du schaust in Neruna gerade genau diesen Posteingang an. Ein Klick öffnet die Nachricht.'}" />
+        <Button Content="{l:T 'Test-Benachrichtigung anzeigen'}" Command="{Binding TestNotificationCommand}" Margin="28,0,0,0" />
       </StackPanel>
 
       <StackPanel Spacing="8">
-        <TextBlock Text="Verfassen" FontSize="16" FontWeight="SemiBold" />
-        <TextBlock Classes="subtle" Text="Neue E-Mails, Antworten und Weiterleitungen öffnen" />
+        <TextBlock Text="{l:T 'Verfassen'}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Classes="subtle" Text="{l:T 'Neue E-Mails, Antworten und Weiterleitungen öffnen'}" />
         <StackPanel Orientation="Horizontal" Spacing="16">
-          <RadioButton GroupName="ComposeTarget" Content="Im Lesebereich" IsChecked="{Binding ComposeInline}" />
-          <RadioButton GroupName="ComposeTarget" Content="In eigenem Fenster" IsChecked="{Binding ComposeInWindow}" />
+          <RadioButton GroupName="ComposeTarget" Content="{l:T 'Im Lesebereich'}" IsChecked="{Binding ComposeInline}" />
+          <RadioButton GroupName="ComposeTarget" Content="{l:T 'In eigenem Fenster'}" IsChecked="{Binding ComposeInWindow}" />
         </StackPanel>
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
-                   Text="Eine Nachricht im Lesebereich lässt sich jederzeit mit «Loslösen» in ein eigenes Fenster verschieben." />
+                   Text="{l:T 'Eine Nachricht im Lesebereich lässt sich jederzeit mit «Loslösen» in ein eigenes Fenster verschieben.'}" />
 
-        <TextBlock Classes="subtle" Text="Standardschrift für neue Nachrichten" Margin="0,8,0,0" />
+        <TextBlock Classes="subtle" Text="{l:T 'Standardschrift für neue Nachrichten'}" Margin="0,8,0,0" />
         <StackPanel Orientation="Horizontal" Spacing="8">
           <ComboBox ItemsSource="{x:Static ed:FontCatalog.Fonts}" SelectedItem="{Binding ComposeFont}" Width="240" MaxDropDownHeight="440">
             <ComboBox.ItemTemplate>
@@ -43,15 +44,15 @@
           <ComboBox ItemsSource="{x:Static ed:FontCatalog.Sizes}" SelectedItem="{Binding ComposeFontSize}" Width="80" MaxDropDownHeight="360" />
         </StackPanel>
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="{DynamicResource PaperBrush}" Padding="12,10" Margin="0,4,0,0">
-          <TextBlock Text="Guten Tag – so sehen Ihre neuen Nachrichten aus."
+          <TextBlock Text="{l:T 'Guten Tag – so sehen Ihre neuen Nachrichten aus.'}"
                      FontFamily="{Binding ComposeFont.Family}"
                      FontSize="{Binding ComposeFontSize, Converter={x:Static vm:MailOptionsViewModel.PointsToPixels}}" />
         </Border>
       </StackPanel>
 
       <StackPanel Spacing="8">
-        <TextBlock Text="Lesebereich" FontSize="16" FontWeight="SemiBold" />
-        <TextBlock Classes="subtle" Text="Nachricht als gelesen markieren" />
+        <TextBlock Text="{l:T 'Lesebereich'}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Classes="subtle" Text="{l:T 'Nachricht als gelesen markieren'}" />
         <ItemsControl ItemsSource="{Binding MarkAsReadOptions}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:MarkAsReadOption">
@@ -60,7 +61,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
-                   Text="Beim Antworten oder Weiterleiten wird eine Nachricht immer als gelesen markiert, ausser bei «Nie automatisch». Manuell: Ctrl+Q bzw. «Gelesen/Ungelesen»." />
+                   Text="{l:T 'Beim Antworten oder Weiterleiten wird eine Nachricht immer als gelesen markiert, ausser bei «Nie automatisch». Manuell: Ctrl+Q bzw. «Gelesen/Ungelesen».'}" />
       </StackPanel>
     </StackPanel>
   </ScrollViewer>

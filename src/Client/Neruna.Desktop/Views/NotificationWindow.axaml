@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Neruna.Desktop.ViewModels"
         x:Class="Neruna.Desktop.Views.NotificationWindow"
@@ -21,7 +22,7 @@
         <TextBlock Text="{Binding Preview}" Classes="subtle" FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasPreview}" />
       </StackPanel>
       <Button x:Name="CloseButton" Grid.Column="3" Classes="command" Padding="6" Margin="0,4,4,0" VerticalAlignment="Top"
-              Cursor="Arrow" ToolTip.Tip="Schliessen">
+              Cursor="Arrow" ToolTip.Tip="{l:T 'Schliessen'}">
         <PathIcon Data="{StaticResource IconClose}" Width="9" Height="9" Margin="0" />
       </Button>
     </Grid>

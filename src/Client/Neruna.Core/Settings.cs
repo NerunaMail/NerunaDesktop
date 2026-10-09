@@ -108,6 +108,9 @@ public static class SettingKeys
     /// <summary>"System", "Light" or "Dark".</summary>
     public const string ThemeMode = "appearance.theme";
 
+    /// <summary>Language of the app: "auto" (system), "de", "en", "fr" or "it"; takes effect with the next start.</summary>
+    public const string UiLanguage = "ui.language";
+
     /// <summary>"Blue", "Red" or "Green".</summary>
     public const string ColorScheme = "appearance.colorScheme";
 }

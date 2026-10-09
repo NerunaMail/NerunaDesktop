@@ -1,10 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              x:Class="Neruna.Desktop.Views.CalendarOptionsView"
              x:DataType="vm:CalendarOptionsViewModel">
   <StackPanel Spacing="8" MaxWidth="640" HorizontalAlignment="Left">
-    <TextBlock Text="Standard-Erinnerung" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Standard-Erinnerung'}" FontSize="16" FontWeight="SemiBold" />
     <ComboBox ItemsSource="{x:Static vm:CalendarOptionsViewModel.ReminderOptions}" SelectedItem="{Binding DefaultReminder}" Width="240">
       <ComboBox.ItemTemplate>
         <DataTemplate x:DataType="vm:ReminderOption">
@@ -13,32 +14,32 @@
       </ComboBox.ItemTemplate>
     </ComboBox>
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,14"
-               Text="Gilt für neue Termine und angenommene Einladungen; im Termin lässt sie sich einzeln ändern. Termine aus dem Webmail oder anderen Programmen behalten ihre eigene Erinnerung." />
+               Text="{l:T 'Gilt für neue Termine und angenommene Einladungen; im Termin lässt sie sich einzeln ändern. Termine aus dem Webmail oder anderen Programmen behalten ihre eigene Erinnerung.'}" />
 
-    <TextBlock Text="Einladungen" FontSize="16" FontWeight="SemiBold" />
-    <CheckBox IsChecked="{Binding DeleteAnsweredInvitations}" Content="Beantwortete Einladungen in den Papierkorb verschieben" />
+    <TextBlock Text="{l:T 'Einladungen'}" FontSize="16" FontWeight="SemiBold" />
+    <CheckBox IsChecked="{Binding DeleteAnsweredInvitations}" Content="{l:T 'Beantwortete Einladungen in den Papierkorb verschieben'}" />
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,14"
-               Text="Nach «Annehmen», «Vorläufig» oder «Ablehnen» – und nach «Aus dem Kalender entfernen» bei einer Absage – verschwindet die Mail aus dem Posteingang. Hat ein Konto keinen Papierkorb, bleibt sie liegen." />
+               Text="{l:T 'Nach «Annehmen», «Vorläufig» oder «Ablehnen» – und nach «Aus dem Kalender entfernen» bei einer Absage – verschwindet die Mail aus dem Posteingang. Hat ein Konto keinen Papierkorb, bleibt sie liegen.'}" />
 
-    <TextBlock Text="Darstellung der Woche" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Darstellung der Woche'}" FontSize="16" FontWeight="SemiBold" />
     <StackPanel Spacing="4" Margin="0,0,0,14">
-      <RadioButton GroupName="CalendarLayout" Content="Liste – Termine pro Tag untereinander" IsChecked="{Binding ListLayout}" />
-      <RadioButton GroupName="CalendarLayout" Content="Zeitraster – stündlich unterteilt, Termine an ihrer Uhrzeit" IsChecked="{Binding TimeGrid}" />
+      <RadioButton GroupName="CalendarLayout" Content="{l:T 'Liste – Termine pro Tag untereinander'}" IsChecked="{Binding ListLayout}" />
+      <RadioButton GroupName="CalendarLayout" Content="{l:T 'Zeitraster – stündlich unterteilt, Termine an ihrer Uhrzeit'}" IsChecked="{Binding TimeGrid}" />
     </StackPanel>
 
-    <TextBlock Text="Raster im Zeitraster" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Raster im Zeitraster'}" FontSize="16" FontWeight="SemiBold" />
     <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,14">
-      <RadioButton GroupName="GridMinutes" Content="60 Minuten" IsChecked="{Binding Grid60}" />
-      <RadioButton GroupName="GridMinutes" Content="30 Minuten" IsChecked="{Binding Grid30}" />
-      <RadioButton GroupName="GridMinutes" Content="15 Minuten" IsChecked="{Binding Grid15}" />
+      <RadioButton GroupName="GridMinutes" Content="{l:T '60 Minuten'}" IsChecked="{Binding Grid60}" />
+      <RadioButton GroupName="GridMinutes" Content="{l:T '30 Minuten'}" IsChecked="{Binding Grid30}" />
+      <RadioButton GroupName="GridMinutes" Content="{l:T '15 Minuten'}" IsChecked="{Binding Grid15}" />
     </StackPanel>
 
-    <TextBlock Text="Monatsübersicht" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Monatsübersicht'}" FontSize="16" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap"
-               Text="Der Monatskalender links über der Kalenderliste – Klick auf einen Tag oder eine Kalenderwoche zeigt diese Woche." />
+               Text="{l:T 'Der Monatskalender links über der Kalenderliste – Klick auf einen Tag oder eine Kalenderwoche zeigt diese Woche.'}" />
     <StackPanel Orientation="Horizontal" Spacing="16">
-      <RadioButton GroupName="NavigatorMonths" Content="1 Monat" IsChecked="{Binding OneMonth}" />
-      <RadioButton GroupName="NavigatorMonths" Content="2 Monate untereinander" IsChecked="{Binding TwoMonths}" />
+      <RadioButton GroupName="NavigatorMonths" Content="{l:T '1 Monat'}" IsChecked="{Binding OneMonth}" />
+      <RadioButton GroupName="NavigatorMonths" Content="{l:T '2 Monate untereinander'}" IsChecked="{Binding TwoMonths}" />
     </StackPanel>
   </StackPanel>
 </UserControl>

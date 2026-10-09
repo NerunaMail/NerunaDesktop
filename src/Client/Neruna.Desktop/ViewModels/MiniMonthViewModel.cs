@@ -9,7 +9,7 @@ namespace Neruna.Desktop.ViewModels;
 /// </summary>
 internal sealed partial class MiniMonth : ObservableObject
 {
-    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-CH");
+    private static CultureInfo German => Neruna.Core.Localization.Texts.Culture;
 
     public MiniMonth()
     {
@@ -70,7 +70,7 @@ internal sealed partial class MiniWeek : ObservableObject
 
 internal sealed partial class MiniDay : ObservableObject
 {
-    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-CH");
+    private static CultureInfo German => Neruna.Core.Localization.Texts.Culture;
 
     [ObservableProperty]
     public partial DateTime Date { get; set; }

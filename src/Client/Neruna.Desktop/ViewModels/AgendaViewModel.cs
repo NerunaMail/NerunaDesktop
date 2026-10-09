@@ -19,7 +19,7 @@ internal sealed partial class AgendaViewModel : ViewModelBase
     /// <summary>Today and the following days.</summary>
     public const int Days = 7;
 
-    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("de-CH");
+    private static CultureInfo Culture => Neruna.Core.Localization.Texts.Culture;
     private readonly CalendarController _calendar;
     private readonly ISettingsStore _settings;
     private readonly ILogger<AgendaViewModel> _logger;

@@ -225,7 +225,7 @@ public static partial class MessageComposer
     /// </summary>
     private static string HtmlQuoteBlock(MimeMessage original)
     {
-        var culture = CultureInfo.GetCultureInfo("de-CH");
+        var culture = Localization.Texts.Culture;
         var html = InlineImagesAsDataUris(MessageContent.From(original));
 
         var header = new StringBuilder()
@@ -276,7 +276,7 @@ public static partial class MessageComposer
 
     private static string QuoteBlock(MimeMessage original)
     {
-        var culture = CultureInfo.GetCultureInfo("de-CH");
+        var culture = Localization.Texts.Culture;
         var block = new StringBuilder()
             .Append("\n\n")
             .Append("-----Ursprüngliche Nachricht-----\n")

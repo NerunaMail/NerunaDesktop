@@ -1,40 +1,41 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
              x:Class="Neruna.Desktop.Views.AppearanceView"
              x:DataType="vm:AppearanceViewModel">
   <StackPanel Spacing="8" MaxWidth="640" HorizontalAlignment="Left">
-    <TextBlock Text="Darstellung" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Darstellung'}" FontSize="16" FontWeight="SemiBold" />
     <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,14">
-      <RadioButton GroupName="ThemeMode" Content="Wie System" IsChecked="{Binding IsSystem}" />
-      <RadioButton GroupName="ThemeMode" Content="Hell" IsChecked="{Binding IsLight}" />
-      <RadioButton GroupName="ThemeMode" Content="Dunkel" IsChecked="{Binding IsDark}" />
+      <RadioButton GroupName="ThemeMode" Content="{l:T 'Wie System'}" IsChecked="{Binding IsSystem}" />
+      <RadioButton GroupName="ThemeMode" Content="{l:T 'Hell'}" IsChecked="{Binding IsLight}" />
+      <RadioButton GroupName="ThemeMode" Content="{l:T 'Dunkel'}" IsChecked="{Binding IsDark}" />
     </StackPanel>
 
-    <TextBlock Text="Schaltflächen im Lesebereich" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Schaltflächen im Lesebereich'}" FontSize="16" FontWeight="SemiBold" />
     <StackPanel Orientation="Horizontal" Spacing="16">
-      <RadioButton GroupName="Toolbar" Content="Symbol und Text" IsChecked="{Binding ToolbarWithText}" />
-      <RadioButton GroupName="Toolbar" Content="Nur Symbol" IsChecked="{Binding ToolbarIconsOnly}" />
+      <RadioButton GroupName="Toolbar" Content="{l:T 'Symbol und Text'}" IsChecked="{Binding ToolbarWithText}" />
+      <RadioButton GroupName="Toolbar" Content="{l:T 'Nur Symbol'}" IsChecked="{Binding ToolbarIconsOnly}" />
     </StackPanel>
-    <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="Bei «Nur Symbol» erscheint der Text, wenn die Maus auf der Schaltfläche ruht." />
+    <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="{l:T 'Bei «Nur Symbol» erscheint der Text, wenn die Maus auf der Schaltfläche ruht.'}" />
 
-    <TextBlock Text="Navigationsleiste" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Navigationsleiste'}" FontSize="16" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
-               Text="Welche Bereiche links erscheinen und in welcher Reihenfolge. Neruna startet mit dem obersten sichtbaren Bereich; mindestens einer bleibt sichtbar." />
+               Text="{l:T 'Welche Bereiche links erscheinen und in welcher Reihenfolge. Neruna startet mit dem obersten sichtbaren Bereich; mindestens einer bleibt sichtbar.'}" />
     <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Width="360" HorizontalAlignment="Left" Padding="4" Margin="0,2,0,6">
       <ItemsControl ItemsSource="{Binding NavigationItems}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:NavigationItem">
             <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="4,2">
-              <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,8,0" ToolTip.Tip="Anzeigen" />
+              <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,8,0" ToolTip.Tip="{l:T 'Anzeigen'}" />
               <PathIcon Grid.Column="1" Data="{Binding IconKey, Converter={x:Static app:Converters.Icon}}" Width="16" Height="16" Margin="0,0,10,0" />
               <TextBlock Grid.Column="2" Text="{Binding Label}" VerticalAlignment="Center" />
-              <Button Grid.Column="3" Classes="command" Padding="6,4" ToolTip.Tip="Nach oben"
+              <Button Grid.Column="3" Classes="command" Padding="6,4" ToolTip.Tip="{l:T 'Nach oben'}"
                       Command="{Binding $parent[UserControl].((vm:AppearanceViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
                 <PathIcon Data="{StaticResource IconChevronUp}" Width="12" Height="12" />
               </Button>
-              <Button Grid.Column="4" Classes="command" Padding="6,4" ToolTip.Tip="Nach unten"
+              <Button Grid.Column="4" Classes="command" Padding="6,4" ToolTip.Tip="{l:T 'Nach unten'}"
                       Command="{Binding $parent[UserControl].((vm:AppearanceViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
                 <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" />
               </Button>
@@ -43,10 +44,18 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </Border>
-    <CheckBox Content="Schaltfläche «Konto hinzufügen» anzeigen" IsChecked="{Binding ShowAddAccountButton}" />
-    <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="Ausgeblendet lassen sich Konten weiterhin unter Einstellungen → Konten hinzufügen." />
+    <CheckBox Content="{l:T 'Schaltfläche «Konto hinzufügen» anzeigen'}" IsChecked="{Binding ShowAddAccountButton}" />
+    <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="{l:T 'Ausgeblendet lassen sich Konten weiterhin unter Einstellungen → Konten hinzufügen.'}" />
 
-    <TextBlock Text="Farbschema" FontSize="16" FontWeight="SemiBold" />
+    <!-- Language of the app: applies after a restart -->
+    <TextBlock Text="{l:T 'Sprache'}" FontSize="16" FontWeight="SemiBold" />
+    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,14">
+      <ComboBox ItemsSource="{Binding LanguageChoices}" SelectedItem="{Binding Language}" MinWidth="240" />
+      <TextBlock Text="{l:T 'Die Sprache wechselt nach einem Neustart.'}" VerticalAlignment="Center" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding RestartNeeded}" />
+      <Button Content="{l:T 'Jetzt neu starten'}" Command="{Binding RestartCommand}" IsVisible="{Binding RestartNeeded}" />
+    </StackPanel>
+
+    <TextBlock Text="{l:T 'Farbschema'}" FontSize="16" FontWeight="SemiBold" />
     <ItemsControl ItemsSource="{Binding Schemes}">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>

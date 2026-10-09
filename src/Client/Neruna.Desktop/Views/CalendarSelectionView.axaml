@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
@@ -6,12 +7,12 @@
              x:DataType="vm:CalendarSelectionViewModel">
   <!-- Accounts on the left, the calendars of the chosen one on the right: the dialog keeps its size with many of both -->
   <StackPanel>
-    <TextBlock Text="Kalender verwalten" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Text="{l:T 'Kalender verwalten'}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,12"
-               Text="Neruna fragt die Server erneut nach allen Kalendern – auch nach im Webmail abonnierten oder mit Ihnen geteilten. Wählen Sie, welche angezeigt werden." />
+               Text="{l:T 'Neruna fragt die Server erneut nach allen Kalendern – auch nach im Webmail abonnierten oder mit Ihnen geteilten. Wählen Sie, welche angezeigt werden.'}" />
 
     <ProgressBar IsIndeterminate="True" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
-    <TextBlock Classes="subtle" Text="Kein CalDAV-Konto eingerichtet." IsVisible="{Binding HasNoSources}" />
+    <TextBlock Classes="subtle" Text="{l:T 'Kein CalDAV-Konto eingerichtet.'}" IsVisible="{Binding HasNoSources}" />
 
     <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding SelectedSource, Converter={x:Static ObjectConverters.IsNotNull}}">
       <!-- Accounts -->
@@ -37,18 +38,18 @@
             <TextBlock Classes="subtle" Text="{Binding Server}" FontSize="12" TextTrimming="CharacterEllipsis" />
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom">
-            <Button Classes="command" Content="Alle" Padding="0,2" CommandParameter="{x:True}"
+            <Button Classes="command" Content="{l:T 'Alle'}" Padding="0,2" CommandParameter="{x:True}"
                     Command="{Binding $parent[UserControl].((vm:CalendarSelectionViewModel)DataContext).SelectAllCommand}" />
-            <Button Classes="command" Content="Keine" Padding="0,2" CommandParameter="{x:False}"
+            <Button Classes="command" Content="{l:T 'Keine'}" Padding="0,2" CommandParameter="{x:False}"
                     Command="{Binding $parent[UserControl].((vm:CalendarSelectionViewModel)DataContext).SelectAllCommand}" />
           </StackPanel>
         </Grid>
-        <TextBox Text="{Binding $parent[UserControl].((vm:CalendarSelectionViewModel)DataContext).Filter}" PlaceholderText="Kalender suchen …" />
+        <TextBox Text="{Binding $parent[UserControl].((vm:CalendarSelectionViewModel)DataContext).Filter}" PlaceholderText="{l:T 'Kalender suchen …'}" />
         <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
 
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="8,4" Height="250">
           <Panel>
-            <TextBlock Classes="subtle" Text="Kein Kalender passt zur Suche." IsVisible="{Binding !HasMatches}" Margin="4" />
+            <TextBlock Classes="subtle" Text="{l:T 'Kein Kalender passt zur Suche.'}" IsVisible="{Binding !HasMatches}" Margin="4" />
             <ScrollViewer>
               <ItemsControl ItemsSource="{Binding Calendars}">
                 <ItemsControl.ItemTemplate>
@@ -59,10 +60,10 @@
                                 Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" />
                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                         <Border IsVisible="{Binding IsNew}" Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="3" Padding="5,0" VerticalAlignment="Center">
-                          <TextBlock Text="neu" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                          <TextBlock Text="{l:T 'neu'}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
                         </Border>
-                        <TextBlock IsVisible="{Binding IsReadOnly}" Classes="subtle" Text="schreibgeschützt" FontSize="12" VerticalAlignment="Center" />
-                        <TextBlock IsVisible="{Binding IsAddedByUrl}" Classes="subtle" Text="per Adresse" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock IsVisible="{Binding IsReadOnly}" Classes="subtle" Text="{l:T 'schreibgeschützt'}" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock IsVisible="{Binding IsAddedByUrl}" Classes="subtle" Text="{l:T 'per Adresse'}" FontSize="12" VerticalAlignment="Center" />
                       </StackPanel>
                     </CheckBox>
                   </DataTemplate>
@@ -73,15 +74,15 @@
         </Border>
 
         <!-- Rarely needed: where the server was asked, and a calendar it does not list -->
-        <Expander Header="Kalender fehlt?" IsVisible="{Binding CanAddByUrl}" HorizontalAlignment="Stretch">
+        <Expander Header="{l:T 'Kalender fehlt?'}" IsVisible="{Binding CanAddByUrl}" HorizontalAlignment="Stretch">
           <StackPanel Spacing="4">
             <TextBlock Classes="subtle" Text="{Binding Details}" FontSize="11" TextWrapping="Wrap"
                        IsVisible="{Binding Details, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
-                       Text="Adresse aus dem Webmail einfügen – SOGo: beim Kalender ⋮ → «Links zu diesem Kalender» → CalDAV-URL." />
+                       Text="{l:T 'Adresse aus dem Webmail einfügen – SOGo: beim Kalender ⋮ → «Links zu diesem Kalender» → CalDAV-URL.'}" />
             <Grid ColumnDefinitions="*,Auto">
-              <TextBox Text="{Binding NewUrl}" PlaceholderText="https://…/SOGo/dav/…/Calendar/…/" />
-              <Button Grid.Column="1" Content="Hinzufügen" Margin="6,0,0,0"
+              <TextBox Text="{Binding NewUrl}" PlaceholderText="{l:T 'https://…/SOGo/dav/…/Calendar/…/'}" />
+              <Button Grid.Column="1" Content="{l:T 'Hinzufügen'}" Margin="6,0,0,0"
                       Command="{Binding $parent[UserControl].((vm:CalendarSelectionViewModel)DataContext).AddByUrlCommand}" CommandParameter="{Binding}" />
             </Grid>
             <ProgressBar IsIndeterminate="True" Height="3" MinWidth="0" IsVisible="{Binding IsAdding}" />
@@ -96,14 +97,14 @@
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,16,0,0">
-      <Button Classes="command" Command="{Binding RefreshCommand}" ToolTip.Tip="Server erneut abfragen">
+      <Button Classes="command" Command="{Binding RefreshCommand}" ToolTip.Tip="{l:T 'Server erneut abfragen'}">
         <StackPanel Orientation="Horizontal">
           <PathIcon Data="{StaticResource IconSync}" />
-          <TextBlock Text="Erneut suchen" />
+          <TextBlock Text="{l:T 'Erneut suchen'}" />
         </StackPanel>
       </Button>
-      <Button Grid.Column="2" Content="Abbrechen" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="3" Classes="accent" Content="Übernehmen" Command="{Binding ApplyCommand}" />
+      <Button Grid.Column="2" Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Classes="accent" Content="{l:T 'Übernehmen'}" Command="{Binding ApplyCommand}" />
     </Grid>
   </StackPanel>
 </UserControl>

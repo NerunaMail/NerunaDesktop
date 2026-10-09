@@ -249,7 +249,7 @@ public static class ITip
     /// <summary>"Do, 15. Okt. 2026 14:00–15:00" for subjects and texts.</summary>
     public static string When(DateTimeOffset start, DateTimeOffset end, bool isAllDay)
     {
-        var culture = CultureInfo.GetCultureInfo("de-CH");
+        var culture = Localization.Texts.Culture;
         var day = start.ToString("ddd, d. MMM yyyy", culture);
         return isAllDay ? day + " (ganztägig)" : $"{day} {start:HH:mm}–{end:HH:mm}";
     }

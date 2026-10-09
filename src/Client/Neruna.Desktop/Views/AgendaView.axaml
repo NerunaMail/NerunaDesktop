@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              x:Class="Neruna.Desktop.Views.AgendaView"
@@ -6,14 +7,14 @@
   <!-- Tagesansicht: the next appointments as a plain list, day by day -->
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="14,10,8,6">
-      <TextBlock Text="Tagesansicht" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
-      <Button Grid.Column="1" Classes="command" Padding="6" ToolTip.Tip="Kalender für die Tagesansicht wählen">
+      <TextBlock Text="{l:T 'Tagesansicht'}" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Classes="command" Padding="6" ToolTip.Tip="{l:T 'Kalender für die Tagesansicht wählen'}">
         <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" />
         <Button.Flyout>
           <Flyout Placement="BottomEdgeAlignedRight">
             <StackPanel Spacing="6" MinWidth="220" MaxWidth="320">
-              <TextBlock Text="Angezeigte Kalender" FontWeight="SemiBold" FontSize="12" />
-              <TextBlock Text="Nur für die Tagesansicht – die Kalenderansicht bleibt, wie sie ist." Classes="subtle" FontSize="11" TextWrapping="Wrap" />
+              <TextBlock Text="{l:T 'Angezeigte Kalender'}" FontWeight="SemiBold" FontSize="12" />
+              <TextBlock Text="{l:T 'Nur für die Tagesansicht – die Kalenderansicht bleibt, wie sie ist.'}" Classes="subtle" FontSize="11" TextWrapping="Wrap" />
               <ItemsControl ItemsSource="{Binding Calendars}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:AgendaCalendarChoice">
@@ -34,7 +35,7 @@
 
     <Panel>
       <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="14,8" IsVisible="{Binding IsEmpty}"
-                 Text="Keine Termine heute und in den nächsten Tagen." />
+                 Text="{l:T 'Keine Termine heute und in den nächsten Tagen.'}" />
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
         <ItemsControl ItemsSource="{Binding Entries}" Margin="8,0,8,12">
           <ItemsControl.DataTemplates>
@@ -44,14 +45,14 @@
             <DataTemplate DataType="vm:AgendaItem">
               <Button Classes="command" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="0" Margin="0,1"
                       Command="{Binding $parent[ItemsControl].((vm:AgendaViewModel)DataContext).OpenCommand}" CommandParameter="{Binding}"
-                      Opacity="{Binding Opacity}" ToolTip.Tip="Im Kalender öffnen">
+                      Opacity="{Binding Opacity}" ToolTip.Tip="{l:T 'Im Kalender öffnen'}">
                 <Grid ColumnDefinitions="4,*">
                   <Border Background="{Binding Brush}" CornerRadius="2" />
                   <StackPanel Grid.Column="1" Margin="8,5,6,5" Spacing="1">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <TextBlock Text="{Binding Time}" FontSize="12" Classes="subtle" />
                       <Border IsVisible="{Binding IsNow}" Background="{Binding Brush}" CornerRadius="3" Padding="5,0" VerticalAlignment="Center">
-                        <TextBlock Text="jetzt" FontSize="10" Foreground="White" FontWeight="SemiBold" />
+                        <TextBlock Text="{l:T 'jetzt'}" FontSize="10" Foreground="White" FontWeight="SemiBold" />
                       </Border>
                     </StackPanel>
                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />

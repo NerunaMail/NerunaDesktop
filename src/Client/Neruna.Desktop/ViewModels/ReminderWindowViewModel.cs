@@ -37,7 +37,7 @@ internal sealed record SnoozeOption(string Label, Func<Reminder, DateTimeOffset,
 /// <summary>One line in the reminder window.</summary>
 internal sealed class ReminderItem(Reminder reminder, DateTimeOffset now)
 {
-    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("de-CH");
+    private static CultureInfo Culture => Neruna.Core.Localization.Texts.Culture;
 
     public Reminder Reminder { get; } = reminder;
 

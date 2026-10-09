@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
@@ -15,14 +16,14 @@
           <Button Classes="accent" Command="{Binding NewEventCommand}" Padding="12,6" Margin="0,0,8,0">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
-              <TextBlock Text="Neuer Termin" />
+              <TextBlock Text="{l:T 'Neuer Termin'}" />
             </StackPanel>
           </Button>
-          <Button Classes="command" Command="{Binding TodayCommand}" Content="Heute" />
-          <Button Classes="command" Command="{Binding PreviousWeekCommand}" ToolTip.Tip="Vorherige Woche">
+          <Button Classes="command" Command="{Binding TodayCommand}" Content="{l:T 'Heute'}" />
+          <Button Classes="command" Command="{Binding PreviousWeekCommand}" ToolTip.Tip="{l:T 'Vorherige Woche'}">
             <PathIcon Data="{StaticResource IconChevronLeft}" Width="14" Height="14" Margin="0" />
           </Button>
-          <Button Classes="command" Command="{Binding NextWeekCommand}" ToolTip.Tip="Nächste Woche">
+          <Button Classes="command" Command="{Binding NextWeekCommand}" ToolTip.Tip="{l:T 'Nächste Woche'}">
             <PathIcon Data="{StaticResource IconChevronRight}" Width="14" Height="14" Margin="0" />
           </Button>
           <TextBlock Text="{Binding RangeTitle}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" />
@@ -30,19 +31,19 @@
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
           <!-- Days shown: full week or Monday–Friday -->
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-            <ToggleButton Content="7 Tage" IsChecked="{Binding IsFullWeek}" Padding="10,5" CornerRadius="4,0,0,4" ToolTip.Tip="Ganze Woche anzeigen" />
-            <ToggleButton Content="Mo–Fr" IsChecked="{Binding IsWorkWeek}" Padding="10,5" CornerRadius="0,4,4,0" ToolTip.Tip="Nur Arbeitstage anzeigen" />
+            <ToggleButton Content="{l:T '7 Tage'}" IsChecked="{Binding IsFullWeek}" Padding="10,5" CornerRadius="4,0,0,4" ToolTip.Tip="{l:T 'Ganze Woche anzeigen'}" />
+            <ToggleButton Content="{l:T 'Mo–Fr'}" IsChecked="{Binding IsWorkWeek}" Padding="10,5" CornerRadius="0,4,4,0" ToolTip.Tip="{l:T 'Nur Arbeitstage anzeigen'}" />
           </StackPanel>
-          <Button Classes="command" Command="{Binding ManageCommand}" ToolTip.Tip="Server erneut nach Kalendern fragen (auch im Webmail abonnierte) und auswählen">
+          <Button Classes="command" Command="{Binding ManageCommand}" ToolTip.Tip="{l:T 'Server erneut nach Kalendern fragen (auch im Webmail abonnierte) und auswählen'}">
             <StackPanel Orientation="Horizontal">
               <PathIcon Data="{StaticResource IconSync}" />
-              <TextBlock Text="Kalender verwalten" />
+              <TextBlock Text="{l:T 'Kalender verwalten'}" />
             </StackPanel>
           </Button>
           <Button Classes="command" Command="{Binding SubscribeCommand}">
             <StackPanel Orientation="Horizontal">
               <PathIcon Data="{StaticResource IconRss}" />
-              <TextBlock Text="Internet-Kalender abonnieren" />
+              <TextBlock Text="{l:T 'Internet-Kalender abonnieren'}" />
             </StackPanel>
           </Button>
         </StackPanel>
@@ -108,12 +109,12 @@
                 <StackPanel Margin="0,0,0,10">
                   <!-- Header: ‹ Oktober 2026 › – both arrows on the top month -->
                   <Grid ColumnDefinitions="26,*,26" Margin="0,0,0,2">
-                    <Button Classes="nav" IsVisible="{Binding IsFirst}" ToolTip.Tip="Vorheriger Monat"
+                    <Button Classes="nav" IsVisible="{Binding IsFirst}" ToolTip.Tip="{l:T 'Vorheriger Monat'}"
                             Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).PreviousMonthCommand}">
                       <PathIcon Data="{StaticResource IconChevronLeft}" Width="10" Height="10" />
                     </Button>
                     <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <Button Grid.Column="2" Classes="nav" IsVisible="{Binding IsFirst}" ToolTip.Tip="Nächster Monat"
+                    <Button Grid.Column="2" Classes="nav" IsVisible="{Binding IsFirst}" ToolTip.Tip="{l:T 'Nächster Monat'}"
                             Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).NextMonthCommand}">
                       <PathIcon Data="{StaticResource IconChevronRight}" Width="10" Height="10" />
                     </Button>
@@ -138,7 +139,7 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:MiniWeek">
                         <Grid ColumnDefinitions="22,Auto">
-                          <Button Classes="week" Content="{Binding NumberText}" ToolTip.Tip="Diese Woche anzeigen"
+                          <Button Classes="week" Content="{Binding NumberText}" ToolTip.Tip="{l:T 'Diese Woche anzeigen'}"
                                   Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).SelectDayCommand}"
                                   CommandParameter="{Binding Start}" />
                           <Border Grid.Column="1" CornerRadius="3" Background="{DynamicResource TodayBrush}" IsVisible="{Binding IsSelected}" />
@@ -167,21 +168,21 @@
           </ItemsControl>
 
           <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="0,0,0,6" />
-          <TextBlock Text="Meine Kalender" FontWeight="SemiBold" Margin="0,0,0,4" />
+          <TextBlock Text="{l:T 'Meine Kalender'}" FontWeight="SemiBold" Margin="0,0,0,4" />
           <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasCalendars}"
-                     Text="Noch keine Kalender. Konto mit CalDAV hinzufügen oder einen Internet-Kalender abonnieren." />
+                     Text="{l:T 'Noch keine Kalender. Konto mit CalDAV hinzufügen oder einen Internet-Kalender abonnieren.'}" />
           <ItemsControl ItemsSource="{Binding Calendars}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CalendarListItem">
                 <Grid ColumnDefinitions="Auto,Auto,*">
-                  <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="Anzeigen" />
+                  <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Anzeigen'}" />
                   <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
                   <Button Grid.Column="1" Width="16" Height="16" MinWidth="0" Padding="0" CornerRadius="3" Background="{Binding Brush}"
-                          BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="Farbe und Name ändern">
+                          BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="{l:T 'Farbe und Name ändern'}">
                     <Button.Flyout>
                       <Flyout Placement="RightEdgeAlignedTop">
                         <StackPanel Spacing="8" Width="220">
-                          <TextBlock Text="Kalenderfarbe" FontWeight="SemiBold" FontSize="12" />
+                          <TextBlock Text="{l:T 'Kalenderfarbe'}" FontWeight="SemiBold" FontSize="12" />
                           <ItemsControl ItemsSource="{x:Static vm:CalendarViewModel.ColorChoices}">
                             <ItemsControl.ItemsPanel>
                               <ItemsPanelTemplate>
@@ -195,16 +196,16 @@
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
-                          <Button Content="Farbe vom Server" FontSize="12" Click="OnColorPicked" Tag="{x:Null}" />
+                          <Button Content="{l:T 'Farbe vom Server'}" FontSize="12" Click="OnColorPicked" Tag="{x:Null}" />
 
                           <!-- Own display name: stored in Neruna, the server keeps its name -->
-                          <TextBlock Text="Anzeigename" FontWeight="SemiBold" FontSize="12" Margin="0,6,0,0" />
+                          <TextBlock Text="{l:T 'Anzeigename'}" FontWeight="SemiBold" FontSize="12" Margin="0,6,0,0" />
                           <TextBox Text="{Binding EditName}" KeyDown="OnRenameKey" />
                           <TextBlock Text="{Binding ServerNameText}" Classes="subtle" FontSize="11" TextWrapping="Wrap"
                                      IsVisible="{Binding IsRenamed}" />
                           <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Button Content="Übernehmen" FontSize="12" Classes="accent" Click="OnRename" />
-                            <Button Content="Originalname" FontSize="12" Click="OnRename" Tag="reset" IsVisible="{Binding IsRenamed}" />
+                            <Button Content="{l:T 'Übernehmen'}" FontSize="12" Classes="accent" Click="OnRename" />
+                            <Button Content="{l:T 'Originalname'}" FontSize="12" Click="OnRename" Tag="reset" IsVisible="{Binding IsRenamed}" />
                           </StackPanel>
                         </StackPanel>
                       </Flyout>
@@ -212,7 +213,7 @@
                   </Button>
                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="(nur lesen)" Classes="subtle" FontSize="11" IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" />
+                    <TextBlock Text="{l:T '(nur lesen)'}" Classes="subtle" FontSize="11" IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" />
                   </StackPanel>
                 </Grid>
               </DataTemplate>
@@ -246,7 +247,7 @@
                         <TextBlock Classes="subtle" FontSize="12" Text="{Binding DayName}" />
                         <TextBlock Text="{Binding DayNumber}" FontSize="18" FontWeight="SemiBold" />
                       </StackPanel>
-                      <Button Grid.Column="1" Classes="command" Padding="6" VerticalAlignment="Top" ToolTip.Tip="Termin an diesem Tag"
+                      <Button Grid.Column="1" Classes="command" Padding="6" VerticalAlignment="Top" ToolTip.Tip="{l:T 'Termin an diesem Tag'}"
                               Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).NewEventCommand}" CommandParameter="{Binding Date}">
                         <PathIcon Data="{StaticResource IconAdd}" Width="12" Height="12" Margin="0" />
                       </Button>
@@ -259,7 +260,7 @@
 
           <!-- All-day events -->
           <Grid Grid.Row="1" ColumnDefinitions="52,*">
-            <TextBlock Classes="subtle" FontSize="10" Text="ganztägig" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,6,0" />
+            <TextBlock Classes="subtle" FontSize="10" Text="{l:T 'ganztägig'}" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,6,0" />
             <ItemsControl Grid.Column="1" ItemsSource="{Binding Days}" MaxHeight="96">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -323,7 +324,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:CalendarDay">
                       <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0" Background="Transparent"
-                              Classes.today="{Binding IsToday}" DoubleTapped="OnTimeGridDoubleTapped" ToolTip.Tip="Doppelklick: neuer Termin">
+                              Classes.today="{Binding IsToday}" DoubleTapped="OnTimeGridDoubleTapped" ToolTip.Tip="{l:T 'Doppelklick: neuer Termin'}">
                         <Border.Styles>
                           <Style Selector="Border.today">
                             <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
@@ -394,7 +395,7 @@
                         <TextBlock Classes="subtle" FontSize="12" Text="{Binding DayName}" />
                         <TextBlock Text="{Binding DayNumber}" FontSize="18" FontWeight="SemiBold" />
                       </StackPanel>
-                      <Button Grid.Column="1" Classes="command" Padding="6" VerticalAlignment="Top" ToolTip.Tip="Termin an diesem Tag"
+                      <Button Grid.Column="1" Classes="command" Padding="6" VerticalAlignment="Top" ToolTip.Tip="{l:T 'Termin an diesem Tag'}"
                               Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).NewEventCommand}" CommandParameter="{Binding Date}">
                         <PathIcon Data="{StaticResource IconAdd}" Width="12" Height="12" Margin="0" />
                       </Button>
@@ -413,7 +414,7 @@
                               <StackPanel Spacing="1">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                   <TextBlock Text="{Binding TimeText}" FontSize="11" Classes="subtle" />
-                                  <PathIcon Data="{StaticResource IconSync}" Width="9" Height="9" IsVisible="{Binding IsRecurring}" ToolTip.Tip="Serie" />
+                                  <PathIcon Data="{StaticResource IconSync}" Width="9" Height="9" IsVisible="{Binding IsRecurring}" ToolTip.Tip="{l:T 'Serie'}" />
                                 </StackPanel>
                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding Location}" FontSize="11" Classes="subtle" IsVisible="{Binding HasLocation}" TextTrimming="CharacterEllipsis" />

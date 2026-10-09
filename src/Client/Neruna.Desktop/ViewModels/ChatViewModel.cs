@@ -505,7 +505,7 @@ internal sealed record ChatMessageItem(long Id, string SenderName, string Text, 
         var today = DateTime.Today;
         return day == today ? "Heute"
             : day == today.AddDays(-1) ? "Gestern"
-            : day.ToString("dddd, d. MMMM", CultureInfo.GetCultureInfo("de-CH"));
+            : day.ToString("dddd, d. MMMM", Neruna.Core.Localization.Texts.Culture);
     }
 }
 

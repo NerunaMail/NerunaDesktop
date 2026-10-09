@@ -14,4 +14,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Neruna.Client.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Translations of the UI texts (German is in the code): Neruna.Core.Localization.Texts -->
+    <EmbeddedResource Include="Localization\*.json" />
+  </ItemGroup>
 </Project>

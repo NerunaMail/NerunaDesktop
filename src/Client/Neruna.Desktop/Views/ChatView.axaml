@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:controls="using:Neruna.Desktop.Controls"
@@ -80,10 +81,10 @@
     <Border Classes="pane" IsVisible="{Binding ShowNotConnected}">
       <StackPanel MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Margin="24">
         <PathIcon Data="{StaticResource IconChat}" Width="44" Height="44" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Center" />
-        <TextBlock Text="Der Chat braucht Neruna Cloud oder Control" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+        <TextBlock Text="{l:T 'Der Chat braucht Neruna Cloud oder Control'}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
         <TextBlock Classes="subtle" TextWrapping="Wrap" TextAlignment="Center"
-                   Text="Räume, private Nachrichten und der Online-Status laufen über den Server deiner Organisation. Ohne Verbindung zu Neruna Cloud oder einem Neruna-Control-Server funktioniert der Chat nicht – Neruna allein (ohne Server) hat keinen Chat." />
-        <Button Classes="accent" Content="Mit der Cloud verbinden …" HorizontalAlignment="Center" Command="{Binding OpenCloudSetupCommand}" Margin="0,6,0,0" />
+                   Text="{l:T 'Räume, private Nachrichten und der Online-Status laufen über den Server deiner Organisation. Ohne Verbindung zu Neruna Cloud oder einem Neruna-Control-Server funktioniert der Chat nicht – Neruna allein (ohne Server) hat keinen Chat.'}" />
+        <Button Classes="accent" Content="{l:T 'Mit der Cloud verbinden …'}" HorizontalAlignment="Center" Command="{Binding OpenCloudSetupCommand}" Margin="0,6,0,0" />
       </StackPanel>
     </Border>
 
@@ -91,9 +92,9 @@
     <Border Classes="pane" IsVisible="{Binding ShowNotIncluded}">
       <StackPanel MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Margin="24">
         <PathIcon Data="{StaticResource IconChat}" Width="44" Height="44" Foreground="{DynamicResource SubtleTextBrush}" HorizontalAlignment="Center" />
-        <TextBlock Text="Der Chat ist ausgeschaltet" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <TextBlock Text="{l:T 'Der Chat ist ausgeschaltet'}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
         <TextBlock Classes="subtle" TextWrapping="Wrap" TextAlignment="Center"
-                   Text="Deine Organisation nutzt den Chat nicht – er ist im Portal ausgeschaltet oder nicht in der Lizenz enthalten. Es werden keine Chatnachrichten gespeichert." />
+                   Text="{l:T 'Deine Organisation nutzt den Chat nicht – er ist im Portal ausgeschaltet oder nicht in der Lizenz enthalten. Es werden keine Chatnachrichten gespeichert.'}" />
       </StackPanel>
     </Border>
 
@@ -104,8 +105,8 @@
         <Grid RowDefinitions="*,Auto,*">
           <ScrollViewer>
             <StackPanel>
-              <TextBlock Classes="section" Text="Räume" />
-              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="Noch keine Räume – sie werden im Portal angelegt."
+              <TextBlock Classes="section" Text="{l:T 'Räume'}" />
+              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="{l:T 'Noch keine Räume – sie werden im Portal angelegt.'}"
                          IsVisible="{Binding !Rooms.Count}" />
               <ItemsControl ItemsSource="{Binding Rooms}">
                 <ItemsControl.ItemTemplate>
@@ -126,8 +127,8 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
 
-              <TextBlock Classes="section" Text="Private Nachrichten" />
-              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="Ein Klick auf eine Person unten beginnt eine private Unterhaltung."
+              <TextBlock Classes="section" Text="{l:T 'Private Nachrichten'}" />
+              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="{l:T 'Ein Klick auf eine Person unten beginnt eine private Unterhaltung.'}"
                          IsVisible="{Binding !Directs.Count}" />
               <ItemsControl ItemsSource="{Binding Directs}">
                 <ItemsControl.ItemTemplate>
@@ -163,7 +164,7 @@
                 <DataTemplate x:DataType="vm:ChatPersonItem">
                   <Button Classes="conversation" IsHitTestVisible="{Binding !IsMe}"
                           Command="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).OpenPrivateCommand}" CommandParameter="{Binding}"
-                          ToolTip.Tip="Private Nachricht schreiben">
+                          ToolTip.Tip="{l:T 'Private Nachricht schreiben'}">
                     <Grid ColumnDefinitions="Auto,*">
                       <Panel Margin="0,0,10,0">
                         <Border Classes="avatar"><TextBlock Text="{Binding Initials}" /></Border>
@@ -205,7 +206,7 @@
 
           <ScrollViewer x:Name="MessageScroller" Grid.Row="1" Padding="16,8,16,8">
             <StackPanel>
-              <TextBlock Classes="subtle" Text="Noch keine Nachrichten – schreib die erste." HorizontalAlignment="Center" Margin="0,24"
+              <TextBlock Classes="subtle" Text="{l:T 'Noch keine Nachrichten – schreib die erste.'}" HorizontalAlignment="Center" Margin="0,24"
                          IsVisible="{Binding !Messages.Count}" />
               <ItemsControl ItemsSource="{Binding Messages}">
                 <ItemsControl.ItemTemplate>
@@ -240,7 +241,7 @@
             <Grid ColumnDefinitions="Auto,*">
               <PathIcon Data="{StaticResource IconWarning}" Width="13" Height="13" Foreground="#CA5010" VerticalAlignment="Top" Margin="0,2,8,0" />
               <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap"
-                         Text="Der Chat ist nicht Ende-zu-Ende-verschlüsselt – bitte keine vertraulichen Daten senden. Dafür E-Mail mit S/MIME-Verschlüsselung oder einen Ende-zu-Ende-verschlüsselten Messenger verwenden." />
+                         Text="{l:T 'Der Chat ist nicht Ende-zu-Ende-verschlüsselt – bitte keine vertraulichen Daten senden. Dafür E-Mail mit S/MIME-Verschlüsselung oder einen Ende-zu-Ende-verschlüsselten Messenger verwenden.'}" />
             </Grid>
           </Border>
 
@@ -248,13 +249,13 @@
           <Border Grid.Row="4" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Margin="12,0,12,12" Padding="4">
             <Grid RowDefinitions="Auto,Auto">
               <StackPanel Orientation="Horizontal" Spacing="2">
-                <Button Classes="format" Click="OnBold" ToolTip.Tip="Fett (Ctrl+B) – erscheint als **Text**">
+                <Button Classes="format" Click="OnBold" ToolTip.Tip="{l:T 'Fett (Ctrl+B) – erscheint als **Text**'}">
                   <TextBlock Text="B" FontWeight="Bold" />
                 </Button>
-                <Button Classes="format" Click="OnUnderline" ToolTip.Tip="Unterstrichen (Ctrl+U) – erscheint als __Text__">
+                <Button Classes="format" Click="OnUnderline" ToolTip.Tip="{l:T 'Unterstrichen (Ctrl+U) – erscheint als __Text__'}">
                   <TextBlock Text="U" TextDecorations="Underline" />
                 </Button>
-                <Button x:Name="EmojiButton" Classes="format" ToolTip.Tip="Smiley einfügen">
+                <Button x:Name="EmojiButton" Classes="format" ToolTip.Tip="{l:T 'Smiley einfügen'}">
                   <TextBlock Text="🙂" />
                   <Button.Flyout>
                     <Flyout Placement="TopEdgeAlignedLeft">
@@ -278,9 +279,9 @@
               </StackPanel>
               <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
                 <TextBox x:Name="DraftBox" Text="{Binding Draft}" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="140" MaxLength="4000"
-                         BorderThickness="0" Background="Transparent" PlaceholderText="Nachricht schreiben – Enter sendet, Shift+Enter neue Zeile" />
+                         BorderThickness="0" Background="Transparent" PlaceholderText="{l:T 'Nachricht schreiben – Enter sendet, Shift+Enter neue Zeile'}" />
                 <Button Grid.Column="1" Classes="accent" Command="{Binding SendCommand}" VerticalAlignment="Bottom" Margin="6,0,2,2" Padding="10,6"
-                        ToolTip.Tip="Senden (Enter)">
+                        ToolTip.Tip="{l:T 'Senden (Enter)'}">
                   <PathIcon Data="{StaticResource IconSend}" Width="14" Height="14" />
                 </Button>
               </Grid>

@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              x:Class="Neruna.Desktop.Views.AccountsView"
@@ -7,22 +8,22 @@
   <ScrollViewer>
       <StackPanel Spacing="8" MaxWidth="900" HorizontalAlignment="Left">
         <Grid ColumnDefinitions="*,Auto,Auto">
-          <TextBlock Text="Konten" FontSize="22" FontWeight="SemiBold" />
+          <TextBlock Text="{l:T 'Konten'}" FontSize="22" FontWeight="SemiBold" />
           <Button Grid.Column="1" Classes="command" Command="{Binding SubscribeCommand}" Margin="0,0,8,0">
             <StackPanel Orientation="Horizontal">
               <PathIcon Data="{StaticResource IconRss}" />
-              <TextBlock Text="Internet-Kalender abonnieren" />
+              <TextBlock Text="{l:T 'Internet-Kalender abonnieren'}" />
             </StackPanel>
           </Button>
           <Button Grid.Column="2" Classes="accent" Command="{Binding AddAccountCommand}" Padding="12,6">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
-              <TextBlock Text="Konto hinzufügen" />
+              <TextBlock Text="{l:T 'Konto hinzufügen'}" />
             </StackPanel>
           </Button>
         </Grid>
 
-        <TextBlock Classes="subtle" Text="Noch keine Konten eingerichtet." IsVisible="{Binding !HasAccounts}" Margin="0,12" />
+        <TextBlock Classes="subtle" Text="{l:T 'Noch keine Konten eingerichtet.'}" IsVisible="{Binding !HasAccounts}" Margin="0,12" />
 
         <ItemsControl ItemsSource="{Binding Items}" Margin="0,8,0,0">
           <ItemsControl.ItemTemplate>
@@ -32,19 +33,19 @@
                   <StackPanel>
                     <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding Sender}" Classes="subtle" />
-                    <TextBlock Text="Von Ihrer Organisation verwaltet" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" />
+                    <TextBlock Text="{l:T 'Von Ihrer Organisation verwaltet'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" />
                   </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
                     <!-- Order in the folder tree and everywhere else -->
-                    <Button Classes="command" Padding="6" ToolTip.Tip="Nach oben" IsEnabled="{Binding CanMoveUp}"
+                    <Button Classes="command" Padding="6" ToolTip.Tip="{l:T 'Nach oben'}" IsEnabled="{Binding CanMoveUp}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
                       <PathIcon Data="{StaticResource IconChevronUp}" Width="12" Height="12" Margin="0" />
                     </Button>
-                    <Button Classes="command" Padding="6" ToolTip.Tip="Nach unten" IsEnabled="{Binding CanMoveDown}"
+                    <Button Classes="command" Padding="6" ToolTip.Tip="{l:T 'Nach unten'}" IsEnabled="{Binding CanMoveDown}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
                       <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" Margin="0" />
                     </Button>
-                    <Button Content="Bearbeiten" Margin="4,0,0,0"
+                    <Button Content="{l:T 'Bearbeiten'}" Margin="4,0,0,0"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
                     <Button Content="{Binding RemoveText}" IsVisible="{Binding !IsFromCloud}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
@@ -66,14 +67,14 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <TextBlock Text="Diagnose" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
+        <TextBlock Text="{l:T 'Diagnose'}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
         <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
-          <TextBlock Text="Datenordner" Classes="subtle" VerticalAlignment="Center" />
+          <TextBlock Text="{l:T 'Datenordner'}" Classes="subtle" VerticalAlignment="Center" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding DataDirectory}" VerticalAlignment="Center" />
-          <Button Grid.Column="2" Classes="command" Content="Öffnen" Command="{Binding OpenDataFolderCommand}" />
-          <TextBlock Grid.Row="1" Text="Logs" Classes="subtle" VerticalAlignment="Center" />
+          <Button Grid.Column="2" Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding OpenDataFolderCommand}" />
+          <TextBlock Grid.Row="1" Text="{l:T 'Logs'}" Classes="subtle" VerticalAlignment="Center" />
           <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LogDirectory}" VerticalAlignment="Center" />
-          <Button Grid.Row="1" Grid.Column="2" Classes="command" Content="Öffnen" Command="{Binding OpenLogFolderCommand}" />
+          <Button Grid.Row="1" Grid.Column="2" Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding OpenLogFolderCommand}" />
         </Grid>
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding ProtocolLogText}" />
       </StackPanel>

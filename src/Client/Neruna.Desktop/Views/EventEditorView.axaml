@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:cal="using:Neruna.Core.Calendar"
@@ -8,25 +9,25 @@
   <StackPanel>
     <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" FontSize="12" Margin="0,4,0,0" IsVisible="{Binding IsSeries}"
-               Text="Wiederkehrender Termin – Änderungen gelten für die ganze Serie." />
+               Text="{l:T 'Wiederkehrender Termin – Änderungen gelten für die ganze Serie.'}" />
     <TextBlock Classes="error" Margin="0,8,0,0" IsVisible="{Binding NoCalendar}"
-               Text="Kein beschreibbarer Kalender vorhanden. Bitte ein Konto mit CalDAV hinzufügen." />
+               Text="{l:T 'Kein beschreibbarer Kalender vorhanden. Bitte ein Konto mit CalDAV hinzufügen.'}" />
 
-    <TextBlock Classes="label" Text="Titel" />
-    <TextBox Text="{Binding Title}" PlaceholderText="Titel hinzufügen" IsReadOnly="{Binding IsReadOnly}" />
+    <TextBlock Classes="label" Text="{l:T 'Titel'}" />
+    <TextBox Text="{Binding Title}" PlaceholderText="{l:T 'Titel hinzufügen'}" IsReadOnly="{Binding IsReadOnly}" />
 
-    <TextBlock Classes="label" Text="Ort" />
+    <TextBlock Classes="label" Text="{l:T 'Ort'}" />
     <TextBox Text="{Binding Location}" IsReadOnly="{Binding IsReadOnly}" />
 
-    <CheckBox Content="Ganztägig" IsChecked="{Binding IsAllDay}" IsEnabled="{Binding CanEdit}" Margin="0,10,0,0" />
+    <CheckBox Content="{l:T 'Ganztägig'}" IsChecked="{Binding IsAllDay}" IsEnabled="{Binding CanEdit}" Margin="0,10,0,0" />
 
     <Grid ColumnDefinitions="60,*,8,Auto" RowDefinitions="Auto,Auto" Margin="0,6,0,0">
-      <TextBlock Text="Beginn" VerticalAlignment="Center" />
+      <TextBlock Text="{l:T 'Beginn'}" VerticalAlignment="Center" />
       <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding StartDate}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}" />
       <TimePicker Grid.Column="3" SelectedTime="{Binding StartTime}" ClockIdentifier="24HourClock" MinuteIncrement="5"
                   IsVisible="{Binding ShowTimes}" IsEnabled="{Binding CanEdit}" />
 
-      <TextBlock Grid.Row="1" Text="Ende" VerticalAlignment="Center" />
+      <TextBlock Grid.Row="1" Text="{l:T 'Ende'}" VerticalAlignment="Center" />
       <CalendarDatePicker Grid.Row="1" Grid.Column="1" SelectedDate="{Binding EndDate}" HorizontalAlignment="Stretch" Margin="0,6,0,0" IsEnabled="{Binding CanEdit}" />
       <TimePicker Grid.Row="1" Grid.Column="3" SelectedTime="{Binding EndTime}" ClockIdentifier="24HourClock" MinuteIncrement="5" Margin="0,6,0,0"
                   IsVisible="{Binding ShowTimes}" IsEnabled="{Binding CanEdit}" />
@@ -34,7 +35,7 @@
 
     <Grid ColumnDefinitions="*,12,*">
       <StackPanel>
-        <TextBlock Classes="label" Text="Wiederholung" />
+        <TextBlock Classes="label" Text="{l:T 'Wiederholung'}" />
         <ComboBox ItemsSource="{x:Static vm:EventEditorViewModel.RecurrenceOptions}" SelectedItem="{Binding Recurrence}"
                   HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}">
           <ComboBox.ItemTemplate>
@@ -45,7 +46,7 @@
         </ComboBox>
       </StackPanel>
       <StackPanel Grid.Column="2">
-        <TextBlock Classes="label" Text="Kalender" />
+        <TextBlock Classes="label" Text="{l:T 'Kalender'}" />
         <ComboBox ItemsSource="{Binding Calendars}" SelectedItem="{Binding SelectedCalendar}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="cal:CalendarInfo">
@@ -58,7 +59,7 @@
 
     <Grid ColumnDefinitions="*,12,*">
       <StackPanel>
-        <TextBlock Classes="label" Text="Erinnerung" />
+        <TextBlock Classes="label" Text="{l:T 'Erinnerung'}" />
         <ComboBox ItemsSource="{Binding ReminderOptions}" SelectedItem="{Binding Reminder}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:ReminderOption">
@@ -69,9 +70,9 @@
       </StackPanel>
     </Grid>
 
-    <TextBlock Classes="label" Text="Teilnehmer" />
+    <TextBlock Classes="label" Text="{l:T 'Teilnehmer'}" />
     <TextBox Text="{Binding AttendeesText}" IsReadOnly="{Binding !CanEditAttendees}"
-             PlaceholderText="E-Mail-Adressen, mit Komma getrennt – sie erhalten eine Einladung" />
+             PlaceholderText="{l:T 'E-Mail-Adressen, mit Komma getrennt – sie erhalten eine Einladung'}" />
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" Text="{Binding OrganizerText}" IsVisible="{Binding !IsOrganizer}" />
     <ItemsControl ItemsSource="{Binding AttendeeStatuses}" IsVisible="{Binding HasAttendeeStatuses}" Margin="0,4,0,0">
       <ItemsControl.ItemTemplate>
@@ -85,7 +86,7 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
-    <TextBlock Classes="label" Text="Beschreibung" />
+    <TextBlock Classes="label" Text="{l:T 'Beschreibung'}" />
     <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" Height="90" IsReadOnly="{Binding IsReadOnly}" />
 
     <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0"
@@ -94,13 +95,13 @@
     <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,20,0,0">
       <Button Classes.danger="{Binding ConfirmDelete}" Command="{Binding DeleteCommand}" IsVisible="{Binding IsExisting}">
         <Panel>
-          <TextBlock Text="Löschen" IsVisible="{Binding !ConfirmDelete}" />
+          <TextBlock Text="{l:T 'Löschen'}" IsVisible="{Binding !ConfirmDelete}" />
           <TextBlock Text="{Binding DeleteConfirmText}" IsVisible="{Binding ConfirmDelete}" />
         </Panel>
       </Button>
       <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="60" MinWidth="0" Height="4" Margin="12,0" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
-      <Button Grid.Column="3" Content="Abbrechen" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="4" Classes="accent" Content="Speichern" Command="{Binding SaveCommand}" IsVisible="{Binding CanEdit}" />
+      <Button Grid.Column="3" Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="4" Classes="accent" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" IsVisible="{Binding CanEdit}" />
     </Grid>
   </StackPanel>
 </UserControl>

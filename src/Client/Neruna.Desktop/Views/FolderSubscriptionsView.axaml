@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
@@ -8,11 +9,11 @@
   <StackPanel>
     <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,10"
-               Text="Abonnierte Ordner erscheinen in der Ordnerliste. Die Auswahl wird auf dem Server gespeichert – andere Mailprogramme sehen dieselbe. Posteingang, Gesendete, Entwürfe und Papierkorb bleiben immer sichtbar." />
+               Text="{l:T 'Abonnierte Ordner erscheinen in der Ordnerliste. Die Auswahl wird auf dem Server gespeichert – andere Mailprogramme sehen dieselbe. Posteingang, Gesendete, Entwürfe und Papierkorb bleiben immer sichtbar.'}" />
 
     <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,6" IsVisible="{Binding Folders.Count}">
-      <Button Classes="command" Content="Alle" Command="{Binding SelectAllCommand}" CommandParameter="{x:True}" Padding="0,2" />
-      <Button Classes="command" Content="Keine" Command="{Binding SelectAllCommand}" CommandParameter="{x:False}" Padding="0,2" />
+      <Button Classes="command" Content="{l:T 'Alle'}" Command="{Binding SelectAllCommand}" CommandParameter="{x:True}" Padding="0,2" />
+      <Button Classes="command" Content="{l:T 'Keine'}" Command="{Binding SelectAllCommand}" CommandParameter="{x:False}" Padding="0,2" />
     </StackPanel>
 
     <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="8" MaxHeight="420">
@@ -39,8 +40,8 @@
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,20,0,0">
-      <Button Content="Abbrechen" Command="{Binding CancelCommand}" />
-      <Button Classes="accent" Content="Speichern" Command="{Binding SaveCommand}" />
+      <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
+      <Button Classes="accent" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" />
     </StackPanel>
   </StackPanel>
 </UserControl>
