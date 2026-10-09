@@ -174,7 +174,17 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
             await store.DeleteOlderThanAsync(Cutoff(response.RetentionDays), cancellationToken);
         }
 
-        var state = new ChatState(response.Available, response.RetentionDays, response.Me, response.Rooms, response.People, response.Reads);
+        // Read markers only move forward: one set here a moment ago may not have reached this answer yet.
+        var reads = new Dictionary<string, long>(response.Reads);
+        foreach (var (conversation, lastRead) in Current.Reads)
+        {
+            if (lastRead > reads.GetValueOrDefault(conversation) && response.Me == Current.Me)
+            {
+                reads[conversation] = lastRead;
+            }
+        }
+
+        var state = new ChatState(response.Available, response.RetentionDays, response.Me, response.Rooms, response.People, reads);
         var stateJson = JsonSerializer.Serialize(state, NerunaJson.Options);
         var stateChanged = stateJson != await settings.GetAsync(SettingKeys.ChatState, cancellationToken);
         if (stateChanged)
@@ -182,7 +192,7 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
             await settings.SetAsync(SettingKeys.ChatState, stateJson, cancellationToken);
         }
 
-        Current = new ChatSnapshot(true, response.Available, response.RetentionDays, response.Me, response.Rooms, response.People, kept, response.Reads);
+        Current = new ChatSnapshot(true, response.Available, response.RetentionDays, response.Me, response.Rooms, response.People, kept, reads);
         return stateChanged || added.Count > 0 || kept.Count < messages.Count || !before.Connected;
     }
 
@@ -241,6 +251,19 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
         {
             await cloud.SetPresenceAsync(presence, cancellationToken);
             _presenceSent = true;
+        }
+    }
+
+    /// <summary>
+    /// The chat is switched off here (its button hidden): others see this person offline; the chosen status is kept
+    /// and sent again with the next refresh once the chat is back.
+    /// </summary>
+    public async Task GoOfflineAsync(CancellationToken cancellationToken = default)
+    {
+        _presenceSent = false;
+        if (await cloud.GetConnectionAsync(cancellationToken) is not null)
+        {
+            await cloud.SetPresenceAsync(Presence.Offline, cancellationToken);
         }
     }
 

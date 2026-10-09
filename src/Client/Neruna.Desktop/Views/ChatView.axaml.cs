@@ -104,7 +104,4 @@ internal sealed partial class ChatView : UserControl
         EmojiButton.Flyout?.Hide();
         DraftBox.Focus();
     }
-
-    // A person picked in the "new private message" list: close the list.
-    private void OnFlyoutPick(object? sender, RoutedEventArgs e) => NewPrivateButton.Flyout?.Hide();
 }

@@ -33,6 +33,12 @@ internal sealed partial class UiPreferences : ObservableObject
     /// <summary>The upper buttons of the navigation rail in the chosen order; hidden ones stay in the list.</summary>
     public ObservableCollection<NavigationItem> NavigationItems { get; } = [];
 
+    /// <summary>Order or visibility of the rail buttons changed (also after loading).</summary>
+    public event EventHandler? NavigationChanged;
+
+    /// <summary>The chat button is shown (hidden: no chat, offline).</summary>
+    public bool IsChatShown => NavigationItems.Any(i => i.Section == Section.Chat && i.IsVisible);
+
     /// <summary>Where Neruna opens: the first visible button.</summary>
     public Section StartSection => NavigationItems.FirstOrDefault(i => i.IsVisible)?.Section ?? Section.Mail;
 
@@ -106,6 +112,8 @@ internal sealed partial class UiPreferences : ObservableObject
             item.PropertyChanged += OnNavigationItemChanged;
             NavigationItems.Add(item);
         }
+
+        NavigationChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnNavigationItemChanged(object? sender, PropertyChangedEventArgs e)
@@ -123,6 +131,7 @@ internal sealed partial class UiPreferences : ObservableObject
         }
 
         SaveNavigation();
+        NavigationChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void SaveNavigation()

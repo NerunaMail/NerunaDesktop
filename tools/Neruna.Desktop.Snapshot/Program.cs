@@ -448,7 +448,20 @@ internal static class Snapshots
             await vm.ChatPage.RefreshNowAsync();
             await Task.Delay(400);
             await SaveAsync(window, output, "chat.png");
-            await vm.ChatPage.SetPresenceCommand.ExecuteAsync(Neruna.Core.Chat.Presence.DoNotDisturb);
+            // The status list in the header is a popup: its buttons must reach the command (and set the status).
+            var presenceButton = window.GetVisualDescendants().OfType<Button>().First(b => b.Name == "PresenceButton");
+            presenceButton.Flyout!.ShowAt(presenceButton);
+            await Task.Delay(300);
+            var choices = TopLevel.GetTopLevel(window)!.GetVisualDescendants().OfType<Button>().ToList();
+            var popupButtons = (presenceButton.Flyout as Flyout)?.Content is Control flyoutContent
+                ? flyoutContent.GetVisualDescendants().OfType<Button>().ToList()
+                : [];
+            Console.WriteLine($"Presence choices: {popupButtons.Count}, with command: {popupButtons.Count(b => b.Command is not null)}");
+            var dnd = popupButtons.FirstOrDefault(b => Equals(b.CommandParameter, Neruna.Core.Chat.Presence.DoNotDisturb));
+            dnd?.Command?.Execute(dnd.CommandParameter);
+            await Task.Delay(300);
+            Console.WriteLine($"Presence after choosing: {vm.ChatPage.Presence}");
+            presenceButton.Flyout.Hide();
             vm.ChatPage.SelectCommand.Execute(vm.ChatPage.Directs.FirstOrDefault());
             vm.ChatPage.Draft = "Ja, gerne **gleich** ☕";
             await Task.Delay(300);
@@ -462,6 +475,15 @@ internal static class Snapshots
             await SaveAsync(window, output, "chat-dark.png");
             Appearance.Apply(ThemeMode.Light, ColorScheme.Blue);
             await vm.ChatPage.SetPresenceCommand.ExecuteAsync(Neruna.Core.Chat.Presence.Available);
+            // Chat button hidden in Einstellungen → Design: offline for the others, no status switch in the header.
+            var chatNav = vm.MailPage.Preferences.NavigationItems.First(n => n.Section == Section.Chat);
+            chatNav.IsVisible = false;
+            await Task.Delay(500);
+            Console.WriteLine($"Chat hidden: status switch shown={vm.ChatPage.ShowPresence}, presence kept={vm.ChatPage.Presence}");
+            await SaveAsync(window, output, "chat-hidden.png");
+            chatNav.IsVisible = true;
+            await Task.Delay(500);
+            Console.WriteLine($"Chat shown again: status switch shown={vm.ChatPage.ShowPresence}");
             vm.NavigateCommand.Execute(Section.Settings);
         }
 

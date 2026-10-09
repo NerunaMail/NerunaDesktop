@@ -36,7 +36,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PresenceChoice">
                       <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Background="Transparent" Padding="8,6"
-                              Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ChatPage.SetPresenceCommand}" CommandParameter="{Binding Key}"
+                              Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).ChatPage.SetPresenceCommand}" CommandParameter="{Binding Key}"
                               Click="OnPresencePicked">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                           <Ellipse Width="10" Height="10" Fill="{Binding Brush}" VerticalAlignment="Center" />

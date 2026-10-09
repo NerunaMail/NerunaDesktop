@@ -66,7 +66,9 @@
     <Style Selector="TextBlock.sender.mine">
       <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
+    <!-- Not focusable: a click must leave the caret and the selection in the text field -->
     <Style Selector="Button.format">
+      <Setter Property="Focusable" Value="False" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="8,3" />
       <Setter Property="MinWidth" Value="30" />
@@ -124,39 +126,8 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
 
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="section" Text="Private Nachrichten" />
-                <!-- A new private conversation with anyone of the organisation -->
-                <Button x:Name="NewPrivateButton" Grid.Column="1" Classes="format" Padding="6,2" Margin="0,6,4,0" ToolTip.Tip="Neue private Nachricht">
-                  <PathIcon Data="{StaticResource IconAdd}" Width="12" Height="12" />
-                  <Button.Flyout>
-                    <Flyout Placement="RightEdgeAlignedTop">
-                      <ScrollViewer MaxHeight="420" Width="260">
-                        <ItemsControl ItemsSource="{Binding Everyone}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ChatPersonItem">
-                              <Button Classes="conversation" Click="OnFlyoutPick"
-                                      Command="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).OpenPrivateCommand}" CommandParameter="{Binding}">
-                                <Grid ColumnDefinitions="Auto,*">
-                                  <Panel Margin="0,0,10,0">
-                                    <Border Classes="avatar"><TextBlock Text="{Binding Initials}" /></Border>
-                                    <Ellipse Classes="presence" Fill="{Binding PresenceBrush}" />
-                                  </Panel>
-                                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Classes="subtle" FontSize="11" Text="{Binding PresenceLabel}" />
-                                  </StackPanel>
-                                </Grid>
-                              </Button>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </ScrollViewer>
-                    </Flyout>
-                  </Button.Flyout>
-                </Button>
-              </Grid>
-              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="Mit + oder einem Klick auf eine Person beginnen."
+              <TextBlock Classes="section" Text="Private Nachrichten" />
+              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="Ein Klick auf eine Person unten beginnt eine private Unterhaltung."
                          IsVisible="{Binding !Directs.Count}" />
               <ItemsControl ItemsSource="{Binding Directs}">
                 <ItemsControl.ItemTemplate>

@@ -45,9 +45,6 @@ internal sealed partial class ChatViewModel : ViewModelBase
     /// <summary>The people of the selected room (online first), or the two of a private conversation.</summary>
     public ObservableCollection<ChatPersonItem> People { get; } = [];
 
-    /// <summary>Everyone of the organisation, for a new private conversation.</summary>
-    public ObservableCollection<ChatPersonItem> Everyone { get; } = [];
-
     public ObservableCollection<ChatMessageItem> Messages { get; } = [];
 
     [ObservableProperty]
@@ -64,8 +61,47 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
     public bool ShowChat => IsConnected && IsAvailable;
 
-    /// <summary>The status switch in the header: only with a chat to show it in.</summary>
-    public bool ShowPresence => ShowChat;
+    /// <summary>The status switch in the header: only with a chat to show it in (and its button not hidden).</summary>
+    public bool ShowPresence => ShowChat && IsEnabled;
+
+    /// <summary>False while the chat button is hidden (Einstellungen → Design): no polling, shown offline to others.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPresence))]
+    public partial bool IsEnabled { get; set; } = true;
+
+    private bool _started;
+
+    async partial void OnIsEnabledChanged(bool value)
+    {
+        if (!_started)
+        {
+            return;
+        }
+
+        if (value)
+        {
+            _timer.Start();
+            await PollAsync();
+        }
+        else
+        {
+            _timer.Stop();
+            await GoOfflineAsync();
+        }
+    }
+
+    private async Task GoOfflineAsync()
+    {
+        try
+        {
+            await _chat.GoOfflineAsync();
+        }
+        catch (Exception ex) when (ex is CloudException or HttpRequestException or TaskCanceledException)
+        {
+            // Unreachable: the server shows offline anyway after 5 minutes without contact.
+            _logger.LogDebug(ex, "Offline status not sent");
+        }
+    }
 
     /// <summary>How long the organisation keeps messages (shown above the conversation).</summary>
     [ObservableProperty]
@@ -156,6 +192,13 @@ internal sealed partial class ChatViewModel : ViewModelBase
             _logger.LogWarning(ex, "Local chat not loaded");
         }
 
+        _started = true;
+        if (!IsEnabled)
+        {
+            await GoOfflineAsync();
+            return;
+        }
+
         _timer.Start();
         await PollAsync();
     }
@@ -165,7 +208,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
     private async Task PollAsync()
     {
-        if (_polling)
+        if (_polling || !IsEnabled)
         {
             return;
         }
@@ -238,7 +281,6 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
         Sync(Rooms, rooms);
         Sync(Directs, directs);
-        Sync(Everyone, snapshot.People.Where(p => p.Id != me).Select(p => new ChatPersonItem(p, false)).ToList());
 
         if (selectedKey != SelectedKey)
         {
@@ -256,12 +298,15 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
     partial void OnSelectedKeyChanged(string? value) => Rebuild();
 
+    // Clicked: the person looks at it – read, whatever the window activation says (a popup just closed may leave it
+    // reported as inactive).
     [RelayCommand]
     private void Select(ChatConversationItem? item)
     {
         if (item is not null)
         {
             SelectedKey = item.Key;
+            _ = MarkShownReadAsync();
         }
     }
 
@@ -331,6 +376,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
         // Not written with yet: the list shows it at the top until there are messages.
         SelectedKey = ChatConversation.Private(person.Id);
+        _ = MarkShownReadAsync();
     }
 
     [RelayCommand(CanExecute = nameof(CanSend))]

@@ -127,6 +127,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             CurrentPage = MailPage;
             await MailPage.ComposeToAsync(recipients);
         };
+        // Chat button hidden in Einstellungen → Design: no chat, offline, no status switch.
+        chatPage.IsEnabled = MailPage.Preferences.IsChatShown;
+        MailPage.Preferences.NavigationChanged += (_, _) => ChatPage.IsEnabled = MailPage.Preferences.IsChatShown;
+
         // The unread count of the chat on its button in the rail.
         chatPage.PropertyChanged += (_, e) =>
         {
