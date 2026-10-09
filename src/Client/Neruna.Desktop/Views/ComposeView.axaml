@@ -89,7 +89,10 @@
     </Grid>
 
     <TextBlock Grid.Row="1" Classes="subtle" Text="Von" VerticalAlignment="Center" />
-    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FromText}" Margin="0,6" />
+    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FromText}" Margin="0,6" IsVisible="{Binding !HasSenderChoice}" />
+    <!-- Aliases: the sender to choose (a reply starts with the address the message was sent to) -->
+    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Senders}" SelectedItem="{Binding From}" IsVisible="{Binding HasSenderChoice}"
+              Margin="0,3" MinWidth="320" HorizontalAlignment="Left" />
 
     <!-- An / Cc: the button opens the contact picker; typing suggests contacts and groups from the address books -->
     <Button x:Name="ToButton" Grid.Row="2" Content="An …" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3"

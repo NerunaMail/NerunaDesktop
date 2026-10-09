@@ -75,7 +75,8 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
             }
         }
 
-        var updated = new Account(account.Id, displayName, emailAddress, connections, string.IsNullOrWhiteSpace(label) ? null : label.Trim());
+        // Aliases and the cloud id come with the passed account.
+        var updated = account with { DisplayName = displayName, EmailAddress = emailAddress, Connections = connections, Label = string.IsNullOrWhiteSpace(label) ? null : label.Trim() };
         ServiceConnection? testing = null;
         try
         {

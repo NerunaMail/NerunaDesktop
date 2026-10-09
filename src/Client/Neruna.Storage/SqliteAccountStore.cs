@@ -7,6 +7,8 @@ namespace Neruna.Storage;
 
 public sealed class SqliteAccountStore(IDbContextFactory<NerunaDbContext> contexts, MessageContentFiles files) : IAccountStore
 {
+    private static readonly JsonSerializerOptions AliasJson = new(JsonSerializerDefaults.Web);
+
     public async Task<IReadOnlyList<Account>> GetAccountsAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
@@ -24,7 +26,9 @@ public sealed class SqliteAccountStore(IDbContextFactory<NerunaDbContext> contex
                     c.Kind,
                     c.ProviderId,
                     JsonSerializer.Deserialize<Dictionary<string, string>>(c.SettingsJson) ?? [])).ToList(),
-                a.Label))
+                a.Label,
+                a.AliasesJson is null ? null : JsonSerializer.Deserialize<List<MailIdentity>>(a.AliasesJson, AliasJson),
+                a.CloudId))
             .ToList();
     }
 
@@ -62,6 +66,8 @@ public sealed class SqliteAccountStore(IDbContextFactory<NerunaDbContext> contex
         entity.DisplayName = account.DisplayName;
         entity.EmailAddress = account.EmailAddress;
         entity.Label = account.Label;
+        entity.AliasesJson = account.Aliases is { Count: > 0 } aliases ? JsonSerializer.Serialize(aliases, AliasJson) : null;
+        entity.CloudId = account.CloudId;
 
         // Removing a connection cascades to its cached folders, calendars and address books; its downloaded messages go too.
         var removed = entity.Connections.Where(c => account.Connections.All(n => n.Id != c.Id)).Select(c => c.Id).ToList();

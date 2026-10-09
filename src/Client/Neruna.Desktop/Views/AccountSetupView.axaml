@@ -25,6 +25,22 @@
     <TextBlock Classes="label" Text="E-Mail-Adresse" />
     <TextBox Text="{Binding Email}" PlaceholderText="anna.muster@example.com" />
 
+    <!-- Aliases: more sender addresses of the same mailbox -->
+    <TextBlock Classes="label" Text="Weitere Absenderadressen (Aliase)" />
+    <ItemsControl ItemsSource="{Binding Aliases}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:AliasRow">
+          <Grid ColumnDefinitions="*,8,*,Auto" Margin="0,0,0,4">
+            <TextBox Text="{Binding Email}" PlaceholderText="info@example.com" />
+            <TextBox Grid.Column="2" Text="{Binding DisplayName}" PlaceholderText="Anzeigename, z. B. Example AG" />
+            <Button Grid.Column="3" Content="✕" Margin="6,0,0,0" ToolTip.Tip="Alias entfernen"
+                    Command="{Binding $parent[UserControl].((vm:AccountSetupViewModel)DataContext).RemoveAliasCommand}" CommandParameter="{Binding}" />
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <Button Classes="command" Content="+ Alias hinzufügen" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left" Padding="0,2" />
+
     <TextBlock Classes="label" Text="Passwort" />
     <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="{Binding PasswordHint}" />
 

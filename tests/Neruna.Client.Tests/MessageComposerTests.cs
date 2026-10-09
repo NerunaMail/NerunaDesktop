@@ -23,6 +23,26 @@ public class MessageComposerTests
     }
 
     [Fact]
+    public void Reply_comes_from_the_alias_the_message_was_sent_to()
+    {
+        // Sent to Lea, an alias of this account: the reply comes from there, and Lea is not replied to.
+        var draft = MessageComposer.Reply(Original(), ["me@example.com", "LEA@example.com"], replyAll: true);
+        Assert.Equal("LEA@example.com", draft.From);
+        Assert.Equal("Anna <anna@example.com>, Thomas <thomas@example.com>", draft.Cc);
+
+        // Bcc / mailing list: only the delivery header knows.
+        var bcc = Original();
+        bcc.To.Clear();
+        bcc.Headers.Add("Delivered-To", "support@example.com");
+        Assert.Equal("support@example.com", MessageComposer.Reply(bcc, ["anna@example.com", "support@example.com"], replyAll: false).From);
+        Assert.Null(MessageComposer.Reply(bcc, ["anna@example.com"], replyAll: false).From);
+
+        // A saved draft keeps its sender.
+        var saved = MessageComposer.Build(new MailboxAddress("Support", "support@example.com"), draft with { From = "support@example.com" }, [], forDraft: true);
+        Assert.Equal("support@example.com", MessageComposer.FromDraft(saved, "1").From);
+    }
+
+    [Fact]
     public void Reply_goes_to_reply_to_with_single_prefix_and_threading()
     {
         var draft = MessageComposer.Reply(Original(), "anna@example.com", replyAll: false);

@@ -12,14 +12,17 @@ namespace Neruna.Core.Cloud;
 /// <summary>What a backup holds: only personal things – nothing the organisation provides through the cloud.</summary>
 /// <param name="Accounts">In the user's order, with the password of every connection.</param>
 /// <param name="Settings">Preferences, without what belongs to this device (cloud connection, chat, window layout).</param>
+/// <param name="CloudPasswords">Passwords the user entered for accounts of the organisation that came without one
+/// (cloud account id → password); the accounts themselves come back from the cloud.</param>
 public sealed record BackupContent(
     IReadOnlyList<BackupAccount> Accounts,
     IReadOnlyDictionary<string, string> Settings,
     IReadOnlyList<Signature> Signatures,
     IReadOnlyList<TextTemplate> TextTemplates,
-    IReadOnlyList<BackupCertificate> Certificates);
+    IReadOnlyList<BackupCertificate> Certificates,
+    IReadOnlyDictionary<string, string>? CloudPasswords = null);
 
-public sealed record BackupAccount(Guid Id, string DisplayName, string? EmailAddress, string? Label, IReadOnlyList<BackupConnection> Connections)
+public sealed record BackupAccount(Guid Id, string DisplayName, string? EmailAddress, string? Label, IReadOnlyList<BackupConnection> Connections, IReadOnlyList<MailIdentity>? Aliases = null)
 {
     public string Title => string.IsNullOrWhiteSpace(Label) ? EmailAddress ?? DisplayName : Label;
 }
@@ -200,7 +203,7 @@ public sealed class SettingsBackupService(
         var content = plan.Content;
 
         var wanted = content.Accounts.Select(a => a.Id).ToHashSet();
-        foreach (var account in await accounts.GetAccountsAsync(cancellationToken))
+        foreach (var account in (await accounts.GetAccountsAsync(cancellationToken)).Where(a => !a.IsFromCloud))
         {
             var kept = content.Accounts.FirstOrDefault(a => a.Id == account.Id);
             foreach (var connection in account.Connections.Where(c => kept?.Connections.Any(k => k.Id == c.Id) != true))
@@ -217,7 +220,7 @@ public sealed class SettingsBackupService(
         foreach (var account in content.Accounts)
         {
             await accounts.SaveAccountAsync(new Account(account.Id, account.DisplayName, account.EmailAddress,
-                account.Connections.Select(c => new ServiceConnection(c.Id, c.Kind, c.ProviderId, c.Settings)).ToList(), account.Label), cancellationToken);
+                account.Connections.Select(c => new ServiceConnection(c.Id, c.Kind, c.ProviderId, c.Settings)).ToList(), account.Label, account.Aliases), cancellationToken);
             foreach (var connection in account.Connections)
             {
                 if (connection.Secret is null)
@@ -232,6 +235,10 @@ public sealed class SettingsBackupService(
         }
 
         await accounts.SetOrderAsync([.. content.Accounts.Select(a => a.Id)], cancellationToken);
+        foreach (var (cloudId, password) in content.CloudPasswords ?? new Dictionary<string, string>())
+        {
+            await CloudAccountPasswords.SetAsync(credentials, accounts, cloudId, password, cancellationToken);
+        }
 
         foreach (var key in (await settings.GetAllAsync(cancellationToken)).Keys.Where(k => IsPersonalSetting(k) && !content.Settings.ContainsKey(k)))
         {
@@ -323,8 +330,20 @@ public sealed class SettingsBackupService(
     public async Task<BackupContent> CollectAsync(CancellationToken cancellationToken = default)
     {
         var accountList = new List<BackupAccount>();
+        var cloudPasswords = new SortedDictionary<string, string>(StringComparer.Ordinal);
         foreach (var account in await accounts.GetAccountsAsync(cancellationToken))
         {
+            if (account.CloudId is { } cloudId)
+            {
+                // From the organisation: only what the user typed in themselves.
+                if (await credentials.GetSecretAsync(CloudAccountPasswords.SecretId(cloudId), cancellationToken) is { } typed)
+                {
+                    cloudPasswords[cloudId] = typed;
+                }
+
+                continue;
+            }
+
             var connections = new List<BackupConnection>();
             foreach (var connection in account.Connections)
             {
@@ -333,7 +352,7 @@ public sealed class SettingsBackupService(
                     await credentials.GetSecretAsync(connection.Id, cancellationToken)));
             }
 
-            accountList.Add(new BackupAccount(account.Id, account.DisplayName, account.EmailAddress, account.Label, connections));
+            accountList.Add(new BackupAccount(account.Id, account.DisplayName, account.EmailAddress, account.Label, connections, account.Aliases));
         }
 
         var personalSettings = new SortedDictionary<string, string>(StringComparer.Ordinal);
@@ -350,7 +369,8 @@ public sealed class SettingsBackupService(
             personalSettings,
             [.. (await signatures.GetAllAsync(cancellationToken)).Where(s => !s.IsFromCloud).OrderBy(s => s.Id)],
             [.. (await textTemplates.GetAllAsync(cancellationToken)).Where(t => !t.IsFromCloud).OrderBy(t => t.Id)],
-            [.. (await certificates.GetPersonalAsync(cancellationToken)).Select(c => new BackupCertificate(c.Certificate.Thumbprint, c.Certificate.Der, c.Certificate.Pkcs12, c.Certificate.Source, c.Certificate.AddedAt, c.Password))]);
+            [.. (await certificates.GetPersonalAsync(cancellationToken)).Select(c => new BackupCertificate(c.Certificate.Thumbprint, c.Certificate.Der, c.Certificate.Pkcs12, c.Certificate.Source, c.Certificate.AddedAt, c.Password))],
+            cloudPasswords.Count > 0 ? cloudPasswords : null);
     }
 
     /// <summary>What restoring <paramref name="backup"/> changes compared with <paramref name="current"/>.</summary>
@@ -365,6 +385,13 @@ public sealed class SettingsBackupService(
             (a, b) => a.Name == b.Name && a.Html == b.Html && a.Shortcut == b.Shortcut);
         Diff(changes, "Zertifikate", current.Certificates, backup.Certificates, c => c.Thumbprint, CertificateName, (a, b) => a.Password == b.Password && a.Source == b.Source);
 
+        var currentPasswords = current.CloudPasswords ?? new Dictionary<string, string>();
+        var changedPasswords = (backup.CloudPasswords ?? new Dictionary<string, string>()).Count(p => currentPasswords.GetValueOrDefault(p.Key) != p.Value);
+        if (changedPasswords > 0)
+        {
+            changes.Add(new BackupChange("Konten", changedPasswords == 1 ? "Passwort eines Kontos der Organisation" : $"Passwörter von {changedPasswords} Konten der Organisation", BackupChangeKind.Changed));
+        }
+
         var changedSettings = current.Settings.Keys.Union(backup.Settings.Keys)
             .Count(k => current.Settings.GetValueOrDefault(k) != backup.Settings.GetValueOrDefault(k));
         if (changedSettings > 0)
@@ -377,6 +404,7 @@ public sealed class SettingsBackupService(
 
     private static bool Same(BackupAccount a, BackupAccount b) =>
         a.DisplayName == b.DisplayName && a.EmailAddress == b.EmailAddress && a.Label == b.Label
+        && (a.Aliases ?? []).SequenceEqual(b.Aliases ?? [])
         && a.Connections.Count == b.Connections.Count
         && a.Connections.Zip(b.Connections).All(p => p.First.Id == p.Second.Id && p.First.ProviderId == p.Second.ProviderId && p.First.Secret == p.Second.Secret
                                                       && p.First.Settings.Count == p.Second.Settings.Count

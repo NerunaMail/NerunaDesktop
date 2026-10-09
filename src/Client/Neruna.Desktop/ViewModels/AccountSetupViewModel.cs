@@ -28,6 +28,15 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     [ObservableProperty]
     public partial string Label { get; set; } = string.Empty;
 
+    /// <summary>Further sender addresses of this mailbox (the mail server has to allow them).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<AliasRow> Aliases { get; } = [];
+
+    [RelayCommand]
+    private void AddAlias() => Aliases.Add(new AliasRow { DisplayName = DisplayName });
+
+    [RelayCommand]
+    private void RemoveAlias(AliasRow row) => Aliases.Remove(row);
+
     /// <summary>"Konto bearbeiten": the account being changed (its servers prefilled; an empty password keeps the old one).</summary>
     public Account? Editing { get; private set; }
 
@@ -50,6 +59,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         Editing = account;
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;
+        Aliases.Clear();
+        foreach (var alias in account.Aliases ?? [])
+        {
+            Aliases.Add(new AliasRow { Email = alias.Email, DisplayName = alias.DisplayName });
+        }
+
         Email = account.EmailAddress ?? string.Empty;
         var config = setup.Describe(account);
         ImapHost = SmtpHost = string.Empty;
@@ -228,7 +243,23 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         var name = string.IsNullOrWhiteSpace(DisplayName) ? email : DisplayName.Trim();
         var config = new MailProviderConfig(domain, null, incoming, outgoing, dav);
         var label = string.IsNullOrWhiteSpace(Label) ? null : Label.Trim();
-        var account = setup.BuildAccount(name, email, config) with { Label = label };
+        var aliases = new List<MailIdentity>();
+        foreach (var row in Aliases.Where(r => !string.IsNullOrWhiteSpace(r.Email)))
+        {
+            var address = row.Email.Trim();
+            if (!MimeKit.MailboxAddress.TryParse(address, out var parsed) || parsed.Address != address || !address.Contains('@', StringComparison.Ordinal))
+            {
+                Error = $"«{address}» ist keine gültige E-Mail-Adresse.";
+                return;
+            }
+
+            if (!string.Equals(address, email, StringComparison.OrdinalIgnoreCase) && aliases.All(a => !string.Equals(a.Email, address, StringComparison.OrdinalIgnoreCase)))
+            {
+                aliases.Add(new MailIdentity(address, string.IsNullOrWhiteSpace(row.DisplayName) ? name : row.DisplayName.Trim()));
+            }
+        }
+
+        var account = setup.BuildAccount(name, email, config) with { Label = label, Aliases = aliases.Count > 0 ? aliases : null };
         if (account.Connections.Count == 0)
         {
             Error = "Bitte mindestens einen IMAP-Server oder eine CalDAV-/CardDAV-Adresse angeben.";
@@ -241,7 +272,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         {
             if (Editing is { } existing)
             {
-                await setup.UpdateAsync(existing, name, label, email, config, Password.Length > 0 ? Password : null);
+                await setup.UpdateAsync(existing with { Aliases = account.Aliases }, name, label, email, config, Password.Length > 0 ? Password : null);
             }
             else
             {
@@ -307,4 +338,13 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         CalDavUrl = result.Config.CalDav?.ServerUrl.AbsoluteUri ?? string.Empty;
         CardDavUrl = result.Config.CardDav?.ServerUrl.AbsoluteUri ?? string.Empty;
     }
+}
+
+internal sealed partial class AliasRow : ObservableObject
+{
+    [ObservableProperty]
+    public partial string Email { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string DisplayName { get; set; } = string.Empty;
 }

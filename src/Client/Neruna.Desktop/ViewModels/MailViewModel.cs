@@ -237,10 +237,10 @@ internal sealed partial class MailViewModel(
 
     // Replies to encrypted mail are encrypted again by default.
     [RelayCommand(CanExecute = nameof(CanRespond))]
-    private Task ReplyAsync() => RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, CurrentAccount!.Account.EmailAddress ?? string.Empty, replyAll: false), ComposeKind.Reply);
+    private Task ReplyAsync() => RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, OwnAddresses(CurrentAccount!.Account), replyAll: false), ComposeKind.Reply);
 
     [RelayCommand(CanExecute = nameof(CanRespond))]
-    private Task ReplyAllAsync() => RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, CurrentAccount!.Account.EmailAddress ?? string.Empty, replyAll: true), ComposeKind.Reply);
+    private Task ReplyAllAsync() => RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, OwnAddresses(CurrentAccount!.Account), replyAll: true), ComposeKind.Reply);
 
     [RelayCommand(CanExecute = nameof(CanRespond))]
     private Task ForwardAsync() => RespondAsync(MessageComposer.Forward(ReadingPane!.Message!), ComposeKind.Forward);
@@ -388,6 +388,8 @@ internal sealed partial class MailViewModel(
         }
     }
 
+    private static string[] OwnAddresses(Account account) => [.. account.Identities.Select(i => i.Email)];
+
     private async Task StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false, Func<Task>? afterSent = null)
     {
         if (CurrentAccount is not { Account.EmailAddress: not null } account)
@@ -514,8 +516,8 @@ internal sealed partial class MailViewModel(
             var window = new MessageWindowViewModel(
                 message.Summary.Subject,
                 preferences,
-                _ => RespondAsync(MessageComposer.Reply(opened.Readable, account.Account.EmailAddress ?? string.Empty, replyAll: false), ComposeKind.Reply),
-                _ => RespondAsync(MessageComposer.Reply(opened.Readable, account.Account.EmailAddress ?? string.Empty, replyAll: true), ComposeKind.Reply),
+                _ => RespondAsync(MessageComposer.Reply(opened.Readable, OwnAddresses(account.Account), replyAll: false), ComposeKind.Reply),
+                _ => RespondAsync(MessageComposer.Reply(opened.Readable, OwnAddresses(account.Account), replyAll: true), ComposeKind.Reply),
                 _ => RespondAsync(MessageComposer.Forward(opened.Readable), ComposeKind.Forward),
                 _ => DeleteFromWindowAsync(message, folder));
             void Show(bool allowRemoteContent) =>

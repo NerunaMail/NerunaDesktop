@@ -110,6 +110,12 @@ internal sealed class AccountEntity
     /// <summary>What Neruna calls the account (folder tree, lists); null = the e-mail address.</summary>
     public string? Label { get; set; }
 
+    /// <summary>Further sender addresses as JSON (<c>[{"email":…,"displayName":…}]</c>); null = none.</summary>
+    public string? AliasesJson { get; set; }
+
+    /// <summary>Id of the account in Neruna Cloud when the organisation set it up there; null = the user's own.</summary>
+    public string? CloudId { get; set; }
+
     /// <summary>Position chosen by the user (folder tree, settings); equal values fall back to the name.</summary>
     public int SortOrder { get; set; }
 

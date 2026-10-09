@@ -23,7 +23,8 @@ public sealed record ComposeDraft(
     IReadOnlyList<MimeEntity> Attachments,
     string? HtmlBody = null,
     string? DraftRemoteId = null,
-    string? MessageId = null)
+    string? MessageId = null,
+    string? From = null)
 {
     public static ComposeDraft Empty { get; } = new(string.Empty, string.Empty, string.Empty, string.Empty, null, [], []);
 }
@@ -31,15 +32,29 @@ public sealed record ComposeDraft(
 /// <summary>Builds replies and forwards the way business users expect (AW:/WG:, header block above the original).</summary>
 public static partial class MessageComposer
 {
-    public static ComposeDraft Reply(MimeMessage original, string ownAddress, bool replyAll)
+    // Where servers note the address a message was delivered to (also for Bcc and mailing lists).
+    private static readonly string[] DeliveryHeaders = ["Delivered-To", "X-Original-To", "Envelope-To"];
+
+    public static ComposeDraft Reply(MimeMessage original, string ownAddress, bool replyAll) => Reply(original, [ownAddress], replyAll);
+
+    /// <param name="ownAddresses">The account's address and aliases: never replied to; the one the message was sent to
+    /// becomes the sender of the reply (<see cref="ComposeDraft.From"/>).</param>
+    public static ComposeDraft Reply(MimeMessage original, IReadOnlyCollection<string> ownAddresses, bool replyAll)
     {
         ArgumentNullException.ThrowIfNull(original);
+        ArgumentNullException.ThrowIfNull(ownAddresses);
 
         var replyTo = original.ReplyTo.Mailboxes.Any() ? original.ReplyTo.Mailboxes : original.From.Mailboxes;
-        var to = Distinct(replyTo, ownAddress, []);
+        var to = Distinct(replyTo, ownAddresses, []);
         var cc = replyAll
-            ? Distinct(original.To.Mailboxes.Concat(original.Cc.Mailboxes), ownAddress, to.Select(m => m.Address))
+            ? Distinct(original.To.Mailboxes.Concat(original.Cc.Mailboxes), ownAddresses, to.Select(m => m.Address))
             : [];
+
+        // To which of the own addresses it was sent: in To/Cc, else what the server noted on delivery (Bcc, lists).
+        var delivered = DeliveryHeaders.SelectMany(h => original.Headers.Where(x => x.Field.Equals(h, StringComparison.OrdinalIgnoreCase)).Select(x => x.Value.Trim().Trim('<', '>')));
+        var from = original.To.Mailboxes.Concat(original.Cc.Mailboxes).Select(m => m.Address).Concat(delivered)
+            .FirstOrDefault(a => ownAddresses.Contains(a, StringComparer.OrdinalIgnoreCase));
+        from = ownAddresses.FirstOrDefault(a => string.Equals(a, from, StringComparison.OrdinalIgnoreCase));
 
         var references = original.References.ToList();
         if (original.MessageId is { } id)
@@ -55,7 +70,8 @@ public static partial class MessageComposer
             original.MessageId,
             references,
             [],
-            HtmlQuoteBlock(original));
+            HtmlQuoteBlock(original),
+            From: from);
     }
 
     public static ComposeDraft Forward(MimeMessage original)
@@ -157,7 +173,8 @@ public static partial class MessageComposer
             content.Attachments,
             hasHtml ? InlineImagesAsDataUris(content) : null,
             remoteId,
-            draft.MessageId);
+            draft.MessageId,
+            draft.From.Mailboxes.FirstOrDefault()?.Address);
     }
 
     private static void AddRecipients(InternetAddressList list, string text, bool lenient)
@@ -278,9 +295,9 @@ public static partial class MessageComposer
             .ToString();
     }
 
-    private static List<MailboxAddress> Distinct(IEnumerable<MailboxAddress> candidates, string ownAddress, IEnumerable<string> exclude)
+    private static List<MailboxAddress> Distinct(IEnumerable<MailboxAddress> candidates, IEnumerable<string> ownAddresses, IEnumerable<string> exclude)
     {
-        var seen = new HashSet<string>(exclude, StringComparer.OrdinalIgnoreCase) { ownAddress };
+        var seen = new HashSet<string>(exclude.Concat(ownAddresses), StringComparer.OrdinalIgnoreCase);
         return candidates.Where(m => seen.Add(m.Address)).ToList();
     }
 

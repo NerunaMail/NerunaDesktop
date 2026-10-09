@@ -77,6 +77,10 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         _settings = settings;
         Encrypt = encrypt;
         IsWindow = isWindow;
+        Senders = account.Identities;
+        From = Senders.FirstOrDefault(i => string.Equals(i.Email, draft.From, StringComparison.OrdinalIgnoreCase))
+               ?? Senders.FirstOrDefault()
+               ?? new MailIdentity(account.EmailAddress ?? string.Empty, account.DisplayName);
         To = draft.To;
         Cc = draft.Cc;
         Subject = draft.Subject;
@@ -89,7 +93,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         _messageId = draft.MessageId ?? MimeUtils.GenerateMessageId();
         PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(To) or nameof(Cc) or nameof(Subject))
+            if (e.PropertyName is nameof(To) or nameof(Cc) or nameof(Subject) or nameof(From))
             {
                 MarkChanged();
             }
@@ -180,7 +184,27 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>The user wants this draft in its own window (state is captured with <see cref="CaptureAsync"/>).</summary>
     public event EventHandler? PopOutRequested;
 
-    public string FromText => $"{_account.DisplayName} <{_account.EmailAddress}>";
+    /// <summary>The account's address and its aliases; a choice only appears when there is more than one.</summary>
+    public IReadOnlyList<MailIdentity> Senders { get; }
+
+    public bool HasSenderChoice => Senders.Count > 1;
+
+    /// <summary>Sender of this message; a reply starts with the address it was sent to.</summary>
+    [ObservableProperty]
+    public partial MailIdentity From { get; set; }
+
+    partial void OnFromChanged(MailIdentity value) => _ = RefreshSignAsync();
+
+    private async Task RefreshSignAsync()
+    {
+        CanSign = (await _secureMime.GetCapabilitiesAsync(From.Email, [])).CanSign;
+        if (!CanSign)
+        {
+            Sign = false;
+        }
+    }
+
+    public string FromText => From.ToString();
 
     public Account Account => _account;
 
@@ -300,7 +324,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
 
         // The sender is always encrypted to as well (readable copy in "Gesendet").
-        var sender = _account.EmailAddress ?? string.Empty;
+        var sender = From.Email;
         var capabilities = await _secureMime.GetCapabilitiesAsync(sender, recipients.Append(sender));
         if (version != _recipientVersion || _encryptChosen)
         {
@@ -333,7 +357,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// </summary>
     public async Task InitializeAsync(bool? sign = null, bool? encrypt = null)
     {
-        CanSign = (await _secureMime.GetCapabilitiesAsync(_account.EmailAddress ?? string.Empty, [])).CanSign;
+        CanSign = (await _secureMime.GetCapabilitiesAsync(From.Email, [])).CanSign;
         Sign = CanSign && (sign ?? await _settings.GetBoolAsync(SettingKeys.AutoSign, fallback: true));
 
         // Replies to encrypted mail stay encrypted; otherwise the recipients decide.
@@ -413,6 +437,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
         return _draft with
         {
+            From = From.Email,
             To = To,
             Cc = Cc,
             Subject = Subject,
@@ -573,7 +598,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     }
 
     private MailboxAddress Sender =>
-        new(_account.DisplayName, _account.EmailAddress ?? throw new InvalidOperationException("Account has no email address."));
+        new(From.DisplayName, string.IsNullOrEmpty(From.Email) ? throw new InvalidOperationException("Account has no email address.") : From.Email);
 
     [RelayCommand(CanExecute = nameof(CanSend))]
     private async Task SendAsync()
