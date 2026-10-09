@@ -17,6 +17,107 @@ namespace Neruna.Desktop.ViewModels;
 /// </summary>
 internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, AccountSetupService setup, HttpClient davProbeClient) : ViewModelBase
 {
+    // ── Step 1 for a new account: which kind. Everything with IMAP/CalDAV/CardDAV is one choice (found automatically);
+    //    only providers that need their own sign-in are listed separately. ──
+
+    /// <summary>"choose", "imap" or "microsoft".</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsMicrosoft), nameof(CanGoBack), nameof(Subtitle))]
+    public partial string Step { get; set; } = "choose";
+
+    public bool IsChoosing => Step == "choose";
+
+    public bool IsImap => Step == "imap";
+
+    public bool IsMicrosoft => Step == "microsoft";
+
+    /// <summary>Back to the choice of kind: for a new account after choosing one.</summary>
+    public bool CanGoBack => !IsChoosing && !IsEditing;
+
+    /// <summary>Microsoft 365 needs Neruna's app registration; without its client id the choice stays off.</summary>
+    public static bool MicrosoftAvailable => Neruna.Providers.Graph.MicrosoftAccount.IsConfigured;
+
+    public static bool MicrosoftUnavailable => !MicrosoftAvailable;
+
+    /// <summary>Set by the shell: the Microsoft sign-in (browser, tokens).</summary>
+    public Neruna.Providers.Graph.GraphConnectionFactory? Graph { get; init; }
+
+    public Neruna.Core.Auth.IBrowserLauncher? Browser { get; init; }
+
+    [RelayCommand]
+    private void ChooseImap() => Step = "imap";
+
+    [RelayCommand]
+    private void ChooseMicrosoft()
+    {
+        if (MicrosoftAvailable)
+        {
+            Step = "microsoft";
+        }
+    }
+
+    [RelayCommand]
+    private void Back()
+    {
+        Error = null;
+        Step = "choose";
+    }
+
+    /// <summary>
+    /// Sign-in in the browser; then the account (mail, calendar, contacts) is set up with the name and address
+    /// Microsoft reports. Editing: sign in again (e.g. after the password changed) and keep the account.
+    /// </summary>
+    [RelayCommand]
+    private async Task SignInMicrosoftAsync()
+    {
+        if (Graph is null || Browser is null)
+        {
+            return;
+        }
+
+        Error = null;
+        IsBusy = true;
+        BusyText = T("Anmeldung im Browser …");
+        try
+        {
+            var tokenId = Editing?.ConnectionsOf(ServiceKind.Mail).FirstOrDefault()?.Id ?? Guid.NewGuid();
+            await Graph.SignInAsync(tokenId, string.IsNullOrWhiteSpace(Email) ? null : Email.Trim(), Browser);
+            if (Editing is { } existing)
+            {
+                await setup.RenameAsync(existing, string.IsNullOrWhiteSpace(DisplayName) ? existing.DisplayName : DisplayName.Trim(), Label);
+                Finished?.Invoke(this, true);
+                return;
+            }
+
+            BusyText = T("Konto wird eingerichtet …");
+            var (email, name) = await Graph.WhoAmIAsync(tokenId);
+            var account = new Account(Guid.NewGuid(), string.IsNullOrWhiteSpace(DisplayName) ? name : DisplayName.Trim(), email,
+                Neruna.Providers.Graph.GraphConnectionFactory.Connections(email, tokenId), string.IsNullOrWhiteSpace(Label) ? null : Label.Trim());
+            await setup.CreateSignedInAsync(account);
+            Finished?.Invoke(this, true);
+        }
+        catch (Exception ex) when (ex is Neruna.Core.Auth.OAuthException or AccountSetupException or HttpRequestException or Neruna.Providers.Graph.GraphException)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyText = null;
+        }
+    }
+
+    /// <summary>Editing a Microsoft account: only the names (servers belong to Microsoft).</summary>
+    [RelayCommand]
+    private async Task SaveMicrosoftAsync()
+    {
+        if (Editing is { } existing)
+        {
+            await setup.RenameAsync(existing, string.IsNullOrWhiteSpace(DisplayName) ? existing.DisplayName : DisplayName.Trim(), Label);
+            Finished?.Invoke(this, true);
+        }
+    }
+
     /// <summary>Raised with true when an account was created, false when cancelled.</summary>
     public event EventHandler<bool>? Finished;
 
@@ -50,7 +151,11 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     public string SaveText => IsEditing ? T("Speichern") : T("Konto hinzufügen");
 
-    public string Subtitle => IsCloud
+    public string Subtitle => IsChoosing && !IsEditing
+        ? T("Welche Art von Konto möchten Sie einrichten?")
+        : IsMicrosoft
+            ? T("Mail, Kalender und Kontakte Ihres Microsoft-Kontos – angemeldet wird im Browser.")
+            : IsCloud
         ? T("Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten.")
         : IsEditing
         ? T("Namen, Passwort und Server ändern. Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten. Leeres Kalender- oder Kontaktfeld entfernt diesen Dienst.")
@@ -63,6 +168,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     {
         ArgumentNullException.ThrowIfNull(account);
         Editing = account;
+        Step = account.Connections.Any(c => c.ProviderId == Neruna.Core.Providers.ProviderIds.Graph) ? "microsoft" : "imap";
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;
         Aliases.Clear();

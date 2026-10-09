@@ -198,6 +198,18 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
         await accounts.SaveAccountAsync(account, cancellationToken);
     }
 
+    /// <summary>Names only (sender name, label) – for accounts whose servers Neruna does not edit (e.g. Microsoft 365).</summary>
+    public async Task<Account> RenameAsync(Account account, string displayName, string? label, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var renamed = account with { DisplayName = displayName, Label = string.IsNullOrWhiteSpace(label) ? null : label.Trim() };
+        await accounts.SaveAccountAsync(renamed, cancellationToken);
+        return renamed;
+    }
+
+    /// <summary>Saves an account whose connections are already signed in (OAuth): tests them, then stores it.</summary>
+    public Task CreateSignedInAsync(Account account, CancellationToken cancellationToken = default) => CreateAsync(account, null, cancellationToken);
+
     private async Task TestAsync(ServiceConnection connection, CancellationToken cancellationToken)
     {
         switch (connection.Kind)

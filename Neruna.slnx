@@ -7,6 +7,7 @@
   </Folder>
   <Folder Name="/Client/Providers/">
     <Project Path="src/Client/Providers/Neruna.Providers.Dav/Neruna.Providers.Dav.csproj" />
+    <Project Path="src/Client/Providers/Neruna.Providers.Graph/Neruna.Providers.Graph.csproj" />
     <Project Path="src/Client/Providers/Neruna.Providers.Ics/Neruna.Providers.Ics.csproj" />
     <Project Path="src/Client/Providers/Neruna.Providers.Imap/Neruna.Providers.Imap.csproj" />
   </Folder>

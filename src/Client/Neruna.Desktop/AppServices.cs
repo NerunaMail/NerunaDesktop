@@ -71,6 +71,12 @@ internal static class AppServices
         services.AddSingleton<IProviderFactory<IContactProvider>>(sp => new CardDavProviderFactory(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("dav"), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ILoggerFactory>()));
         services.AddSingleton<IProviderFactory<ICalendarProvider>, IcsProviderFactory>();
+        // Microsoft 365 / Outlook.com: one sign-in for mail, calendar and contacts (see MicrosoftAccount for the app id).
+        services.AddSingleton(sp => new Neruna.Providers.Graph.GraphConnectionFactory(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>()));
+        services.AddSingleton<IProviderFactory<IMailProvider>, Neruna.Providers.Graph.GraphMailProviderFactory>();
+        services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Graph.GraphCalendarProviderFactory>();
+        services.AddSingleton<IProviderFactory<IContactProvider>, Neruna.Providers.Graph.GraphContactProviderFactory>();
+        services.AddSingleton<Neruna.Core.Auth.IBrowserLauncher, Neruna.Desktop.Infrastructure.BrowserLauncher>();
         if (options.Demo)
         {
             services.AddSingleton<IProviderFactory<IMailProvider>, DemoMailProviderFactory>();

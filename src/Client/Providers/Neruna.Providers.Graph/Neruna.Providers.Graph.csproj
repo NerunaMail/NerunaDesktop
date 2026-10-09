@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Microsoft 365 and Outlook.com accounts (mail, calendar, contacts) through Microsoft Graph for Neruna Desktop.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Neruna.Core\Neruna.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Neruna.Client.Tests" />
+  </ItemGroup>
+</Project>

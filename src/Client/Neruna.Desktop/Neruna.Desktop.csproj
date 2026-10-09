@@ -32,6 +32,7 @@
     <ProjectReference Include="..\Neruna.Core\Neruna.Core.csproj" />
     <ProjectReference Include="..\Neruna.Storage\Neruna.Storage.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Imap\Neruna.Providers.Imap.csproj" />
+    <ProjectReference Include="..\Providers\Neruna.Providers.Graph\Neruna.Providers.Graph.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Ics\Neruna.Providers.Ics.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Dav\Neruna.Providers.Dav.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Demo\Neruna.Providers.Demo.csproj" />

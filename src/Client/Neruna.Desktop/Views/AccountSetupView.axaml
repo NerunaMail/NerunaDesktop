@@ -7,6 +7,19 @@
              x:Class="Neruna.Desktop.Views.AccountSetupView"
              x:DataType="vm:AccountSetupViewModel">
 
+  <UserControl.Styles>
+    <!-- The kinds of account: cards to click -->
+    <Style Selector="Button.choice">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="Button.choice:pointerover /template/ ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+  </UserControl.Styles>
+
   <UserControl.DataTemplates>
     <DataTemplate DataType="dc:SocketSecurity">
       <TextBlock Text="{Binding Converter={x:Static app:Converters.SecurityLabel}}" />
@@ -16,6 +29,40 @@
   <StackPanel>
     <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,8" Text="{Binding Subtitle}" />
+
+    <!-- Step 1: which kind of account (only providers with their own sign-in are listed; all others are "E-Mail-Konto") -->
+    <StackPanel IsVisible="{Binding IsChoosing}" Spacing="10" Margin="0,4,0,0">
+      <Button Classes="choice" Command="{Binding ChooseImapCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{l:T 'E-Mail-Konto'}" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'IMAP/SMTP, CalDAV und CardDAV – für die meisten Anbieter und eigene Server. Die Einstellungen werden automatisch gesucht.'}" />
+        </StackPanel>
+      </Button>
+      <Button Classes="choice" Command="{Binding ChooseMicrosoftCommand}" IsEnabled="{x:Static vm:AccountSetupViewModel.MicrosoftAvailable}"
+              HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
+        <StackPanel Spacing="2">
+          <TextBlock Text="Microsoft 365 / Outlook.com" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Mail, Kalender und Kontakte mit Anmeldung bei Microsoft.'}" />
+          <TextBlock Classes="subtle" FontStyle="Italic" Text="{l:T 'Bald verfügbar'}" IsVisible="{x:Static vm:AccountSetupViewModel.MicrosoftUnavailable}" />
+        </StackPanel>
+      </Button>
+    </StackPanel>
+
+    <!-- Microsoft: sign in in the browser; servers and sender come from Microsoft -->
+    <StackPanel IsVisible="{Binding IsMicrosoft}" Spacing="2">
+      <TextBlock Classes="label" Text="{l:T 'Ihr Name (Absender)'}" IsVisible="{Binding IsEditing}" />
+      <TextBox Text="{Binding DisplayName}" IsVisible="{Binding IsEditing}" />
+      <TextBlock Classes="label" Text="{l:T 'Kontobezeichnung (optional)'}" />
+      <TextBox Text="{Binding Label}" PlaceholderText="{l:T 'z. B. Privat oder Firma – sonst steht die E-Mail-Adresse in der Ordnerliste'}" />
+      <TextBlock Classes="label" Text="{l:T 'E-Mail-Adresse'}" IsVisible="{Binding !IsEditing}" />
+      <TextBox Text="{Binding Email}" PlaceholderText="name@example.com" IsVisible="{Binding !IsEditing}" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,10,0,0"
+                 Text="{l:T 'Die Anmeldung öffnet sich im Browser. Neruna erhält dabei kein Passwort, nur eine Berechtigung für Mail, Kalender und Kontakte – sie liegt im Schlüsselbund dieses Computers.'}" />
+      <Button Classes="accent" Margin="0,12,0,0" HorizontalAlignment="Left" Command="{Binding SignInMicrosoftCommand}"
+              Content="{l:T 'Bei Microsoft anmelden'}" />
+    </StackPanel>
+
+    <StackPanel IsVisible="{Binding IsImap}">
 
     <!-- Accounts of the organisation: only the label (and a password typed in here) are the user's -->
     <Border IsVisible="{Binding IsCloud}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
@@ -84,7 +131,9 @@
       </Grid>
     </StackPanel>
 
-    <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0"
+    </StackPanel>
+
+    <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0" TextWrapping="Wrap"
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,20,0,0">
@@ -92,9 +141,22 @@
         <ProgressBar IsIndeterminate="True" Width="60" MinWidth="0" Height="4" />
         <TextBlock Text="{Binding BusyText}" Classes="subtle" FontSize="12" />
       </StackPanel>
-      <Button Grid.Column="2" Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="3" Classes="accent" Content="{l:T 'Weiter'}" Command="{Binding DiscoverCommand}" IsVisible="{Binding !ShowServerSettings}" />
-      <Button Grid.Column="3" Classes="accent" Content="{Binding SaveText}" Command="{Binding CreateCommand}" IsVisible="{Binding ShowServerSettings}" />
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="0,0,8,0">
+        <Button Content="{l:T 'Zurück'}" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}" />
+        <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
+      </StackPanel>
+      <Panel Grid.Column="3" IsVisible="{Binding IsImap}">
+        <Button Classes="accent" Content="{l:T 'Weiter'}" Command="{Binding DiscoverCommand}" IsVisible="{Binding !ShowServerSettings}" />
+        <Button Classes="accent" Content="{Binding SaveText}" Command="{Binding CreateCommand}" IsVisible="{Binding ShowServerSettings}" />
+      </Panel>
+      <Button Grid.Column="3" Classes="accent" Content="{l:T 'Speichern'}" Command="{Binding SaveMicrosoftCommand}">
+        <Button.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="IsMicrosoft" />
+            <Binding Path="IsEditing" />
+          </MultiBinding>
+        </Button.IsVisible>
+      </Button>
     </Grid>
   </StackPanel>
 </UserControl>

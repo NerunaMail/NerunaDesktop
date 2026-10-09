@@ -115,6 +115,8 @@ Verwendete Bibliotheken und ihre Lizenzen: [`THIRD-PARTY-NOTICES.md`](THIRD-PART
 
 **Name und Logo sind nicht Teil der Lizenz:** «Neruna» und das Neruna-Logo sind Marken von Patrik Zimmermann. Forks
 sind willkommen, brauchen aber einen eigenen Namen und ein eigenes Logo – siehe [`TRADEMARKS.md`](TRADEMARKS.md).
+Dasselbe gilt für die App-Registrierungen bei Anbietern mit eigener Anmeldung (OAuth): Forks tragen ihre eigenen
+Client-IDs ein (`src/Client/Providers/*/…Account.cs`).
 
 
 Mitwirken: [`CONTRIBUTING.md`](CONTRIBUTING.md) (mit [CLA](CLA.md)) · Sicherheitslücken melden: [`SECURITY.md`](SECURITY.md)

@@ -14,6 +14,7 @@ public static class ProviderIds
     public const string CardDav = "carddav";
     public const string Ics = "ics";
     public const string Ews = "ews";
+    public const string Graph = "graph";
 }
 
 /// <summary>Describes a provider and creates instances bound to one connection.</summary>

@@ -70,7 +70,7 @@ public partial class LocalizationTests
 
     private static string[] Placeholders(string text) => [.. PlaceholderPattern().Matches(text).Select(m => m.Value).Order(StringComparer.Ordinal)];
 
-    [GeneratedRegex("""(?<![\w.])(?:Texts\.)?[TF]\("((?:[^"\\]|\\.)*)"[,)]""")]
+    [GeneratedRegex("""(?:(?<![\w.])|(?<=Texts\.))[TF]\("((?:[^"\\]|\\.)*)"[,)]""")]
     private static partial Regex CallPattern();
 
     [GeneratedRegex("""\{l:T '([^']*)'\}|ConverterParameter='([^']*)'""")]

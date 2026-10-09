@@ -557,6 +557,8 @@ internal static class Snapshots
 
         vm.NavigateCommand.Execute(Section.Mail);
         vm.ShowAccountSetupCommand.Execute(null);
+        await SaveAsync(window, output, "account-setup-kind.png");
+        ((AccountSetupViewModel)vm.Overlay!).ChooseImapCommand.Execute(null);
         await SaveAsync(window, output, "account-setup.png");
 
         window.Close();

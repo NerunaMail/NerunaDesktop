@@ -43,6 +43,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly ISettingsStore _settings;
     private readonly Neruna.Core.Cloud.SettingsBackupService _backup;
     private readonly Neruna.Core.Cloud.CloudAccountSync _cloudAccounts;
+    private readonly Neruna.Providers.Graph.GraphConnectionFactory _graph;
+    private readonly Neruna.Core.Auth.IBrowserLauncher _browser;
 
     // Accounts whose password the user postponed ("Später") – asked again with the next start.
     private readonly HashSet<string> _postponedCloudAccounts = [];
@@ -73,8 +75,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Cloud.CloudCertificateSync cloudCertificates,
         Neruna.Core.Cloud.SettingsBackupService backup,
         Neruna.Core.Cloud.CloudAccountSync cloudAccounts,
+        Neruna.Providers.Graph.GraphConnectionFactory graph,
+        Neruna.Core.Auth.IBrowserLauncher browser,
         ILogger<MainWindowViewModel> logger)
     {
+        _graph = graph;
+        _browser = browser;
         _backup = backup;
         _cloudAccounts = cloudAccounts;
         // Accounts of the organisation arrived (connecting, or the regular cloud refresh): show them and fetch their mail.
@@ -621,7 +627,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void ShowAccountSetup(Neruna.Core.Accounts.Account? editing = null)
     {
-        var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav"));
+        var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav")) { Graph = _graph, Browser = _browser };
         if (editing is not null)
         {
             setup.LoadForEditing(editing);

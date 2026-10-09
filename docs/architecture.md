@@ -50,6 +50,7 @@ src/
       Neruna.Providers.Imap   IMAP + SMTP (MailKit)
       Neruna.Providers.Dav    CalDAV + CardDAV (gemeinsame WebDAV-Basis, RFC 4791/6352/6578/6764)
       Neruna.Providers.Ics    ICS/webcal-Abos (read-only)
+      Neruna.Providers.Graph  Microsoft 365 / Outlook.com über Microsoft Graph (OAuth2, Mail+Kalender+Kontakte)
       Neruna.Providers.Demo   Beispieldaten (--demo, Screenshots)
     Neruna.Desktop        Avalonia-App (Composition Root)
 server/                   → proprietär: Laravel-App (Neruna Cloud/Control)
@@ -490,6 +491,21 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   Benutzer), entfernt nicht mehr zugeordnete. Ohne Passwort fragt er den Benutzer; dieses Passwort liegt nur lokal
   und geht in die persönliche Sicherung, die Cloud-Konten selbst nicht.
 - Kalender und Adressbücher findet der Client mit den Zugangsdaten selbst (der Server kennt das Passwort nicht).
+
+## 6d. Anbieter mit eigener Anmeldung (OAuth2)
+
+- Kontodialog: zuerst die Art. «E-Mail-Konto» deckt alles mit IMAP/SMTP, CalDAV, CardDAV ab (automatische Erkennung);
+  eigene Einträge nur für Anbieter mit eigener Anmeldung – vorerst Microsoft 365 / Outlook.com (Graph).
+- OAuth2 im Kern (`Neruna.Core.Auth`): Public Client nach RFC 8252 – Anmeldung im Systembrowser, PKCE, Rückleitung an
+  `http://localhost:{port}/`, Tokens nur im Schlüsselbund, Erneuern kurz vor Ablauf. Kein Client-Geheimnis.
+- Die Client-ID ist nicht geheim und steht an genau einer Stelle (`MicrosoftAccount.ClientId`); leer = Auswahl aus.
+  Forks registrieren eigene Apps.
+- Graph: Mail per Delta-Abfrage (erstes Mal 90 Tage, Älteres beim Nachladen), Nachrichten als MIME, Senden legt
+  Microsoft selbst in «Gesendet» ab; Kalender und Kontakte werden in iCalendar bzw. vCard umgewandelt, Exchange
+  verschickt Einladungen selbst. Kein Push für Desktop-Apps (Abfrage jede Minute). Noch nicht: einzeln geänderte
+  Termine einer Serie, Kontaktbilder.
+- Google später: OAuth über die bestehenden IMAP-/DAV-Provider; Mailzugriff ist bei Google ein «restricted scope»
+  (Verifizierung und jährliche Sicherheitsprüfung ab 100 Nutzern). Bis dahin IMAP mit App-Passwort.
 
 ## 7. Offene Entscheide
 
