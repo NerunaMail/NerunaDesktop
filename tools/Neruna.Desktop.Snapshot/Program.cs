@@ -128,7 +128,8 @@ internal static class Snapshots
         // Own text templates (inserted at the caret, or by "kürzel::").
         var textTemplates = services.GetRequiredService<Neruna.Core.Mail.TextTemplateService>();
         await textTemplates.SaveAsync(new Neruna.Core.Mail.TextTemplate(Guid.NewGuid(), "Anrufnotiz",
-            "<p><strong>Anrufnotiz</strong></p><table><tr><td>Name</td><td>&nbsp;</td></tr><tr><td>Nummer</td><td>&nbsp;</td></tr><tr><td>Grund</td><td>&nbsp;</td></tr></table>",
+            "<p><strong>Anrufnotiz</strong></p><table style=\"border-collapse: collapse; width: 100%\">"
+            + "<tr><td style=\"border: 1px solid #c8c8c8; padding: 4px 8px; vertical-align: top\" width=\"120\">Name</td><td style=\"border: 1px solid #c8c8c8; padding: 4px 8px; vertical-align: top\">&nbsp;</td></tr><tr><td style=\"border: 1px solid #c8c8c8; padding: 4px 8px; vertical-align: top\">Nummer</td><td style=\"border: 1px solid #c8c8c8; padding: 4px 8px; vertical-align: top\">&nbsp;</td></tr><tr><td style=\"border: 1px solid #c8c8c8; padding: 4px 8px; vertical-align: top\">Grund</td><td style=\"border: 1px solid #c8c8c8; padding: 4px 8px; vertical-align: top\">&nbsp;</td></tr></table>",
             DateTimeOffset.Now, Shortcut: "tel"));
         await textTemplates.SaveAsync(new Neruna.Core.Mail.TextTemplate(Guid.NewGuid(), "Terminbestätigung", "<p>Gerne bestätige ich Ihnen den Termin.</p>", DateTimeOffset.Now, Shortcut: "termin"));
 
