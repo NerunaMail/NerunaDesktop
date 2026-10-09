@@ -40,6 +40,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly NotificationService _notifications;
     private readonly ReminderScheduler _reminders;
     private readonly ISettingsStore _settings;
+    private readonly Neruna.Core.Cloud.SettingsBackupService _backup;
 
     /// <summary>Remembered window placement and column widths; the views restore and update them.</summary>
     public UiLayout Layout { get; }
@@ -65,8 +66,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Cloud.CloudSignatureSync cloudSignatures,
         Neruna.Core.Cloud.CloudTextTemplateSync cloudTemplates,
         Neruna.Core.Cloud.CloudCertificateSync cloudCertificates,
+        Neruna.Core.Cloud.SettingsBackupService backup,
         ILogger<MainWindowViewModel> logger)
     {
+        _backup = backup;
         _cloudSignatures = cloudSignatures;
         _cloudTemplates = cloudTemplates;
         _cloudCertificates = cloudCertificates;
@@ -159,6 +162,18 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 await ChatPage.RefreshNowAsync();
             }
         };
+        // Restored from a backup: every page from the store again, then the servers of the restored accounts.
+        settingsPage.Cloud.Restored += async (_, _) =>
+        {
+            ShowBackupHint = false;
+            await MailPage.Preferences.LoadAsync();
+            await SettingsPage.ReloadAsync();
+            await RefreshPagesAsync();
+            HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
+            await UpdatePushAsync();
+            await SyncAsync();
+        };
+        settingsPage.Cloud.BackedUp += (_, _) => ShowBackupHint = false;
         accountsPage.AddAccountRequested += (_, _) => ShowAccountSetup();
         accountsPage.EditRequested += (_, account) => ShowAccountSetup(account);
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
@@ -675,7 +690,55 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _ = RefreshIfStaleAsync(value);
     }
 
-    partial void OnOverlayChanged(ViewModelBase? value) => UpdateChatActive();
+    partial void OnOverlayChanged(ViewModelBase? value)
+    {
+        UpdateChatActive();
+        if (value is null && CurrentPage != SettingsPage)
+        {
+            _ = CheckBackupHintAsync();
+        }
+    }
+
+    // Leaving the settings (or an account dialog opened from elsewhere): changed since the last backup? Then ask.
+    partial void OnCurrentPageChanged(ViewModelBase oldValue, ViewModelBase newValue)
+    {
+        if (oldValue == SettingsPage && newValue != SettingsPage)
+        {
+            _ = CheckBackupHintAsync();
+        }
+    }
+
+    /// <summary>"Einstellungen geändert – Neue Sicherung erstellen?" (only when this device has the vault set up).</summary>
+    [ObservableProperty]
+    public partial bool ShowBackupHint { get; set; }
+
+    private async Task CheckBackupHintAsync()
+    {
+        try
+        {
+            ShowBackupHint = await _backup.ShouldSuggestBackupAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not compare settings with the last backup");
+        }
+    }
+
+    [RelayCommand]
+    private void BackupNow()
+    {
+        ShowBackupHint = false;
+        CurrentPage = SettingsPage;
+        SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        SettingsPage.Cloud.StartBackup();
+    }
+
+    [RelayCommand]
+    private async Task BackupLaterAsync()
+    {
+        ShowBackupHint = false;
+        await _backup.DismissSuggestionAsync();
+    }
 }
 
 /// <summary>The answer to "Entwurf speichern?" when Neruna closes.</summary>

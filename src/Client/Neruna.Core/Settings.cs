@@ -8,6 +8,9 @@ public interface ISettingsStore
     Task<string?> GetAsync(string key, CancellationToken cancellationToken = default);
 
     Task SetAsync(string key, string? value, CancellationToken cancellationToken = default);
+
+    /// <summary>Every setting with a value (for a settings backup).</summary>
+    Task<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken cancellationToken = default);
 }
 
 public static class SettingKeys

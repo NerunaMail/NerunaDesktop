@@ -8,6 +8,23 @@ namespace Neruna.Shared.Tests;
 public class CloudContractTests
 {
     [Fact]
+    public void Client_reads_the_vault_and_a_backup()
+    {
+        var vault = JsonSerializer.Deserialize<VaultResponse>(ContractFixtures.Read("vault-example.json"), NerunaJson.Options)!;
+        Assert.Equal(new Guid("5d0f8a52-6b0e-4c4b-9f43-2f7c2a8d9e11"), vault.Vault!.VaultId);
+        var keys = vault.Vault.Keys.Deserialize<List<Neruna.Vault.WrappedKey>>(NerunaJson.Options)!;
+        Assert.Equal(["password", "recovery"], keys.Select(k => k.Kind));
+        Assert.Equal(new Neruna.Vault.KdfParameters(65536, 3, 1), keys[0].Kdf);
+        Assert.Equal(20, vault.MaxBackups);
+        Assert.Equal(["Büro-PC", "Laptop"], vault.Backups.Select(b => b.DeviceName));
+        Assert.Null(vault.Backups[1].Note);
+
+        var backup = JsonSerializer.Deserialize<VaultBackupResponse>(ContractFixtures.Read("vault-backup-example.json"), NerunaJson.Options)!;
+        Assert.Equal((vault.Backups[0].Id, vault.Vault.VaultId, 1), (backup.Id, backup.VaultId, backup.Version));
+        Assert.False(string.IsNullOrEmpty(backup.Ciphertext));
+    }
+
+    [Fact]
     public void Client_reads_the_enrollment_response()
     {
         var response = JsonSerializer.Deserialize<EnrollmentResponse>(ContractFixtures.Read("enrollment-response-example.json"), NerunaJson.Options)!;

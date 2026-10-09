@@ -88,6 +88,66 @@ public sealed class UnlockedVault : IDisposable
         return Unwrap(envelope, wrapped, DeriveRecoveryKey(secret));
     }
 
+    /// <summary>
+    /// Continues with a data key kept on this device (system keychain) after the vault was unlocked once, so a backup
+    /// does not need the password every time. <paramref name="keys"/> are the wrapped keys as stored with the server.
+    /// </summary>
+    public static UnlockedVault Resume(Guid vaultId, ReadOnlySpan<byte> dataKey, IEnumerable<WrappedKey> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        if (dataKey.Length != KeySize)
+        {
+            throw new VaultUnlockException("The stored data key has the wrong length.");
+        }
+
+        return new UnlockedVault(vaultId, dataKey.ToArray(), keys);
+    }
+
+    /// <summary>The wrapped keys (password, recovery code) – what the server keeps to unlock on another device.</summary>
+    public IReadOnlyList<WrappedKey> Keys => [.. _keys];
+
+    /// <summary>The data key, to keep in the system keychain of this device (see <see cref="Resume"/>).</summary>
+    public byte[] ExportDataKey()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return (byte[])_dek.Clone();
+    }
+
+    /// <summary>A short text (e.g. a backup's note) encrypted with the data key, as "nonce.ciphertext" (Base64).</summary>
+    public string EncryptText(string text)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(text);
+        var (nonce, ciphertext) = Encrypt(_dek, Encoding.UTF8.GetBytes(text), TextAad(VaultId));
+        return $"{nonce}.{ciphertext}";
+    }
+
+    /// <summary>Opens <see cref="EncryptText"/>; null when it is not from this vault or was changed.</summary>
+    public string? DecryptText(string? encrypted)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var parts = encrypted?.Split('.') ?? [];
+        return parts.Length == 2 && Decrypt(_dek, parts[0], parts[1], TextAad(VaultId)) is { } plain ? Encoding.UTF8.GetString(plain) : null;
+    }
+
+    /// <summary>
+    /// A keyed fingerprint of a payload (HMAC-SHA256 with a key derived from the data key): tells whether settings
+    /// changed since the last backup without keeping anything about them readable on disk.
+    /// </summary>
+    public string Fingerprint(ReadOnlySpan<byte> payload)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var key = HKDF.DeriveKey(HashAlgorithmName.SHA256, _dek, KeySize, salt: [], info: "neruna-vault/fingerprint"u8.ToArray());
+        try
+        {
+            return Convert.ToHexString(HMACSHA256.HashData(key, payload));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
+    }
+
     /// <summary>Encrypts <paramref name="payload"/> into a new envelope (fresh nonce every time).</summary>
     public VaultEnvelope Seal(ReadOnlySpan<byte> payload)
     {
@@ -212,6 +272,9 @@ public sealed class UnlockedVault : IDisposable
 
     private static byte[] PayloadAad(int version, Guid vaultId) =>
         Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"neruna-vault|v{version}|{vaultId:N}|payload"));
+
+    private static byte[] TextAad(Guid vaultId) =>
+        Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"neruna-vault|v{VaultFormat.CurrentVersion}|{vaultId:N}|text"));
 
     private static byte[] KeyAad(Guid vaultId, string kind, KdfParameters? kdf) =>
         Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture,

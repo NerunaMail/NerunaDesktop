@@ -134,3 +134,33 @@ public sealed record CloudCertificate(
 
 /// <summary>Body of <c>PUT /api/v1/device/encryption-key</c>.</summary>
 public sealed record DeviceEncryptionKeyRequest(string PublicKey);
+
+/// <summary>
+/// <c>GET /api/v1/vault</c>: the config vault (null until set up) and its backups, newest first. Everything is encrypted
+/// in the app (Neruna.Vault); see contract/openapi.yaml.
+/// </summary>
+public sealed record VaultResponse(CloudVault? Vault, IReadOnlyList<VaultBackupSummary> Backups, int MaxBackups);
+
+/// <param name="Keys">The data key wrapped with password and recovery code – Neruna.Vault's <c>WrappedKey</c> list as JSON.</param>
+public sealed record CloudVault(Guid VaultId, System.Text.Json.JsonElement Keys, DateTimeOffset UpdatedAt);
+
+/// <param name="Note">Encrypted ("nonce.ciphertext"), null when none was given.</param>
+public sealed record VaultBackupSummary(string Id, DateTimeOffset CreatedAt, string? DeviceName, string? Note, long Size);
+
+/// <summary><c>GET /api/v1/vault/backups/{id}</c>: one backup with its encrypted content.</summary>
+public sealed record VaultBackupResponse(
+    string Id,
+    DateTimeOffset CreatedAt,
+    string? DeviceName,
+    string? Note,
+    long Size,
+    Guid VaultId,
+    int Version,
+    string Nonce,
+    string Ciphertext);
+
+/// <summary>Body of <c>PUT /api/v1/vault</c>.</summary>
+public sealed record VaultUpdateRequest(Guid VaultId, System.Text.Json.JsonElement Keys);
+
+/// <summary>Body of <c>POST /api/v1/vault/backups</c>.</summary>
+public sealed record VaultBackupRequest(Guid VaultId, int Version, string Nonce, string Ciphertext, string? Note);

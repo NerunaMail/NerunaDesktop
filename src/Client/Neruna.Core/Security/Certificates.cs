@@ -345,6 +345,41 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         return new SecureMimeMaterial(keys, certificates, authorities, infos);
     }
 
+    /// <summary>
+    /// The user's own certificates for a settings backup: imported and collected ones with the PKCS#12 password –
+    /// never those from the organisation (they come back through the cloud).
+    /// </summary>
+    public async Task<IReadOnlyList<(StoredCertificate Certificate, string? Password)>> GetPersonalAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new List<(StoredCertificate, string?)>();
+        foreach (var item in (await store.GetAllAsync(cancellationToken)).Where(c => c.Source != CertificateSource.Cloud).OrderBy(c => c.Thumbprint, StringComparer.Ordinal))
+        {
+            result.Add((item, item.Pkcs12 is null ? null : await secrets.GetSecretAsync(SecretId(item.Thumbprint), cancellationToken)));
+        }
+
+        return result;
+    }
+
+    /// <summary>Restoring a backup: the own certificates become exactly <paramref name="certificates"/>; cloud ones stay.</summary>
+    public async Task ReplacePersonalAsync(IReadOnlyList<(StoredCertificate Certificate, string? Password)> certificates, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(certificates);
+        var keep = certificates.Select(c => c.Certificate.Thumbprint).ToHashSet(StringComparer.Ordinal);
+        foreach (var stale in (await store.GetAllAsync(cancellationToken)).Where(c => c.Source != CertificateSource.Cloud && !keep.Contains(c.Thumbprint)))
+        {
+            await RemoveAsync(stale.Thumbprint, cancellationToken);
+        }
+
+        foreach (var (certificate, password) in certificates)
+        {
+            await store.SaveAsync(certificate, cancellationToken);
+            if (certificate.Pkcs12 is not null && password is not null)
+            {
+                await secrets.SetSecretAsync(SecretId(certificate.Thumbprint), password, cancellationToken);
+            }
+        }
+    }
+
     // A stable credential-store id per certificate.
     private static Guid SecretId(string thumbprint) =>
         new(SHA256.HashData(Encoding.UTF8.GetBytes("neruna-cert:" + thumbprint)).AsSpan(0, 16));

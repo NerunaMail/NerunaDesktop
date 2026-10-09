@@ -71,6 +71,138 @@
       </Border>
 
       <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <!-- Sicherung: personal settings into the vault, encrypted on this device; only by hand, with a note -->
+      <StackPanel Spacing="10" Margin="0,18,0,0" IsVisible="{Binding Connection, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <TextBlock Text="Sicherung" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Classes="subtle" TextWrapping="Wrap"
+                   Text="Sichert deine persönlichen Einstellungen – Konten samt Passwörtern, eigene Signaturen, Textvorlagen und Zertifikate, Einstellungen – verschlüsselt mit deinem Tresor-Passwort. Die Cloud kann sie nicht lesen. Was von deiner Organisation kommt, ist nicht dabei: Es kommt nach dem Verbinden automatisch wieder." />
+
+        <!-- No vault yet -->
+        <StackPanel Spacing="8" IsVisible="{Binding ShowVaultSetup}">
+          <TextBlock Text="Tresor-Passwort festlegen" FontWeight="SemiBold" />
+          <TextBox Text="{Binding VaultPassword}" PasswordChar="•" PlaceholderText="Mindestens 10 Zeichen" />
+          <TextBox Text="{Binding VaultPasswordRepeat}" PasswordChar="•" PlaceholderText="Passwort wiederholen" />
+          <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                     Text="Ohne dieses Passwort oder den Wiederherstellungscode kann niemand die Sicherungen öffnen – auch deine Organisation und Neruna nicht." />
+          <Button Classes="accent" Content="Tresor einrichten" Command="{Binding SetUpVaultCommand}" HorizontalAlignment="Left" />
+        </StackPanel>
+
+        <!-- Recovery code: shown once, alone, until confirmed -->
+        <Border IsVisible="{Binding HasRecoveryCode}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Dein Wiederherstellungscode" FontWeight="SemiBold" />
+            <TextBlock TextWrapping="Wrap" Text="Er öffnet den Tresor, wenn du das Passwort vergisst. Er wird nur jetzt angezeigt – schreib ihn auf oder speichere ihn in einem Passwortmanager." />
+            <SelectableTextBlock Text="{Binding RecoveryCode}" FontFamily="Consolas, Cascadia Mono, monospace" FontSize="15" TextWrapping="Wrap" />
+            <CheckBox Content="Ich habe den Code sicher aufbewahrt" IsChecked="{Binding RecoveryStored}" />
+            <Button Classes="accent" Content="Weiter" Command="{Binding ConfirmRecoveryCodeCommand}" IsEnabled="{Binding RecoveryStored}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </Border>
+
+        <!-- Vault exists, not on this device yet (new computer) -->
+        <StackPanel Spacing="8" IsVisible="{Binding ShowVaultUnlock}">
+          <TextBlock TextWrapping="Wrap" Text="{Binding BackupCountText, StringFormat='Es gibt bereits einen Tresor. {0}'}" />
+          <TextBlock Text="Tresor entsperren" FontWeight="SemiBold" />
+          <TextBox Text="{Binding UnlockSecret}" PasswordChar="•" PlaceholderText="Tresor-Passwort oder Wiederherstellungscode" />
+          <Button Classes="accent" Content="Entsperren" Command="{Binding UnlockVaultCommand}" HorizontalAlignment="Left" />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+            <TextBlock Classes="subtle" FontSize="12" VerticalAlignment="Center" Text="Passwort und Code verloren?" />
+            <Button Classes="command" FontSize="12" Command="{Binding ResetVaultCommand}">
+              <Panel>
+                <TextBlock Text="Tresor löschen und neu beginnen" IsVisible="{Binding !ConfirmReset}" TextDecorations="Underline" />
+                <TextBlock Text="Wirklich? Alle Sicherungen gehen verloren – nochmals klicken" IsVisible="{Binding ConfirmReset}" Foreground="#C50F1F" />
+              </Panel>
+            </Button>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Unlocked: make, restore, delete -->
+        <StackPanel Spacing="8" IsVisible="{Binding ShowBackups}">
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsWritingNote}">
+            <Button Classes="accent" Content="Sicherung erstellen …" Command="{Binding NewBackupCommand}" />
+          </StackPanel>
+          <Border IsVisible="{Binding IsWritingNote}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Neue Sicherung" FontWeight="SemiBold" />
+              <TextBox Text="{Binding BackupNote}" PlaceholderText="Kommentar, z. B. «Neues Firmenkonto eingerichtet»" MaxLength="200" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="accent" Content="Sichern" Command="{Binding CreateBackupCommand}" IsDefault="True" />
+                <Button Content="Abbrechen" Command="{Binding CancelBackupCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Preview before restoring -->
+          <Border IsVisible="{Binding HasRestorePlan}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14">
+            <StackPanel Spacing="10">
+              <TextBlock Text="{Binding RestoreTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+              <TextBlock IsVisible="{Binding RestoreIsEmpty}" Text="Keine Unterschiede – dieses Gerät entspricht bereits der Sicherung." TextWrapping="Wrap" />
+              <ItemsControl ItemsSource="{Binding RestoreGroups}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:RestoreGroup">
+                    <StackPanel Spacing="2" Margin="0,0,0,8">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Classes.removal="{Binding IsRemoval}">
+                        <TextBlock.Styles>
+                          <Style Selector="TextBlock.removal">
+                            <Setter Property="Foreground" Value="#C50F1F" />
+                          </Style>
+                        </TextBlock.Styles>
+                      </TextBlock>
+                      <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <TextBlock Text="{Binding StringFormat='• {0}'}" TextWrapping="Wrap" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                         Text="Mails, Termine und Kontakte bleiben auf den Servern und werden danach neu geladen. Einstellungen und Zertifikate deiner Organisation sind nicht betroffen." />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="accent" Content="Sicherung wiederherstellen" Command="{Binding RestoreCommand}" />
+                <Button Content="Abbrechen" Command="{Binding CancelRestoreCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <TextBlock Classes="subtle" IsVisible="{Binding !Backups.Count}" Text="Noch keine Sicherung." />
+          <ItemsControl ItemsSource="{Binding Backups}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:BackupItem">
+                <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="2,8">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="1">
+                      <TextBlock Text="{Binding Note}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Classes="subtle" FontSize="12">
+                        <Run Text="{Binding When, Mode=OneWay}" />
+                        <Run Text=" · " />
+                        <Run Text="{Binding Details, Mode=OneWay}" />
+                      </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <Button Content="Wiederherstellen …" FontSize="12"
+                              Command="{Binding $parent[UserControl].((vm:CloudViewModel)DataContext).PrepareRestoreCommand}" CommandParameter="{Binding}" />
+                      <Button Content="{Binding DeleteText}" FontSize="12"
+                              Command="{Binding $parent[UserControl].((vm:CloudViewModel)DataContext).DeleteBackupCommand}" CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="subtle" FontSize="12" Text="{Binding BackupCountText}" IsVisible="{Binding Backups.Count}" />
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding BackupBusy}">
+          <ProgressBar IsIndeterminate="True" Width="80" VerticalAlignment="Center" />
+          <TextBlock Classes="subtle" FontSize="12" Text="Einen Moment …" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Text="{Binding BackupMessage}" TextWrapping="Wrap" Foreground="#107C10" IsVisible="{Binding BackupMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <TextBlock Classes="error" Text="{Binding BackupError}" TextWrapping="Wrap" IsVisible="{Binding BackupError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

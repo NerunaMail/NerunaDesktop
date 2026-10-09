@@ -33,6 +33,81 @@ internal static class LiveScenario
     private static readonly string CertDir = Path.GetFullPath(Path.Combine("tools", "testlab", "certs"));
 
     /// <summary>
+    /// Settings backup, end to end against a real server: the office computer (demo data) sets up the vault and makes a
+    /// backup; a new laptop connects, unlocks with the recovery code, sees the preview and restores.
+    /// </summary>
+    public static async Task BackupAsync(string output, string server, string code1, string pin1, string code2, string pin2)
+    {
+        string recovery;
+        {
+            var dataDir = Path.Combine(Path.GetTempPath(), "neruna-backup-a-" + Guid.NewGuid().ToString("N"));
+            await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: true));
+            var vm = services.GetRequiredService<MainWindowViewModel>();
+            var window = new MainWindow { DataContext = vm, Width = 1440, Height = 900 };
+            window.Show();
+            await vm.InitializeAsync();
+            var cloud = vm.SettingsPage.Cloud;
+            (cloud.Server, cloud.Code, cloud.Pin, cloud.DeviceName) = (server, code1, pin1, "Büro-PC");
+            await cloud.ConnectCommand.ExecuteAsync(null);
+            vm.NavigateCommand.Execute(Section.Settings);
+            vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+            await Task.Delay(300);
+            Console.WriteLine($"A connected: {cloud.ConnectedText ?? cloud.Error}, setup={cloud.ShowVaultSetup}, error={cloud.BackupError}");
+            await Snapshots.SaveAsync(window, output, "backup-1-setup.png");
+            cloud.VaultPassword = cloud.VaultPasswordRepeat = "Mein Tresor 2026!";
+            await cloud.SetUpVaultCommand.ExecuteAsync(null);
+            recovery = cloud.RecoveryCode ?? throw new InvalidOperationException(cloud.BackupError);
+            await Snapshots.SaveAsync(window, output, "backup-2-recovery.png");
+            cloud.RecoveryStored = true;
+            cloud.ConfirmRecoveryCodeCommand.Execute(null);
+            cloud.BackupNote = "Alle Konten eingerichtet";
+            await Snapshots.SaveAsync(window, output, "backup-3-note.png");
+            await cloud.CreateBackupCommand.ExecuteAsync(null);
+            await Snapshots.SaveAsync(window, output, "backup-4-list.png");
+            Console.WriteLine($"A backup: {cloud.BackupMessage ?? cloud.BackupError}, backups={cloud.Backups.Count}");
+
+            // A change, leaving the settings: the hint in the status bar.
+            await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.SettingKeys.SmimeDigest, "sha512");
+            vm.NavigateCommand.Execute(Section.Mail);
+            for (var i = 0; i < 30 && !vm.ShowBackupHint; i++)
+            {
+                await Task.Delay(100);
+            }
+
+            Console.WriteLine($"A hint: {vm.ShowBackupHint}");
+            await Snapshots.SaveAsync(window, output, "backup-5-hint.png");
+            window.Close();
+        }
+
+        {
+            var dataDir = Path.Combine(Path.GetTempPath(), "neruna-backup-b-" + Guid.NewGuid().ToString("N"));
+            await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: false));
+            var vm = services.GetRequiredService<MainWindowViewModel>();
+            var window = new MainWindow { DataContext = vm, Width = 1440, Height = 900 };
+            window.Show();
+            await vm.LoadLocalAsync();
+            var cloud = vm.SettingsPage.Cloud;
+            (cloud.Server, cloud.Code, cloud.Pin, cloud.DeviceName) = (server, code2, pin2, "Neuer Laptop");
+            await cloud.ConnectCommand.ExecuteAsync(null);
+            vm.NavigateCommand.Execute(Section.Settings);
+            vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+            await Task.Delay(300);
+            Console.WriteLine($"B connected: {cloud.ConnectedText ?? cloud.Error}, unlock={cloud.ShowVaultUnlock}");
+            await Snapshots.SaveAsync(window, output, "backup-6-unlock.png");
+            cloud.UnlockSecret = recovery;
+            await cloud.UnlockVaultCommand.ExecuteAsync(null);
+            await cloud.PrepareRestoreCommand.ExecuteAsync(cloud.Backups[0]);
+            Console.WriteLine($"B plan: {cloud.RestorePlan?.Changes.Count} changes, error={cloud.BackupError}");
+            await Snapshots.SaveAsync(window, output, "backup-7-preview.png");
+            await cloud.RestoreCommand.ExecuteAsync(null);
+            await Task.Delay(1500);
+            Console.WriteLine($"B restored: {cloud.BackupMessage ?? cloud.BackupError}, accounts={(await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync()).Count}");
+            await Snapshots.SaveAsync(window, output, "backup-8-restored.png");
+            window.Close();
+        }
+    }
+
+    /// <summary>
     /// Certificates from the organisation, end to end: connect, register the device key, then wait while an admin
     /// sets up the organisation key, uploads a certificate and approves this device in the portal (a browser, run
     /// alongside) – until the certificate is here.

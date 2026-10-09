@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -16,8 +17,253 @@ internal sealed partial class CloudViewModel(
     CloudSignatureSync signatures,
     CloudTextTemplateSync textTemplates,
     CloudCertificateSync certificates,
-    AccountDiscovery discovery) : ViewModelBase
+    AccountDiscovery discovery,
+    SettingsBackupService backup) : ViewModelBase
 {
+    // ── Sicherung: manual backups of the personal settings into the vault (zero knowledge) ──
+
+    /// <summary>A backup was restored: everything has to be reloaded and synced.</summary>
+    public event EventHandler? Restored;
+
+    /// <summary>A backup was made (the hint "Neue Sicherung erstellen?" can go).</summary>
+    public event EventHandler? BackedUp;
+
+    public ObservableCollection<BackupItem> Backups { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowVaultSetup), nameof(ShowVaultUnlock), nameof(ShowBackups))]
+    public partial BackupOverview? BackupState { get; set; }
+
+    [ObservableProperty]
+    public partial bool BackupBusy { get; set; }
+
+    [ObservableProperty]
+    public partial string? BackupError { get; set; }
+
+    [ObservableProperty]
+    public partial string? BackupMessage { get; set; }
+
+    [ObservableProperty]
+    public partial string VaultPassword { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string VaultPasswordRepeat { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string UnlockSecret { get; set; } = string.Empty;
+
+    /// <summary>Shown once after setting up; nothing else until the user confirmed it is stored.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowVaultSetup), nameof(ShowVaultUnlock), nameof(ShowBackups), nameof(HasRecoveryCode))]
+    public partial string? RecoveryCode { get; set; }
+
+    [ObservableProperty]
+    public partial bool RecoveryStored { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsWritingNote { get; set; }
+
+    [ObservableProperty]
+    public partial string BackupNote { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRestorePlan), nameof(RestoreTitle), nameof(RestoreIsEmpty))]
+    public partial RestorePlan? RestorePlan { get; set; }
+
+    public ObservableCollection<RestoreGroup> RestoreGroups { get; } = [];
+
+    [ObservableProperty]
+    public partial bool ConfirmReset { get; set; }
+
+    public bool HasRecoveryCode => RecoveryCode is not null;
+
+    public bool ShowVaultSetup => BackupState is { HasVault: false } && RecoveryCode is null;
+
+    public bool ShowVaultUnlock => BackupState is { HasVault: true, IsUnlocked: false } && RecoveryCode is null;
+
+    public bool ShowBackups => BackupState is { HasVault: true, IsUnlocked: true } && RecoveryCode is null;
+
+    public bool HasRestorePlan => RestorePlan is not null;
+
+    public bool RestoreIsEmpty => RestorePlan is { Changes.Count: 0 };
+
+    public string? RestoreTitle => RestorePlan is { } plan
+        ? $"Sicherung vom {plan.Backup.CreatedAt.ToLocalTime():dd.MM.yyyy HH:mm}{(plan.Backup.Note is { } note ? $" – «{note}»" : string.Empty)} wiederherstellen?"
+        : null;
+
+    public string BackupCountText => BackupState is { } state ? $"{state.Backups.Count} von {state.MaxBackups} Sicherungen – bei einer weiteren wird die älteste gelöscht." : string.Empty;
+
+    /// <summary>Loads the vault state from the cloud (when connected).</summary>
+    public async Task LoadBackupsAsync()
+    {
+        if (Connection is null)
+        {
+            BackupState = null;
+            Backups.Clear();
+            return;
+        }
+
+        await RunBackupAsync(async () => ShowOverview(await backup.GetOverviewAsync()));
+    }
+
+    /// <summary>From the hint "Neue Sicherung erstellen?": opens the note field.</summary>
+    public void StartBackup()
+    {
+        BackupMessage = null;
+        IsWritingNote = true;
+    }
+
+    [RelayCommand]
+    private Task SetUpVaultAsync() => RunBackupAsync(async () =>
+    {
+        if (VaultPassword.Length < 10)
+        {
+            throw new BackupException("Das Tresor-Passwort braucht mindestens 10 Zeichen.");
+        }
+
+        if (VaultPassword != VaultPasswordRepeat)
+        {
+            throw new BackupException("Die beiden Passwörter stimmen nicht überein.");
+        }
+
+        RecoveryCode = await backup.SetUpAsync(VaultPassword);
+        VaultPassword = VaultPasswordRepeat = string.Empty;
+        RecoveryStored = false;
+        ShowOverview(await backup.GetOverviewAsync());
+    });
+
+    [RelayCommand]
+    private void ConfirmRecoveryCode()
+    {
+        if (RecoveryStored)
+        {
+            RecoveryCode = null;
+            StartBackup();
+        }
+    }
+
+    [RelayCommand]
+    private Task UnlockVaultAsync() => RunBackupAsync(async () =>
+    {
+        await backup.UnlockAsync(UnlockSecret.Trim());
+        UnlockSecret = string.Empty;
+        ShowOverview(await backup.GetOverviewAsync());
+    });
+
+    [RelayCommand]
+    private void NewBackup() => StartBackup();
+
+    [RelayCommand]
+    private void CancelBackup()
+    {
+        IsWritingNote = false;
+        BackupNote = string.Empty;
+    }
+
+    [RelayCommand]
+    private Task CreateBackupAsync() => RunBackupAsync(async () =>
+    {
+        var created = await backup.CreateBackupAsync(BackupNote);
+        IsWritingNote = false;
+        BackupNote = string.Empty;
+        ShowOverview(await backup.GetOverviewAsync());
+        BackupMessage = $"Sicherung erstellt ({created.Size / 1024.0:0.#} KB).";
+        BackedUp?.Invoke(this, EventArgs.Empty);
+    });
+
+    [RelayCommand]
+    private Task PrepareRestoreAsync(BackupItem item) => RunBackupAsync(async () =>
+    {
+        var plan = await backup.PrepareRestoreAsync(item.Entry.Id);
+        RestoreGroups.Clear();
+        foreach (var kind in new[] { BackupChangeKind.Added, BackupChangeKind.Changed, BackupChangeKind.Removed })
+        {
+            var changes = plan.Changes.Where(c => c.Kind == kind).ToList();
+            if (changes.Count > 0)
+            {
+                RestoreGroups.Add(new RestoreGroup(kind, changes.Select(c => $"{c.Area}: {c.Name}").ToList()));
+            }
+        }
+
+        RestorePlan = plan;
+    });
+
+    [RelayCommand]
+    private void CancelRestore() => RestorePlan = null;
+
+    [RelayCommand]
+    private Task RestoreAsync() => RunBackupAsync(async () =>
+    {
+        if (RestorePlan is not { } plan)
+        {
+            return;
+        }
+
+        await backup.RestoreAsync(plan);
+        RestorePlan = null;
+        BackupMessage = "Sicherung wiederhergestellt. Die Konten werden jetzt neu synchronisiert.";
+        Restored?.Invoke(this, EventArgs.Empty);
+    });
+
+    [RelayCommand]
+    private Task DeleteBackupAsync(BackupItem item) => RunBackupAsync(async () =>
+    {
+        if (!item.ConfirmDelete)
+        {
+            item.ConfirmDelete = true;
+            return;
+        }
+
+        await backup.DeleteBackupAsync(item.Entry.Id);
+        ShowOverview(await backup.GetOverviewAsync());
+    });
+
+    /// <summary>Password and recovery code lost: delete the vault with every backup and start over (asked twice).</summary>
+    [RelayCommand]
+    private Task ResetVaultAsync() => RunBackupAsync(async () =>
+    {
+        if (!ConfirmReset)
+        {
+            ConfirmReset = true;
+            return;
+        }
+
+        ConfirmReset = false;
+        await backup.ResetAsync();
+        ShowOverview(await backup.GetOverviewAsync());
+    });
+
+    private void ShowOverview(BackupOverview overview)
+    {
+        BackupState = overview;
+        Backups.Clear();
+        foreach (var entry in overview.Backups)
+        {
+            Backups.Add(new BackupItem(entry));
+        }
+
+        OnPropertyChanged(nameof(BackupCountText));
+    }
+
+    private async Task RunBackupAsync(Func<Task> action)
+    {
+        BackupError = null;
+        BackupMessage = null;
+        BackupBusy = true;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is BackupException or CloudException or HttpRequestException)
+        {
+            BackupError = ex.Message;
+        }
+        finally
+        {
+            BackupBusy = false;
+        }
+    }
+
     /// <summary>Certificates from the organisation: how many arrived, whether the portal still has to approve this device.</summary>
     [ObservableProperty]
     public partial string? CertificatesText { get; set; }
@@ -188,6 +434,10 @@ internal sealed partial class CloudViewModel(
             await signatures.RemoveAllAsync();
             await textTemplates.RemoveAllAsync();
             await certificates.RemoveAllAsync();
+            await backup.ForgetAsync();
+            BackupState = null;
+            Backups.Clear();
+            RestorePlan = null;
             UpdateCertificateStatus();
             Connection = null;
             Profile = null;
@@ -217,6 +467,7 @@ internal sealed partial class CloudViewModel(
         }
 
         UpdateCertificateStatus();
+        await LoadBackupsAsync();
         Photo = null;
         if (Profile.Member.HasPhoto && await cloud.GetPhotoAsync() is { } bytes)
         {
@@ -224,4 +475,34 @@ internal sealed partial class CloudViewModel(
             Photo = new Bitmap(stream);
         }
     }
+}
+
+internal sealed partial class BackupItem(BackupEntry entry) : ObservableObject
+{
+    public BackupEntry Entry { get; } = entry;
+
+    public string When => Entry.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.GetCultureInfo("de-CH"));
+
+    public string Details => $"{Entry.DeviceName ?? "Unbekanntes Gerät"} · {Entry.Size / 1024.0:0.#} KB";
+
+    public string Note => string.IsNullOrWhiteSpace(Entry.Note) ? "(ohne Kommentar)" : Entry.Note;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeleteText))]
+    public partial bool ConfirmDelete { get; set; }
+
+    public string DeleteText => ConfirmDelete ? "Wirklich löschen?" : "Löschen";
+}
+
+/// <summary>Restore preview: what is created, changed or removed here.</summary>
+internal sealed record RestoreGroup(BackupChangeKind Kind, IReadOnlyList<string> Items)
+{
+    public string Title => Kind switch
+    {
+        BackupChangeKind.Added => "Wird erstellt",
+        BackupChangeKind.Changed => "Wird überschrieben",
+        _ => "Wird entfernt",
+    };
+
+    public bool IsRemoval => Kind == BackupChangeKind.Removed;
 }

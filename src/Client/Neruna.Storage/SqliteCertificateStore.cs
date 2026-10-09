@@ -62,6 +62,12 @@ public sealed class SqliteSettingsStore(IDbContextFactory<NerunaDbContext> conte
         return _values.TryGetValue(key, out var value) ? value : null;
     }
 
+    public async Task<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        await LoadedAsync().WaitAsync(cancellationToken);
+        return _values.Where(v => v.Value is not null).ToDictionary(v => v.Key, v => v.Value!, StringComparer.Ordinal);
+    }
+
     public async Task SetAsync(string key, string? value, CancellationToken cancellationToken = default)
     {
         await LoadedAsync().WaitAsync(cancellationToken);

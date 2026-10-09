@@ -426,7 +426,7 @@ Kontaktliste mit Detailansicht. Screenshots: `docs/screenshots/` (erzeugt mit `t
 | Thunderbird-Autoconfig (beide Pfade) | ✔ inkl. Vertragstest |
 | Admin und Kundenportal | ✔ Filament 5: `/admin` (Mandanten, Lizenz, Limits, Addons, Logins), `/portal` (Firmendaten, Benutzer, Verbindungscodes, Geräte) |
 | Signaturvorlagen, Kalender-Abos, Richtlinien | offen |
-| Config-Tresor-Ablage | offen (Server speichert nur `VaultEnvelope`-JSON) |
+| Config-Tresor-Ablage | ✔ `/api/v1/vault`: verpackte Schlüssel + max. 20 verschlüsselte Sicherungen pro Person (Abschnitt 6) |
 | Geräte verbinden | ✔ Einmal-Code + separate PIN, Geräteschlüssel (ECDSA P-256), signierte Anmeldung, Tokens; Geräte im Portal sperrbar |
 | Betrieb | ✔ Shared Hosting (PHP 8.4+, MySQL/MariaDB, ohne Worker/Redis/Node), Paket per `scripts/package-shared-hosting.sh` |
 
@@ -446,8 +446,18 @@ DEK (256 bit, zufällig)
 
 - Server speichert nur den Envelope; Passwortwechsel = neues Wrapping, Payload unverändert.
 - KDF-Parameter und Schlüsselart sind als AAD gebunden; zu schwache Parameter werden beim Entsperren abgelehnt.
-- Optionaler Admin-Escrow-Schlüssel der Organisation (X25519) als weiterer Wrap: Entscheid offen.
-- Implementiert und getestet in `Neruna.Vault`; Anbindung an Client-UI und Server folgt.
+- Kein Admin-Escrow: Ohne Passwort und Wiederherstellungscode ist der Tresor verloren («neu beginnen» löscht ihn).
+- **Sicherungen (Einstellungen → Cloud):** nur manuell mit Kommentar, kein Abgleich zwischen Geräten. Inhalt: nur
+  Persönliches – Konten samt Passwörtern, eigene Signaturen/Textvorlagen/Zertifikate, Einstellungen ohne
+  Gerätespezifisches (`cloud.*`, `chat.*`, Fensterlayout). Nichts aus der Cloud (kommt nach dem Verbinden wieder).
+  Server: verpackte Schlüssel einmal pro Person, Sicherungen nur als Nonce/Ciphertext, Kommentar ebenfalls
+  verschlüsselt; die 21. löscht die älteste.
+- Das Gerät behält den Datenschlüssel nach dem Einrichten/Entsperren im Schlüsselbund (sichern ohne Passwort).
+  Geänderte Einstellungen erkennt ein HMAC-Fingerabdruck (Schlüssel aus dem DEK abgeleitet) → Hinweis «Neue
+  Sicherung erstellen?» beim Verlassen der Einstellungen.
+- Wiederherstellen: Vorschau (wird erstellt/überschrieben/entfernt), danach entspricht das Gerät der Sicherung.
+- Geräteschlüssel (Anmeldung, Zertifikats-Verschlüsselung) sind nie Teil davon: Jedes Gerät hat eigene; ein neues
+  Gerät erhält Cloud-Zertifikate nach der Freigabe im Portal (Hinweis auf dem Dashboard, alle auf einmal).
 
 ## 6b. S/MIME-Zertifikate aus dem Portal (Zero-Knowledge)
 
@@ -474,7 +484,7 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 |---|---|---|
 | 1 | Lizenz Client/Shared | ✔ MPL 2.0 (Beiträge mit CLA) |
 | 2 | Endbenutzer-Auth gegenüber Cloud | ✔ Geräte-Code aus dem Portal + PIN, danach Geräteschlüssel |
-| 3 | Admin-Escrow für Tresor | Für S/MIME-Zertifikate ✔ Organisationsschlüssel (6b); Config-Tresor offen |
+| 3 | Admin-Escrow für Tresor | Für S/MIME-Zertifikate ✔ Organisationsschlüssel (6b); Config-Tresor ✔ ohne Escrow |
 | 4 | Preismodell | pro User · pro Domain · Staffeln |
 | 5 | UI-Sprachen | heute nur Deutsch; `.resx` de/en vor Release |
 | 6 | HTML-Darstellung von Mails | ✔ Lesen: Avalonia.HtmlRenderer; Verfassen: native WebView (WebView2/WebKit). Avalonias RichTextEditor ist kommerziell → nicht verwendet |

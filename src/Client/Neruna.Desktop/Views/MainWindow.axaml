@@ -110,12 +110,22 @@
 
     <!-- Status bar; on the right a downloaded update waiting for a restart -->
     <Border Grid.Row="2" Padding="12,0">
-      <Grid ColumnDefinitions="*,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto">
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <ProgressBar IsIndeterminate="True" Width="60" Height="4" MinWidth="0" IsVisible="{Binding IsSyncing}" />
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding StatusText}" />
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding SettingsPage.Updates.IsReady}">
+        <!-- Personal settings changed since the last backup -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,16,0" IsVisible="{Binding ShowBackupHint}">
+          <TextBlock FontSize="12" Text="Einstellungen geändert – neue Sicherung erstellen?" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" />
+          <Button Classes="command" Command="{Binding BackupNowCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="Einstellungen → Cloud → Sicherung">
+            <TextBlock Text="Sichern" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+          </Button>
+          <Button Classes="command" Command="{Binding BackupLaterCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="Erst nach der nächsten Änderung wieder fragen">
+            <TextBlock Text="Später" Classes="subtle" TextDecorations="Underline" />
+          </Button>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding SettingsPage.Updates.IsReady}">
           <TextBlock FontSize="12" Text="{Binding SettingsPage.Updates.ReadyText}" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" />
           <Button Classes="command" Command="{Binding SettingsPage.Updates.RestartNowCommand}" Padding="6,1" FontSize="12"
                   ToolTip.Tip="Neruna schliessen, das Update installieren und wieder starten">

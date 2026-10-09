@@ -133,6 +133,36 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task<CertificatesResponse> GetCertificatesAsync(CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<CertificatesResponse>("api/v1/certificates", cancellationToken);
 
+    /// <summary>The config vault (wrapped keys) and the list of backups.</summary>
+    public async Task<VaultResponse> GetVaultAsync(CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<VaultResponse>("api/v1/vault", cancellationToken);
+
+    /// <summary>Sets up the vault or replaces its wrapped keys.</summary>
+    public async Task<CloudVault> SetVaultAsync(VaultUpdateRequest request, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<CloudVault>(HttpMethod.Put, "api/v1/vault", request, cancellationToken);
+
+    /// <summary>Deletes the vault and all backups (start over).</summary>
+    public Task DeleteVaultAsync(CancellationToken cancellationToken = default) => SendWithoutAnswerAsync(HttpMethod.Delete, "api/v1/vault", cancellationToken);
+
+    public async Task<VaultBackupSummary> CreateVaultBackupAsync(VaultBackupRequest request, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<VaultBackupSummary>(HttpMethod.Post, "api/v1/vault/backups", request, cancellationToken);
+
+    public async Task<VaultBackupResponse> GetVaultBackupAsync(string id, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<VaultBackupResponse>($"api/v1/vault/backups/{Uri.EscapeDataString(id)}", cancellationToken);
+
+    public Task DeleteVaultBackupAsync(string id, CancellationToken cancellationToken = default) =>
+        SendWithoutAnswerAsync(HttpMethod.Delete, $"api/v1/vault/backups/{Uri.EscapeDataString(id)}", cancellationToken);
+
+    private async Task SendWithoutAnswerAsync(HttpMethod method, string path, CancellationToken cancellationToken)
+    {
+        var connection = await RequireConnectionAsync(cancellationToken);
+        using var response = await SendAuthorizedAsync(connection, method, path, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ReadAsync<CloudError>(response, cancellationToken);
+        }
+    }
+
     /// <summary>The person's photo from the portal, if there is one.</summary>
     public async Task<byte[]?> GetPhotoAsync(CancellationToken cancellationToken = default)
     {

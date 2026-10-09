@@ -21,6 +21,34 @@ public class UnlockedVaultTests
     }
 
     [Fact]
+    public void Kept_data_key_resumes_the_vault_for_notes_backups_and_fingerprints()
+    {
+        using var created = UnlockedVault.Create("Correct horse", out _, FastKdf);
+        var envelope = created.Seal(Payload);
+        var note = created.EncryptText("Neues Firmenkonto");
+        Assert.DoesNotContain("Firmenkonto", note, StringComparison.Ordinal);
+
+        // What the device keeps in its keychain is enough – no password needed for the next backup.
+        using var resumed = UnlockedVault.Resume(created.VaultId, created.ExportDataKey(), created.Keys);
+        Assert.Equal(Payload, resumed.Open(envelope));
+        Assert.Equal("Neues Firmenkonto", resumed.DecryptText(note));
+        Assert.Equal(created.Fingerprint(Payload), resumed.Fingerprint(Payload));
+        Assert.NotEqual(created.Fingerprint(Payload), resumed.Fingerprint("{}"u8));
+        using (var reopened = UnlockedVault.UnlockWithPassword(resumed.Seal(Payload), "Correct horse", FastKdf))
+        {
+            Assert.Equal(Payload, reopened.Open(envelope));
+        }
+
+        // Another vault reads neither notes nor gets the same fingerprints; tampering is noticed.
+        using var other = UnlockedVault.Create("Correct horse", out _, FastKdf);
+        Assert.Null(other.DecryptText(note));
+        Assert.NotEqual(created.Fingerprint(Payload), other.Fingerprint(Payload));
+        Assert.Null(created.DecryptText(note[..^4] + "AAA="));
+        Assert.Null(created.DecryptText("kein text"));
+        Assert.Throws<VaultUnlockException>(() => UnlockedVault.Resume(created.VaultId, new byte[16], []));
+    }
+
+    [Fact]
     public void Wrong_password_fails()
     {
         var envelope = CreateEnvelope("Correct horse", out _);
