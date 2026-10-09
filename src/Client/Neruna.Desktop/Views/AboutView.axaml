@@ -5,7 +5,8 @@
              x:DataType="vm:SettingsViewModel">
   <ScrollViewer>
     <StackPanel Spacing="10" MaxWidth="680" HorizontalAlignment="Left" Margin="0,0,0,20">
-      <Image Source="/Assets/app.ico" Width="56" Height="56" HorizontalAlignment="Left" />
+      <!-- The big logo, as on the splash screen -->
+      <Image Source="/Assets/logo.png" Width="270" HorizontalAlignment="Left" Margin="-8,0,0,0" />
       <TextBlock Text="Neruna Desktop" FontSize="22" FontWeight="SemiBold" />
       <TextBlock x:Name="VersionText" Classes="subtle" />
 
