@@ -32,6 +32,46 @@ internal static class LiveScenario
 {
     private static readonly string CertDir = Path.GetFullPath(Path.Combine("tools", "testlab", "certs"));
 
+    /// <summary>
+    /// First start: no account yet, the setup dialog creates one (as a user would) – afterwards the mail page must show
+    /// folders and messages without a restart.
+    /// </summary>
+    public static async Task FirstStartAsync(string output, string mailHost)
+    {
+        await SeedMailAsync(mailHost);
+        var dataDir = Path.Combine(Path.GetTempPath(), "neruna-first-" + Guid.NewGuid().ToString("N"));
+        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: false));
+        var vm = services.GetRequiredService<MainWindowViewModel>();
+        var window = new MainWindow { DataContext = vm, Width = 1440, Height = 880 };
+        window.Show();
+        await vm.InitializeAsync();
+
+        var setup = (AccountSetupViewModel)vm.Overlay!;
+        setup.DisplayName = "Anna Muster";
+        setup.Email = "anna@example.com";
+        setup.Password = "geheim";
+        setup.ShowServerSettings = true;
+        setup.ImapHost = mailHost;
+        setup.ImapPort = "3143";
+        setup.ImapSecurity = SocketSecurity.None;
+        setup.SmtpHost = mailHost;
+        setup.SmtpPort = "3025";
+        setup.SmtpSecurity = SocketSecurity.None;
+        setup.Username = "anna@example.com";
+        await setup.CreateCommand.ExecuteAsync(null);
+        for (var i = 0; i < 100 && (vm.Overlay is not null || vm.IsSyncing || vm.MailPage.Accounts.Count == 0); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await Task.Delay(500);
+        Console.WriteLine($"First start: overlay={vm.Overlay?.GetType().Name ?? "none"}, error={setup.Error}, accounts={vm.MailPage.Accounts.Count}, " +
+                          $"folders={vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).Count()}, current={vm.MailPage.CurrentFolder?.Folder.Name ?? "none"}, " +
+                          $"messages={vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()}, status={vm.StatusText}");
+        await Snapshots.SaveAsync(window, output, "first-start.png");
+        window.Close();
+    }
+
     public static async Task RunAsync(string output, string mailHost, Uri davUrl)
     {
         var user = "anna@example.com";

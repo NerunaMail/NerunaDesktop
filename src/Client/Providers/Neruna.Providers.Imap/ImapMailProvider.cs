@@ -114,7 +114,7 @@ public sealed class ImapMailProvider(
             {
                 foreach (var summary in await imapFolder.FetchAsync(batch, MessageSummaryItems.UniqueId | MessageSummaryItems.Flags, cancellationToken))
                 {
-                    flagUpdates[summary.UniqueId.Id.ToString(CultureInfo.InvariantCulture)] = MapFlags(summary.Flags);
+                    flagUpdates[summary.UniqueId.Id.ToString(CultureInfo.InvariantCulture)] = MapFlags(summary.Flags, summary.Keywords);
                 }
             }
         }
@@ -148,8 +148,20 @@ public sealed class ImapMailProvider(
         ArgumentNullException.ThrowIfNull(remoteIds);
 
         var imapFolder = await OpenAsync(folder.RemoteId, FolderAccess.ReadWrite, cancellationToken);
-        var request = new StoreFlagsRequest(add ? StoreAction.Add : StoreAction.Remove, MapFlags(flags)) { Silent = true };
-        await imapFolder.StoreAsync(remoteIds.Select(ParseUid).ToList(), request, cancellationToken);
+        var uids = remoteIds.Select(ParseUid).ToList();
+        var system = MapFlags(flags);
+        if (system != ImapFlags.None)
+        {
+            await imapFolder.StoreAsync(uids, new StoreFlagsRequest(add ? StoreAction.Add : StoreAction.Remove, system) { Silent = true }, cancellationToken);
+        }
+
+        // "Weitergeleitet" is the keyword $Forwarded (RFC 5788), not a system flag; only where the folder keeps keywords.
+        if (flags.HasFlag(CoreFlags.Forwarded) && AcceptsKeyword(imapFolder, ForwardedKeyword))
+        {
+            var request = new StoreFlagsRequest(add ? StoreAction.Add : StoreAction.Remove, ImapFlags.None) { Silent = true };
+            request.Keywords.Add(ForwardedKeyword);
+            await imapFolder.StoreAsync(uids, request, cancellationToken);
+        }
     }
 
     public async Task MoveAsync(MailFolder source, IReadOnlyCollection<string> remoteIds, MailFolder target, CancellationToken cancellationToken = default)
@@ -476,7 +488,7 @@ public sealed class ImapMailProvider(
             from is null ? null : new MailAddress(from.Name, from.Address),
             envelope?.To.Mailboxes.Select(m => new MailAddress(m.Name, m.Address)).ToList() ?? [],
             envelope?.Date ?? summary.InternalDate ?? DateTimeOffset.MinValue,
-            MapFlags(summary.Flags),
+            MapFlags(summary.Flags, summary.Keywords),
             (long)(summary.Size ?? 0),
             HasRealAttachments(summary),
             summary.PreviewText,
@@ -541,10 +553,17 @@ public sealed class ImapMailProvider(
         return MessageSecurity.None;
     }
 
-    internal static CoreFlags MapFlags(ImapFlags? flags)
+    /// <summary>Keyword for forwarded messages (RFC 5788; also used by other mail programs).</summary>
+    internal const string ForwardedKeyword = "$Forwarded";
+
+    private static bool AcceptsKeyword(IMailFolder folder, string keyword) =>
+        folder.PermanentFlags.HasFlag(ImapFlags.UserDefined) || folder.PermanentKeywords.Contains(keyword);
+
+    internal static CoreFlags MapFlags(ImapFlags? flags, IEnumerable<string>? keywords = null)
     {
         var f = flags ?? ImapFlags.None;
         var result = CoreFlags.None;
+        if (keywords?.Contains(ForwardedKeyword, StringComparer.OrdinalIgnoreCase) == true) result |= CoreFlags.Forwarded;
         if (f.HasFlag(ImapFlags.Seen)) result |= CoreFlags.Seen;
         if (f.HasFlag(ImapFlags.Answered)) result |= CoreFlags.Answered;
         if (f.HasFlag(ImapFlags.Flagged)) result |= CoreFlags.Flagged;

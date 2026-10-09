@@ -17,6 +17,12 @@ public sealed class MailController(
     ProviderRegistry providers,
     ILogger<MailController> logger)
 {
+    /// <summary>The folder list of a connection was read (new folders may be there); raised on the syncing thread.</summary>
+    public event EventHandler<Guid>? FoldersSynced;
+
+    /// <summary>One folder of a full sync is done – the UI can show it before the others (raised on the syncing thread).</summary>
+    public event EventHandler<MailFolder>? FolderSynced;
+
     public Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default) =>
         SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Mail, SyncConnectionAsync, logger, cancellationToken);
 
@@ -26,11 +32,14 @@ public sealed class MailController(
 
         var remoteFolders = await provider.GetFoldersAsync(cancellationToken);
         var folders = await store.MergeFoldersAsync(connection.Id, remoteFolders, cancellationToken);
+        FoldersSynced?.Invoke(this, connection.Id);
 
-        // Inbox first so the user sees new mail as early as possible.
+        // Inbox first so the user sees new mail as early as possible; each folder shows up as soon as it is done
+        // (the first sync of a large mailbox takes a while).
         foreach (var folder in folders.OrderBy(f => f.Role == FolderRole.Inbox ? 0 : 1))
         {
             await SyncFolderAsync(provider, folder, cancellationToken);
+            FolderSynced?.Invoke(this, folder);
         }
     }
 

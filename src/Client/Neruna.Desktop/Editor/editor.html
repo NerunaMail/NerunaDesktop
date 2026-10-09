@@ -16,6 +16,8 @@
   #editor > div, #editor > p { margin: 0 0 0.5em 0; }
   #editor blockquote { margin: 0 0 0 4px; padding-left: 10px; border-left: 2px solid #c8c8c8; }
   #editor img { max-width: 100%; }
+  /* A fine frame around pictures while writing, so white or transparent ones can be seen (not sent: CSS of the editor). */
+  #editor img { outline: 1px solid rgba(0, 0, 0, 0.22); outline-offset: 0; }
   /* An empty cell (a form from a text template) stays wide enough to click into. */
   #editor td, #editor th { min-width: 3em; }
   #editor a { color: #0f6cbd; }

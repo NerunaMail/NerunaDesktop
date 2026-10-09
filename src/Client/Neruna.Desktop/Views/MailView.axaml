@@ -180,6 +180,8 @@
                       <PathIcon Data="{StaticResource IconLock}" Width="14" Height="14" Foreground="#B8860B"
                                 IsVisible="{Binding IsEncrypted}" ToolTip.Tip="Verschlüsselt (S/MIME)" />
                       <PathIcon Data="{StaticResource IconAttach}" Width="12" Height="12" IsVisible="{Binding HasAttachments}" />
+                      <PathIcon Data="{StaticResource IconReply}" Width="12" Height="12" IsVisible="{Binding IsAnswered}" ToolTip.Tip="Beantwortet" />
+                      <PathIcon Data="{StaticResource IconForward}" Width="12" Height="12" IsVisible="{Binding IsForwarded}" ToolTip.Tip="Weitergeleitet" />
                       <PathIcon Data="{StaticResource IconFlag}" Width="12" Height="12" Foreground="#C50F1F" IsVisible="{Binding IsFlagged}" />
                     </StackPanel>
                     <TextBlock Grid.Row="1" Classes="subject" Text="{Binding Subject}" TextTrimming="CharacterEllipsis" FontSize="13" />

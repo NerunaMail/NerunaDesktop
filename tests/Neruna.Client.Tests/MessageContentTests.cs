@@ -42,6 +42,18 @@ public class MessageContentTests
     }
 
     [Fact]
+    public void Attributes_of_broken_html_do_not_stop_the_message()
+    {
+        // Unquoted style with a space: the tokenizer sees an attribute named "ui',sans-serif;".
+        var message = Message(new TextPart("html") { Text = "<p style=font-family:'Segoe ui',sans-serif; class=x>Hallo <b>Welt</b></p>" });
+
+        var content = MessageContent.From(message);
+
+        Assert.Contains("Hallo <b>Welt</b>", content.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("sans-serif;=", content.Html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Scripts_handlers_forms_and_remote_content_are_removed()
     {
         const string html = """
@@ -188,4 +200,18 @@ public class MessageContentTests
         message.From.Add(new MailboxAddress("Marco", "marco@example.com"));
         return message;
     }
+}
+
+public class MailPreviewTests
+{
+    [Theory]
+    [InlineData("Hallo Anna [cid:c09a909-45kk] Anbei die Offerte<https://example.com/offerte> wie besprochen",
+                "Hallo Anna Anbei die Offerte wie besprochen")]
+    [InlineData("Siehe <b>hier</b>&nbsp;&amp; dort\r\n\r\nGruss", "Siehe hier & dort Gruss")]
+    [InlineData("[image: Logo] Newsletter <mailto:info@example.com>", "Newsletter")]
+    [InlineData("Mehr dazu unter<https://example.com/very/long/li", "Mehr dazu unter")]
+    [InlineData("3 < 5 und a<b", "3 < 5 und a<b")]
+    [InlineData(null, "")]
+    public void Technical_leftovers_are_removed(string? preview, string expected) =>
+        Assert.Equal(expected, Neruna.Core.Mail.MailPreview.Clean(preview));
 }

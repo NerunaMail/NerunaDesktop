@@ -184,6 +184,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         push.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId));
         push.NewMail += (_, e) => _ = Dispatcher.UIThread.InvokeAsync(() => NotifyAsync(e));
 
+        // During a full sync: folders and each finished folder appear at once, not only when everything is done.
+        mail.FoldersSynced += (_, _) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshAfterSyncAsync());
+        mail.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId));
+
         _timer = new DispatcherTimer { Interval = SyncInterval };
         _timer.Tick += async (_, _) => await SyncAsync();
     }
@@ -273,6 +277,21 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        await StartServicesAsync();
+    }
+
+    private bool _servicesStarted;
+
+    // Periodic sync, updates, push and reminders – at start, or after the first account was set up.
+    private async Task StartServicesAsync()
+    {
+        if (_servicesStarted)
+        {
+            await SyncAsync();
+            return;
+        }
+
+        _servicesStarted = true;
         _timer.Start();
         SettingsPage.Updates.Start();
         await SyncAsync();
@@ -498,8 +517,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             if (created)
             {
                 HasAccounts = true;
-                _timer.Start();
-                await SyncAsync();
+                await StartServicesAsync();
             }
         };
         Overlay = setup;

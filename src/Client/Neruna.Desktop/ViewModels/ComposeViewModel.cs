@@ -168,6 +168,9 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>Raised with true after sending, false when discarded.</summary>
     public event EventHandler<bool>? Closed;
 
+    /// <summary>Runs once the message is sent (a reply or forward marks its original).</summary>
+    public Func<Task>? AfterSent { get; set; }
+
     /// <summary>The user wants this draft in its own window (state is captured with <see cref="CaptureAsync"/>).</summary>
     public event EventHandler? PopOutRequested;
 
@@ -576,6 +579,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             var message = MessageComposer.Build(Sender, await SnapshotAsync(), []);
             await _secureMime.ProtectAsync(message, Sign, Encrypt);
             await _mail.SendAsync(_connection, message);
+            if (AfterSent is { } afterSent)
+            {
+                await afterSent();
+            }
+
             Finish();
             await RemoveSavedDraftAsync();
             Closed?.Invoke(this, true);

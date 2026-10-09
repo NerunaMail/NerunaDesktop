@@ -198,6 +198,9 @@ public sealed partial class MessageContent
         return new FlowedToText { DeleteSpace = deleteSpace }.Convert(text);
     }
 
+    private static bool IsValidAttributeName(string name) =>
+        name.Length > 0 && char.IsAsciiLetter(name[0]) && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or ':' or '.');
+
     private static string Sanitize(string html, bool allowRemote, HashSet<string> referencedIds, ref bool blocked)
     {
         var blockedLocal = false;
@@ -235,7 +238,9 @@ public sealed partial class MessageContent
                     var value = attribute.Value ?? string.Empty;
                     var attributeName = attribute.Name;
 
-                    if (attributeName.StartsWith("on", StringComparison.OrdinalIgnoreCase) || IsScriptUrl(value))
+                    // Broken HTML (style=font-family:'Segoe ui',sans-serif; without quotes) yields names like
+                    // "ui',sans-serif;" – they mean nothing and cannot be written; dropped instead of failing the message.
+                    if (!IsValidAttributeName(attributeName) || attributeName.StartsWith("on", StringComparison.OrdinalIgnoreCase) || IsScriptUrl(value))
                     {
                         continue;
                     }

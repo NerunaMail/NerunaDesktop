@@ -61,6 +61,14 @@ public class ImapIntegrationTests
 
         var after = Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
         Assert.True(after.Flags.HasFlag(MessageFlags.Seen));
+
+        // Answered (\Answered) and forwarded ($Forwarded) come back from the server with the next sync.
+        await controller.SetFlagsAsync(connection, inbox, [summary.RemoteId], MessageFlags.Answered | MessageFlags.Forwarded, add: true, ct);
+        await env.MailStore.UpdateFlagsAsync(inbox.ConnectionId, inbox.RemoteId, [summary.RemoteId], MessageFlags.Answered | MessageFlags.Forwarded, false, ct);
+        await controller.SyncAllAsync(ct);
+        var responded = Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+        Assert.True(responded.Flags.HasFlag(MessageFlags.Answered));
+        Assert.True(responded.Flags.HasFlag(MessageFlags.Forwarded));
     }
 
     [Fact]

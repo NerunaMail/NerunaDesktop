@@ -248,7 +248,9 @@ internal sealed partial class MailViewModel(
     private async Task RespondAsync(ComposeDraft draft, ComposeKind kind)
     {
         var message = SelectedMessage;
-        await StartComposeAsync(draft, kind, _opened?.Security.WasEncrypted == true);
+        var folder = message is null ? null : FolderOf(message);
+        await StartComposeAsync(draft, kind, _opened?.Security.WasEncrypted == true,
+            message is null || folder is null ? null : () => MarkRespondedAsync(message, folder, kind));
 
         // Replying or forwarding always means the message was read (except when the user wants to mark manually).
         if (message is { IsUnread: true } && await GetMarkAsReadModeAsync() != MarkAsReadMode.Never)
@@ -364,7 +366,29 @@ internal sealed partial class MailViewModel(
         }
     }
 
-    private async Task StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false)
+    // Sent: the original gets "beantwortet" or "weitergeleitet" – on the server, so other programs see it too.
+    private async Task MarkRespondedAsync(MessageItemViewModel message, MailFolderNode folder, ComposeKind kind)
+    {
+        var flag = kind == ComposeKind.Forward ? MessageFlags.Forwarded : MessageFlags.Answered;
+        try
+        {
+            await mail.SetFlagsAsync(folder.Account.Connection, folder.Folder, [message.Summary.RemoteId], flag, add: true);
+            if (flag == MessageFlags.Forwarded)
+            {
+                message.IsForwarded = true;
+            }
+            else
+            {
+                message.IsAnswered = true;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report("Markierung «" + (flag == MessageFlags.Forwarded ? "weitergeleitet" : "beantwortet") + "» konnte nicht gesetzt werden", ex);
+        }
+    }
+
+    private async Task StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false, Func<Task>? afterSent = null)
     {
         if (CurrentAccount is not { Account.EmailAddress: not null } account)
         {
@@ -376,6 +400,7 @@ internal sealed partial class MailViewModel(
         {
             var inWindow = await settings.GetBoolAsync(SettingKeys.ComposeInWindow);
             var compose = CreateCompose(account.Account, account.Connection, draft, kind, encrypt, inWindow);
+            compose.AfterSent = afterSent;
             await compose.InitializeAsync();
             await ShowComposeAsync(compose);
         }
@@ -414,6 +439,7 @@ internal sealed partial class MailViewModel(
             var dirty = compose.IsDirty;
             var (current, sign, encryptCurrent) = await compose.CaptureAsync();
             var window = CreateCompose(compose.Account, compose.Connection, current, compose.Kind, encryptCurrent, inWindow: true);
+            window.AfterSent = compose.AfterSent;
             if (dirty)
             {
                 window.MarkChanged();
@@ -513,6 +539,7 @@ internal sealed partial class MailViewModel(
         try
         {
             var compose = CreateCompose(account.Account, account.Connection, draft, kind, encrypt, inWindow: true);
+            compose.AfterSent = () => MarkRespondedAsync(message, folder, kind);
             await compose.InitializeAsync();
             await ShowComposeAsync(compose);
             if (message.IsUnread && CurrentFolder == folder && await GetMarkAsReadModeAsync() != MarkAsReadMode.Never)
@@ -1469,7 +1496,7 @@ internal sealed partial class MessageItemViewModel(MessageSummary summary, MailF
 
     public string Subject => string.IsNullOrWhiteSpace(Summary.Subject) ? "(kein Betreff)" : Summary.Subject;
 
-    public string Preview => Summary.Preview?.Trim() is { Length: > 0 } preview
+    public string Preview => MailPreview.Clean(Summary.Preview) is { Length: > 0 } preview
         ? preview
         : IsEncrypted ? "Verschlüsselte Nachricht – Inhalt wird beim Öffnen entschlüsselt" : string.Empty;
 
@@ -1486,6 +1513,14 @@ internal sealed partial class MessageItemViewModel(MessageSummary summary, MailF
 
     [ObservableProperty]
     public partial bool IsFlagged { get; set; } = summary.Flags.HasFlag(MessageFlags.Flagged);
+
+    /// <summary>Answered (IMAP \Answered) – also when answered with another mail program.</summary>
+    [ObservableProperty]
+    public partial bool IsAnswered { get; set; } = summary.Flags.HasFlag(MessageFlags.Answered);
+
+    /// <summary>Forwarded (IMAP keyword $Forwarded).</summary>
+    [ObservableProperty]
+    public partial bool IsForwarded { get; set; } = summary.Flags.HasFlag(MessageFlags.Forwarded);
 
     public bool Matches(string query) =>
         Subject.Contains(query, StringComparison.CurrentCultureIgnoreCase)
