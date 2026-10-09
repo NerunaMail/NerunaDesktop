@@ -45,7 +45,8 @@ public sealed class ImapMailProvider(
 
     public MailProviderCapabilities Capabilities =>
         MailProviderCapabilities.Send | MailProviderCapabilities.Flags | MailProviderCapabilities.Move |
-        MailProviderCapabilities.Delete | MailProviderCapabilities.ServerSearch | MailProviderCapabilities.Append | MailProviderCapabilities.Push;
+        MailProviderCapabilities.Delete | MailProviderCapabilities.ServerSearch | MailProviderCapabilities.Append | MailProviderCapabilities.Push |
+        MailProviderCapabilities.Subscriptions;
 
     public async Task TestConnectionAsync(CancellationToken cancellationToken = default)
     {
@@ -54,11 +55,18 @@ public sealed class ImapMailProvider(
         await smtp.DisconnectAsync(true, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<MailFolder>> GetFoldersAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MailFolder>> GetFoldersAsync(CancellationToken cancellationToken = default) =>
+        [.. (await GetSubscriptionsAsync(cancellationToken)).Where(s => s.Subscribed).Select(s => s.Folder)];
+
+    /// <summary>
+    /// All folders and whether they are subscribed. A server where nothing is subscribed (some never use it) counts as
+    /// "everything subscribed" – otherwise only the inbox would be left. Special folders are always shown.
+    /// </summary>
+    public async Task<IReadOnlyList<FolderSubscription>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)
     {
         var imap = await GetImapAsync(cancellationToken);
-        var result = new List<MailFolder> { ToMailFolder(imap.Inbox, FolderRole.Inbox) };
-
+        var all = new List<(IMailFolder Folder, FolderRole Role)> { (imap.Inbox, FolderRole.Inbox) };
+        var subscribed = new HashSet<string>(StringComparer.Ordinal);
         foreach (var ns in imap.PersonalNamespaces)
         {
             foreach (var folder in await imap.GetFoldersAsync(ns, StatusItems.None, false, cancellationToken))
@@ -68,11 +76,56 @@ public sealed class ImapMailProvider(
                     continue;
                 }
 
-                result.Add(ToMailFolder(folder, RoleOf(folder)));
+                all.Add((folder, RoleOf(folder)));
+            }
+
+            foreach (var folder in await imap.GetFoldersAsync(ns, StatusItems.None, true, cancellationToken))
+            {
+                subscribed.Add(folder.FullName);
             }
         }
 
-        return result;
+        var everything = subscribed.Count == 0;
+        return [.. all.Select(f =>
+        {
+            var required = f.Role is FolderRole.Inbox or FolderRole.Sent or FolderRole.Drafts or FolderRole.Trash;
+            return new FolderSubscription(ToMailFolder(f.Folder, f.Role), everything || required || subscribed.Contains(f.Folder.FullName), required);
+        })];
+    }
+
+    public async Task SetSubscriptionsAsync(IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remoteIds);
+        var imap = await GetImapAsync(cancellationToken);
+        var wanted = remoteIds.ToHashSet(StringComparer.Ordinal);
+        var subscribed = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var ns in imap.PersonalNamespaces)
+        {
+            foreach (var folder in await imap.GetFoldersAsync(ns, StatusItems.None, true, cancellationToken))
+            {
+                subscribed.Add(folder.FullName);
+            }
+        }
+
+        foreach (var subscription in await GetSubscriptionsAsync(cancellationToken))
+        {
+            var id = subscription.Folder.RemoteId;
+            var want = subscription.Required || wanted.Contains(id);
+            if (want == subscribed.Contains(id))
+            {
+                continue;
+            }
+
+            var folder = await imap.GetFolderAsync(id, cancellationToken);
+            if (want)
+            {
+                await folder.SubscribeAsync(cancellationToken);
+            }
+            else
+            {
+                await folder.UnsubscribeAsync(cancellationToken);
+            }
+        }
     }
 
     public async Task<FolderSyncResult> SyncFolderAsync(MailFolder folder, IReadOnlyCollection<string> knownRemoteIds, CancellationToken cancellationToken = default)

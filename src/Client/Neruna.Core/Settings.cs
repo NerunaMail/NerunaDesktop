@@ -66,6 +66,9 @@ public static class SettingKeys
     /// <summary>Folder tree nodes the user collapsed (JSON list of keys); everything else is expanded.</summary>
     public const string CollapsedFolders = "mail.collapsedFolders";
 
+    /// <summary>Folders in "Favoriten" at the top of the folder tree: JSON list of "connectionId|folderRemoteId".</summary>
+    public const string MailFavorites = "mail.favorites";
+
     /// <summary>New mail in the inbox right away (IMAP IDLE; servers without it are asked every 2 minutes). Default: on.</summary>
     public const string MailPush = "mail.push";
 

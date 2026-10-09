@@ -185,4 +185,58 @@ public class ImapIntegrationTests
         await controller.SyncAllAsync(ct);
         Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
     }
+
+    [Fact]
+    public async Task Only_subscribed_folders_are_shown_and_hidden_ones_leave_with_their_mail()
+    {
+        Assert.SkipWhen(Host is null, "NERUNA_TEST_IMAP_HOST not set");
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var credentials = env.Get<ICredentialStore>();
+        var registry = new ProviderRegistry([new ImapProviderFactory(credentials, NullLoggerFactory.Instance)], [], []);
+        var controller = new MailController(env.Accounts, env.MailStore, registry, NullLogger<MailController>.Instance);
+        var settings = new ImapSettings(Host!, 3143, SocketSecurity.None, Host!, 3025, SocketSecurity.None, "lea@example.com");
+        var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, ProviderIds.Imap, settings.ToDictionary());
+        await credentials.SetSecretAsync(connection.Id, "geheim", ct);
+        await env.Accounts.SaveAccountAsync(new Account(Guid.NewGuid(), "Lea", "lea@example.com", [connection]), ct);
+
+        // Two folders made by another program.
+        var suffix = Guid.NewGuid().ToString("N")[..6];
+        using (var imap = new MailKit.Net.Imap.ImapClient())
+        {
+            await imap.ConnectAsync(Host!, 3143, MailKit.Security.SecureSocketOptions.None, ct);
+            await imap.AuthenticateAsync("lea@example.com", "geheim", ct);
+            var root = imap.GetFolder(imap.PersonalNamespaces[0]);
+            // Subscribed, as other programs do when they create one (the server may already use subscriptions).
+            await (await root.CreateAsync("Kunden" + suffix, true, ct))!.SubscribeAsync(ct);
+            await (await root.CreateAsync("Alt" + suffix, true, ct))!.SubscribeAsync(ct);
+            await imap.DisconnectAsync(true, ct);
+        }
+
+        var all = await controller.GetSubscriptionsAsync(connection, ct);
+        var keep = all.Single(s => s.Folder.Name == "Kunden" + suffix).Folder.RemoteId;
+        var hide = all.Single(s => s.Folder.Name == "Alt" + suffix).Folder.RemoteId;
+        Assert.True(all.Single(s => s.Folder.Role == FolderRole.Inbox).Required);
+        await controller.SyncConnectionAsync(connection, ct);
+        Assert.Contains(await controller.GetFoldersAsync(connection.Id, ct), f => f.RemoteId == hide);
+
+        try
+        {
+            // Everything but "Alt…": it disappears here (with its cache) and is unsubscribed on the server.
+            await controller.SetSubscriptionsAsync(connection, [.. all.Select(s => s.Folder.RemoteId).Where(id => id != hide)], ct);
+            var shown = await controller.GetFoldersAsync(connection.Id, ct);
+            Assert.Contains(shown, f => f.RemoteId == keep);
+            Assert.Contains(shown, f => f.Role == FolderRole.Inbox);
+            Assert.DoesNotContain(shown, f => f.RemoteId == hide);
+            Assert.False((await controller.GetSubscriptionsAsync(connection, ct)).Single(s => s.Folder.RemoteId == hide).Subscribed);
+
+            // The inbox cannot be hidden.
+            await controller.SetSubscriptionsAsync(connection, [keep], ct);
+            Assert.Contains(await controller.GetFoldersAsync(connection.Id, ct), f => f.Role == FolderRole.Inbox);
+        }
+        finally
+        {
+            await controller.SetSubscriptionsAsync(connection, [.. (await controller.GetSubscriptionsAsync(connection, ct)).Select(s => s.Folder.RemoteId)], ct);
+        }
+    }
 }

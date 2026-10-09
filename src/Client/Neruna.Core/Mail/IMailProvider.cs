@@ -15,7 +15,14 @@ public enum MailProviderCapabilities
 
     /// <summary>Can store a complete message in a folder (IMAP APPEND) – needed to move mail between accounts.</summary>
     Append = 64,
+
+    /// <summary>Folders can be subscribed and unsubscribed (IMAP SUBSCRIBE); only subscribed ones are listed.</summary>
+    Subscriptions = 128,
 }
+
+/// <summary>A folder on the server and whether it shows up in Neruna (subscribed).</summary>
+/// <param name="Required">Inbox, sent, drafts, trash: always shown – Neruna needs them.</param>
+public sealed record FolderSubscription(MailFolder Folder, bool Subscribed, bool Required);
 
 /// <summary>
 /// A mail backend (IMAP/SMTP, later EWS, Graph, JMAP …) bound to one connection.
@@ -30,7 +37,18 @@ public interface IMailProvider : IAsyncDisposable
     /// <summary>Connects and authenticates; used to validate settings during account setup.</summary>
     Task TestConnectionAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>The folders to show: with <see cref="MailProviderCapabilities.Subscriptions"/> the subscribed ones.</summary>
     Task<IReadOnlyList<MailFolder>> GetFoldersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Every folder on the server with its subscription ("Ordner abonnieren").</summary>
+    /// <exception cref="NotSupportedException">The provider lacks <see cref="MailProviderCapabilities.Subscriptions"/>.</exception>
+    Task<IReadOnlyList<FolderSubscription>> GetSubscriptionsAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    /// <summary>Subscribes exactly <paramref name="remoteIds"/> (required folders stay subscribed).</summary>
+    /// <exception cref="NotSupportedException">The provider lacks <see cref="MailProviderCapabilities.Subscriptions"/>.</exception>
+    Task SetSubscriptionsAsync(IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
 
     /// <summary>
     /// Brings a folder up to date relative to <paramref name="folder"/>.<see cref="MailFolder.SyncState"/>.

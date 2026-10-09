@@ -65,6 +65,17 @@ internal sealed partial class MailViewModel(
 
     public ObservableCollection<MailAccountNode> Accounts { get; } = [];
 
+    /// <summary>What the folder tree shows: "Favoriten" (when there are some), then the accounts.</summary>
+    public ObservableCollection<object> TreeRoots { get; } = [];
+
+    public FavoritesNode Favorites { get; } = new();
+
+    /// <summary>Raised for "Ordner abonnieren …" on an account (the shell shows the dialog).</summary>
+    public event EventHandler<MailAccountNode>? FolderSubscriptionsRequested;
+
+    private List<string>? _favoriteKeys;
+    private bool _treeRootsFollow;
+
     /// <summary>Flat list of date-group headers and messages, rendered by one ListBox.</summary>
     public ObservableCollection<MessageListEntry> Entries { get; } = [];
 
@@ -162,8 +173,27 @@ internal sealed partial class MailViewModel(
         var selectedFolder = CurrentFolder?.Folder;
         var selectedMessage = SelectedMessage?.Summary.RemoteId;
 
+        if (!_treeRootsFollow)
+        {
+            // The tree's top level follows the accounts: moved in place, otherwise built again.
+            _treeRootsFollow = true;
+            Accounts.CollectionChanged += (_, e) =>
+            {
+                if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Move)
+                {
+                    var offset = TreeRoots.Count > 0 && TreeRoots[0] is FavoritesNode ? 1 : 0;
+                    TreeRoots.Move(e.OldStartingIndex + offset, e.NewStartingIndex + offset);
+                }
+                else
+                {
+                    RebuildTreeRoots();
+                }
+            };
+        }
+
         Accounts.Clear();
         _collapsed ??= await LoadCollapsedAsync();
+        _favoriteKeys ??= await LoadFavoritesAsync();
         foreach (var account in await accounts.GetAccountsAsync())
         {
             foreach (var connection in account.ConnectionsOf(ServiceKind.Mail))
@@ -181,6 +211,7 @@ internal sealed partial class MailViewModel(
         }
 
         OnPropertyChanged(nameof(HasMailAccounts));
+        RebuildFavorites();
         var allFolders = Accounts.SelectMany(a => a.AllFolders()).ToList();
         var folderToSelect = allFolders.FirstOrDefault(f => selectedFolder is not null && f.Folder.ConnectionId == selectedFolder.ConnectionId && f.Folder.RemoteId == selectedFolder.RemoteId)
                              ?? allFolders.FirstOrDefault(f => f.Folder.Role == FolderRole.Inbox);
@@ -202,6 +233,12 @@ internal sealed partial class MailViewModel(
 
     partial void OnSelectedTreeItemChanged(object? value)
     {
+        // A favourite opens its folder (the list and everything else work with the real folder).
+        if (value is FavoriteFolderNode favorite)
+        {
+            value = favorite.Target;
+        }
+
         if (value is MailFolderNode folder && folder != CurrentFolder)
         {
             var select = _revealMessage;
@@ -272,6 +309,118 @@ internal sealed partial class MailViewModel(
 
     [RelayCommand]
     private Task MoveAccountDownAsync(MailAccountNode node) => MoveAccountAsync(node, +1);
+
+    [RelayCommand]
+    private void SubscribeFolders(MailAccountNode node) => FolderSubscriptionsRequested?.Invoke(this, node);
+
+    [RelayCommand]
+    private async Task AddFavoriteAsync(MailFolderNode folder)
+    {
+        _favoriteKeys ??= await LoadFavoritesAsync();
+        if (!_favoriteKeys.Contains(folder.ExpansionKey))
+        {
+            _favoriteKeys.Add(folder.ExpansionKey);
+            await SaveFavoritesAsync();
+        }
+    }
+
+    /// <summary>From the folder itself or from its entry under "Favoriten".</summary>
+    [RelayCommand]
+    private async Task RemoveFavoriteAsync(object node)
+    {
+        var key = node switch
+        {
+            FavoriteFolderNode favorite => favorite.Target.ExpansionKey,
+            MailFolderNode folder => folder.ExpansionKey,
+            _ => null,
+        };
+        if (key is not null && _favoriteKeys?.Remove(key) == true)
+        {
+            await SaveFavoritesAsync();
+        }
+    }
+
+    [RelayCommand]
+    private Task MoveFavoriteUpAsync(FavoriteFolderNode node) => MoveFavoriteAsync(node, -1);
+
+    [RelayCommand]
+    private Task MoveFavoriteDownAsync(FavoriteFolderNode node) => MoveFavoriteAsync(node, +1);
+
+    private async Task MoveFavoriteAsync(FavoriteFolderNode node, int delta)
+    {
+        var index = _favoriteKeys?.IndexOf(node.Target.ExpansionKey) ?? -1;
+        if (index < 0 || index + delta < 0 || index + delta >= _favoriteKeys!.Count)
+        {
+            return;
+        }
+
+        (_favoriteKeys[index], _favoriteKeys[index + delta]) = (_favoriteKeys[index + delta], _favoriteKeys[index]);
+        await SaveFavoritesAsync();
+    }
+
+    private async Task SaveFavoritesAsync()
+    {
+        await settings.SetAsync(SettingKeys.MailFavorites, System.Text.Json.JsonSerializer.Serialize(_favoriteKeys));
+        RebuildFavorites();
+    }
+
+    private async Task<List<string>> LoadFavoritesAsync()
+    {
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<string>>(await settings.GetAsync(SettingKeys.MailFavorites) ?? "[]") ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+
+    // Favourites whose folder is gone (hidden, account removed) are skipped but kept: they come back with the folder.
+    private void RebuildFavorites()
+    {
+        var folders = Accounts.SelectMany(a => a.AllFolders()).ToDictionary(f => f.ExpansionKey, StringComparer.Ordinal);
+        foreach (var folder in folders.Values)
+        {
+            folder.IsFavorite = _favoriteKeys?.Contains(folder.ExpansionKey) == true;
+        }
+
+        Favorites.Items.Clear();
+        foreach (var key in _favoriteKeys ?? [])
+        {
+            if (folders.TryGetValue(key, out var folder))
+            {
+                Favorites.Items.Add(new FavoriteFolderNode(folder));
+            }
+        }
+
+        var shown = TreeRoots.Count > 0 && TreeRoots[0] is FavoritesNode;
+        if (Favorites.Items.Count > 0 && !shown)
+        {
+            TreeRoots.Insert(0, Favorites);
+        }
+        else if (Favorites.Items.Count == 0 && shown)
+        {
+            TreeRoots.RemoveAt(0);
+        }
+    }
+
+    private void RebuildTreeRoots()
+    {
+        var selected = SelectedTreeItem;
+        TreeRoots.Clear();
+        if (Favorites.Items.Count > 0)
+        {
+            TreeRoots.Add(Favorites);
+        }
+
+        foreach (var account in Accounts)
+        {
+            TreeRoots.Add(account);
+        }
+
+        SelectedTreeItem = selected;
+    }
 
     // Same order as in Einstellungen → Konten; the tree is rearranged in place (expanded folders stay open).
     private async Task MoveAccountAsync(MailAccountNode node, int delta)
@@ -1483,8 +1632,56 @@ internal sealed partial class MailAccountNode : ObservableObject
     public IEnumerable<MailFolderNode> AllFolders() => Folders.SelectMany(f => f.SelfAndDescendants());
 }
 
+/// <summary>"Favoriten" at the top of the folder tree: folders of any account the user picked (e.g. all inboxes).</summary>
+internal sealed partial class FavoritesNode : ObservableObject
+{
+    public string Title { get; } = "Favoriten";
+
+    public ObservableCollection<FavoriteFolderNode> Items { get; } = [];
+
+    [ObservableProperty]
+    public partial bool IsExpanded { get; set; } = true;
+}
+
+/// <summary>A folder shown under "Favoriten": name and unread count of the real folder, plus its account.</summary>
+internal sealed partial class FavoriteFolderNode : ObservableObject
+{
+    public FavoriteFolderNode(MailFolderNode target)
+    {
+        Target = target;
+        target.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MailFolderNode.UnreadCount))
+            {
+                OnPropertyChanged(nameof(UnreadText));
+                OnPropertyChanged(nameof(HasUnread));
+            }
+        };
+    }
+
+    public MailFolderNode Target { get; }
+
+    public MailFolder Folder => Target.Folder;
+
+    public string Name => Target.Name;
+
+    public string AccountTitle => Target.Account.Title;
+
+    public bool HasUnread => Target.HasUnread;
+
+    public string UnreadText => Target.UnreadText;
+
+    /// <summary>For the tree's expansion binding (a favourite has no children).</summary>
+    [ObservableProperty]
+    public partial bool IsExpanded { get; set; }
+}
+
 internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObject
 {
+    /// <summary>Also listed under "Favoriten" (the context menu offers adding or removing).</summary>
+    [ObservableProperty]
+    public partial bool IsFavorite { get; set; }
+
     /// <summary>Set by <see cref="MailAccountNode"/> when the tree is attached.</summary>
     public MailAccountNode Account { get; set; } = null!;
 
@@ -1496,7 +1693,9 @@ internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObje
     public string ExpansionKey => Folder.ConnectionId.ToString("N") + "|" + Folder.RemoteId;
 
     /// <summary>Special folders get familiar German names, whatever the server calls them (INBOX, Sent, Trash …).</summary>
-    public string Name => Folder.Role switch
+    public string Name => DisplayName(Folder);
+
+    public static string DisplayName(MailFolder folder) => folder.Role switch
     {
         FolderRole.Inbox => "Posteingang",
         FolderRole.Drafts => "Entwürfe",
@@ -1504,7 +1703,7 @@ internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObje
         FolderRole.Trash => "Gelöschte Elemente",
         FolderRole.Junk => "Junk-E-Mail",
         FolderRole.Archive => "Archiv",
-        _ => Folder.Name,
+        _ => folder.Name,
     };
 
     public ObservableCollection<MailFolderNode> Children { get; } = [];

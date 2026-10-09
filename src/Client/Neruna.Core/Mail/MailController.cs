@@ -43,6 +43,25 @@ public sealed class MailController(
         }
     }
 
+    /// <summary>"Ordner abonnieren": every folder of the connection's server and whether it is shown.</summary>
+    /// <exception cref="NotSupportedException">The provider has no subscriptions.</exception>
+    public async Task<IReadOnlyList<FolderSubscription>> GetSubscriptionsAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
+    {
+        await using var provider = providers.CreateMail(connection);
+        return await provider.GetSubscriptionsAsync(cancellationToken);
+    }
+
+    /// <summary>Shows exactly these folders (subscribed on the server); hidden ones leave this device with their mail.</summary>
+    public async Task SetSubscriptionsAsync(ServiceConnection connection, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)
+    {
+        await using (var provider = providers.CreateMail(connection))
+        {
+            await provider.SetSubscriptionsAsync(remoteIds, cancellationToken);
+        }
+
+        await SyncConnectionAsync(connection, cancellationToken);
+    }
+
     public Task<IReadOnlyList<MailFolder>> GetFoldersAsync(Guid connectionId, CancellationToken cancellationToken = default) =>
         store.GetFoldersAsync(connectionId, cancellationToken);
 

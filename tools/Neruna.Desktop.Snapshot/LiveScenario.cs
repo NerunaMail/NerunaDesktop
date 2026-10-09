@@ -283,6 +283,29 @@ internal static class LiveScenario
         vm.NavigateCommand.Execute(Section.Mail);
         await Task.Delay(300);
         await Snapshots.SaveAsync(window, output, "account-label-tree.png");
+
+        // Favoriten: the inbox and "Projekte" on top; right-click on the account → "Ordner abonnieren …".
+        var mailPage = vm.MailPage;
+        foreach (var folder in mailPage.Accounts[0].AllFolders().Where(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox || f.Name == "Projekte"))
+        {
+            await mailPage.AddFavoriteCommand.ExecuteAsync(folder);
+        }
+
+        await Task.Delay(300);
+        Console.WriteLine($"Favourites: {string.Join(", ", mailPage.Favorites.Items.Select(f => f.Name + "/" + f.AccountTitle))}, roots={mailPage.TreeRoots.Count}");
+        mailPage.SelectedTreeItem = mailPage.Favorites.Items[^1];
+        await Task.Delay(800);
+        Console.WriteLine($"Opened from favourites: {mailPage.CurrentFolder?.Name}");
+        await Snapshots.SaveAsync(window, output, "favorites.png");
+        mailPage.SubscribeFoldersCommand.Execute(mailPage.Accounts[0]);
+        for (var i = 0; i < 50 && (vm.Overlay as FolderSubscriptionsViewModel)?.IsBusy != false; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Console.WriteLine($"Subscriptions: {string.Join(", ", ((FolderSubscriptionsViewModel)vm.Overlay!).Folders.Select(f => f.Name + (f.IsSubscribed ? "+" : "-")))}");
+        await Snapshots.SaveAsync(window, output, "folder-subscriptions.png");
+        ((FolderSubscriptionsViewModel)vm.Overlay!).CancelCommand.Execute(null);
         window.Close();
     }
 

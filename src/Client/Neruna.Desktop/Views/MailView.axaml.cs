@@ -185,7 +185,7 @@ internal sealed partial class MailView : UserControl
     private static MailFolderNode? FolderAt(DragEventArgs e, out TreeViewItem? item)
     {
         item = (e.Source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
-        return item?.DataContext as MailFolderNode;
+        return item?.DataContext as MailFolderNode ?? (item?.DataContext as FavoriteFolderNode)?.Target;
     }
 
     private void Highlight(TreeViewItem? item)

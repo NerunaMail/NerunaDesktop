@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:app="using:Neruna.Desktop"
+             x:Class="Neruna.Desktop.Views.FolderSubscriptionsView"
+             x:DataType="vm:FolderSubscriptionsViewModel">
+
+  <StackPanel>
+    <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,10"
+               Text="Abonnierte Ordner erscheinen in der Ordnerliste. Die Auswahl wird auf dem Server gespeichert – andere Mailprogramme sehen dieselbe. Posteingang, Gesendete, Entwürfe und Papierkorb bleiben immer sichtbar." />
+
+    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,6" IsVisible="{Binding Folders.Count}">
+      <Button Classes="command" Content="Alle" Command="{Binding SelectAllCommand}" CommandParameter="{x:True}" Padding="0,2" />
+      <Button Classes="command" Content="Keine" Command="{Binding SelectAllCommand}" CommandParameter="{x:False}" Padding="0,2" />
+    </StackPanel>
+
+    <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="8" MaxHeight="420">
+      <Panel>
+        <ProgressBar IsIndeterminate="True" Width="120" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" HorizontalAlignment="Left" />
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding Folders}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FolderSubscriptionItem">
+                <CheckBox IsChecked="{Binding IsSubscribed}" IsEnabled="{Binding CanChange}" Margin="{Binding Indent}" MinHeight="28">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <PathIcon Data="{Binding Role, Converter={x:Static app:Converters.FolderIcon}}" Width="14" Height="14" Foreground="{DynamicResource SubtleTextBrush}" />
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </CheckBox>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Panel>
+    </Border>
+
+    <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0" TextWrapping="Wrap"
+               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,20,0,0">
+      <Button Content="Abbrechen" Command="{Binding CancelCommand}" />
+      <Button Classes="accent" Content="Speichern" Command="{Binding SaveCommand}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

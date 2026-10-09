@@ -182,6 +182,21 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             await SyncAsync();
         };
         settingsPage.Cloud.BackedUp += (_, _) => ShowBackupHint = false;
+        // Right-click on an account → "Ordner abonnieren …".
+        mailPage.FolderSubscriptionsRequested += async (_, node) =>
+        {
+            var dialog = new FolderSubscriptionsViewModel(_mail, node.Connection, node.Title);
+            dialog.Finished += async (_, saved) =>
+            {
+                Overlay = null;
+                if (saved)
+                {
+                    await MailPage.ReloadAsync();
+                }
+            };
+            Overlay = dialog;
+            await dialog.LoadAsync();
+        };
         accountsPage.AddAccountRequested += (_, _) => ShowAccountSetup();
         accountsPage.EditRequested += (_, account) => ShowAccountSetup(account);
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();

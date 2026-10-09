@@ -32,7 +32,7 @@
           </Button>
         <Panel>
           <TextBlock Classes="subtle" Text="Kein E-Mail-Konto" IsVisible="{Binding !HasMailAccounts}" Margin="12" />
-          <TreeView x:Name="FolderTree" ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedTreeItem}" DragDrop.AllowDrop="True">
+          <TreeView x:Name="FolderTree" ItemsSource="{Binding TreeRoots}" SelectedItem="{Binding SelectedTreeItem}" DragDrop.AllowDrop="True">
             <TreeView.Styles>
               <!-- Drag & drop: the folder under the pointer is highlighted -->
               <Style Selector="TreeViewItem.drop-target /template/ Border#PART_LayoutRoot">
@@ -52,13 +52,47 @@
                     <ContextMenu>
                       <MenuItem Header="Konto nach oben" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MoveAccountUpCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="Konto nach unten" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MoveAccountDownCommand}" CommandParameter="{Binding}" />
+                      <Separator />
+                      <MenuItem Header="Ordner abonnieren …" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).SubscribeFoldersCommand}" CommandParameter="{Binding}" />
                     </ContextMenu>
                   </TextBlock.ContextMenu>
                 </TextBlock>
               </TreeDataTemplate>
+              <!-- Favoriten: folders of any account the user picked -->
+              <TreeDataTemplate DataType="vm:FavoritesNode" ItemsSource="{Binding Items}">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+              </TreeDataTemplate>
+              <TreeDataTemplate DataType="vm:FavoriteFolderNode">
+                <Grid ColumnDefinitions="Auto,*" Background="Transparent" ToolTip.Tip="{Binding AccountTitle}">
+                  <Grid.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Aus Favoriten entfernen" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).RemoveFavoriteCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="Nach oben" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MoveFavoriteUpCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="Nach unten" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MoveFavoriteDownCommand}" CommandParameter="{Binding}" />
+                    </ContextMenu>
+                  </Grid.ContextMenu>
+                  <PathIcon Data="{Binding Folder.Role, Converter={x:Static app:Converters.FolderIcon}}" Width="14" Height="14" Margin="0,0,8,0"
+                            Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock TextTrimming="CharacterEllipsis" FontWeight="{Binding HasUnread, Converter={x:Static app:Converters.BoldIf}}">
+                      <Run Text="{Binding Name, Mode=OneWay}" />
+                      <Run Text="{Binding UnreadText, Mode=OneWay}" Foreground="{DynamicResource AccentTextBrush}" />
+                    </TextBlock>
+                    <TextBlock Text="{Binding AccountTitle}" Classes="subtle" FontSize="11" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </Grid>
+              </TreeDataTemplate>
               <TreeDataTemplate DataType="vm:MailFolderNode" ItemsSource="{Binding Children}">
                 <!-- Icon + "Posteingang (3)": system folders have their own icon, name bold while there is unread mail -->
-                <Grid ColumnDefinitions="Auto,*">
+                <Grid ColumnDefinitions="Auto,*" Background="Transparent">
+                  <Grid.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Zu Favoriten hinzufügen" IsVisible="{Binding !IsFavorite}"
+                                Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).AddFavoriteCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="Aus Favoriten entfernen" IsVisible="{Binding IsFavorite}"
+                                Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).RemoveFavoriteCommand}" CommandParameter="{Binding}" />
+                    </ContextMenu>
+                  </Grid.ContextMenu>
                   <PathIcon Data="{Binding Folder.Role, Converter={x:Static app:Converters.FolderIcon}}" Width="14" Height="14" Margin="0,0,8,0"
                             Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" />
                   <TextBlock Grid.Column="1" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontWeight="{Binding HasUnread, Converter={x:Static app:Converters.BoldIf}}">
