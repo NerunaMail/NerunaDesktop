@@ -110,6 +110,9 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>The address books, for completing An/Cc and the contact picker (none in tests).</summary>
     public RecipientDirectory? Recipients { get; init; }
 
+    /// <summary>Toolbar with or without text below the icons (Einstellungen → Design), as in the reading pane.</summary>
+    public Neruna.Desktop.Infrastructure.UiPreferences? Preferences { get; init; }
+
     /// <summary>Adds chosen contacts/groups to An or Cc; addresses already in the field are not added twice.</summary>
     public void AddRecipients(bool cc, IEnumerable<RecipientEntry> entries)
     {
@@ -160,7 +163,10 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     /// <summary>"Verwerfen" asks once ("Wirklich verwerfen?") when something would be lost.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DiscardLabel))]
     public partial bool ConfirmDiscard { get; set; }
+
+    public string DiscardLabel => ConfirmDiscard ? "Wirklich?" : "Verwerfen";
 
     /// <summary>Carries unsaved edits over when the draft moves to its own window.</summary>
     public void MarkChanged() => _changes++;

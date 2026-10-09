@@ -129,10 +129,16 @@ internal static class Snapshots
 
         // The editor shows a formatted preview here (no WebView headless): toolbar, text and signature as on Windows.
         await vm.MailPage.NewMailCommand.ExecuteAsync(null);
+        await Task.Delay(300);
+        var focused = window.FocusManager?.GetFocusedElement() as Control;
+        Console.WriteLine($"New mail focus: {focused?.GetType().Name} in {focused?.FindAncestorOfType<Neruna.Desktop.Controls.RecipientBox>()?.Name ?? "-"}");
         vm.MailPage.Compose!.To = "Marco Bernasconi <marco@bernasconi.example>";
         vm.MailPage.Compose.Subject = "Offerte Netzwerk-Erneuerung Q4";
         await Task.Delay(300);
         await SaveAsync(window, output, "compose.png");
+        vm.MailPage.Preferences.ToolbarLabels = false;
+        await SaveAsync(window, output, "compose-icons-only.png");
+        vm.MailPage.Preferences.ToolbarLabels = true;
 
         // An: typing suggests contacts and groups; the "An …" button opens the picker (several at once).
         var toBox = window.GetVisualDescendants().OfType<Neruna.Desktop.Controls.RecipientBox>().First();

@@ -9,42 +9,46 @@
              x:DataType="vm:ComposeViewModel">
 
 
+  <UserControl.Styles>
+    <!-- "Wirklich?" after the first click on Verwerfen -->
+    <!-- Signieren / Verschlüsseln: like the other buttons; switched on with the accent tint -->
+    <Style Selector="ToggleButton.tool">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="6,4" />
+    </Style>
+    <Style Selector="ToggleButton.tool:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Button.tool.confirm">
+      <Setter Property="Foreground" Value="#C42B1C" />
+    </Style>
+  </UserControl.Styles>
+
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
 
     <!-- Actions -->
     <Grid Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-      <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6">
-        <Button Classes="accent" Command="{Binding SendCommand}" Padding="14,6" HotKey="Ctrl+Enter" ToolTip.Tip="Senden (Ctrl+Enter)">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconSend}" Width="14" Height="14" />
-            <TextBlock Text="Senden" />
+      <WrapPanel Orientation="Horizontal" ItemSpacing="4" LineSpacing="6">
+        <!-- Icons with the text below, as in the reading pane (or icons only: Einstellungen → Design) -->
+        <Button Classes="accent" Command="{Binding SendCommand}" HotKey="Ctrl+Enter" ToolTip.Tip="Senden (Ctrl+Enter)" VerticalAlignment="Stretch"
+                Padding="{Binding Preferences.ToolbarLabels, FallbackValue=True, Converter={x:Static views:ComposeView.SendPadding}}" MinWidth="64">
+          <StackPanel>
+            <PathIcon Data="{StaticResource IconSend}" Width="18" Height="18" HorizontalAlignment="Center" />
+            <TextBlock Text="Senden" FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,0" IsVisible="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
           </StackPanel>
         </Button>
-        <Button Classes="command" Command="{Binding AddAttachmentCommand}">
-          <StackPanel Orientation="Horizontal">
-            <PathIcon Data="{StaticResource IconAttach}" />
-            <TextBlock Text="Datei anhängen" />
-          </StackPanel>
-        </Button>
-        <ToggleButton IsChecked="{Binding Sign}" IsEnabled="{Binding CanSign}" ToolTip.Tip="{Binding SignHint}" ToolTip.ShowOnDisabled="True" Padding="10,6">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconCertificate}" Width="14" Height="14" />
-            <TextBlock Text="Signieren" />
-          </StackPanel>
-        </ToggleButton>
-        <ToggleButton IsChecked="{Binding Encrypt}" ToolTip.Tip="{Binding EncryptHint}" Padding="10,6">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconLock}" Width="14" Height="14" />
-            <TextBlock Text="Verschlüsseln" />
-          </StackPanel>
-        </ToggleButton>
+        <ctl:ToolButton Icon="{StaticResource IconAttach}" Label="Anhängen" Hint="Datei anhängen" Command="{Binding AddAttachmentCommand}"
+                        ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+        <ctl:ToolToggleButton Icon="{StaticResource IconCertificate}" Label="Signieren" Hint="{Binding SignHint}" IsChecked="{Binding Sign}" IsEnabled="{Binding CanSign}"
+                              ToolTip.ShowOnDisabled="True" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+        <ctl:ToolToggleButton Icon="{StaticResource IconLock}" Label="Verschlüsseln" Hint="{Binding EncryptHint}" IsChecked="{Binding Encrypt}"
+                              ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
-        <Button Classes="command" ToolTip.Tip="Textvorlage an der Cursorposition einfügen – oder «kürzel::» tippen" IsEnabled="{Binding HasTemplates}">
-          <StackPanel Orientation="Horizontal">
-            <PathIcon Data="{StaticResource IconTextTemplate}" />
-            <TextBlock Text="Textvorlage" />
-          </StackPanel>
-          <Button.Flyout>
+        <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="Textvorlage" Hint="Textvorlage an der Cursorposition einfügen – oder «kürzel::» tippen"
+                        IsEnabled="{Binding HasTemplates}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
+          <ctl:ToolButton.Flyout>
             <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding TemplateMenu}">
               <MenuFlyout.ItemContainerTheme>
                 <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:TextTemplateMenuItem">
@@ -54,15 +58,12 @@
                 </ControlTheme>
               </MenuFlyout.ItemContainerTheme>
             </MenuFlyout>
-          </Button.Flyout>
-        </Button>
+          </ctl:ToolButton.Flyout>
+        </ctl:ToolButton>
         <!-- Signatur: swap or remove the signature in the text -->
-        <Button Classes="command" IsVisible="{Binding Formatting.IsRichText}" ToolTip.Tip="Signatur einfügen oder wechseln">
-          <StackPanel Orientation="Horizontal">
-            <PathIcon Data="{StaticResource IconSignature}" />
-            <TextBlock Text="Signatur" />
-          </StackPanel>
-          <Button.Flyout>
+        <ctl:ToolButton Icon="{StaticResource IconSignature}" Label="Signatur" Hint="Signatur einfügen oder wechseln" IsVisible="{Binding Formatting.IsRichText}"
+                        ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
+          <ctl:ToolButton.Flyout>
             <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding SignatureMenu}">
               <MenuFlyout.ItemContainerTheme>
                 <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SignatureMenuItem">
@@ -72,28 +73,20 @@
                 </ControlTheme>
               </MenuFlyout.ItemContainerTheme>
             </MenuFlyout>
-          </Button.Flyout>
-        </Button>
-        <Button Classes="command" Command="{Binding SaveDraftCommand}" HotKey="Ctrl+S" ToolTip.Tip="Als Entwurf speichern (Ctrl+S) – geschieht auch automatisch">
-          <StackPanel Orientation="Horizontal">
-            <PathIcon Data="{StaticResource IconEdit}" />
-            <TextBlock Text="Speichern" />
-          </StackPanel>
-        </Button>
-        <Button Classes="command" Command="{Binding DiscardCommand}" ToolTip.Tip="Nachricht verwerfen (auch den gespeicherten Entwurf)">
-          <Panel>
-            <TextBlock Text="Verwerfen" IsVisible="{Binding !ConfirmDiscard}" />
-            <TextBlock Text="Wirklich verwerfen?" IsVisible="{Binding ConfirmDiscard}" Foreground="#C42B1C" />
-          </Panel>
-        </Button>
+          </ctl:ToolButton.Flyout>
+        </ctl:ToolButton>
+        <ctl:ToolButton Icon="{StaticResource IconEdit}" Label="Speichern" Hint="Als Entwurf speichern (Ctrl+S) – geschieht auch automatisch"
+                        Command="{Binding SaveDraftCommand}" HotKey="Ctrl+S" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+        <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{Binding DiscardLabel}" Hint="Nachricht verwerfen (auch den gespeicherten Entwurf)"
+                        Command="{Binding DiscardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}"
+                        Classes.confirm="{Binding ConfirmDiscard}" />
         <ProgressBar IsIndeterminate="True" Width="60" MinWidth="0" Height="4" IsVisible="{Binding IsSending}" VerticalAlignment="Center" />
         <TextBlock Text="{Binding DraftStatus}" Classes="subtle" FontSize="12" VerticalAlignment="Center"
                    IsVisible="{Binding DraftStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </WrapPanel>
       <!-- Pop-out, icon-only ("In neuem Fenster öffnen") -->
-      <Button Grid.Column="1" Classes="command" Command="{Binding PopOutCommand}" IsVisible="{Binding CanPopOut}" ToolTip.Tip="Loslösen – in eigenem Fenster weiterschreiben" Margin="8,0,0,0" VerticalAlignment="Top">
-        <PathIcon Data="{StaticResource IconPopOut}" Margin="0" />
-      </Button>
+      <ctl:ToolButton Grid.Column="1" Icon="{StaticResource IconPopOut}" Label="Loslösen" Hint="Loslösen – in eigenem Fenster weiterschreiben"
+                      Command="{Binding PopOutCommand}" IsVisible="{Binding CanPopOut}" Margin="8,0,0,0" VerticalAlignment="Top" ShowLabel="False" />
     </Grid>
 
     <TextBlock Grid.Row="1" Classes="subtle" Text="Von" VerticalAlignment="Center" />
@@ -102,7 +95,7 @@
     <!-- An / Cc: the button opens the contact picker; typing suggests contacts and groups from the address books -->
     <Button x:Name="ToButton" Grid.Row="2" Content="An …" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3"
             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="Kontakte auswählen" />
-    <ctl:RecipientBox Grid.Row="2" Grid.Column="1" Text="{Binding To}" Directory="{Binding Recipients}" Margin="0,3" PlaceholderText="Name oder Adresse eingeben, mehrere mit Komma trennen" />
+    <ctl:RecipientBox x:Name="ToBox" Grid.Row="2" Grid.Column="1" Text="{Binding To}" Directory="{Binding Recipients}" Margin="0,3" PlaceholderText="Name oder Adresse eingeben, mehrere mit Komma trennen" />
 
     <Button x:Name="CcButton" Grid.Row="3" Content="Cc …" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3"
             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="Kontakte auswählen" />

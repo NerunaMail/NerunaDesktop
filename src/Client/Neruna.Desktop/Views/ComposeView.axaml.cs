@@ -9,6 +9,10 @@ internal sealed partial class ComposeView : UserControl
 {
     private ComposeViewModel? _attached;
 
+    // "Senden" keeps its accent look; it follows the other buttons with or without text.
+    public static readonly Avalonia.Data.Converters.IValueConverter SendPadding =
+        new Avalonia.Data.Converters.FuncValueConverter<bool, Avalonia.Thickness>(labels => labels ? new Avalonia.Thickness(10, 4) : new Avalonia.Thickness(12, 6));
+
     public ComposeView()
     {
         InitializeComponent();
@@ -20,6 +24,13 @@ internal sealed partial class ComposeView : UserControl
             {
                 _attached = vm;
                 await vm.AttachEditorAsync(this.FindControl<HtmlEditor>("Editor")!);
+
+                // New mail or forward (no recipient yet): start in "An"; replies already have one.
+                if (string.IsNullOrWhiteSpace(vm.To))
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<Neruna.Desktop.Controls.RecipientBox>("ToBox")?.FocusText(),
+                        Avalonia.Threading.DispatcherPriority.Loaded);
+                }
             }
         };
     }

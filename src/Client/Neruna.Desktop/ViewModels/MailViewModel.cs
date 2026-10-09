@@ -415,6 +415,7 @@ internal sealed partial class MailViewModel(
         var compose = new ComposeViewModel(mail, account, connection, draft, files, secureMime, settings, signatures, kind, encrypt, inWindow)
         {
             Recipients = recipients,
+            Preferences = preferences,
             TextTemplates = textTemplates,
         };
         compose.Closed += async (_, sent) =>

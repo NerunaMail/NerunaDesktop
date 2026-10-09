@@ -33,6 +33,13 @@ internal sealed class RecipientBox : UserControl
     private readonly ListBox _list;
     private readonly Popup _popup;
     private bool _syncing;
+
+    /// <summary>Puts the caret into the field (at the end of what is there).</summary>
+    public void FocusText()
+    {
+        _box.Focus();
+        _box.CaretIndex = _box.Text?.Length ?? 0;
+    }
     private int _queryVersion;
 
     public RecipientBox()
