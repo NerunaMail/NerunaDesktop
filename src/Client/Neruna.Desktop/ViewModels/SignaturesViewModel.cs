@@ -25,11 +25,16 @@ internal sealed partial class SignaturesViewModel(SignatureService signatures, I
     public ObservableCollection<AccountSignatureRow> Accounts { get; } = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(PreviewHtml))]
+    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(PreviewHtml), nameof(IsCloudSelected))]
     [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(DeleteCommand))]
     public partial Signature? Selected { get; set; }
 
     public bool HasSelection => Selected is not null;
+
+    /// <summary>A signature of the organisation (Neruna Cloud): shown and usable, but kept in the portal.</summary>
+    public bool IsCloudSelected => Selected?.IsFromCloud == true;
+
+    private bool CanModify() => Selected is { IsFromCloud: false };
 
     public bool HasSignatures => Signatures.Count > 0;
 
@@ -91,10 +96,10 @@ internal sealed partial class SignaturesViewModel(SignatureService signatures, I
         }
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelection))]
+    [RelayCommand(CanExecute = nameof(CanModify))]
     private async Task EditAsync() => await OpenEditorAsync(Selected!, isNew: false);
 
-    [RelayCommand(CanExecute = nameof(HasSelection))]
+    [RelayCommand(CanExecute = nameof(CanModify))]
     private async Task DeleteAsync()
     {
         var signature = Selected!;

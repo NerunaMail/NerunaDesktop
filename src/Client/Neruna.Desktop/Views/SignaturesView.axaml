@@ -11,6 +11,8 @@
     <Grid Grid.Row="1" ColumnDefinitions="260,16,*" MinHeight="260">
       <!-- List -->
       <DockPanel>
+        <TextBlock DockPanel.Dock="Bottom" Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0" IsVisible="{Binding IsCloudSelected}"
+                   Text="Diese Signatur pflegt Ihre Organisation im Neruna-Portal. Sie wird hier automatisch aktuell gehalten und kann wie jede andere Signatur gewählt werden." />
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
           <Button Classes="accent" Content="Neu" Command="{Binding NewCommand}" />
           <Button Content="Bearbeiten" Command="{Binding EditCommand}" />
@@ -22,7 +24,13 @@
             <ListBox ItemsSource="{Binding Signatures}" SelectedItem="{Binding Selected}" Background="Transparent" DoubleTapped="OnDoubleTapped">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="core:Signature">
-                  <TextBlock Text="{Binding Name}" Margin="0,2" />
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <Border Grid.Column="1" IsVisible="{Binding IsFromCloud}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="3"
+                            Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center" ToolTip.Tip="Von Ihrer Organisation in der Neruna Cloud">
+                      <TextBlock Text="Cloud" FontSize="11" Foreground="{DynamicResource AccentTextBrush}" />
+                    </Border>
+                  </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>

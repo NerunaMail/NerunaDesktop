@@ -36,4 +36,17 @@ public class CloudContractTests
 
         Assert.Equal(["code", "pin", "publicKey", "deviceName", "appVersion", "osName", "osVersion", "osUser"], names);
     }
+
+    [Fact]
+    public void Client_reads_the_signatures()
+    {
+        var response = JsonSerializer.Deserialize<SignaturesResponse>(ContractFixtures.Read("signatures-example.json"), NerunaJson.Options)!;
+
+        Assert.True(response.Available);
+        var signature = Assert.Single(response.Signatures);
+        Assert.Equal("Example AG", signature.Name);
+        Assert.Contains("<strong>Anna Muster</strong>", signature.Html, StringComparison.Ordinal);
+        Assert.StartsWith("Freundliche Grüsse", signature.Text, StringComparison.Ordinal);
+        Assert.Equal(2026, signature.UpdatedAt.Year);
+    }
 }

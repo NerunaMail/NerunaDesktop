@@ -9,6 +9,11 @@ namespace Neruna.Core.Mail;
 public sealed record Signature(Guid Id, string Name, string Html, DateTimeOffset UpdatedAt, string Source = Signature.LocalSource)
 {
     public const string LocalSource = "local";
+
+    /// <summary>Kept by the organisation in Neruna Cloud: read-only here, replaced on every refresh.</summary>
+    public const string CloudSource = "cloud";
+
+    public bool IsFromCloud => Source == CloudSource;
 }
 
 public interface ISignatureStore

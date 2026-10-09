@@ -375,6 +375,13 @@ internal static class Snapshots
             await vm.SettingsPage.Cloud.ConnectCommand.ExecuteAsync(null);
             Console.WriteLine($"Cloud: {vm.SettingsPage.Cloud.ConnectedText ?? vm.SettingsPage.Cloud.Error}");
             await SaveAsync(window, output, "settings-cloud-connected.png");
+
+            // The organisation's signatures arrived with the connection.
+            vm.SettingsPage.SelectedTab = 3;
+            await vm.SettingsPage.Signatures.ReloadAsync();
+            vm.SettingsPage.Signatures.Selected = vm.SettingsPage.Signatures.Signatures.FirstOrDefault(s => s.IsFromCloud);
+            Console.WriteLine($"Cloud signatures: {string.Join(", ", vm.SettingsPage.Signatures.Signatures.Where(s => s.IsFromCloud).Select(s => s.Name))}");
+            await SaveAsync(window, output, "settings-signatures-cloud.png");
         }
 
         vm.SettingsPage.SelectedTab = 7;

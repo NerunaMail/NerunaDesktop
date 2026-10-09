@@ -90,6 +90,10 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task<MeResponse> GetProfileAsync(CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<MeResponse>("api/v1/me", cancellationToken);
 
+    /// <summary>The organisation's central signatures, filled in for this person.</summary>
+    public async Task<SignaturesResponse> GetSignaturesAsync(CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<SignaturesResponse>("api/v1/signatures", cancellationToken);
+
     /// <summary>The person's photo from the portal, if there is one.</summary>
     public async Task<byte[]?> GetPhotoAsync(CancellationToken cancellationToken = default)
     {

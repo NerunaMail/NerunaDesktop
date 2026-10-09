@@ -89,6 +89,7 @@ internal static class AppServices
         services.AddSingleton<AccountSetupService>();
         services.AddSingleton<AccountDiscovery>();
         services.AddSingleton<Neruna.Core.Cloud.CloudController>();
+        services.AddSingleton<Neruna.Core.Cloud.CloudSignatureSync>();
         services.AddSingleton<IFileService, FileService>();
         services.AddSingleton<IWindowService, WindowService>();
         services.AddSingleton<UiLayout>();

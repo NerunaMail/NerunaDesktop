@@ -60,8 +60,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         NotificationService notifications,
         ReminderScheduler reminders,
         ISettingsStore settings,
+        Neruna.Core.Cloud.CloudSignatureSync cloudSignatures,
         ILogger<MainWindowViewModel> logger)
     {
+        _cloudSignatures = cloudSignatures;
+        settingsPage.Attach(cloudSignatures);
         Layout = layout;
         _push = push;
         _notifications = notifications;
@@ -320,6 +323,28 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _ => MailPage,
     };
 
+    private readonly Neruna.Core.Cloud.CloudSignatureSync _cloudSignatures;
+    private DateTime _cloudSyncedAt;
+
+    // The organisation's central signatures: with the sync, at most every 10 minutes; offline or unreachable is no error.
+    private async Task SyncCloudAsync()
+    {
+        if (DateTime.UtcNow - _cloudSyncedAt < TimeSpan.FromMinutes(10))
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() => _cloudSignatures.SyncAsync());
+            _cloudSyncedAt = DateTime.UtcNow;
+        }
+        catch (Exception ex) when (ex is Neruna.Core.Cloud.CloudException or HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Cloud signatures not refreshed");
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanSync))]
     private async Task SyncAsync()
     {
@@ -333,6 +358,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             await RefreshPagesAsync();
             await MailPage.Agenda.ReloadAsync();
             await _reminders.CheckAsync();
+            await SyncCloudAsync();
 
             var failures = reports.SelectMany(r => r.Failures).ToList();
             StatusText = failures.Count == 0

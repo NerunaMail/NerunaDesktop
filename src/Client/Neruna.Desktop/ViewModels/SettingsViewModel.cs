@@ -29,6 +29,13 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     [ObservableProperty]
     public partial int SelectedTab { get; set; }
 
+    /// <summary>Central signatures arrived or went: the list here follows.</summary>
+    public void Attach(Neruna.Core.Cloud.CloudSignatureSync cloudSignatures)
+    {
+        ArgumentNullException.ThrowIfNull(cloudSignatures);
+        cloudSignatures.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(async () => await Signatures.ReloadAsync());
+    }
+
     public async Task ReloadAsync()
     {
         await Accounts.ReloadAsync();

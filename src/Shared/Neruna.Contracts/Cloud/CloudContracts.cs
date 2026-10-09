@@ -51,3 +51,11 @@ public sealed record CloudOrganization(
     string? Website);
 
 public sealed record CloudDevice(string Id, string Name);
+
+/// <summary>Response of <c>GET /api/v1/signatures</c>: the organisation's signatures, filled in for this person.</summary>
+/// <param name="Available">The licence includes central signatures.</param>
+public sealed record SignaturesResponse(bool Available, IReadOnlyList<CloudSignature> Signatures);
+
+/// <param name="Html">Mail-safe HTML (inline styles, images as data: URIs).</param>
+/// <param name="UpdatedAt">Also moves when the person's or the organisation's details change.</param>
+public sealed record CloudSignature(string Id, string Name, string Html, string Text, DateTimeOffset UpdatedAt);
