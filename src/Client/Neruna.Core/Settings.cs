@@ -21,6 +21,9 @@ public static class SettingKeys
     /// <summary>"true": new mails, replies and forwards open in their own window instead of the reading pane.</summary>
     public const string ComposeInWindow = "compose.openInWindow";
 
+    /// <summary>Messages whose pictures the user loaded once (JSON list of Message-IDs, newest last, limited).</summary>
+    public const string RemoteContentAllowed = "mail.remoteContentAllowed";
+
     /// <summary>Connection to a Neruna Cloud/Control server (JSON of CloudConnection; the device key is in the keychain).</summary>
     public const string CloudConnection = "cloud.connection";
 

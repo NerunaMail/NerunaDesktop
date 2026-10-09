@@ -519,8 +519,12 @@ internal sealed partial class MailViewModel(
                 _ => RespondAsync(MessageComposer.Forward(opened.Readable), ComposeKind.Forward),
                 _ => DeleteFromWindowAsync(message, folder));
             void Show(bool allowRemoteContent) =>
-                window.Pane = ReadingPaneViewModel.ForMessage(message.Summary, opened, allowRemoteContent, files, _imageClient, () => Show(allowRemoteContent: true));
-            Show(allowRemoteContent: false);
+                window.Pane = ReadingPaneViewModel.ForMessage(message.Summary, opened, allowRemoteContent, files, _imageClient, () =>
+                {
+                    _ = RememberRemoteContentAsync(message.Summary);
+                    Show(allowRemoteContent: true);
+                });
+            Show(await IsRemoteContentAllowedAsync(message.Summary));
             windows.ShowMessage(window);
 
             if (message.IsUnread && await GetMarkAsReadModeAsync() != MarkAsReadMode.Never)
@@ -1183,7 +1187,7 @@ internal sealed partial class MailViewModel(
             }
 
             _opened = await secureMime.OpenAsync(mime, token);
-            ShowOpened(message.Summary, allowRemoteContent: false);
+            ShowOpened(message.Summary, allowRemoteContent: await IsRemoteContentAllowedAsync(message.Summary));
 
             if (message.IsUnread)
             {
@@ -1214,6 +1218,50 @@ internal sealed partial class MailViewModel(
         }
     }
 
+    // "Bilder laden" is remembered per message (by its Message-ID): opened again, the pictures come at once.
+    private const int RememberedRemoteContentLimit = 2000;
+    private List<string>? _remoteContentAllowed;
+
+    private static string RemoteContentKey(MessageSummary summary) => summary.MessageId ?? summary.Subject + "|" + summary.Date.ToUnixTimeSeconds();
+
+    private async Task<List<string>> RemoteContentAllowedAsync()
+    {
+        if (_remoteContentAllowed is null)
+        {
+            try
+            {
+                _remoteContentAllowed = System.Text.Json.JsonSerializer.Deserialize<List<string>>(await settings.GetAsync(SettingKeys.RemoteContentAllowed) ?? "[]") ?? [];
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                _remoteContentAllowed = [];
+            }
+        }
+
+        return _remoteContentAllowed;
+    }
+
+    private async Task<bool> IsRemoteContentAllowedAsync(MessageSummary summary) =>
+        (await RemoteContentAllowedAsync()).Contains(RemoteContentKey(summary));
+
+    private async Task RememberRemoteContentAsync(MessageSummary summary)
+    {
+        var allowed = await RemoteContentAllowedAsync();
+        var key = RemoteContentKey(summary);
+        if (allowed.Contains(key))
+        {
+            return;
+        }
+
+        allowed.Add(key);
+        if (allowed.Count > RememberedRemoteContentLimit)
+        {
+            allowed.RemoveRange(0, allowed.Count - RememberedRemoteContentLimit);
+        }
+
+        await settings.SetAsync(SettingKeys.RemoteContentAllowed, System.Text.Json.JsonSerializer.Serialize(allowed));
+    }
+
     private void ShowOpened(MessageSummary summary, bool allowRemoteContent)
     {
         if (_opened is not { } opened)
@@ -1221,7 +1269,11 @@ internal sealed partial class MailViewModel(
             return;
         }
 
-        ReadingPane = ReadingPaneViewModel.ForMessage(summary, opened, allowRemoteContent, files, _imageClient, () => ShowOpened(summary, allowRemoteContent: true));
+        ReadingPane = ReadingPaneViewModel.ForMessage(summary, opened, allowRemoteContent, files, _imageClient, () =>
+        {
+            _ = RememberRemoteContentAsync(summary);
+            ShowOpened(summary, allowRemoteContent: true);
+        });
         if (_invitation is { } shown && shown.RemoteId == summary.RemoteId)
         {
             ReadingPane.Invitation = shown.Banner;

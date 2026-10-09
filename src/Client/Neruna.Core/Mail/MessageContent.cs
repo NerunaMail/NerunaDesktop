@@ -22,6 +22,11 @@ public sealed partial class MessageContent
         "script", "iframe", "frame", "frameset", "object", "embed", "applet", "noscript", "audio", "video", "canvas", "svg", "math", "template",
     };
 
+    private static readonly HashSet<string> TableTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "colgroup", "col",
+    };
+
     private static readonly HashSet<string> RemovedTagOnly = new(StringComparer.OrdinalIgnoreCase)
     {
         "form", "input", "button", "select", "option", "textarea", "meta", "link", "base", "source", "track", "param",
@@ -266,6 +271,13 @@ public sealed partial class MessageContent
                     if (attributeName.Equals("style", StringComparison.OrdinalIgnoreCase))
                     {
                         value = SanitizeCss(value, allowRemote, referencedIds, ref blockedLocal);
+
+                        // Newsletter builders lay out <div>s as table and cells (display: table / table-cell); the
+                        // renderer then shows nothing at all. As blocks the content is there (columns one below the other).
+                        if (!TableTags.Contains(name))
+                        {
+                            value = DisplayTable().Replace(value, "display: block");
+                        }
                     }
 
                     writer.WriteAttribute(attributeName, value);
@@ -382,6 +394,9 @@ public sealed partial class MessageContent
     // RFC 3676 4.3: the signature separator "-- " is never a soft line break.
     [GeneratedRegex(@"^-- $", RegexOptions.Multiline)]
     private static partial Regex SignatureSeparator();
+
+    [GeneratedRegex(@"display\s*:\s*(?:inline-)?table(?:-[a-z-]+)?", RegexOptions.IgnoreCase)]
+    private static partial Regex DisplayTable();
 
     [GeneratedRegex(@"(?<![\w.#-])(\d*\.?\d+)(in|cm|mm|pc)\b", RegexOptions.IgnoreCase)]
     private static partial Regex AbsoluteLength();

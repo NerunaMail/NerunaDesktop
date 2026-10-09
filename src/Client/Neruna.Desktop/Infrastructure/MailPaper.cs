@@ -11,15 +11,16 @@ namespace Neruna.Desktop.Infrastructure;
 /// </summary>
 internal static partial class MailPaper
 {
-    // Lines a little apart; a hard Enter (paragraph, line of a text mail) half a line more than a line that merely wraps.
+    // A hard Enter (paragraph, line of a text mail) a little more apart than a line that merely wraps or a soft break;
+    // the line height itself stays the renderer's (on Windows, more made soft breaks look like hard ones).
     private const string Common =
         " pre, code { font-family: Consolas, 'Cascadia Mono', monospace; }" +
-        " body { line-height: 1.35; } p { margin-top: 0; margin-bottom: 0.6em; } .neruna-text > div { margin-bottom: 0.6em; }";
+        " p { margin-top: 0; margin-bottom: 0.3em; } .neruna-text > div { margin-bottom: 0.3em; }";
 
     // Outlook writes every line as its own paragraph with margin 0 (p.MsoNormal in the mail's own <style>), so a
     // hard Enter looked like a wrapped line; this comes after the mail's styles and wins.
     private const string ParagraphSpacing =
-        "<style>p.MsoNormal, li.MsoNormal, div.MsoNormal, p.MsoPlainText { margin-bottom: 0.6em; }</style>";
+        "<style>p.MsoNormal, li.MsoNormal, div.MsoNormal, p.MsoPlainText { margin-bottom: 0.3em; }</style>";
 
     public const string LightStylesheet =
         "body { font-family: 'Segoe UI', Inter, Arial, sans-serif; font-size: 10.5pt; color: #1b1b1b; margin: 0; }" +

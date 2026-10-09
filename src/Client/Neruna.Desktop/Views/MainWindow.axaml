@@ -35,8 +35,8 @@
                 <ItemsControl ItemsSource="{x:Static vm:ChatViewModel.PresenceChoices}" Width="200">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PresenceChoice">
+                      <!-- Click only (no Command binding): the list closes on the click, a bound command would be gone by then -->
                       <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Background="Transparent" Padding="8,6"
-                              Command="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).ChatPage.SetPresenceCommand}" CommandParameter="{Binding Key}"
                               Click="OnPresencePicked">
                         <StackPanel Orientation="Horizontal" Spacing="10">
                           <Ellipse Width="10" Height="10" Fill="{Binding Brush}" VerticalAlignment="Center" />

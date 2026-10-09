@@ -59,6 +59,24 @@ public class MessageContentTests
     }
 
     [Fact]
+    public void Divs_laid_out_as_tables_become_blocks_real_tables_stay()
+    {
+        // Newsletter builder layout: with these the reading pane showed nothing at all.
+        var message = Message(new TextPart("html")
+        {
+            Text = "<div style=\"display: table;width: 100%\"><div style=\"min-width: 600px;display: table-cell;vertical-align: top;\">Dear Sir</div></div>"
+                   + "<table style=\"display: table\"><tr><td style=\"display:table-cell\">Zelle</td></tr></table>",
+        });
+
+        var html = MessageContent.From(message).Html;
+
+        Assert.Contains("<div style=\"display: block;width: 100%\">", html, StringComparison.Ordinal);
+        Assert.Contains("min-width: 600px;display: block;vertical-align: top;", html, StringComparison.Ordinal);
+        Assert.Contains("<table style=\"display: table\">", html, StringComparison.Ordinal);
+        Assert.Contains("<td style=\"display:table-cell\">", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Attributes_of_broken_html_do_not_stop_the_message()
     {
         // Unquoted style with a space: the tokenizer sees an attribute named "ui',sans-serif;".

@@ -119,7 +119,22 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     public bool IsSecurityBad => SecurityLevel == SecurityLevel.Bad;
 
-    public string Initials => From.Length == 0 ? "?" : string.Concat(From.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+    // From the name only ("Green <servicedesk@green.ch>" → "G", not "G<"); without a name from the address.
+    public string Initials
+    {
+        get
+        {
+            var name = From.Split('<')[0].Trim();
+            if (name.Length == 0)
+            {
+                name = From.Trim('<', '>', ' ');
+            }
+
+            var initials = string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => p.FirstOrDefault(char.IsLetterOrDigit)).Where(c => c != default).Take(2).Select(char.ToUpperInvariant));
+            return initials.Length == 0 ? "?" : initials;
+        }
+    }
 
     public static ReadingPaneViewModel Info(string text) =>
         new(string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, text, null, null, [], (SecurityLevel.None, string.Empty, null), null, null, false, isInfo: true);

@@ -456,9 +456,15 @@ internal static class Snapshots
             var popupButtons = (presenceButton.Flyout as Flyout)?.Content is Control flyoutContent
                 ? flyoutContent.GetVisualDescendants().OfType<Button>().ToList()
                 : [];
-            Console.WriteLine($"Presence choices: {popupButtons.Count}, with command: {popupButtons.Count(b => b.Command is not null)}");
-            var dnd = popupButtons.FirstOrDefault(b => Equals(b.CommandParameter, Neruna.Core.Chat.Presence.DoNotDisturb));
-            dnd?.Command?.Execute(dnd.CommandParameter);
+            Console.WriteLine($"Presence choices: {popupButtons.Count}");
+            // A real click (pointer down/up) on "Nicht stören", as a user does.
+            var dnd = popupButtons.FirstOrDefault(b => b.DataContext is PresenceChoice { Key: Neruna.Core.Chat.Presence.DoNotDisturb });
+            if (dnd?.TranslatePoint(new Point(dnd.Bounds.Width / 2, dnd.Bounds.Height / 2), window) is { } at)
+            {
+                window.MouseDown(at, Avalonia.Input.MouseButton.Left);
+                window.MouseUp(at, Avalonia.Input.MouseButton.Left);
+            }
+
             await Task.Delay(300);
             Console.WriteLine($"Presence after choosing: {vm.ChatPage.Presence}");
             presenceButton.Flyout.Hide();
@@ -533,7 +539,7 @@ internal static class Snapshots
                 e.Event.Callback(new Avalonia.Media.Imaging.Bitmap(stream));
             };
             view.Text = Neruna.Desktop.Infrastructure.MailPaper.Prepare(content.Html, darkTheme: false).Html;
-            var window = new Window { Width = 720, Height = 520, Content = view, Background = Brushes.White };
+            var window = new Window { Width = 720, Height = 1000, Content = view, Background = Brushes.White };
             window.Show();
             await Task.Delay(300);
             Dispatcher.UIThread.RunJobs();

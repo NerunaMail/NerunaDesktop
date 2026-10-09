@@ -42,8 +42,16 @@ internal sealed partial class MainWindow : Window
         };
     }
 
-    // A status picked in the header: close the list.
-    private void OnPresencePicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => PresenceButton.Flyout?.Hide();
+    // A status picked in the header: set it, then close the list.
+    private void OnPresencePicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: PresenceChoice choice } && DataContext is MainWindowViewModel vm)
+        {
+            vm.ChatPage.SetPresenceCommand.Execute(choice.Key);
+        }
+
+        PresenceButton.Flyout?.Hide();
+    }
 
     // Open drafts with unsaved changes: ask first (Speichern / Nicht speichern / Abbrechen).
     protected override async void OnClosing(WindowClosingEventArgs e)
