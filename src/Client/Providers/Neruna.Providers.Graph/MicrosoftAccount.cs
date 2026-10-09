@@ -10,7 +10,7 @@ namespace Neruna.Providers.Graph;
 public static class MicrosoftAccount
 {
     /// <summary>Application (client) ID from portal.azure.com → Microsoft Entra ID → App registrations.</summary>
-    public const string ClientId = "";
+    public const string ClientId = "d365c924-b087-40b6-88a7-823a382785fc";
 
     public static bool IsConfigured => !string.IsNullOrWhiteSpace(ClientId);
 
