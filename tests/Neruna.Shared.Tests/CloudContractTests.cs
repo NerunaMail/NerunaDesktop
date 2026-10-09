@@ -24,7 +24,7 @@ public class CloudContractTests
         Assert.Equal(("Anna", "Muster", "Projektleiterin", "+41 79 123 45 67"), (me.Member.FirstName, me.Member.LastName, me.Member.Position, me.Member.PhoneMobile));
         Assert.False(me.Member.HasPhoto);
         Assert.Equal(("Example AG", "Zürich", "https://example.com"), (me.Organization.Name, me.Organization.City, me.Organization.Website));
-        Assert.Equal(["signatures"], me.Addons);
+        Assert.Equal(["signatures", "chat"], me.Addons);
         Assert.Equal("Anna – Notebook", me.Device.Name);
     }
 
@@ -58,5 +58,30 @@ public class CloudContractTests
         var template = Assert.Single(response.Templates);
         Assert.Equal(("Anrufnotiz", "tel"), (template.Name, template.Shortcut));
         Assert.Contains("<table", template.Html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Client_reads_the_chat()
+    {
+        var chat = JsonSerializer.Deserialize<ChatResponse>(ContractFixtures.Read("chat-example.json"), NerunaJson.Options)!;
+
+        Assert.True(chat.Available);
+        Assert.Equal(14, chat.RetentionDays);
+        var room = Assert.Single(chat.Rooms);
+        Assert.Equal(2, room.MemberIds.Count);
+        Assert.Equal(["available", "offline"], chat.People.Select(p => p.Presence));
+        Assert.Equal((room.Id, (string?)null), (chat.Messages[0].RoomId, chat.Messages[0].RecipientId));
+        Assert.Equal(chat.Me, chat.Messages[1].RecipientId);
+        Assert.Equal(41, chat.Reads["room:" + room.Id]);
+    }
+
+    [Fact]
+    public void Chat_requests_use_the_server_field_names()
+    {
+        var json = JsonSerializer.Serialize(new ChatSendRequest(null, "01B", "Hallo"), NerunaJson.Options);
+        // Empty fields are left out (the server reads a missing roomId as none).
+        Assert.Equal("""{"recipientId":"01B","text":"Hallo"}""", json);
+        Assert.Equal("""{"conversation":"pm:01B","lastId":7}""", JsonSerializer.Serialize(new ChatReadRequest("pm:01B", 7), NerunaJson.Options));
+        Assert.Equal("""{"presence":"dnd"}""", JsonSerializer.Serialize(new PresenceRequest("dnd"), NerunaJson.Options));
     }
 }

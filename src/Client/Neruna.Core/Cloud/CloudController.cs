@@ -98,6 +98,29 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task<TextTemplatesResponse> GetTextTemplatesAsync(CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<TextTemplatesResponse>("api/v1/text-templates", cancellationToken);
 
+    /// <summary>Chat: everything newer than message <paramref name="after"/>; also keeps this person online.</summary>
+    public async Task<ChatResponse> GetChatAsync(long after, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<ChatResponse>($"api/v1/chat?after={after}", cancellationToken);
+
+    /// <summary>Sends a chat message to a room or one person; returns it as stored (with its id).</summary>
+    public async Task<CloudChatMessage> SendChatMessageAsync(ChatSendRequest request, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<CloudChatMessage>(HttpMethod.Post, "api/v1/chat/messages", request, cancellationToken);
+
+    /// <summary>Marks a chat conversation read up to a message.</summary>
+    public async Task MarkChatReadAsync(ChatReadRequest request, CancellationToken cancellationToken = default)
+    {
+        var connection = await RequireConnectionAsync(cancellationToken);
+        using var response = await SendAuthorizedAsync(connection, HttpMethod.Post, "api/v1/chat/read", cancellationToken, request);
+        if (!response.IsSuccessStatusCode)
+        {
+            await ReadAsync<CloudError>(response, cancellationToken);
+        }
+    }
+
+    /// <summary>Sets the online status others see in the chat.</summary>
+    public async Task SetPresenceAsync(string presence, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PresenceRequest>(HttpMethod.Put, "api/v1/presence", new PresenceRequest(presence), cancellationToken);
+
     /// <summary>The person's photo from the portal, if there is one.</summary>
     public async Task<byte[]?> GetPhotoAsync(CancellationToken cancellationToken = default)
     {
@@ -134,13 +157,25 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         return await ReadAsync<T>(response, cancellationToken);
     }
 
+    private async Task<T> AuthorizedAsync<T>(HttpMethod method, string path, object body, CancellationToken cancellationToken)
+    {
+        var connection = await RequireConnectionAsync(cancellationToken);
+        using var response = await SendAuthorizedAsync(connection, method, path, cancellationToken, body);
+        return await ReadAsync<T>(response, cancellationToken);
+    }
+
     // Bearer token from a signed assertion; renewed shortly before it expires, and once more if the server refuses it.
-    private async Task<HttpResponseMessage> SendAuthorizedAsync(CloudConnection connection, HttpMethod method, string path, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendAuthorizedAsync(CloudConnection connection, HttpMethod method, string path, CancellationToken cancellationToken, object? body = null)
     {
         for (var attempt = 0; ; attempt++)
         {
             var token = await TokenAsync(connection, cancellationToken);
             var request = new HttpRequestMessage(method, new Uri(connection.Server, path));
+            if (body is not null)
+            {
+                request.Content = JsonContent.Create(body, body.GetType(), options: NerunaJson.Options);
+            }
+
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             var response = await SendRawAsync(request, cancellationToken);
             if (response.StatusCode != HttpStatusCode.Unauthorized || attempt > 0)

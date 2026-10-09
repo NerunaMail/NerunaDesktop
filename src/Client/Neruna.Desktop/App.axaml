@@ -57,6 +57,8 @@
       <StreamGeometry x:Key="IconCalendar">M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V2zM5 9v10h14V9H5zm2 2h2v2H7v-2zm4 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-8 4h2v2H7v-2zm4 0h2v2h-2v-2z</StreamGeometry>
       <StreamGeometry x:Key="IconGroup">M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm7.5 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM9 13c-3.9 0-7 1.9-7 4.3V19h14v-1.7C16 14.9 12.9 13 9 13zm7.5 0c-.6 0-1.2.1-1.8.2 1.4.9 2.3 2.2 2.3 3.6V19h5v-1.5c0-2.5-2.5-4.5-5.5-4.5z</StreamGeometry>
       <StreamGeometry x:Key="IconPeople">M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z</StreamGeometry>
+      <StreamGeometry x:Key="IconChat">M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9.4L5 21.5V18H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm0 2v11h3v1.6L9 16h11V5H4zm3 3h10v2H7V8zm0 4h7v2H7v-2z</StreamGeometry>
+      <StreamGeometry x:Key="IconClock">M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm-1 3h2v4.6l3.2 3.2-1.4 1.4L11 12.4V7z</StreamGeometry>
       <StreamGeometry x:Key="IconSync">M12 4a8 8 0 0 1 7.4 5H17v2h6V5h-2v2.5A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8zm8 8a8 8 0 0 1-15.4 3H7v-2H1v6h2v-2.5A10 10 0 0 0 22 12h-2z</StreamGeometry>
       <StreamGeometry x:Key="IconSidebar">M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v12h10V6H4zm12 0v12h4V6h-4zm1 2h2v1.5h-2V8zm0 3h2v1.5h-2V11z</StreamGeometry>
       <StreamGeometry x:Key="IconAccountAdd">M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-4.4 0-8 2.2-8 5v1h11.3a6 6 0 0 1-.3-1.8c0-1.5.5-2.9 1.4-4A13 13 0 0 0 10 14zm8 0v3h-3v2h3v3h2v-3h3v-2h-3v-3h-2z</StreamGeometry>
@@ -130,6 +132,12 @@
 
     <!-- Command bar buttons -->
     <!-- Toggle in the coloured header bar (Tagesansicht): transparent, a light veil while switched on -->
+    <Style Selector="Button.header">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.header:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#26FFFFFF" />
+    </Style>
     <Style Selector="ToggleButton.header">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="8,6" />

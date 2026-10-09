@@ -100,11 +100,19 @@ internal sealed class StubHttpHandler : HttpMessageHandler
 
     public List<string> Requested { get; } = [];
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    /// <summary>Method, address and body of requests that had one (POST, PUT).</summary>
+    public List<(string Method, string Url, string Body)> Sent { get; } = [];
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var url = request.RequestUri!.AbsoluteUri;
         Requested.Add(url);
+        if (request.Content is not null)
+        {
+            Sent.Add((request.Method.Method, url, await request.Content.ReadAsStringAsync(cancellationToken)));
+        }
+
         var (status, body) = Responses.TryGetValue(url, out var r) ? r : (HttpStatusCode.NotFound, string.Empty);
-        return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body) });
+        return new HttpResponseMessage(status) { Content = new StringContent(body) };
     }
 }

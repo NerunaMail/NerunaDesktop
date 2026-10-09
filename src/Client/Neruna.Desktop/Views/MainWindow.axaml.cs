@@ -17,6 +17,15 @@ internal sealed partial class MainWindow : Window
             if (DataContext is MainWindowViewModel vm)
             {
                 // "Jetzt neu starten": close as usual (drafts are asked about), then install and start again.
+                Activated += (_, _) => vm.UpdateChatActive();
+                Deactivated += (_, _) => vm.UpdateChatActive();
+                PropertyChanged += (_, e) =>
+                {
+                    if (e.Property == WindowStateProperty)
+                    {
+                        vm.UpdateChatActive();
+                    }
+                };
                 vm.SettingsPage.Updates.RestartRequested += (_, _) =>
                 {
                     _restartForUpdate = true;
@@ -32,6 +41,9 @@ internal sealed partial class MainWindow : Window
             }
         };
     }
+
+    // A status picked in the header: close the list.
+    private void OnPresencePicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => PresenceButton.Flyout?.Hide();
 
     // Open drafts with unsaved changes: ask first (Speichern / Nicht speichern / Abbrechen).
     protected override async void OnClosing(WindowClosingEventArgs e)

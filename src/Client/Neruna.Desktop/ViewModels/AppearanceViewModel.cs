@@ -31,6 +31,15 @@ internal sealed partial class AppearanceViewModel(ISettingsStore settings, Nerun
         }
     }
 
+    /// <summary>E-Mail, Kalender, Kontakte, Chat in the rail: shown or not, in this order.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<NavigationItem> NavigationItems => preferences.NavigationItems;
+
+    [RelayCommand]
+    private void MoveUp(NavigationItem item) => preferences.MoveNavigationItem(item, -1);
+
+    [RelayCommand]
+    private void MoveDown(NavigationItem item) => preferences.MoveNavigationItem(item, 1);
+
     public bool ToolbarIconsOnly
     {
         get => !ToolbarWithText;

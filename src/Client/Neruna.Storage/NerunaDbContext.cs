@@ -41,6 +41,8 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
 
     internal DbSet<ReminderStateEntity> ReminderStates => Set<ReminderStateEntity>();
 
+    internal DbSet<ChatMessageEntity> ChatMessages => Set<ChatMessageEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AccountEntity>(e =>
@@ -82,6 +84,12 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
         modelBuilder.Entity<CertificateEntity>(e => e.HasKey(c => c.Thumbprint));
         modelBuilder.Entity<SettingEntity>(e => e.HasKey(s => s.Key));
         modelBuilder.Entity<ReminderStateEntity>(e => e.HasKey(r => r.Key));
+
+        modelBuilder.Entity<ChatMessageEntity>(e =>
+        {
+            e.Property(m => m.Id).ValueGeneratedNever();
+            e.HasIndex(m => m.SentUnixMs);
+        });
 
         modelBuilder.Entity<ContactEntity>(e =>
         {
@@ -264,6 +272,22 @@ internal sealed class ReminderStateEntity
     public bool Dismissed { get; set; }
 
     public long ExpiresUnixMs { get; set; }
+}
+
+/// <summary>A chat message from Neruna Cloud/Control (id from the server; deleted after the organisation's retention).</summary>
+internal sealed class ChatMessageEntity
+{
+    public long Id { get; set; }
+
+    public string? RoomId { get; set; }
+
+    public required string SenderId { get; set; }
+
+    public string? RecipientId { get; set; }
+
+    public required string Text { get; set; }
+
+    public long SentUnixMs { get; set; }
 }
 
 internal sealed class TextTemplateEntity

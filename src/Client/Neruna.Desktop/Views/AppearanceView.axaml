@@ -20,6 +20,29 @@
     <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="Bei «Nur Symbol» erscheint der Text, wenn die Maus auf der Schaltfläche ruht." />
 
     <TextBlock Text="Navigationsleiste" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+               Text="Welche Bereiche links erscheinen und in welcher Reihenfolge. Neruna startet mit dem obersten sichtbaren Bereich; mindestens einer bleibt sichtbar." />
+    <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Width="360" HorizontalAlignment="Left" Padding="4" Margin="0,2,0,6">
+      <ItemsControl ItemsSource="{Binding NavigationItems}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:NavigationItem">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="4,2">
+              <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,8,0" ToolTip.Tip="Anzeigen" />
+              <PathIcon Grid.Column="1" Data="{Binding IconKey, Converter={x:Static app:Converters.Icon}}" Width="16" Height="16" Margin="0,0,10,0" />
+              <TextBlock Grid.Column="2" Text="{Binding Label}" VerticalAlignment="Center" />
+              <Button Grid.Column="3" Classes="command" Padding="6,4" ToolTip.Tip="Nach oben"
+                      Command="{Binding $parent[UserControl].((vm:AppearanceViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
+                <PathIcon Data="{StaticResource IconChevronUp}" Width="12" Height="12" />
+              </Button>
+              <Button Grid.Column="4" Classes="command" Padding="6,4" ToolTip.Tip="Nach unten"
+                      Command="{Binding $parent[UserControl].((vm:AppearanceViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
+                <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" />
+              </Button>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
     <CheckBox Content="Schaltfläche «Konto hinzufügen» anzeigen" IsChecked="{Binding ShowAddAccountButton}" />
     <TextBlock Classes="subtle" FontSize="12" Margin="0,0,0,14" Text="Ausgeblendet lassen sich Konten weiterhin unter Einstellungen → Konten hinzufügen." />
 

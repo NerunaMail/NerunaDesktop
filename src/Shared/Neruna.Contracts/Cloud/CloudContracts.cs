@@ -65,3 +65,40 @@ public sealed record TextTemplatesResponse(bool Available, IReadOnlyList<CloudTe
 
 /// <param name="Shortcut">Typed with "::" while writing (may be null).</param>
 public sealed record CloudTextTemplate(string Id, string Name, string? Shortcut, string Html, string Text, DateTimeOffset UpdatedAt);
+
+/// <summary>
+/// Response of <c>GET /api/v1/chat?after=…</c>: rooms the person sees, everyone of the organisation with their online
+/// status, the messages newer than <c>after</c> (at most 500; <see cref="More"/> → ask again) and the read markers.
+/// </summary>
+/// <param name="Available">The licence includes the chat (otherwise everything is empty).</param>
+/// <param name="RetentionDays">Messages older than this are deleted on the server; the app deletes them too.</param>
+/// <param name="Me">The connected person's id.</param>
+/// <param name="Reads">Conversation ("room:&lt;id&gt;", "pm:&lt;person id&gt;") → id of the last message read.</param>
+public sealed record ChatResponse(
+    bool Available,
+    int RetentionDays,
+    string Me,
+    IReadOnlyList<CloudChatRoom> Rooms,
+    IReadOnlyList<CloudChatPerson> People,
+    IReadOnlyList<CloudChatMessage> Messages,
+    IReadOnlyDictionary<string, long> Reads,
+    bool More);
+
+/// <param name="MemberIds">The people who see the room.</param>
+public sealed record CloudChatRoom(string Id, string Name, string? Description, IReadOnlyList<string> MemberIds);
+
+/// <param name="Presence">available, away, brb, dnd or offline (also when the app has not called in for 5 minutes).</param>
+public sealed record CloudChatPerson(string Id, string Name, string? Position, string Presence);
+
+/// <summary>A chat message in a room (<see cref="RoomId"/>) or private (<see cref="RecipientId"/>).</summary>
+/// <param name="Text">Plain text with **bold** and __underlined__; emoji as Unicode.</param>
+public sealed record CloudChatMessage(long Id, string? RoomId, string SenderId, string? RecipientId, string Text, DateTimeOffset SentAt);
+
+/// <summary>Body of <c>POST /api/v1/chat/messages</c>: either a room or a recipient.</summary>
+public sealed record ChatSendRequest(string? RoomId, string? RecipientId, string Text);
+
+/// <summary>Body of <c>POST /api/v1/chat/read</c>.</summary>
+public sealed record ChatReadRequest(string Conversation, long LastId);
+
+/// <summary>Body of <c>PUT /api/v1/presence</c>.</summary>
+public sealed record PresenceRequest(string Presence);

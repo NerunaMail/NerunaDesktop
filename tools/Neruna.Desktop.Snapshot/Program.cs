@@ -372,11 +372,37 @@ internal static class Snapshots
         Console.WriteLine($"'Konto hinzufügen' hidden: {!addAccount.IsVisible}, remembered: {await services.GetRequiredService<Neruna.Core.ISettingsStore>().GetAsync(Neruna.Core.SettingKeys.ShowAddAccountButton)}");
         await SaveAsync(window, output, "settings-design-no-add-account.png");
         preferences.ShowAddAccountButton = true;
+        // Navigation rail: Chat moved up to second place, Kontakte hidden – the rail follows at once, the choice is kept.
+        var chatItem = preferences.NavigationItems.First(n => n.Section == Section.Chat);
+        preferences.MoveNavigationItem(chatItem, -2);
+        preferences.NavigationItems.First(n => n.Section == Section.Contacts).IsVisible = false;
+        await SaveAsync(window, output, "settings-design-navigation.png");
+        Console.WriteLine($"Navigation saved: {await services.GetRequiredService<Neruna.Core.ISettingsStore>().GetAsync(Neruna.Core.SettingKeys.NavigationItems)}");
+        foreach (var item in preferences.NavigationItems)
+        {
+            item.IsVisible = false; // the last one stays visible
+        }
+
+        Console.WriteLine($"Visible after hiding all: {string.Join(", ", preferences.NavigationItems.Where(n => n.IsVisible).Select(n => n.Label))}");
+        await preferences.LoadAsync();
+        Console.WriteLine($"Reloaded: {string.Join(", ", preferences.NavigationItems.Select(n => n.Label + (n.IsVisible ? string.Empty : " (aus)")))}");
+        foreach (var item in preferences.NavigationItems)
+        {
+            item.IsVisible = true;
+        }
+
+        preferences.MoveNavigationItem(preferences.NavigationItems.First(n => n.Section == Section.Chat), 2);
         // Einstellungen → Cloud: not connected; connected when a code for a running server is given
         // (NERUNA_SNAPSHOT_CLOUD=<url> NERUNA_SNAPSHOT_CLOUD_CODE=… NERUNA_SNAPSHOT_CLOUD_PIN=…).
         vm.SettingsPage.SelectedTab = 7;
         vm.SettingsPage.Cloud.DeviceName = "Anna – Notebook";
         await SaveAsync(window, output, "settings-cloud.png");
+
+        // Chat without a cloud connection: the note that it needs Neruna Cloud/Control.
+        vm.NavigateCommand.Execute(Section.Chat);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "chat-not-connected.png");
+        vm.NavigateCommand.Execute(Section.Settings);
         if (Environment.GetEnvironmentVariable("NERUNA_SNAPSHOT_CLOUD") is { Length: > 0 } cloudUrl)
         {
             vm.SettingsPage.Cloud.Server = cloudUrl;
@@ -392,6 +418,32 @@ internal static class Snapshots
             vm.SettingsPage.Signatures.Selected = vm.SettingsPage.Signatures.Signatures.FirstOrDefault(s => s.IsFromCloud);
             Console.WriteLine($"Cloud signatures: {string.Join(", ", vm.SettingsPage.Signatures.Signatures.Where(s => s.IsFromCloud).Select(s => s.Name))}");
             await SaveAsync(window, output, "settings-signatures-cloud.png");
+
+            // Chat: rooms, people with their status, messages with formatting; the badge counts what is unread.
+            await vm.ChatPage.RefreshNowAsync();
+            await Task.Delay(300);
+            Console.WriteLine($"Chat: {vm.ChatPage.Rooms.Count} room(s), {vm.ChatPage.Directs.Count} private, {vm.ChatPage.TotalUnread} unread");
+            vm.NavigateCommand.Execute(Section.Mail);
+            await SaveAsync(window, output, "chat-badge.png");
+            vm.NavigateCommand.Execute(Section.Chat);
+            await vm.ChatPage.RefreshNowAsync();
+            await Task.Delay(400);
+            await SaveAsync(window, output, "chat.png");
+            await vm.ChatPage.SetPresenceCommand.ExecuteAsync(Neruna.Core.Chat.Presence.DoNotDisturb);
+            vm.ChatPage.SelectCommand.Execute(vm.ChatPage.Directs.FirstOrDefault());
+            vm.ChatPage.Draft = "Ja, gerne **gleich** ☕";
+            await Task.Delay(300);
+            await SaveAsync(window, output, "chat-private.png");
+            await vm.ChatPage.SendCommand.ExecuteAsync(null);
+            await Task.Delay(300);
+            await SaveAsync(window, output, "chat-sent.png");
+            Appearance.Apply(ThemeMode.Dark, ColorScheme.Blue);
+            vm.ChatPage.SelectCommand.Execute(vm.ChatPage.Rooms.FirstOrDefault());
+            await Task.Delay(300);
+            await SaveAsync(window, output, "chat-dark.png");
+            Appearance.Apply(ThemeMode.Light, ColorScheme.Blue);
+            await vm.ChatPage.SetPresenceCommand.ExecuteAsync(Neruna.Core.Chat.Presence.Available);
+            vm.NavigateCommand.Execute(Section.Settings);
         }
 
         vm.SettingsPage.SelectedTab = 8;

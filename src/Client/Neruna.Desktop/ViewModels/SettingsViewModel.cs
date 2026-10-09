@@ -29,6 +29,9 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
 
     public AppearanceViewModel Appearance { get; } = appearance;
 
+    /// <summary>Index of the «Cloud» tab (the chat sends people there to connect).</summary>
+    public const int CloudTab = 7;
+
     [ObservableProperty]
     public partial int SelectedTab { get; set; }
 

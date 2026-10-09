@@ -36,6 +36,9 @@ internal static class Converters
             _ => "IconFolder",
         }) as Geometry);
 
+    /// <summary>An icon geometry from App.axaml by its key.</summary>
+    public static FuncValueConverter<string?, Geometry?> Icon { get; } = new(key => key is null ? null : Resource(key) as Geometry);
+
     private static object? Resource(string key) =>
         Avalonia.Application.Current is { } app && app.TryGetResource(key, app.ActualThemeVariant, out var value) ? value : null;
 

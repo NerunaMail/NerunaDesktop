@@ -1,0 +1,313 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:controls="using:Neruna.Desktop.Controls"
+             xmlns:local="using:Neruna.Desktop.Views"
+             xmlns:app="using:Neruna.Desktop"
+             x:Class="Neruna.Desktop.Views.ChatView"
+             x:DataType="vm:ChatViewModel">
+
+  <UserControl.Styles>
+    <!-- Rooms and private conversations on the left: a full-width button; the open one highlighted -->
+    <Style Selector="Button.conversation">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="8,5" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Button.conversation.selected">
+      <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
+    </Style>
+    <Style Selector="Border.badge">
+      <Setter Property="Background" Value="#C50F1F" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="MinWidth" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Padding" Value="5,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.badge TextBlock">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.avatar">
+      <Setter Property="Background" Value="{DynamicResource AccentTextBrush}" />
+      <Setter Property="Width" Value="30" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="CornerRadius" Value="15" />
+    </Style>
+    <Style Selector="Border.avatar TextBlock">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Ellipse.presence">
+      <Setter Property="Width" Value="10" />
+      <Setter Property="Height" Value="10" />
+      <Setter Property="Stroke" Value="{DynamicResource PaneBackgroundBrush}" />
+      <Setter Property="StrokeThickness" Value="1.5" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Bottom" />
+      <Setter Property="Margin" Value="0,0,-2,-2" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}" />
+      <Setter Property="Margin" Value="8,10,8,4" />
+    </Style>
+    <!-- Own messages: the name in the accent colour -->
+    <Style Selector="TextBlock.sender.mine">
+      <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Button.format">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="MinWidth" Value="30" />
+    </Style>
+  </UserControl.Styles>
+
+  <Panel>
+    <!-- Without Neruna Cloud/Control there is no chat: say so, offer to connect -->
+    <Border Classes="pane" IsVisible="{Binding ShowNotConnected}">
+      <StackPanel MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Margin="24">
+        <PathIcon Data="{StaticResource IconChat}" Width="44" Height="44" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Center" />
+        <TextBlock Text="Der Chat braucht Neruna Cloud oder Control" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+        <TextBlock Classes="subtle" TextWrapping="Wrap" TextAlignment="Center"
+                   Text="Räume, private Nachrichten und der Online-Status laufen über den Server deiner Organisation. Ohne Verbindung zu Neruna Cloud oder einem Neruna-Control-Server funktioniert der Chat nicht – Neruna allein (ohne Server) hat keinen Chat." />
+        <Button Classes="accent" Content="Mit der Cloud verbinden …" HorizontalAlignment="Center" Command="{Binding OpenCloudSetupCommand}" Margin="0,6,0,0" />
+      </StackPanel>
+    </Border>
+
+    <!-- Connected, but the licence leaves the chat out -->
+    <Border Classes="pane" IsVisible="{Binding ShowNotIncluded}">
+      <StackPanel MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Margin="24">
+        <PathIcon Data="{StaticResource IconChat}" Width="44" Height="44" Foreground="{DynamicResource SubtleTextBrush}" HorizontalAlignment="Center" />
+        <TextBlock Text="Der Chat ist nicht freigeschaltet" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <TextBlock Classes="subtle" TextWrapping="Wrap" TextAlignment="Center"
+                   Text="Die Lizenz deiner Organisation enthält keinen Chat. Die Administration deiner Organisation kann ihn im Portal unter «Lizenz» anfragen." />
+      </StackPanel>
+    </Border>
+
+    <Grid ColumnDefinitions="260,6,*" IsVisible="{Binding ShowChat}">
+
+      <!-- Left: rooms and private conversations, below the people of the open room -->
+      <Border Classes="pane" Padding="6,4">
+        <Grid RowDefinitions="*,Auto,*">
+          <ScrollViewer>
+            <StackPanel>
+              <TextBlock Classes="section" Text="Räume" />
+              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="Noch keine Räume – sie werden im Portal angelegt."
+                         IsVisible="{Binding !Rooms.Count}" />
+              <ItemsControl ItemsSource="{Binding Rooms}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ChatConversationItem">
+                    <Button Classes="conversation" Classes.selected="{Binding IsSelected}"
+                            Command="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).SelectCommand}" CommandParameter="{Binding}"
+                            ToolTip.Tip="{Binding Subtitle}">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Text="#" FontWeight="SemiBold" Foreground="{DynamicResource SubtleTextBrush}" Margin="2,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                   FontWeight="{Binding HasUnread, Converter={x:Static app:Converters.BoldIf}}" />
+                        <Border Grid.Column="2" Classes="badge" IsVisible="{Binding HasUnread}">
+                          <TextBlock Text="{Binding UnreadText}" />
+                        </Border>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="section" Text="Private Nachrichten" />
+                <!-- A new private conversation with anyone of the organisation -->
+                <Button x:Name="NewPrivateButton" Grid.Column="1" Classes="format" Padding="6,2" Margin="0,6,4,0" ToolTip.Tip="Neue private Nachricht">
+                  <PathIcon Data="{StaticResource IconAdd}" Width="12" Height="12" />
+                  <Button.Flyout>
+                    <Flyout Placement="RightEdgeAlignedTop">
+                      <ScrollViewer MaxHeight="420" Width="260">
+                        <ItemsControl ItemsSource="{Binding Everyone}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ChatPersonItem">
+                              <Button Classes="conversation" Click="OnFlyoutPick"
+                                      Command="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).OpenPrivateCommand}" CommandParameter="{Binding}">
+                                <Grid ColumnDefinitions="Auto,*">
+                                  <Panel Margin="0,0,10,0">
+                                    <Border Classes="avatar"><TextBlock Text="{Binding Initials}" /></Border>
+                                    <Ellipse Classes="presence" Fill="{Binding PresenceBrush}" />
+                                  </Panel>
+                                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Classes="subtle" FontSize="11" Text="{Binding PresenceLabel}" />
+                                  </StackPanel>
+                                </Grid>
+                              </Button>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+              </Grid>
+              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="Mit + oder einem Klick auf eine Person beginnen."
+                         IsVisible="{Binding !Directs.Count}" />
+              <ItemsControl ItemsSource="{Binding Directs}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ChatConversationItem">
+                    <Button Classes="conversation" Classes.selected="{Binding IsSelected}"
+                            Command="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).SelectCommand}" CommandParameter="{Binding}">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Panel Margin="0,0,10,0">
+                          <Border Classes="avatar" Width="26" Height="26" CornerRadius="13"><TextBlock Text="{Binding Initials}" FontSize="10" /></Border>
+                          <Ellipse Classes="presence" Fill="{Binding PresenceBrush}" />
+                        </Panel>
+                        <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                   FontWeight="{Binding HasUnread, Converter={x:Static app:Converters.BoldIf}}" />
+                        <Border Grid.Column="2" Classes="badge" IsVisible="{Binding HasUnread}">
+                          <TextBlock Text="{Binding UnreadText}" />
+                        </Border>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+
+          <Border Grid.Row="1" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0" Margin="4,6,4,0">
+            <TextBlock Classes="section" Text="{Binding PeopleTitle}" Margin="4,8,4,4" />
+          </Border>
+
+          <!-- The people of the room (online first); a click opens a private conversation -->
+          <ScrollViewer Grid.Row="2">
+            <ItemsControl ItemsSource="{Binding People}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChatPersonItem">
+                  <Button Classes="conversation" IsHitTestVisible="{Binding !IsMe}"
+                          Command="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).OpenPrivateCommand}" CommandParameter="{Binding}"
+                          ToolTip.Tip="Private Nachricht schreiben">
+                    <Grid ColumnDefinitions="Auto,*">
+                      <Panel Margin="0,0,10,0">
+                        <Border Classes="avatar"><TextBlock Text="{Binding Initials}" /></Border>
+                        <Ellipse Classes="presence" Fill="{Binding PresenceBrush}" />
+                      </Panel>
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="subtle" FontSize="11" TextTrimming="CharacterEllipsis">
+                          <Run Text="{Binding PresenceLabel, Mode=OneWay}" /><Run Text="{Binding Position, Mode=OneWay, StringFormat=' · {0}'}" />
+                        </TextBlock>
+                      </StackPanel>
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+
+      <!-- Right: the conversation -->
+      <Border Grid.Column="2" Classes="pane">
+        <Grid RowDefinitions="Auto,*,Auto,Auto">
+          <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="16,10">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel>
+                <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="subtle" FontSize="12" Text="{Binding Subtitle}" IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+              <!-- The organisation's retention: how long messages are kept -->
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0" Background="Transparent"
+                          ToolTip.Tip="{Binding RetentionDetails}">
+                <PathIcon Data="{StaticResource IconClock}" Width="13" Height="13" Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" />
+                <TextBlock Classes="subtle" FontSize="12" Text="{Binding RetentionText}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <ScrollViewer x:Name="MessageScroller" Grid.Row="1" Padding="16,8,16,8">
+            <StackPanel>
+              <TextBlock Classes="subtle" Text="Noch keine Nachrichten – schreib die erste." HorizontalAlignment="Center" Margin="0,24"
+                         IsVisible="{Binding !Messages.Count}" />
+              <ItemsControl ItemsSource="{Binding Messages}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ChatMessageItem">
+                    <StackPanel>
+                      <TextBlock Classes="subtle" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,12,0,4"
+                                 Text="{Binding DayHeader}" IsVisible="{Binding HasDayHeader}" />
+                      <Grid ColumnDefinitions="40,*" Margin="{Binding ShowHeader, Converter={x:Static local:ChatView.MessageMargin}}">
+                        <Border Classes="avatar" VerticalAlignment="Top" HorizontalAlignment="Left" IsVisible="{Binding ShowHeader}">
+                          <TextBlock Text="{Binding Initials}" />
+                        </Border>
+                        <StackPanel Grid.Column="1">
+                          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowHeader}">
+                            <TextBlock Classes="sender" Classes.mine="{Binding IsMine}" Text="{Binding SenderName}" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Classes="subtle" FontSize="11" Text="{Binding Time}" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+                          </StackPanel>
+                          <controls:ChatText Markup="{Binding Text}" TextWrapping="Wrap" ToolTip.Tip="{Binding Time}" />
+                        </StackPanel>
+                      </Grid>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+
+          <TextBlock Grid.Row="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                     Margin="16,0,16,4" TextWrapping="Wrap" />
+
+          <!-- Writing: bold, underlined, smileys; Enter sends, Shift+Enter makes a new line -->
+          <Border Grid.Row="3" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Margin="12,0,12,12" Padding="4">
+            <Grid RowDefinitions="Auto,Auto">
+              <StackPanel Orientation="Horizontal" Spacing="2">
+                <Button Classes="format" Click="OnBold" ToolTip.Tip="Fett (Ctrl+B) – erscheint als **Text**">
+                  <TextBlock Text="B" FontWeight="Bold" />
+                </Button>
+                <Button Classes="format" Click="OnUnderline" ToolTip.Tip="Unterstrichen (Ctrl+U) – erscheint als __Text__">
+                  <TextBlock Text="U" TextDecorations="Underline" />
+                </Button>
+                <Button x:Name="EmojiButton" Classes="format" ToolTip.Tip="Smiley einfügen">
+                  <TextBlock Text="🙂" />
+                  <Button.Flyout>
+                    <Flyout Placement="TopEdgeAlignedLeft">
+                      <ItemsControl ItemsSource="{x:Static vm:ChatViewModel.Emojis}" Width="324">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <WrapPanel />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <Button Classes="format" Width="36" Height="34" Padding="0" Click="OnEmoji" Tag="{Binding}" HorizontalContentAlignment="Center">
+                              <TextBlock Text="{Binding}" FontSize="18" />
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Flyout>
+                  </Button.Flyout>
+                </Button>
+              </StackPanel>
+              <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+                <TextBox x:Name="DraftBox" Text="{Binding Draft}" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="140" MaxLength="4000"
+                         BorderThickness="0" Background="Transparent" PlaceholderText="Nachricht schreiben – Enter sendet, Shift+Enter neue Zeile" />
+                <Button Grid.Column="1" Classes="accent" Command="{Binding SendCommand}" VerticalAlignment="Bottom" Margin="6,0,2,2" Padding="10,6"
+                        ToolTip.Tip="Senden (Enter)">
+                  <PathIcon Data="{StaticResource IconSend}" Width="14" Height="14" />
+                </Button>
+              </Grid>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
+  </Panel>
+</UserControl>

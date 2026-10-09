@@ -14,6 +14,9 @@ Stand: 2026-10-07 · lebendes Dokument, wird mit dem Code nachgeführt.
 
 1. **Neruna hostet keine Nutzdaten.** Mails, Kalender und Kontakte bleiben auf den Servern des Kunden
    (SOGo, Nextcloud, Dovecot/Postfix, Mailcow …). Cloud/Control verwalten ausschliesslich *Konfiguration*.
+   Bewusste Ausnahme: der **Chat** (Räume, private Nachrichten, Online-Status) liegt auf Cloud/Control –
+   unverschlüsselt, nicht für vertrauliche Daten, nur so lange wie die Organisation festlegt (1 Tag bis 3 Monate,
+   Standard 14 Tage; Server und Client löschen ältere Nachrichten). Abgleich per HTTP-Polling, kein Socket-Server.
 2. **Der Client ist ohne Cloud vollwertig.** Die Cloud ist Mehrwert für Organisationen, nie Voraussetzung.
 3. **Zero-Knowledge für Geheimnisse.** Passwörter und Tokens verlassen den Client nur clientseitig verschlüsselt.
 4. **Offene Standards vor eigenen Protokollen** (Thunderbird-Autoconfig, RFC 6186/6764, iCalendar, vCard).

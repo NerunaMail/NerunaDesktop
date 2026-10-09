@@ -13,6 +13,7 @@ internal sealed class ViewLocator : IDataTemplate
         MailViewModel => new MailView(),
         CalendarViewModel => new CalendarView(),
         ContactsViewModel => new ContactsView(),
+        ChatViewModel => new ChatView(),
         AccountSetupViewModel => new AccountSetupView(),
         IcsSubscriptionViewModel => new IcsSubscriptionView(),
         CalendarSelectionViewModel => new CalendarSelectionView(),

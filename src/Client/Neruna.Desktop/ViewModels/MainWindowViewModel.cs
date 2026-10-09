@@ -18,6 +18,7 @@ internal enum Section
     Mail,
     Calendar,
     Contacts,
+    Chat,
     Settings,
 }
 
@@ -47,6 +48,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         MailViewModel mailPage,
         CalendarViewModel calendarPage,
         ContactsViewModel contactsPage,
+        ChatViewModel chatPage,
         SettingsViewModel settingsPage,
         MailController mail,
         CalendarController calendar,
@@ -75,6 +77,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         MailPage = mailPage;
         CalendarPage = calendarPage;
         ContactsPage = contactsPage;
+        ChatPage = chatPage;
         SettingsPage = settingsPage;
         var accountsPage = settingsPage.Accounts;
         _mail = mail;
@@ -86,6 +89,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _http = http;
         _logger = logger;
         CurrentPage = mailPage;
+        mailPage.Preferences.NavigationItems[0].IsActive = true;
 
         mailPage.StatusMessage += (_, message) => StatusText = message;
         mailPage.Agenda.OpenRequested += async (_, occurrence) =>
@@ -122,6 +126,32 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         {
             CurrentPage = MailPage;
             await MailPage.ComposeToAsync(recipients);
+        };
+        // The unread count of the chat on its button in the rail.
+        chatPage.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ChatViewModel.UnreadText) || e.PropertyName == nameof(ChatViewModel.HasUnread))
+            {
+                UpdateChatBadge();
+            }
+        };
+        MailPage.Preferences.NavigationItems.CollectionChanged += (_, _) =>
+        {
+            UpdateChatBadge();
+            OnCurrentPageChanged(CurrentPage);
+        };
+        chatPage.CloudSetupRequested += (_, _) =>
+        {
+            CurrentPage = SettingsPage;
+            SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        };
+        // Connected or disconnected: the chat follows at once, not only with the next tick.
+        settingsPage.Cloud.PropertyChanged += async (_, e) =>
+        {
+            if (e.PropertyName == nameof(CloudViewModel.Connection))
+            {
+                await ChatPage.RefreshNowAsync();
+            }
         };
         accountsPage.AddAccountRequested += (_, _) => ShowAccountSetup();
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
@@ -164,11 +194,24 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     public ContactsViewModel ContactsPage { get; }
 
+    public ChatViewModel ChatPage { get; }
+
     public SettingsViewModel SettingsPage { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsMail), nameof(IsCalendar), nameof(IsContacts), nameof(IsSettings), nameof(SectionTitle))]
+    [NotifyPropertyChangedFor(nameof(IsMail), nameof(IsCalendar), nameof(IsContacts), nameof(IsChat), nameof(IsSettings), nameof(SectionTitle))]
     public partial ViewModelBase CurrentPage { get; set; }
+
+    private void UpdateChatBadge()
+    {
+        foreach (var item in MailPage.Preferences.NavigationItems)
+        {
+            item.Badge = item.Section == Section.Chat && ChatPage.HasUnread ? ChatPage.UnreadText : null;
+        }
+    }
+
+    /// <summary>The chat is in front in an active window: it asks often and marks what is shown as read.</summary>
+    public void UpdateChatActive() => ChatPage.IsActive = IsChat && Overlay is null && NotificationService.IsAppActive;
 
     public bool IsMail => CurrentPage == MailPage;
 
@@ -176,10 +219,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     public bool IsContacts => CurrentPage == ContactsPage;
 
+    public bool IsChat => CurrentPage == ChatPage;
+
     public bool IsSettings => CurrentPage == SettingsPage;
 
     /// <summary>Shown in the header bar; the window title already says "Neruna".</summary>
-    public string SectionTitle => IsCalendar ? "Kalender" : IsContacts ? "Kontakte" : IsSettings ? "Einstellungen" : "E-Mails";
+    public string SectionTitle => IsCalendar ? "Kalender" : IsContacts ? "Kontakte" : IsChat ? "Chat" : IsSettings ? "Einstellungen" : "E-Mails";
 
     /// <summary>Modal content shown above the shell, or null.</summary>
     [ObservableProperty]
@@ -210,6 +255,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     /// <summary>Everything from the local store – fast, done while the splash screen is visible.</summary>
     public async Task LoadLocalAsync()
     {
+        // Neruna opens with the first button of the rail (E-Mail unless hidden or moved).
+        Navigate(MailPage.Preferences.StartSection);
         await RefreshPagesAsync();
         await MailPage.Agenda.LoadStateAsync();
         HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
@@ -218,6 +265,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     /// <summary>Once the window is visible: account setup for a first start, otherwise sync with the servers.</summary>
     public async Task StartAsync()
     {
+        // The chat needs no mail account, only the cloud connection.
+        _ = ChatPage.StartAsync();
         if (!HasAccounts)
         {
             ShowAccountSetup();
@@ -316,11 +365,16 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         await MailPage.RevealAsync(folder.ConnectionId, folder.RemoteId, remoteId);
     }
 
+    private Section? SectionOf(ViewModelBase page) =>
+        page == MailPage ? Section.Mail : page == CalendarPage ? Section.Calendar : page == ContactsPage ? Section.Contacts
+        : page == ChatPage ? Section.Chat : page == SettingsPage ? Section.Settings : null;
+
     [RelayCommand]
     private void Navigate(Section section) => CurrentPage = section switch
     {
         Section.Calendar => CalendarPage,
         Section.Contacts => ContactsPage,
+        Section.Chat => ChatPage,
         Section.Settings => SettingsPage,
         _ => MailPage,
     };
@@ -568,7 +622,18 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    partial void OnCurrentPageChanged(ViewModelBase value) => _ = RefreshIfStaleAsync(value);
+    partial void OnCurrentPageChanged(ViewModelBase value)
+    {
+        foreach (var item in MailPage.Preferences.NavigationItems)
+        {
+            item.IsActive = SectionOf(value) == item.Section;
+        }
+
+        UpdateChatActive();
+        _ = RefreshIfStaleAsync(value);
+    }
+
+    partial void OnOverlayChanged(ViewModelBase? value) => UpdateChatActive();
 }
 
 /// <summary>The answer to "Entwurf speichern?" when Neruna closes.</summary>

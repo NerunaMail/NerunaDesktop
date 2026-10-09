@@ -21,10 +21,16 @@ public static class SettingKeys
     /// <summary>"true": new mails, replies and forwards open in their own window instead of the reading pane.</summary>
     public const string ComposeInWindow = "compose.openInWindow";
 
-    /// <summary>The agenda (today's and the next days' appointments) is shown beside the mail (default: off).</summary>
     /// <summary>Connection to a Neruna Cloud/Control server (JSON of CloudConnection; the device key is in the keychain).</summary>
     public const string CloudConnection = "cloud.connection";
 
+    /// <summary>Chat: rooms, people, read markers and retention from the last answer (JSON), for a start without network.</summary>
+    public const string ChatState = "chat.state";
+
+    /// <summary>Own online status chosen in the header (available, away, brb, dnd, offline; default: available).</summary>
+    public const string ChatPresence = "chat.presence";
+
+    /// <summary>The agenda (today's and the next days' appointments) is shown beside the mail (default: off).</summary>
     public const string MailAgendaOpen = "mail.agendaOpen";
 
     /// <summary>Calendars left out of the agenda, independent of the calendar page (JSON list of "connection|calendar").</summary>
@@ -74,6 +80,9 @@ public static class SettingKeys
 
     /// <summary>"Konto hinzufügen" in the navigation rail (default: shown; accounts can always be added in Einstellungen → Konten).</summary>
     public const string ShowAddAccountButton = "ui.showAddAccountButton";
+
+    /// <summary>Navigation rail: order and visibility of E-Mail, Kalender, Kontakte, Chat (JSON list of {section, visible}).</summary>
+    public const string NavigationItems = "ui.navigation";
 
     /// <summary>"System", "Light" or "Dark".</summary>
     public const string ThemeMode = "appearance.theme";
