@@ -23,7 +23,8 @@ public sealed class SqliteAccountStore(IDbContextFactory<NerunaDbContext> contex
                     c.Id,
                     c.Kind,
                     c.ProviderId,
-                    JsonSerializer.Deserialize<Dictionary<string, string>>(c.SettingsJson) ?? [])).ToList()))
+                    JsonSerializer.Deserialize<Dictionary<string, string>>(c.SettingsJson) ?? [])).ToList(),
+                a.Label))
             .ToList();
     }
 
@@ -60,9 +61,11 @@ public sealed class SqliteAccountStore(IDbContextFactory<NerunaDbContext> contex
 
         entity.DisplayName = account.DisplayName;
         entity.EmailAddress = account.EmailAddress;
+        entity.Label = account.Label;
 
-        // Removing a connection cascades to its cached folders, calendars and address books.
-        entity.Connections.RemoveAll(c => account.Connections.All(n => n.Id != c.Id));
+        // Removing a connection cascades to its cached folders, calendars and address books; its downloaded messages go too.
+        var removed = entity.Connections.Where(c => account.Connections.All(n => n.Id != c.Id)).Select(c => c.Id).ToList();
+        entity.Connections.RemoveAll(c => removed.Contains(c.Id));
         foreach (var connection in account.Connections)
         {
             var existing = entity.Connections.FirstOrDefault(c => c.Id == connection.Id);
@@ -70,6 +73,9 @@ public sealed class SqliteAccountStore(IDbContextFactory<NerunaDbContext> contex
             {
                 existing = new ConnectionEntity { Id = connection.Id, ProviderId = connection.ProviderId, SettingsJson = "{}" };
                 entity.Connections.Add(existing);
+                // It comes with its id already set: without this, EF Core would take it for an existing row (an edited
+                // account that gains a calendar) and try to update it.
+                db.Entry(existing).State = EntityState.Added;
             }
 
             existing.Kind = connection.Kind;
@@ -78,6 +84,10 @@ public sealed class SqliteAccountStore(IDbContextFactory<NerunaDbContext> contex
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        foreach (var id in removed)
+        {
+            files.DeleteConnection(id);
+        }
     }
 
     public async Task DeleteAccountAsync(Guid accountId, CancellationToken cancellationToken = default)

@@ -160,6 +160,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         accountsPage.AddAccountRequested += (_, _) => ShowAccountSetup();
+        accountsPage.EditRequested += (_, account) => ShowAccountSetup(account);
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         accountsPage.AccountsChanged += async (_, _) =>
         {
@@ -340,7 +341,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private async Task ShowNotificationsAsync(NewMailEvent e)
     {
-        var account = e.Account.EmailAddress ?? e.Account.DisplayName;
+        var account = e.Account.Title;
         if (!await _settings.GetBoolAsync(SettingKeys.MailNotifications, fallback: true))
         {
             _logger.LogInformation("{Count} new mail(s) for {Account}: notifications are switched off", e.Messages.Count, account);
@@ -517,12 +518,26 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ShowAccountSetup()
+    private void ShowAccountSetup(Neruna.Core.Accounts.Account? editing = null)
     {
         var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav"));
+        if (editing is not null)
+        {
+            setup.LoadForEditing(editing);
+        }
+
         setup.Finished += async (_, created) =>
         {
             Overlay = null;
+            if (created && editing is not null)
+            {
+                // Changed names or servers: every page reloads, then a sync with the new settings.
+                await SettingsPage.Accounts.ReloadAsync();
+                await RefreshPagesAsync();
+                await SyncAsync();
+                return;
+            }
+
             if (created)
             {
                 HasAccounts = true;

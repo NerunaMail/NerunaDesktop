@@ -13,18 +13,20 @@
   </UserControl.DataTemplates>
 
   <StackPanel>
-    <TextBlock Text="Konto hinzufügen" FontSize="20" FontWeight="SemiBold" />
-    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,8"
-               Text="E-Mail (IMAP/SMTP), Kalender (CalDAV) und Kontakte (CardDAV) – z. B. SOGo, Nextcloud, Mailcow oder Ihr Provider. Die Servereinstellungen werden automatisch gesucht." />
+    <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,8" Text="{Binding Subtitle}" />
 
-    <TextBlock Classes="label" Text="Ihr Name" />
+    <TextBlock Classes="label" Text="Ihr Name (Absender)" />
     <TextBox Text="{Binding DisplayName}" PlaceholderText="Anna Muster" />
+
+    <TextBlock Classes="label" Text="Kontobezeichnung (optional)" />
+    <TextBox Text="{Binding Label}" PlaceholderText="z. B. Privat oder Firma – sonst steht die E-Mail-Adresse in der Ordnerliste" />
 
     <TextBlock Classes="label" Text="E-Mail-Adresse" />
     <TextBox Text="{Binding Email}" PlaceholderText="anna.muster@example.com" />
 
     <TextBlock Classes="label" Text="Passwort" />
-    <TextBox Text="{Binding Password}" PasswordChar="●" />
+    <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="{Binding PasswordHint}" />
 
     <!-- Server settings, prefilled by discovery -->
     <StackPanel IsVisible="{Binding ShowServerSettings}" Margin="0,12,0,0">
@@ -71,7 +73,7 @@
       </StackPanel>
       <Button Grid.Column="2" Content="Abbrechen" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
       <Button Grid.Column="3" Classes="accent" Content="Weiter" Command="{Binding DiscoverCommand}" IsVisible="{Binding !ShowServerSettings}" />
-      <Button Grid.Column="3" Classes="accent" Content="Konto hinzufügen" Command="{Binding CreateCommand}" IsVisible="{Binding ShowServerSettings}" />
+      <Button Grid.Column="3" Classes="accent" Content="{Binding SaveText}" Command="{Binding CreateCommand}" IsVisible="{Binding ShowServerSettings}" />
     </Grid>
   </StackPanel>
 </UserControl>

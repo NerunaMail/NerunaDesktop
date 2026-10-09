@@ -18,6 +18,7 @@ namespace Neruna.Client.Tests;
 /// NERUNA_TEST_IMAP_HOST=127.0.0.1 dotnet test
 /// </code>
 /// </summary>
+[Collection(Testlab.Name)]
 public class ImapIntegrationTests
 {
     private static readonly string? Host = Environment.GetEnvironmentVariable("NERUNA_TEST_IMAP_HOST");

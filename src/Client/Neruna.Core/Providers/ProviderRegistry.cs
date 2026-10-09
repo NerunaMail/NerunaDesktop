@@ -31,6 +31,12 @@ public interface IProviderFactory<out TProvider>
     /// Lets account setup stay protocol-neutral: each provider claims what it understands.
     /// </summary>
     IReadOnlyDictionary<string, string>? SettingsFromDiscovery(MailProviderConfig config, string emailAddress) => null;
+
+    /// <summary>
+    /// The reverse of <see cref="SettingsFromDiscovery"/>: a connection's settings as servers (host, port, security,
+    /// user; URLs), so "Konto bearbeiten" can show them protocol-neutrally. Null if this provider cannot describe them.
+    /// </summary>
+    MailProviderConfig? DescribeSettings(IReadOnlyDictionary<string, string> settings) => null;
 }
 
 public sealed class ProviderNotFoundException(string providerId, ServiceKind kind)

@@ -14,6 +14,7 @@ using Neruna.Providers.Imap;
 
 namespace Neruna.Client.Tests;
 
+[Collection(Testlab.Name)]
 public class InvitationTests
 {
     private static readonly string? ImapHost = Environment.GetEnvironmentVariable("NERUNA_TEST_IMAP_HOST");

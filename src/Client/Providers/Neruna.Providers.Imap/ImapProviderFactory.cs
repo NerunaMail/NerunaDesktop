@@ -33,4 +33,13 @@ public sealed class ImapProviderFactory(
 
     public IReadOnlyDictionary<string, string>? SettingsFromDiscovery(MailProviderConfig config, string emailAddress) =>
         ImapSettings.FromDiscovery(config, emailAddress)?.ToDictionary();
+
+    public MailProviderConfig? DescribeSettings(IReadOnlyDictionary<string, string> settings)
+    {
+        var imap = ImapSettings.FromDictionary(settings);
+        return new MailProviderConfig(string.Empty, null,
+            [new MailServerSettings(ServerProtocol.Imap, imap.ImapHost, imap.ImapPort, imap.ImapSecurity, AuthScheme.PasswordCleartext, imap.Username)],
+            [new MailServerSettings(ServerProtocol.Smtp, imap.SmtpHost, imap.SmtpPort, imap.SmtpSecurity, AuthScheme.PasswordCleartext, imap.Username)],
+            []);
+    }
 }

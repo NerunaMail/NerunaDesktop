@@ -107,6 +107,9 @@ internal sealed class AccountEntity
 
     public string? EmailAddress { get; set; }
 
+    /// <summary>What Neruna calls the account (folder tree, lists); null = the e-mail address.</summary>
+    public string? Label { get; set; }
+
     /// <summary>Position chosen by the user (folder tree, settings); equal values fall back to the name.</summary>
     public int SortOrder { get; set; }
 

@@ -5,12 +5,18 @@ namespace Neruna.Core.Accounts;
 /// A typical SOGo account has one mail, one calendar and one contacts connection; an "Internet calendars"
 /// account may only hold ICS subscriptions.
 /// </summary>
+/// <param name="DisplayName">The sender name in mails ("Anna Muster").</param>
+/// <param name="Label">What Neruna calls the account (folder tree, lists), e.g. "Privat"; null = the e-mail address.</param>
 public sealed record Account(
     Guid Id,
     string DisplayName,
     string? EmailAddress,
-    IReadOnlyList<ServiceConnection> Connections)
+    IReadOnlyList<ServiceConnection> Connections,
+    string? Label = null)
 {
+    /// <summary>The account's name in Neruna: the label, else the e-mail address, else the sender name.</summary>
+    public string Title => string.IsNullOrWhiteSpace(Label) ? EmailAddress ?? DisplayName : Label;
+
     public IEnumerable<ServiceConnection> ConnectionsOf(ServiceKind kind) => Connections.Where(c => c.Kind == kind);
 }
 

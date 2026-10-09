@@ -63,7 +63,7 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
 
         // With several accounts the account is shown below each address book: two "Domain Address Book" stay apart.
         var sources = await contacts.GetSourcesAsync();
-        var owners = sources.ToDictionary(s => s.Connection.Id, s => s.Account.EmailAddress ?? s.Account.DisplayName);
+        var owners = sources.ToDictionary(s => s.Connection.Id, s => s.Account.Title);
         var showOwner = owners.Values.Distinct().Count() > 1;
 
         AddressBooks.Clear();

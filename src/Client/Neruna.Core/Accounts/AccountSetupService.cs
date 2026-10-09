@@ -10,6 +10,138 @@ namespace Neruna.Core.Accounts;
 /// </summary>
 public sealed class AccountSetupService(ProviderRegistry providers, IAccountStore accounts, ICredentialStore credentials)
 {
+    /// <summary>
+    /// An existing account as servers, for "Konto bearbeiten": what each connection's provider can describe (the first
+    /// connection per kind – the ones setup made from the discovered configuration).
+    /// </summary>
+    public MailProviderConfig Describe(Account account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var incoming = new List<MailServerSettings>();
+        var outgoing = new List<MailServerSettings>();
+        var dav = new List<DavServerSettings>();
+        foreach (var connection in EditableConnections(account))
+        {
+            if (Describe(connection) is { } part)
+            {
+                incoming.AddRange(part.IncomingServers);
+                outgoing.AddRange(part.OutgoingServers);
+                dav.AddRange(part.DavServers);
+            }
+        }
+
+        var domain = account.EmailAddress?.Split('@').LastOrDefault() ?? string.Empty;
+        return new MailProviderConfig(domain, null, incoming, outgoing, dav);
+    }
+
+    /// <summary>
+    /// Saves changed names and servers of an account. Each connection keeps its id (and so its offline data); a service
+    /// left empty is removed, a new one added. Every connection is verified first; if one fails, nothing changes –
+    /// not even the passwords.
+    /// </summary>
+    /// <param name="password">A new password for all connections, or null to keep the stored ones.</param>
+    /// <exception cref="AccountSetupException">A connection could not be established; nothing is saved.</exception>
+    public async Task<Account> UpdateAsync(Account account, string displayName, string? label, string emailAddress, MailProviderConfig config, string? password, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var built = BuildAccount(displayName, emailAddress, config);
+        var editable = EditableConnections(account).ToList();
+        var connections = account.Connections.Where(c => !editable.Contains(c)).ToList();
+        var added = new List<ServiceConnection>();
+        foreach (var connection in built.Connections)
+        {
+            // Same service and provider as before: same id, so folders, mails and calendars stay.
+            if (editable.FirstOrDefault(c => c.Kind == connection.Kind && c.ProviderId == connection.ProviderId) is { } existing)
+            {
+                connections.Add(connection with { Id = existing.Id });
+            }
+            else
+            {
+                connections.Add(connection);
+                added.Add(connection);
+            }
+        }
+
+        // Secrets: a new password for all, else new connections get the one the account already uses.
+        var previous = new Dictionary<Guid, string?>();
+        var known = editable.Count > 0 ? await credentials.GetSecretAsync(editable[0].Id, cancellationToken) : null;
+        foreach (var connection in connections.Where(c => built.Connections.Any(b => b.Kind == c.Kind && b.ProviderId == c.ProviderId)))
+        {
+            previous[connection.Id] = await credentials.GetSecretAsync(connection.Id, cancellationToken);
+            var secret = password ?? previous[connection.Id] ?? known;
+            if (secret is not null)
+            {
+                await credentials.SetSecretAsync(connection.Id, secret, cancellationToken);
+            }
+        }
+
+        var updated = new Account(account.Id, displayName, emailAddress, connections, string.IsNullOrWhiteSpace(label) ? null : label.Trim());
+        ServiceConnection? testing = null;
+        try
+        {
+            foreach (var connection in connections.Where(c => previous.ContainsKey(c.Id)))
+            {
+                testing = connection;
+                await TestAsync(connection, cancellationToken);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            foreach (var (id, secret) in previous)
+            {
+                if (secret is null)
+                {
+                    await credentials.DeleteSecretAsync(id, CancellationToken.None);
+                }
+                else
+                {
+                    await credentials.SetSecretAsync(id, secret, CancellationToken.None);
+                }
+            }
+
+            throw new AccountSetupException($"{KindName(testing?.Kind)} ({testing?.ProviderId}): {ex.Message}", ex);
+        }
+
+        // Services left out are gone (their offline data with them); their passwords too.
+        foreach (var removed in editable.Where(c => connections.All(n => n.Id != c.Id)))
+        {
+            await credentials.DeleteSecretAsync(removed.Id, cancellationToken);
+        }
+
+        await accounts.SaveAccountAsync(updated, cancellationToken);
+        return updated;
+    }
+
+    // Per kind the first connection a provider can describe – what setup created; extra ones (ICS feeds …) stay as they are.
+    private IEnumerable<ServiceConnection> EditableConnections(Account account) =>
+        account.Connections.GroupBy(c => c.Kind).Select(g => g.FirstOrDefault(c => Describe(c) is not null)).OfType<ServiceConnection>();
+
+    private MailProviderConfig? Describe(ServiceConnection connection)
+    {
+        try
+        {
+            return connection.Kind switch
+            {
+                ServiceKind.Mail => providers.MailProviders.FirstOrDefault(f => f.ProviderId == connection.ProviderId)?.DescribeSettings(connection.Settings),
+                ServiceKind.Calendar => providers.CalendarProviders.FirstOrDefault(f => f.ProviderId == connection.ProviderId)?.DescribeSettings(connection.Settings),
+                ServiceKind.Contacts => providers.ContactProviders.FirstOrDefault(f => f.ProviderId == connection.ProviderId)?.DescribeSettings(connection.Settings),
+                _ => null,
+            };
+        }
+        catch (InvalidOperationException)
+        {
+            return null; // incomplete settings: not editable here
+        }
+    }
+
+    private static string KindName(ServiceKind? kind) => kind switch
+    {
+        ServiceKind.Mail => "E-Mail",
+        ServiceKind.Calendar => "Kalender",
+        ServiceKind.Contacts => "Kontakte",
+        _ => "Verbindung",
+    };
+
     public Account BuildAccount(string displayName, string emailAddress, MailProviderConfig config)
     {
         var connections = new List<ServiceConnection>();
@@ -51,14 +183,7 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
                 await credentials.DeleteSecretAsync(connection.Id, CancellationToken.None);
             }
 
-            var what = testing?.Kind switch
-            {
-                ServiceKind.Mail => "E-Mail",
-                ServiceKind.Calendar => "Kalender",
-                ServiceKind.Contacts => "Kontakte",
-                _ => "Verbindung",
-            };
-            throw new AccountSetupException($"{what} ({testing?.ProviderId}): {ex.Message}", ex);
+            throw new AccountSetupException($"{KindName(testing?.Kind)} ({testing?.ProviderId}): {ex.Message}", ex);
         }
 
         await accounts.SaveAccountAsync(account, cancellationToken);

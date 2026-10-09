@@ -19,6 +19,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, ICredent
 
     public event EventHandler? SubscribeRequested;
 
+    /// <summary>"Bearbeiten": the shell shows the setup dialog with this account.</summary>
+    public event EventHandler<Neruna.Core.Accounts.Account>? EditRequested;
+
     /// <summary>Raised after an account was removed, so the other pages reload.</summary>
     public event EventHandler? AccountsChanged;
 
@@ -52,6 +55,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, ICredent
 
     [RelayCommand]
     private void Subscribe() => SubscribeRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void Edit(AccountItem item) => EditRequested?.Invoke(this, item.Account);
 
     [RelayCommand]
     private async Task RemoveAsync(AccountItem item)
@@ -117,7 +123,10 @@ internal sealed partial class AccountItem(Account account) : ObservableObject
 {
     public Account Account { get; } = account;
 
-    public string Title => Account.DisplayName;
+    public string Title => Account.Title;
+
+    /// <summary>Under the title: sender name and address (the title may be a label like "Privat").</summary>
+    public string Sender => Account.EmailAddress is { } email ? $"{Account.DisplayName} <{email}>" : Account.DisplayName;
 
     public string? Email => Account.EmailAddress;
 

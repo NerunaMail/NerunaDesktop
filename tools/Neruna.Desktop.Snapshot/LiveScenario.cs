@@ -123,6 +123,28 @@ internal static class LiveScenario
                           $"folders={vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).Count()}, current={vm.MailPage.CurrentFolder?.Folder.Name ?? "none"}, " +
                           $"messages={vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()}, status={vm.StatusText}");
         await Snapshots.SaveAsync(window, output, "first-start.png");
+
+        // Einstellungen → Konten → Bearbeiten: the stored servers prefilled, a label for the folder tree.
+        vm.NavigateCommand.Execute(Section.Settings);
+        vm.SettingsPage.SelectedTab = 0;
+        await vm.SettingsPage.Accounts.ReloadAsync();
+        vm.SettingsPage.Accounts.EditCommand.Execute(vm.SettingsPage.Accounts.Items[0]);
+        await Task.Delay(300);
+        var edit = (AccountSetupViewModel)vm.Overlay!;
+        await Snapshots.SaveAsync(window, output, "account-edit.png");
+        edit.Label = "Privat";
+        await edit.CreateCommand.ExecuteAsync(null);
+        for (var i = 0; i < 100 && vm.Overlay is not null; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await Task.Delay(500);
+        Console.WriteLine($"Edited: error={edit.Error}, tree={vm.MailPage.Accounts.FirstOrDefault()?.Title}, accounts={vm.SettingsPage.Accounts.Items.FirstOrDefault()?.Title}");
+        await Snapshots.SaveAsync(window, output, "account-edited.png");
+        vm.NavigateCommand.Execute(Section.Mail);
+        await Task.Delay(300);
+        await Snapshots.SaveAsync(window, output, "account-label-tree.png");
         window.Close();
     }
 

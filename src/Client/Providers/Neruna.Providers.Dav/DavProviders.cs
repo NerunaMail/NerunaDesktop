@@ -209,6 +209,12 @@ public sealed class CalDavProviderFactory(HttpClient http, ICredentialStore cred
 
     public IReadOnlyDictionary<string, string>? SettingsFromDiscovery(MailProviderConfig config, string emailAddress) =>
         DavSettings.FromDiscovery(config?.CalDav, emailAddress)?.ToDictionary();
+
+    public MailProviderConfig? DescribeSettings(IReadOnlyDictionary<string, string> settings)
+    {
+        var dav = DavSettings.FromDictionary(settings);
+        return new MailProviderConfig(string.Empty, null, [], [], [new DavServerSettings(ServerProtocol.CalDav, dav.Url, dav.Username)]);
+    }
 }
 
 /// <param name="http">Must not follow redirects automatically (see <see cref="DavClient"/>).</param>
@@ -226,4 +232,10 @@ public sealed class CardDavProviderFactory(HttpClient http, ICredentialStore cre
 
     public IReadOnlyDictionary<string, string>? SettingsFromDiscovery(MailProviderConfig config, string emailAddress) =>
         DavSettings.FromDiscovery(config?.CardDav, emailAddress)?.ToDictionary();
+
+    public MailProviderConfig? DescribeSettings(IReadOnlyDictionary<string, string> settings)
+    {
+        var dav = DavSettings.FromDictionary(settings);
+        return new MailProviderConfig(string.Empty, null, [], [], [new DavServerSettings(ServerProtocol.CardDav, dav.Url, dav.Username)]);
+    }
 }

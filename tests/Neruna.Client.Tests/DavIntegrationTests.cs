@@ -20,6 +20,7 @@ namespace Neruna.Client.Tests;
 /// </code>
 /// Every test uses its own user, so runs never interfere.
 /// </summary>
+[Collection(Testlab.Name)]
 public sealed class DavIntegrationTests : IDisposable
 {
     private static readonly string? ServerUrl = Environment.GetEnvironmentVariable("NERUNA_TEST_DAV_URL");

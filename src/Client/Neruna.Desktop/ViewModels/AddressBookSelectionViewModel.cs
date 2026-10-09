@@ -97,7 +97,7 @@ internal sealed class AddressBookSourceGroup(AddressBookSource source) : Observa
 
     public AddressBookSource Source { get; } = source;
 
-    public string Title => Source.Account.EmailAddress ?? Source.Account.DisplayName;
+    public string Title => Source.Account.Title;
 
     public string Server => Source.Connection.Settings.TryGetValue(Neruna.Providers.Dav.DavSettings.UrlKey, out var url) ? url : Source.Connection.ProviderId;
 

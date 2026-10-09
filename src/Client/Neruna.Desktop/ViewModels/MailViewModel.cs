@@ -1468,7 +1468,7 @@ internal sealed partial class MailAccountNode : ObservableObject
 
     public string Title => TitleOf(Account);
 
-    public static string TitleOf(Account account) => account.EmailAddress ?? account.DisplayName;
+    public static string TitleOf(Account account) => account.Title;
 
     public ObservableCollection<MailFolderNode> Folders { get; }
 

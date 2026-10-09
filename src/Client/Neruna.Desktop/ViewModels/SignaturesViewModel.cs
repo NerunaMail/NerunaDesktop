@@ -171,7 +171,7 @@ internal sealed partial class AccountSignatureRow : ObservableObject
 
     public Account Account { get; }
 
-    public string Title => Account.EmailAddress ?? Account.DisplayName;
+    public string Title => Account.Title;
 
     public IReadOnlyList<SignatureChoice> Choices { get; }
 

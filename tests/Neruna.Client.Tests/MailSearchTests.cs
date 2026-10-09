@@ -10,6 +10,7 @@ using Neruna.Providers.Imap;
 
 namespace Neruna.Client.Tests;
 
+[Collection(Testlab.Name)]
 public class MailSearchTests
 {
     private static readonly string? Host = Environment.GetEnvironmentVariable("NERUNA_TEST_IMAP_HOST");

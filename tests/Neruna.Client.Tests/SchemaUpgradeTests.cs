@@ -69,7 +69,7 @@ public sealed class SchemaUpgradeTests : IDisposable
             await raw.OpenAsync(ct);
             await using var command = raw.CreateCommand();
             command.CommandText = "DROP TABLE Certificates; DROP TABLE Settings; DROP TABLE Signatures; DROP TABLE ReminderStates; DROP TABLE TextTemplates; DROP TABLE ChatMessages; " +
-                                  "ALTER TABLE Messages DROP COLUMN Security; ALTER TABLE Accounts DROP COLUMN SortOrder;";
+                                  "ALTER TABLE Messages DROP COLUMN Security; ALTER TABLE Accounts DROP COLUMN SortOrder; ALTER TABLE Accounts DROP COLUMN Label;";
             await command.ExecuteNonQueryAsync(ct);
         }
 

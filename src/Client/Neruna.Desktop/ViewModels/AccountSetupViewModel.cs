@@ -24,6 +24,66 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     [ObservableProperty]
     public partial string DisplayName { get; set; } = string.Empty;
 
+    /// <summary>Optional name of the account in Neruna (folder tree, lists) instead of the e-mail address.</summary>
+    [ObservableProperty]
+    public partial string Label { get; set; } = string.Empty;
+
+    /// <summary>"Konto bearbeiten": the account being changed (its servers prefilled; an empty password keeps the old one).</summary>
+    public Account? Editing { get; private set; }
+
+    public bool IsEditing => Editing is not null;
+
+    public string Title => IsEditing ? "Konto bearbeiten" : "Konto hinzufügen";
+
+    public string SaveText => IsEditing ? "Speichern" : "Konto hinzufügen";
+
+    public string Subtitle => IsEditing
+        ? "Namen, Passwort und Server ändern. Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten. Leeres Kalender- oder Kontaktfeld entfernt diesen Dienst."
+        : "E-Mail (IMAP/SMTP), Kalender (CalDAV) und Kontakte (CardDAV) – z. B. SOGo, Nextcloud, Mailcow oder Ihr Provider. Die Servereinstellungen werden automatisch gesucht.";
+
+    public string PasswordHint => IsEditing ? "leer lassen = unverändert" : string.Empty;
+
+    /// <summary>Shows an existing account for editing: names and the servers its connections describe.</summary>
+    public void LoadForEditing(Account account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        Editing = account;
+        DisplayName = account.DisplayName;
+        Label = account.Label ?? string.Empty;
+        Email = account.EmailAddress ?? string.Empty;
+        var config = setup.Describe(account);
+        ImapHost = SmtpHost = string.Empty;
+        if (config.IncomingServers.FirstOrDefault() is { } imap)
+        {
+            ImapHost = imap.Host;
+            ImapPort = imap.Port.ToString(CultureInfo.InvariantCulture);
+            ImapSecurity = imap.Security;
+            Username = imap.UsernameTemplate;
+        }
+
+        if (config.OutgoingServers.FirstOrDefault() is { } smtp)
+        {
+            SmtpHost = smtp.Host;
+            SmtpPort = smtp.Port.ToString(CultureInfo.InvariantCulture);
+            SmtpSecurity = smtp.Security;
+        }
+
+        CalDavUrl = config.CalDav?.ServerUrl.AbsoluteUri ?? string.Empty;
+        CardDavUrl = config.CardDav?.ServerUrl.AbsoluteUri ?? string.Empty;
+        if (Username.Length == 0)
+        {
+            Username = config.DavServers.FirstOrDefault()?.UsernameTemplate ?? string.Empty;
+        }
+
+        ShowServerSettings = true;
+        OnPropertyChanged(nameof(IsEditing));
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(SaveText));
+        OnPropertyChanged(nameof(Subtitle));
+        OnPropertyChanged(nameof(PasswordHint));
+        CreateCommand.NotifyCanExecuteChanged();
+    }
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DiscoverCommand))]
     public partial string Email { get; set; } = string.Empty;
@@ -166,7 +226,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
 
         var name = string.IsNullOrWhiteSpace(DisplayName) ? email : DisplayName.Trim();
-        var account = setup.BuildAccount(name, email, new MailProviderConfig(domain, null, incoming, outgoing, dav));
+        var config = new MailProviderConfig(domain, null, incoming, outgoing, dav);
+        var label = string.IsNullOrWhiteSpace(Label) ? null : Label.Trim();
+        var account = setup.BuildAccount(name, email, config) with { Label = label };
         if (account.Connections.Count == 0)
         {
             Error = "Bitte mindestens einen IMAP-Server oder eine CalDAV-/CardDAV-Adresse angeben.";
@@ -177,7 +239,15 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         BusyText = "Verbindungen werden geprüft …";
         try
         {
-            await setup.CreateAsync(account, Password);
+            if (Editing is { } existing)
+            {
+                await setup.UpdateAsync(existing, name, label, email, config, Password.Length > 0 ? Password : null);
+            }
+            else
+            {
+                await setup.CreateAsync(account, Password);
+            }
+
             Finished?.Invoke(this, true);
         }
         catch (AccountSetupException ex)
@@ -191,7 +261,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
     }
 
-    private bool CanCreate() => !IsBusy && Password.Length > 0;
+    private bool CanCreate() => !IsBusy && (IsEditing || Password.Length > 0);
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, false);
