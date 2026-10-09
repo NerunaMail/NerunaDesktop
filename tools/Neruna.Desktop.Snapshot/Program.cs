@@ -108,6 +108,13 @@ internal static class Snapshots
         await CheckMarkAsReadAsync(vm, services.GetRequiredService<ISettingsStore>());
         await CheckLayoutAsync(vm, window, services.GetRequiredService<ISettingsStore>());
 
+        // Favoriten on top of the folder tree: the inbox and a project folder.
+        foreach (var folder in vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).Where(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox).Take(2)
+                     .Concat(vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).Where(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.None).Take(1)))
+        {
+            await vm.MailPage.AddFavoriteCommand.ExecuteAsync(folder);
+        }
+
         // Mail: open the first message in the inbox.
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
         await Task.Delay(300);
@@ -389,6 +396,24 @@ internal static class Snapshots
         await vm.SettingsPage.ReloadAsync();
         vm.SettingsPage.SelectedTab = 1;
         await SaveAsync(window, output, "settings-mail.png");
+
+        // Konto bearbeiten with a label and an alias (sender address of the same mailbox).
+        var editedAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync())[0];
+        vm.SettingsPage.SelectedTab = 0;
+        await vm.SettingsPage.Accounts.ReloadAsync();
+        vm.SettingsPage.Accounts.EditCommand.Execute(vm.SettingsPage.Accounts.Items[0]);
+        await Task.Delay(300);
+        if (vm.Overlay is AccountSetupViewModel accountEdit)
+        {
+            accountEdit.Label = "Büro";
+            // Demo accounts have no servers; for the picture what a typical one looks like.
+            (accountEdit.ImapHost, accountEdit.SmtpHost, accountEdit.Username) = ("mail.example.com", "mail.example.com", editedAccount.EmailAddress!);
+            accountEdit.CalDavUrl = "https://mail.example.com/SOGo/dav/";
+            accountEdit.CardDavUrl = "https://mail.example.com/SOGo/dav/";
+            accountEdit.Aliases.Add(new AliasRow { Email = "info@" + editedAccount.EmailAddress!.Split('@')[1], DisplayName = "Muster Informatik AG" });
+            await SaveAsync(window, output, "account-edit.png");
+            accountEdit.CancelCommand.Execute(null);
+        }
         var notifications = services.GetRequiredService<NotificationService>();
         vm.SettingsPage.MailOptions.TestNotificationCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
