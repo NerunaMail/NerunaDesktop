@@ -181,10 +181,20 @@ public sealed class OAuthTokenSource(OAuthClient client, OAuthEndpoints endpoint
 {
     private static readonly Dictionary<Guid, SemaphoreSlim> Gates = [];
 
+    // The short-lived access token stays in memory only; the keychain keeps the refresh token (smaller, and nothing
+    // that works on its own for long).
+    private static readonly Dictionary<Guid, OAuthTokens> Current = [];
+
     public static async Task StoreAsync(ICredentialStore credentials, Guid secretId, OAuthTokens tokens, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(credentials);
-        await credentials.SetSecretAsync(secretId, JsonSerializer.Serialize(tokens), cancellationToken);
+        ArgumentNullException.ThrowIfNull(tokens);
+        lock (Current)
+        {
+            Current[secretId] = tokens;
+        }
+
+        await credentials.SetSecretAsync(secretId, JsonSerializer.Serialize(tokens with { AccessToken = string.Empty, ExpiresAt = DateTimeOffset.MinValue }), cancellationToken);
     }
 
     /// <exception cref="OAuthException">Not signed in, or the sign-in expired.</exception>
@@ -202,7 +212,13 @@ public sealed class OAuthTokenSource(OAuthClient client, OAuthEndpoints endpoint
         await gate.WaitAsync(cancellationToken);
         try
         {
-            var stored = await credentials.GetSecretAsync(secretId, cancellationToken) is { Length: > 0 } json
+            OAuthTokens? stored;
+            lock (Current)
+            {
+                stored = Current.GetValueOrDefault(secretId);
+            }
+
+            stored ??= await credentials.GetSecretAsync(secretId, cancellationToken) is { Length: > 0 } json
                 ? JsonSerializer.Deserialize<OAuthTokens>(json)
                 : null;
             if (stored is null)

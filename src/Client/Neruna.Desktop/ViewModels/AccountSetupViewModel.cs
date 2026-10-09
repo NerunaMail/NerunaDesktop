@@ -96,9 +96,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             await setup.CreateSignedInAsync(account);
             Finished?.Invoke(this, true);
         }
-        catch (Exception ex) when (ex is Neruna.Core.Auth.OAuthException or AccountSetupException or HttpRequestException or Neruna.Providers.Graph.GraphException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = ex.Message;
+            // Whatever goes wrong (browser, keychain, Graph): a message in the dialog, never a crash.
+            Error = ex is Neruna.Core.Auth.OAuthException or AccountSetupException or Neruna.Providers.Graph.GraphException
+                ? ex.Message
+                : F("Anmeldung fehlgeschlagen: {0}", ex.Message);
         }
         finally
         {

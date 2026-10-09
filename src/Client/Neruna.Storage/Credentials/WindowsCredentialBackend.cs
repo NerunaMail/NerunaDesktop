@@ -16,6 +16,9 @@ internal sealed class WindowsCredentialBackend : ISecretBackend
     private const int CredPersistLocalMachine = 2;
     private const int ErrorNotFound = 1168;
 
+    /// <summary>Windows keeps at most 2560 bytes per credential (CRED_MAX_CREDENTIAL_BLOB_SIZE) – 1280 UTF-16 chars.</summary>
+    public const int MaxChars = 1280;
+
     public string Name => "Windows-Anmeldeinformationsverwaltung";
 
     public string? Get(string key)

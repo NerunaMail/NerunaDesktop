@@ -78,7 +78,7 @@ internal static class CredentialStoreSelector
         try
         {
             ISecretBackend? backend =
-                OperatingSystem.IsWindows() ? new WindowsCredentialBackend() :
+                OperatingSystem.IsWindows() ? new ChunkingSecretBackend(new WindowsCredentialBackend(), WindowsCredentialBackend.MaxChars) :
                 OperatingSystem.IsMacOS() ? new MacKeychainBackend() :
                 OperatingSystem.IsLinux() ? LibSecretBackend.TryCreate(logger) :
                 null;
