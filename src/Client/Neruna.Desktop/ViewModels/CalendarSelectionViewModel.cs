@@ -25,6 +25,30 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
 
     public bool HasNoSources => !IsBusy && Sources.Count == 0;
 
+    /// <summary>The account whose calendars are shown on the right (the list on the left only with several accounts).</summary>
+    [ObservableProperty]
+    public partial CalendarSourceGroup? SelectedSource { get; set; }
+
+    public bool HasSeveralSources => Sources.Count > 1;
+
+    /// <summary>Narrows the calendars of the selected account by name.</summary>
+    [ObservableProperty]
+    public partial string Filter { get; set; } = string.Empty;
+
+    partial void OnFilterChanged(string value) => SelectedSource?.ApplyFilter(value);
+
+    partial void OnSelectedSourceChanged(CalendarSourceGroup? value) => value?.ApplyFilter(Filter);
+
+    /// <summary>"Alle" / "Keine": the calendars of the selected account that the filter shows.</summary>
+    [RelayCommand]
+    private void SelectAll(bool value)
+    {
+        foreach (var item in SelectedSource?.Calendars.Where(c => c.IsVisible) ?? [])
+        {
+            item.IsSelected = value;
+        }
+    }
+
     partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(HasNoSources));
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
@@ -32,6 +56,7 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
     {
         IsBusy = true;
         Error = null;
+        var selected = SelectedSource?.Source.Connection.Id;
         try
         {
             Sources.Clear();
@@ -54,11 +79,15 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
                 {
                     group.Error = "Server nicht erreichbar: " + ex.Message;
                 }
+
+                group.UpdateSummary();
             }
         }
         finally
         {
             IsBusy = false;
+            OnPropertyChanged(nameof(HasSeveralSources));
+            SelectedSource = Sources.FirstOrDefault(s => s.Source.Connection.Id == selected) ?? Sources.FirstOrDefault();
         }
     }
 
@@ -116,6 +145,7 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
             if (existing is null)
             {
                 group.Calendars.Add(new CalendarChoiceItem(new CalendarCandidate(added, true, true, true)));
+                group.ApplyFilter(Filter);
             }
             else
             {
@@ -143,9 +173,29 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
     private bool IsIdle() => !IsBusy;
 }
 
-internal sealed partial class CalendarSourceGroup(CalendarSource source) : ObservableObject
+internal sealed partial class CalendarSourceGroup : ObservableObject
 {
-    public CalendarSource Source { get; } = source;
+    public CalendarSourceGroup(CalendarSource source)
+    {
+        Source = source;
+        Calendars.CollectionChanged += (_, e) =>
+        {
+            foreach (CalendarChoiceItem item in e.NewItems ?? Array.Empty<CalendarChoiceItem>())
+            {
+                item.PropertyChanged += (_, p) =>
+                {
+                    if (p.PropertyName == nameof(CalendarChoiceItem.IsSelected))
+                    {
+                        UpdateSummary();
+                    }
+                };
+            }
+
+            UpdateSummary();
+        };
+    }
+
+    public CalendarSource Source { get; }
 
     public string Title => Source.Account.Title;
 
@@ -153,8 +203,35 @@ internal sealed partial class CalendarSourceGroup(CalendarSource source) : Obser
 
     public ObservableCollection<CalendarChoiceItem> Calendars { get; } = [];
 
+    /// <summary>"3 von 12 angezeigt" in the account list.</summary>
     [ObservableProperty]
+    public partial string Summary { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool HasMatches { get; set; } = true;
+
+    public void UpdateSummary()
+    {
+        Summary = Error is not null ? "nicht erreichbar"
+            : Calendars.Count == 0 ? "keine Kalender"
+            : $"{Calendars.Count(c => c.IsSelected)} von {Calendars.Count} angezeigt";
+    }
+
+    public void ApplyFilter(string filter)
+    {
+        foreach (var item in Calendars)
+        {
+            item.IsVisible = filter.Length == 0 || item.Name.Contains(filter.Trim(), StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        HasMatches = Calendars.Count == 0 || Calendars.Any(c => c.IsVisible);
+    }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
     public partial string? Error { get; set; }
+
+    public bool HasError => Error is not null;
 
     /// <summary>Where the server was asked (calendar home, user name) – helps when a subscription is missing.</summary>
     [ObservableProperty]
@@ -188,4 +265,8 @@ internal sealed partial class CalendarChoiceItem(CalendarCandidate candidate) : 
 
     [ObservableProperty]
     public partial bool IsSelected { get; set; } = candidate.IsSelected;
+
+    /// <summary>Matches the search field.</summary>
+    [ObservableProperty]
+    public partial bool IsVisible { get; set; } = true;
 }

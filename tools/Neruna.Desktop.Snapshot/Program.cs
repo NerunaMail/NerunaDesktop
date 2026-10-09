@@ -20,6 +20,7 @@ var output = Path.GetFullPath(args.Length > 0 ? args[0] : "artifacts/screenshots
 var theme = args.Length > 1 && args[1] == "dark" ? ThemeVariant.Dark : ThemeVariant.Light;
 var mailFiles = Array.IndexOf(args, "--eml") is var e and >= 0 ? args[(e + 1)..] : null;
 var certificates = Array.IndexOf(args, "--certificates") is var ce and >= 0 ? args[(ce + 1)..(ce + 4)] : null;
+var calendars = Array.IndexOf(args, "--calendars") is var cl and >= 0 ? new Uri(args[cl + 1]) : null;
 var cloudAccounts = Array.IndexOf(args, "--cloud-accounts") is var ca and >= 0 ? args[(ca + 1)..(ca + 4)] : null;
 var backup = Array.IndexOf(args, "--backup") is var bk and >= 0 ? args[(bk + 1)..(bk + 6)] : null;
 var firstStart = Array.IndexOf(args, "--first-start") is var fs and >= 0 ? args[fs + 1] : null;
@@ -47,6 +48,10 @@ Dispatcher.UIThread.Post(async () =>
         if (mailFiles is not null)
         {
             await Snapshots.RenderMailsAsync(output, mailFiles);
+        }
+        else if (calendars is { } calendarDav)
+        {
+            await LiveScenario.CalendarManagementAsync(output, calendarDav);
         }
         else if (cloudAccounts is [var accountsServer, var accountsCode, var accountsPin])
         {

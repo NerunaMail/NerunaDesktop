@@ -283,7 +283,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     public bool HasOverlay => Overlay is not null;
 
     /// <summary>The group editor shows members and contacts side by side and needs more room.</summary>
-    public double OverlayWidth => Overlay is GroupEditorViewModel { IsReadOnly: false } ? 980 : 640;
+    public double OverlayWidth => Overlay switch
+    {
+        GroupEditorViewModel { IsReadOnly: false } => 980,
+        CalendarSelectionViewModel { HasSeveralSources: true } => 900,
+        _ => 640,
+    };
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SyncCommand))]
@@ -668,6 +673,14 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             {
                 await CalendarPage.ReloadAsync();
                 StatusText = $"Kalender aktualisiert um {DateTime.Now:HH:mm}";
+            }
+        };
+        // Several accounts: the two-column layout needs more room once they are known.
+        selection.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(CalendarSelectionViewModel.HasSeveralSources))
+            {
+                OnPropertyChanged(nameof(OverlayWidth));
             }
         };
         Overlay = selection;

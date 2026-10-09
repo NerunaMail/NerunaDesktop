@@ -1096,6 +1096,44 @@ internal static class LiveScenario
         await http.SendAsync(new HttpRequestMessage(HttpMethod.Delete, new Uri(new Uri(davUrl, "/" + Uri.EscapeDataString(user) + "/"), path)));
     }
 
+    /// <summary>"Kalender verwalten" with three accounts and many calendars each (Radicale of the test lab).</summary>
+    public static async Task CalendarManagementAsync(string output, Uri davUrl)
+    {
+        var dataDir = Path.Combine(Path.GetTempPath(), "neruna-calendars-" + Guid.NewGuid().ToString("N"));
+        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: false));
+        var setup = services.GetRequiredService<Neruna.Core.Accounts.AccountSetupService>();
+        string[] names = ["Kalender", "Team", "Ferien", "Projekt Alpha", "Projekt Beta", "Support-Pikett", "Schulungen", "Raum Zürich", "Raum Bern", "Fahrzeuge", "Geburtstage", "Feiertage"];
+        foreach (var (user, count) in new[] { ("anna", 12), ("lea", 5), ("marco", 3) })
+        {
+            for (var i = 0; i < count; i++)
+            {
+                await AddServerCalendarAsync(davUrl, user, $"verwalten-{i}/", names[i]);
+            }
+
+            var config = new Neruna.Contracts.Discovery.MailProviderConfig("example.com", null, [], [],
+                [new Neruna.Contracts.Discovery.DavServerSettings(Neruna.Contracts.Discovery.ServerProtocol.CalDav, davUrl, user)]);
+            await setup.CreateAsync(setup.BuildAccount(user, user + "@example.com", config), "geheim");
+        }
+
+        var vm = services.GetRequiredService<MainWindowViewModel>();
+        var window = new MainWindow { DataContext = vm, Width = 1440, Height = 880 };
+        window.Show();
+        await vm.LoadLocalAsync();
+        vm.NavigateCommand.Execute(Section.Calendar);
+        vm.CalendarPage.ManageCommand.Execute(null);
+        var selection = (CalendarSelectionViewModel)vm.Overlay!;
+        await WaitAsync(() => !selection.IsBusy);
+        await Task.Delay(300);
+        Console.WriteLine("Sources: " + string.Join(", ", selection.Sources.Select(s => $"{s.Title}: {s.Summary}")));
+        await Snapshots.SaveAsync(window, output, "calendar-manage.png");
+        selection.Filter = "raum";
+        await Snapshots.SaveAsync(window, output, "calendar-manage-filter.png");
+        selection.Filter = string.Empty;
+        selection.SelectedSource = selection.Sources[1];
+        await Snapshots.SaveAsync(window, output, "calendar-manage-second.png");
+        window.Close();
+    }
+
     private static async Task AddServerCalendarAsync(Uri davUrl, string user, string path, string name)
     {
         using var http = new HttpClient();
