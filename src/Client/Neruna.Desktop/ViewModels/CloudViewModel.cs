@@ -18,8 +18,12 @@ internal sealed partial class CloudViewModel(
     CloudTextTemplateSync textTemplates,
     CloudCertificateSync certificates,
     AccountDiscovery discovery,
-    SettingsBackupService backup) : ViewModelBase
+    SettingsBackupService backup,
+    CloudAccountSync accounts) : ViewModelBase
 {
+    /// <summary>Accounts of the organisation were set up, changed or removed (the shell reloads and syncs).</summary>
+    public event EventHandler? AccountsArrived;
+
     // ── Sicherung: manual backups of the personal settings into the vault (zero knowledge) ──
 
     /// <summary>A backup was restored: everything has to be reloaded and synced.</summary>
@@ -284,7 +288,25 @@ internal sealed partial class CloudViewModel(
                     : status.Received == 0
                         ? "Zertifikate: Ihnen ist noch kein Zertifikat zugeordnet."
                         : $"Zertifikate: {status.Received} von der Organisation auf diesem Gerät.");
+
+        var mail = accounts.Status;
+        AccountsNeedAttention = mail.Problem is not null || mail.Waiting > 0 || mail.Pending.Count > 0;
+        AccountsText = mail.Problem
+            ?? (mail.Received + mail.Waiting + mail.Pending.Count == 0 ? null
+                : string.Join(" ", new[]
+                {
+                    mail.Received > 0 ? $"E-Mail-Konten: {mail.Received} von der Organisation eingerichtet." : "E-Mail-Konten:",
+                    mail.Waiting > 0 ? $"{mail.Waiting} warten auf die Freigabe dieses Geräts im Portal." : null,
+                    mail.Pending.Count > 0 ? $"{mail.Pending.Count} brauchen noch Ihr Passwort." : null,
+                }.Where(t => t is not null)));
     }
+
+    /// <summary>Mail accounts from the organisation: how many are set up, waiting for approval or for a password.</summary>
+    [ObservableProperty]
+    public partial string? AccountsText { get; set; }
+
+    [ObservableProperty]
+    public partial bool AccountsNeedAttention { get; set; }
 
     public const string DefaultServer = "https://neruna.cloud";
 
@@ -434,6 +456,11 @@ internal sealed partial class CloudViewModel(
             await signatures.RemoveAllAsync();
             await textTemplates.RemoveAllAsync();
             await certificates.RemoveAllAsync();
+            if (await accounts.RemoveAllAsync())
+            {
+                AccountsArrived?.Invoke(this, EventArgs.Empty);
+            }
+
             await backup.ForgetAsync();
             BackupState = null;
             Backups.Clear();
@@ -464,6 +491,19 @@ internal sealed partial class CloudViewModel(
         catch (Exception ex) when (ex is CloudException or HttpRequestException)
         {
             Error = "Zertifikate konnten nicht abgeglichen werden: " + ex.Message;
+        }
+
+        try
+        {
+            // Also when one only waits for its password: the shell asks for it.
+            if (await accounts.SyncAsync() || accounts.Status.Pending.Count > 0)
+            {
+                AccountsArrived?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        catch (Exception ex) when (ex is CloudException or HttpRequestException)
+        {
+            Error = "E-Mail-Konten der Organisation konnten nicht abgeglichen werden: " + ex.Message;
         }
 
         UpdateCertificateStatus();

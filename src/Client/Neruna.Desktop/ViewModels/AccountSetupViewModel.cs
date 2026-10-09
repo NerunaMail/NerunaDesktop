@@ -42,11 +42,16 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     public bool IsEditing => Editing is not null;
 
+    /// <summary>Set up by the organisation: servers, sender and aliases are read-only here.</summary>
+    public bool IsCloud => Editing?.IsFromCloud == true;
+
     public string Title => IsEditing ? "Konto bearbeiten" : "Konto hinzufügen";
 
     public string SaveText => IsEditing ? "Speichern" : "Konto hinzufügen";
 
-    public string Subtitle => IsEditing
+    public string Subtitle => IsCloud
+        ? "Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten."
+        : IsEditing
         ? "Namen, Passwort und Server ändern. Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten. Leeres Kalender- oder Kontaktfeld entfernt diesen Dienst."
         : "E-Mail (IMAP/SMTP), Kalender (CalDAV) und Kontakte (CardDAV) – z. B. SOGo, Nextcloud, Mailcow oder Ihr Provider. Die Servereinstellungen werden automatisch gesucht.";
 
@@ -95,6 +100,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(SaveText));
         OnPropertyChanged(nameof(Subtitle));
+        OnPropertyChanged(nameof(IsCloud));
         OnPropertyChanged(nameof(PasswordHint));
         CreateCommand.NotifyCanExecuteChanged();
     }

@@ -110,6 +110,13 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
         }
 
         await accounts.SaveAccountAsync(updated, cancellationToken);
+
+        // Typed in for an account of the organisation that came without one: kept for it (and the personal backup).
+        if (account.CloudId is { } cloudId && password is not null)
+        {
+            await credentials.SetSecretAsync(Cloud.CloudAccountPasswords.SecretId(cloudId), password, cancellationToken);
+        }
+
         return updated;
     }
 

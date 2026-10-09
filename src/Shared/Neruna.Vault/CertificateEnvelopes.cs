@@ -35,7 +35,11 @@ public static class CertificateEnvelopes
 
     /// <summary>The certificate key from this device's envelope.</summary>
     /// <exception cref="CryptographicException">Not for this device or this certificate, or changed.</exception>
-    public static byte[] Unwrap(string envelope, ECDiffieHellman deviceKey, string certificateId, string deviceId)
+    public static byte[] Unwrap(string envelope, ECDiffieHellman deviceKey, string certificateId, string deviceId) =>
+        UnwrapFor(envelope, deviceKey, Context(certificateId, deviceId));
+
+    /// <summary>An envelope bound to <paramref name="context"/> (certificate or account key, see the browser module).</summary>
+    internal static byte[] UnwrapFor(string envelope, ECDiffieHellman deviceKey, string context)
     {
         ArgumentNullException.ThrowIfNull(deviceKey);
         var parsed = JsonSerializer.Deserialize<Sealed>(envelope) ?? throw new CryptographicException("Empty envelope.");
@@ -44,7 +48,6 @@ public static class CertificateEnvelopes
             throw new CryptographicException("Unknown envelope format.");
         }
 
-        var context = Context(certificateId, deviceId);
         using var ephemeral = ECDiffieHellman.Create();
         ephemeral.ImportSubjectPublicKeyInfo(Convert.FromBase64String(parsed.epk), out _);
         var shared = deviceKey.DeriveRawSecretAgreement(ephemeral.PublicKey);
@@ -55,8 +58,7 @@ public static class CertificateEnvelopes
     /// <summary>The PKCS#12 and its password.</summary>
     public static (byte[] Pkcs12, string Password) Decrypt(string certificateId, string payload, byte[] certificateKey)
     {
-        var parsed = JsonSerializer.Deserialize<Sealed>(payload) ?? throw new CryptographicException("Empty payload.");
-        var plain = Open(certificateKey, parsed, "neruna-cert-payload-v1|" + certificateId);
+        var plain = OpenPayload(payload, certificateKey, "neruna-cert-payload-v1|" + certificateId);
         var content = JsonSerializer.Deserialize<Content>(plain) ?? throw new CryptographicException("Empty payload.");
         return (Convert.FromBase64String(content.pkcs12), content.password);
     }
@@ -65,13 +67,22 @@ public static class CertificateEnvelopes
     /// The organisation signed exactly this payload for exactly this certificate. Without that, a certificate is never
     /// taken – a server could otherwise slip in a key of its own (others would then encrypt to it).
     /// </summary>
-    public static bool Verify(string certificateId, string payload, string signature, string signingPublicKey)
+    public static bool Verify(string certificateId, string payload, string signature, string signingPublicKey) =>
+        VerifySigned($"neruna-cert-v1|{certificateId}|{payload}", signature, signingPublicKey);
+
+    internal static byte[] OpenPayload(string payload, byte[] key, string aad)
+    {
+        var parsed = JsonSerializer.Deserialize<Sealed>(payload) ?? throw new CryptographicException("Empty payload.");
+        return Open(key, parsed, aad);
+    }
+
+    internal static bool VerifySigned(string message, string signature, string signingPublicKey)
     {
         try
         {
             using var key = ECDsa.Create();
             key.ImportSubjectPublicKeyInfo(Convert.FromBase64String(signingPublicKey), out _);
-            return key.VerifyData(Encoding.UTF8.GetBytes($"neruna-cert-v1|{certificateId}|{payload}"), Convert.FromBase64String(signature),
+            return key.VerifyData(Encoding.UTF8.GetBytes(message), Convert.FromBase64String(signature),
                 HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
         }
         catch (Exception ex) when (ex is FormatException or CryptographicException)

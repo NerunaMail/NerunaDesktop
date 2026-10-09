@@ -20,6 +20,7 @@ var output = Path.GetFullPath(args.Length > 0 ? args[0] : "artifacts/screenshots
 var theme = args.Length > 1 && args[1] == "dark" ? ThemeVariant.Dark : ThemeVariant.Light;
 var mailFiles = Array.IndexOf(args, "--eml") is var e and >= 0 ? args[(e + 1)..] : null;
 var certificates = Array.IndexOf(args, "--certificates") is var ce and >= 0 ? args[(ce + 1)..(ce + 4)] : null;
+var cloudAccounts = Array.IndexOf(args, "--cloud-accounts") is var ca and >= 0 ? args[(ca + 1)..(ca + 4)] : null;
 var backup = Array.IndexOf(args, "--backup") is var bk and >= 0 ? args[(bk + 1)..(bk + 6)] : null;
 var firstStart = Array.IndexOf(args, "--first-start") is var fs and >= 0 ? args[fs + 1] : null;
 var live = Array.IndexOf(args, "--live") is var i and >= 0 ? (Host: args[i + 1], Dav: new Uri(args[i + 2])) : ((string Host, Uri Dav)?)null;
@@ -46,6 +47,10 @@ Dispatcher.UIThread.Post(async () =>
         if (mailFiles is not null)
         {
             await Snapshots.RenderMailsAsync(output, mailFiles);
+        }
+        else if (cloudAccounts is [var accountsServer, var accountsCode, var accountsPin])
+        {
+            await LiveScenario.CloudAccountsAsync(output, accountsServer, accountsCode, accountsPin);
         }
         else if (backup is [var backupServer, var code1, var pin1, var code2, var pin2])
         {

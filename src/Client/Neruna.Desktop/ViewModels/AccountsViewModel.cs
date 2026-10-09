@@ -125,6 +125,9 @@ internal sealed partial class AccountItem(Account account) : ObservableObject
 
     public string Title => Account.Title;
 
+    /// <summary>Set up by the organisation in Neruna Cloud: it goes when the organisation removes it, not here.</summary>
+    public bool IsFromCloud => Account.IsFromCloud;
+
     /// <summary>Under the title: sender name and address (the title may be a label like "Privat").</summary>
     public string Sender => Account.EmailAddress is { } email ? $"{Account.DisplayName} <{email}>" : Account.DisplayName;
 

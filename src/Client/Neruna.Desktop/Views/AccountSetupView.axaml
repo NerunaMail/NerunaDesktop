@@ -16,18 +16,22 @@
     <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,8" Text="{Binding Subtitle}" />
 
+    <!-- Accounts of the organisation: only the label (and a password typed in here) are the user's -->
+    <Border IsVisible="{Binding IsCloud}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+      <TextBlock TextWrapping="Wrap" Text="Von Ihrer Organisation verwaltet: Server, Absender und Aliase kommen aus Neruna Cloud. Hier lassen sich die Kontobezeichnung und – falls Sie es selbst eingegeben haben – das Passwort ändern." />
+    </Border>
     <TextBlock Classes="label" Text="Ihr Name (Absender)" />
-    <TextBox Text="{Binding DisplayName}" PlaceholderText="Anna Muster" />
+    <TextBox Text="{Binding DisplayName}" PlaceholderText="Anna Muster" IsEnabled="{Binding !IsCloud}" />
 
     <TextBlock Classes="label" Text="Kontobezeichnung (optional)" />
     <TextBox Text="{Binding Label}" PlaceholderText="z. B. Privat oder Firma – sonst steht die E-Mail-Adresse in der Ordnerliste" />
 
     <TextBlock Classes="label" Text="E-Mail-Adresse" />
-    <TextBox Text="{Binding Email}" PlaceholderText="anna.muster@example.com" />
+    <TextBox Text="{Binding Email}" PlaceholderText="anna.muster@example.com" IsEnabled="{Binding !IsCloud}" />
 
     <!-- Aliases: more sender addresses of the same mailbox -->
     <TextBlock Classes="label" Text="Weitere Absenderadressen (Aliase)" />
-    <ItemsControl ItemsSource="{Binding Aliases}">
+    <ItemsControl ItemsSource="{Binding Aliases}" IsEnabled="{Binding !IsCloud}">
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:AliasRow">
           <Grid ColumnDefinitions="*,8,*,Auto" Margin="0,0,0,4">
@@ -39,13 +43,13 @@
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
-    <Button Classes="command" Content="+ Alias hinzufügen" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left" Padding="0,2" />
+    <Button Classes="command" Content="+ Alias hinzufügen" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left" Padding="0,2" IsVisible="{Binding !IsCloud}" />
 
     <TextBlock Classes="label" Text="Passwort" />
     <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="{Binding PasswordHint}" />
 
     <!-- Server settings, prefilled by discovery -->
-    <StackPanel IsVisible="{Binding ShowServerSettings}" Margin="0,12,0,0">
+    <StackPanel IsVisible="{Binding ShowServerSettings}" IsEnabled="{Binding !IsCloud}" Margin="0,12,0,0">
       <TextBlock Text="{Binding DiscoverySource}" Foreground="{DynamicResource AccentTextBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding DiscoverySource, Converter={x:Static ObjectConverters.IsNotNull}}" />
 

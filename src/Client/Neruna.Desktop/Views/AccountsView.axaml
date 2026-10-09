@@ -32,6 +32,7 @@
                   <StackPanel>
                     <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding Sender}" Classes="subtle" />
+                    <TextBlock Text="Von Ihrer Organisation verwaltet" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" />
                   </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
                     <!-- Order in the folder tree and everywhere else -->
@@ -45,7 +46,7 @@
                     </Button>
                     <Button Content="Bearbeiten" Margin="4,0,0,0"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
-                    <Button Content="{Binding RemoveText}"
+                    <Button Content="{Binding RemoveText}" IsVisible="{Binding !IsFromCloud}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
                   </StackPanel>
                   <ItemsControl Grid.Row="1" Grid.ColumnSpan="2" ItemsSource="{Binding Connections}" Margin="0,10,0,0">

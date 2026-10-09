@@ -41,6 +41,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly ReminderScheduler _reminders;
     private readonly ISettingsStore _settings;
     private readonly Neruna.Core.Cloud.SettingsBackupService _backup;
+    private readonly Neruna.Core.Cloud.CloudAccountSync _cloudAccounts;
+
+    // Accounts whose password the user postponed ("Später") – asked again with the next start.
+    private readonly HashSet<string> _postponedCloudAccounts = [];
 
     /// <summary>Remembered window placement and column widths; the views restore and update them.</summary>
     public UiLayout Layout { get; }
@@ -67,9 +71,13 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Cloud.CloudTextTemplateSync cloudTemplates,
         Neruna.Core.Cloud.CloudCertificateSync cloudCertificates,
         Neruna.Core.Cloud.SettingsBackupService backup,
+        Neruna.Core.Cloud.CloudAccountSync cloudAccounts,
         ILogger<MainWindowViewModel> logger)
     {
         _backup = backup;
+        _cloudAccounts = cloudAccounts;
+        // Accounts of the organisation arrived (connecting, or the regular cloud refresh): show them and fetch their mail.
+        settingsPage.Cloud.AccountsArrived += async (_, _) => await CloudAccountsChangedAsync(sync: true);
         _cloudSignatures = cloudSignatures;
         _cloudTemplates = cloudTemplates;
         _cloudCertificates = cloudCertificates;
@@ -426,12 +434,15 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private DateTime _cloudSyncedAt;
 
     // The organisation's central signatures: with the sync, at most every 10 minutes; offline or unreachable is no error.
-    private async Task SyncCloudAsync()
+    /// <returns>Accounts of the organisation were added, changed or removed (their mail still has to be fetched).</returns>
+    private async Task<bool> SyncCloudAsync()
     {
         if (DateTime.UtcNow - _cloudSyncedAt < TimeSpan.FromMinutes(10))
         {
-            return;
+            return false;
         }
+
+        var cloudAccountsChanged = false;
 
         try
         {
@@ -439,12 +450,61 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             await Task.Run(() => _cloudTemplates.SyncAsync());
             await Task.Run(() => _cloudCertificates.SyncAsync());
             SettingsPage.Cloud.UpdateCertificateStatus();
+            if (await Task.Run(() => _cloudAccounts.SyncAsync()))
+            {
+                await CloudAccountsChangedAsync(sync: false);
+                cloudAccountsChanged = true;
+            }
+
+            AskForCloudAccountPassword();
             _cloudSyncedAt = DateTime.UtcNow;
         }
         catch (Exception ex) when (ex is Neruna.Core.Cloud.CloudException or HttpRequestException or TaskCanceledException)
         {
             _logger.LogWarning(ex, "Cloud signatures not refreshed");
         }
+
+        return cloudAccountsChanged;
+    }
+
+    private async Task CloudAccountsChangedAsync(bool sync)
+    {
+        await SettingsPage.Accounts.ReloadAsync();
+        await RefreshPagesAsync();
+        HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
+        await UpdatePushAsync();
+        if (sync && CanSync())
+        {
+            await SyncAsync();
+        }
+
+        AskForCloudAccountPassword();
+    }
+
+    // An account of the organisation without password: ask for it (one at a time, not over another dialog).
+    private void AskForCloudAccountPassword()
+    {
+        if (Overlay is not null || _cloudAccounts.Status.Pending.FirstOrDefault(p => !_postponedCloudAccounts.Contains(p.CloudId)) is not { } pending)
+        {
+            return;
+        }
+
+        var prompt = new CloudAccountPasswordViewModel(pending, _cloudAccounts);
+        prompt.Finished += async (_, done) =>
+        {
+            Overlay = null;
+            if (done)
+            {
+                await CloudAccountsChangedAsync(sync: true);
+            }
+            else
+            {
+                _postponedCloudAccounts.Add(pending.CloudId);
+            }
+
+            AskForCloudAccountPassword();
+        };
+        Overlay = prompt;
     }
 
     [RelayCommand(CanExecute = nameof(CanSync))]
@@ -460,7 +520,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             await RefreshPagesAsync();
             await MailPage.Agenda.ReloadAsync();
             await _reminders.CheckAsync();
-            await SyncCloudAsync();
+            if (await SyncCloudAsync())
+            {
+                // New accounts from the organisation: fetch their folders and mail right away.
+                reports = [.. reports, .. await Task.Run(() => Task.WhenAll(_mail.SyncAllAsync(), _calendar.SyncAllAsync(), _contacts.SyncAllAsync()))];
+                await RefreshPagesAsync();
+            }
 
             var failures = reports.SelectMany(r => r.Failures).ToList();
             StatusText = failures.Count == 0

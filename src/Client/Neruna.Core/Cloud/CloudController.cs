@@ -133,6 +133,10 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task<CertificatesResponse> GetCertificatesAsync(CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<CertificatesResponse>("api/v1/certificates", cancellationToken);
 
+    /// <summary>The mail accounts the organisation set up for this person, encrypted for this device.</summary>
+    public async Task<MailAccountsResponse> GetMailAccountsAsync(CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<MailAccountsResponse>("api/v1/mail-accounts", cancellationToken);
+
     /// <summary>The config vault (wrapped keys) and the list of backups.</summary>
     public async Task<VaultResponse> GetVaultAsync(CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<VaultResponse>("api/v1/vault", cancellationToken);

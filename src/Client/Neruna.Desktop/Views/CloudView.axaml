@@ -61,6 +61,14 @@
               </Style>
             </TextBlock.Styles>
           </TextBlock>
+          <TextBlock Text="{Binding AccountsText}" TextWrapping="Wrap" IsVisible="{Binding AccountsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                     Classes.attention="{Binding AccountsNeedAttention}">
+            <TextBlock.Styles>
+              <Style Selector="TextBlock.attention">
+                <Setter Property="Foreground" Value="#CA5010" />
+              </Style>
+            </TextBlock.Styles>
+          </TextBlock>
           <TextBlock Text="{Binding ConnectedText}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="Aktualisieren" Command="{Binding RefreshCommand}" />

@@ -164,3 +164,11 @@ public sealed record VaultUpdateRequest(Guid VaultId, System.Text.Json.JsonEleme
 
 /// <summary>Body of <c>POST /api/v1/vault/backups</c>.</summary>
 public sealed record VaultBackupRequest(Guid VaultId, int Version, string Nonce, string Ciphertext, string? Note);
+
+/// <summary>
+/// <c>GET /api/v1/mail-accounts</c>: the mail accounts the organisation set up for this person. Payload encrypted and
+/// signed by the organisation; envelope = its key for this device (null until approved). See contract/openapi.yaml.
+/// </summary>
+public sealed record MailAccountsResponse(bool Available, CloudOrganizationKey? OrganizationKey, CloudCertificateDevice Device, IReadOnlyList<CloudMailAccount> Accounts);
+
+public sealed record CloudMailAccount(string Id, string Email, string DisplayName, string Payload, string PayloadSignature, string? Envelope);

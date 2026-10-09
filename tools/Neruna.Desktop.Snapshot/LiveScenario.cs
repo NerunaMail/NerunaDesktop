@@ -33,6 +33,69 @@ internal static class LiveScenario
     private static readonly string CertDir = Path.GetFullPath(Path.Combine("tools", "testlab", "certs"));
 
     /// <summary>
+    /// Mail accounts from the organisation, end to end: connect, then wait while an admin sets up an account in the portal
+    /// and approves this device (a browser, run alongside) – one with password, one without (the user is asked).
+    /// </summary>
+    public static async Task CloudAccountsAsync(string output, string server, string code, string pin)
+    {
+        var dataDir = Path.Combine(Path.GetTempPath(), "neruna-cloud-accounts-" + Guid.NewGuid().ToString("N"));
+        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: false));
+        var vm = services.GetRequiredService<MainWindowViewModel>();
+        var window = new MainWindow { DataContext = vm, Width = 1440, Height = 880 };
+        window.Show();
+        await vm.LoadLocalAsync();
+        var cloud = vm.SettingsPage.Cloud;
+        (cloud.Server, cloud.Code, cloud.Pin, cloud.DeviceName) = (server, code, pin, "Anna – Laptop");
+        await cloud.ConnectCommand.ExecuteAsync(null);
+        Console.WriteLine($"Connected: {cloud.ConnectedText ?? cloud.Error}");
+        Console.WriteLine("DEVICE READY");
+
+        var sync = services.GetRequiredService<Neruna.Core.Cloud.CloudAccountSync>();
+        for (var i = 0; i < 90 && sync.Status.Received == 0; i++)
+        {
+            await Task.Delay(3000);
+            await cloud.RefreshCommand.ExecuteAsync(null);
+        }
+
+        Console.WriteLine($"Accounts: {cloud.AccountsText}");
+        vm.NavigateCommand.Execute(Section.Settings);
+        vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        await Task.Delay(500);
+        await Snapshots.SaveAsync(window, output, "cloud-accounts-1-status.png");
+        for (var i = 0; i < 50 && vm.Overlay is not CloudAccountPasswordViewModel; i++)
+        {
+            await Task.Delay(200);
+        }
+
+        if (vm.Overlay is CloudAccountPasswordViewModel prompt)
+        {
+            await Snapshots.SaveAsync(window, output, "cloud-accounts-2-password.png");
+            prompt.Password = "geheim";
+            await prompt.CompleteCommand.ExecuteAsync(null);
+            Console.WriteLine($"Password: error={prompt.Error}");
+        }
+
+        for (var i = 0; i < 60 && vm.Overlay is not null; i++)
+        {
+            await Task.Delay(200);
+        }
+
+        await Task.Delay(3000);
+        vm.SettingsPage.SelectedTab = 0;
+        await vm.SettingsPage.Accounts.ReloadAsync();
+        await Snapshots.SaveAsync(window, output, "cloud-accounts-3-settings.png");
+        Console.WriteLine($"Accounts here: {string.Join(", ", vm.SettingsPage.Accounts.Items.Select(a => a.Title + (a.IsFromCloud ? " (cloud)" : string.Empty)))}");
+        vm.SettingsPage.Accounts.EditCommand.Execute(vm.SettingsPage.Accounts.Items[0]);
+        await Task.Delay(300);
+        await Snapshots.SaveAsync(window, output, "cloud-accounts-4-edit.png");
+        ((AccountSetupViewModel)vm.Overlay!).CancelCommand.Execute(null);
+        vm.NavigateCommand.Execute(Section.Mail);
+        await Task.Delay(2000);
+        await Snapshots.SaveAsync(window, output, "cloud-accounts-5-mail.png");
+        window.Close();
+    }
+
+    /// <summary>
     /// Settings backup, end to end against a real server: the office computer (demo data) sets up the vault and makes a
     /// backup; a new laptop connects, unlocks with the recovery code, sees the preview and restores.
     /// </summary>
