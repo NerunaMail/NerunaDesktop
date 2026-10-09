@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Neruna.Core.Security;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Storage.Credentials;
 
@@ -95,7 +96,7 @@ public sealed class LocalCredentialStore : ICredentialStore, IDisposable
 
     public bool Exists => File.Exists(_storePath);
 
-    public string Location => "verschlüsselte Datei im Datenordner (kein Schlüsselbund des Systems verfügbar)";
+    public string Location => T("verschlüsselte Datei im Datenordner (kein Schlüsselbund des Systems verfügbar)");
 
     /// <summary>Every stored secret, to move them into the system store.</summary>
     internal async Task<IReadOnlyDictionary<Guid, string>> ReadAllAsync(CancellationToken cancellationToken)

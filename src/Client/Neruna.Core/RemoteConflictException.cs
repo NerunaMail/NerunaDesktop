@@ -1,3 +1,4 @@
+using static Neruna.Core.Localization.Texts;
 namespace Neruna.Core;
 
 /// <summary>
@@ -7,7 +8,7 @@ namespace Neruna.Core;
 public sealed class RemoteConflictException : Exception
 {
     public RemoteConflictException()
-        : base("Das Element wurde inzwischen auf dem Server geändert.")
+        : base(T("Das Element wurde inzwischen auf dem Server geändert."))
     {
     }
 

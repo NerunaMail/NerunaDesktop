@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Neruna.Contracts.Cloud;
 using Neruna.Core.Chat;
 using Neruna.Core.Cloud;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -131,7 +132,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
     public string? Subtitle => Selected?.Subtitle;
 
-    public string PeopleTitle => Selected is { IsRoom: false } ? "Unterhaltung" : "Im Raum";
+    public string PeopleTitle => Selected is { IsRoom: false } ? T("Unterhaltung") : T("Im Raum");
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
@@ -222,7 +223,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
         catch (Exception ex) when (ex is CloudException or HttpRequestException or TaskCanceledException)
         {
             // Offline or server away: the chat shows what it has and tries again with the next tick.
-            Error = "Keine Verbindung zum Chat-Server – neuer Versuch läuft.";
+            Error = T("Keine Verbindung zum Chat-Server – neuer Versuch läuft.");
             _logger.LogDebug(ex, "Chat not refreshed");
         }
         finally
@@ -237,9 +238,9 @@ internal sealed partial class ChatViewModel : ViewModelBase
         var snapshot = _chat.Current;
         IsConnected = snapshot.Connected;
         IsAvailable = snapshot.Available;
-        RetentionText = snapshot.RetentionDays == 1 ? "Nachrichten werden 1 Tag aufbewahrt" : $"Nachrichten werden {snapshot.RetentionDays} Tage aufbewahrt";
-        RetentionDetails = RetentionText + " und danach gelöscht – auf dem Server und auf diesem Computer. "
-                           + "Die Dauer legt deine Organisation im Portal fest. Der Chat ist nicht für vertrauliche Daten gedacht.";
+        RetentionText = snapshot.RetentionDays == 1 ? T("Nachrichten werden 1 Tag aufbewahrt") : F("Nachrichten werden {0} Tage aufbewahrt", snapshot.RetentionDays);
+        RetentionDetails = RetentionText + T(" und danach gelöscht – auf dem Server und auf diesem Computer. ")
+                           + T("Die Dauer legt deine Organisation im Portal fest. Der Chat ist nicht für vertrauliche Daten gedacht.");
         TotalUnread = snapshot.TotalUnread;
 
         var people = snapshot.People.ToDictionary(p => p.Id);
@@ -398,7 +399,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
         {
             _logger.LogWarning(ex, "Chat message not sent");
             Draft = text;
-            Error = "Nicht gesendet: " + ex.Message;
+            Error = T("Nicht gesendet: ") + ex.Message;
         }
     }
 
@@ -503,8 +504,8 @@ internal sealed record ChatMessageItem(long Id, string SenderName, string Text, 
     private static string DayName(DateTime day)
     {
         var today = DateTime.Today;
-        return day == today ? "Heute"
-            : day == today.AddDays(-1) ? "Gestern"
+        return day == today ? T("Heute")
+            : day == today.AddDays(-1) ? T("Gestern")
             : day.ToString("dddd, d. MMMM", Neruna.Core.Localization.Texts.Culture);
     }
 }

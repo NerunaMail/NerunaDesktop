@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core.Accounts;
 using Neruna.Core.Mail;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -14,7 +15,7 @@ internal sealed partial class FolderSubscriptionsViewModel(MailController mail, 
 {
     public event EventHandler<bool>? Finished;
 
-    public string Title => $"Ordner abonnieren – {accountTitle}";
+    public string Title => F("Ordner abonnieren – {0}", accountTitle);
 
     public ObservableCollection<FolderSubscriptionItem> Folders { get; } = [];
 
@@ -41,11 +42,11 @@ internal sealed partial class FolderSubscriptionsViewModel(MailController mail, 
         }
         catch (Exception ex) when (ex is NotSupportedException)
         {
-            Error = "Dieser Kontotyp kennt keine Ordner-Abos.";
+            Error = T("Dieser Kontotyp kennt keine Ordner-Abos.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = "Die Ordner konnten nicht vom Server geladen werden: " + ex.Message;
+            Error = T("Die Ordner konnten nicht vom Server geladen werden: ") + ex.Message;
         }
         finally
         {
@@ -74,7 +75,7 @@ internal sealed partial class FolderSubscriptionsViewModel(MailController mail, 
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = "Speichern fehlgeschlagen: " + ex.Message;
+            Error = T("Speichern fehlgeschlagen: ") + ex.Message;
         }
         finally
         {

@@ -4,6 +4,7 @@ using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Views;
 
@@ -14,7 +15,7 @@ internal sealed partial class SplashWindow : Window
     {
         InitializeComponent();
         // The version of this build (e.g. "Beta 0.1.1"), not a fixed text.
-        this.FindControl<TextBlock>("VersionText")!.Text = "Beta " + Infrastructure.UpdateService.AppVersion;
+        this.FindControl<TextBlock>("VersionText")!.Text = T("Beta ") + Infrastructure.UpdateService.AppVersion;
     }
 
     public string Status

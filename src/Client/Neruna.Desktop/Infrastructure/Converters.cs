@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Neruna.Contracts.Discovery;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop;
 
@@ -11,7 +12,7 @@ internal static class Converters
     {
         SocketSecurity.SslOnConnect => "SSL/TLS",
         SocketSecurity.StartTls => "STARTTLS",
-        _ => "Keine (unverschlüsselt)",
+        _ => T("Keine (unverschlüsselt)"),
     });
 
     /// <summary>"#RRGGBB" → brush, for color swatches.</summary>

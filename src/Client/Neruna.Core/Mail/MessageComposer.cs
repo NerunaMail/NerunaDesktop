@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using MimeKit;
 using MimeKit.Utils;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Mail;
 
@@ -231,15 +232,15 @@ public static partial class MessageComposer
         var header = new StringBuilder()
             .Append("<div><br></div><div><br></div>")
             .Append("<div style=\"border:none;border-top:solid #E1E1E1 1pt;padding:3pt 0 0 0;font-family:Calibri,Arial,sans-serif;font-size:11pt\">")
-            .Append(CultureInfo.InvariantCulture, $"<b>Von:</b> {Encode(Format(original.From.Mailboxes))}<br>")
-            .Append(CultureInfo.InvariantCulture, $"<b>Gesendet:</b> {Encode(original.Date.LocalDateTime.ToString("dddd, d. MMMM yyyy HH:mm", culture))}<br>")
-            .Append(CultureInfo.InvariantCulture, $"<b>An:</b> {Encode(Format(original.To.Mailboxes))}<br>");
+            .Append(CultureInfo.InvariantCulture, $"<b>{T("Von:")}</b> {Encode(Format(original.From.Mailboxes))}<br>")
+            .Append(CultureInfo.InvariantCulture, $"<b>{T("Gesendet:")}</b> {Encode(original.Date.LocalDateTime.ToString("f", culture))}<br>")
+            .Append(CultureInfo.InvariantCulture, $"<b>{T("An:")}</b> {Encode(Format(original.To.Mailboxes))}<br>");
         if (original.Cc.Mailboxes.Any())
         {
             header.Append(CultureInfo.InvariantCulture, $"<b>Cc:</b> {Encode(Format(original.Cc.Mailboxes))}<br>");
         }
 
-        header.Append(CultureInfo.InvariantCulture, $"<b>Betreff:</b> {Encode(original.Subject ?? string.Empty)}</div><div><br></div>");
+        header.Append(CultureInfo.InvariantCulture, $"<b>{T("Betreff:")}</b> {Encode(original.Subject ?? string.Empty)}</div><div><br></div>");
         // A quoted Neruna mail must not carry our signature marker, or choosing a signature would replace the quoted one.
         var quoted = BodyOf(html).Replace($"id=\"{SignatureBlock.ElementId}\"", string.Empty, StringComparison.Ordinal);
         return header + "<div>" + StylesOf(html) + quoted + "</div>";
@@ -279,10 +280,10 @@ public static partial class MessageComposer
         var culture = Localization.Texts.Culture;
         var block = new StringBuilder()
             .Append("\n\n")
-            .Append("-----Ursprüngliche Nachricht-----\n")
-            .Append(CultureInfo.InvariantCulture, $"Von: {Format(original.From.Mailboxes)}\n")
-            .Append(CultureInfo.InvariantCulture, $"Gesendet: {original.Date.LocalDateTime.ToString("dddd, d. MMMM yyyy HH:mm", culture)}\n")
-            .Append(CultureInfo.InvariantCulture, $"An: {Format(original.To.Mailboxes)}\n");
+            .Append(T("-----Ursprüngliche Nachricht-----")).Append('\n')
+            .Append(CultureInfo.InvariantCulture, $"{T("Von:")} {Format(original.From.Mailboxes)}\n")
+            .Append(CultureInfo.InvariantCulture, $"{T("Gesendet:")} {original.Date.LocalDateTime.ToString("f", culture)}\n")
+            .Append(CultureInfo.InvariantCulture, $"{T("An:")} {Format(original.To.Mailboxes)}\n");
 
         if (original.Cc.Mailboxes.Any())
         {
@@ -290,7 +291,7 @@ public static partial class MessageComposer
         }
 
         return block
-            .Append(CultureInfo.InvariantCulture, $"Betreff: {original.Subject}\n\n")
+            .Append(CultureInfo.InvariantCulture, $"{T("Betreff:")} {original.Subject}\n\n")
             .Append(PlainTextOf(original).Trim())
             .ToString();
     }

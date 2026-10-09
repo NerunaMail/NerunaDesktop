@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -18,7 +19,7 @@ internal sealed partial class MessageWindowViewModel(
     /// <summary>Raised when the window should close (message deleted).</summary>
     public event EventHandler? CloseRequested;
 
-    public string WindowTitle { get; } = string.IsNullOrWhiteSpace(subject) ? "(kein Betreff)" : subject;
+    public string WindowTitle { get; } = string.IsNullOrWhiteSpace(subject) ? T("(kein Betreff)") : subject;
 
     public Neruna.Desktop.Infrastructure.UiPreferences Preferences => preferences;
 

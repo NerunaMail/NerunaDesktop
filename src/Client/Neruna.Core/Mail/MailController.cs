@@ -4,6 +4,7 @@ using MimeKit;
 using MimeKit.Utils;
 using Neruna.Core.Accounts;
 using Neruna.Core.Providers;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Mail;
 
@@ -143,7 +144,7 @@ public sealed class MailController(
         await using var targetProvider = providers.CreateMail(targetConnection);
         if (!targetProvider.Capabilities.HasFlag(MailProviderCapabilities.Append))
         {
-            throw new NotSupportedException("Das Zielkonto kann keine Nachrichten ablegen.");
+            throw new NotSupportedException(T("Das Zielkonto kann keine Nachrichten ablegen."));
         }
 
         await using var sourceProvider = providers.CreateMail(sourceConnection);
@@ -194,7 +195,7 @@ public sealed class MailController(
     {
         ArgumentNullException.ThrowIfNull(folder);
         var archive = await FindFolderAsync(folder.ConnectionId, FolderRole.Archive, cancellationToken)
-            ?? throw new InvalidOperationException("Dieses Konto hat keinen Archivordner.");
+            ?? throw new InvalidOperationException(T("Dieses Konto hat keinen Archivordner."));
         await MoveAsync(connection, folder, remoteIds, archive, cancellationToken);
     }
 
@@ -322,7 +323,7 @@ public sealed class MailController(
         await using var provider = providers.CreateMail(connection);
         if (!provider.Capabilities.HasFlag(MailProviderCapabilities.Append))
         {
-            throw new NotSupportedException("Dieses Konto kann keine Entwürfe speichern.");
+            throw new NotSupportedException(T("Dieses Konto kann keine Entwürfe speichern."));
         }
 
         draft.MessageId ??= MimeUtils.GenerateMessageId();

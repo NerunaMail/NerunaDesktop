@@ -499,7 +499,7 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 | 2 | Endbenutzer-Auth gegenüber Cloud | ✔ Geräte-Code aus dem Portal + PIN, danach Geräteschlüssel |
 | 3 | Admin-Escrow für Tresor | Für S/MIME-Zertifikate ✔ Organisationsschlüssel (6b); Config-Tresor ✔ ohne Escrow |
 | 4 | Preismodell | pro User · pro Domain · Staffeln |
-| 5 | UI-Sprachen | heute nur Deutsch; `.resx` de/en vor Release |
+| 5 | UI-Sprachen | ✔ de/en/fr/it: deutscher Text als Schlüssel, Kataloge `Neruna.Core/Localization/*.json`, Wahl unter Design (Neustart) |
 | 6 | HTML-Darstellung von Mails | ✔ Lesen: Avalonia.HtmlRenderer; Verfassen: native WebView (WebView2/WebKit). Avalonias RichTextEditor ist kommerziell → nicht verwendet |
 | 7 | Admin-UI Server | ✔ Filament 5 |
 | 8 | Produkt-Domain | ✔ neruna.org |

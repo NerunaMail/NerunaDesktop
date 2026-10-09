@@ -6,6 +6,7 @@ using Neruna.Core.Accounts;
 using Neruna.Core.Mail;
 using Neruna.Desktop.Editor;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -84,7 +85,7 @@ internal sealed partial class SignaturesViewModel(SignatureService signatures, I
     [RelayCommand]
     private async Task NewAsync()
     {
-        var name = Signatures.Count == 0 ? "Standard" : $"Signatur {Signatures.Count + 1}";
+        var name = Signatures.Count == 0 ? T("Standard") : F("Signatur {0}", Signatures.Count + 1);
         var saved = await OpenEditorAsync(new Signature(Guid.NewGuid(), name, string.Empty, DateTimeOffset.Now), isNew: true);
         if (saved is not null && Signatures.Count == 1)
         {
@@ -152,7 +153,7 @@ internal sealed partial class SignaturesViewModel(SignatureService signatures, I
 
 internal sealed record SignatureChoice(Guid? Id, string Name)
 {
-    public static SignatureChoice None { get; } = new(null, "(keine)");
+    public static SignatureChoice None { get; } = new(null, T("(keine)"));
 }
 
 /// <summary>One mail account with its two default signatures; changes are saved immediately.</summary>
@@ -226,10 +227,10 @@ internal sealed partial class SignatureEditorViewModel : ViewModelBase
 
     public string Title => (_isTextTemplate, IsNew) switch
     {
-        (true, true) => "Neue Textvorlage",
-        (true, false) => "Textvorlage bearbeiten",
-        (false, true) => "Neue Signatur",
-        _ => "Signatur bearbeiten",
+        (true, true) => T("Neue Textvorlage"),
+        (true, false) => T("Textvorlage bearbeiten"),
+        (false, true) => T("Neue Signatur"),
+        _ => T("Signatur bearbeiten"),
     };
 
     public bool IsTextTemplate => _isTextTemplate;
@@ -241,7 +242,7 @@ internal sealed partial class SignatureEditorViewModel : ViewModelBase
     /// <summary>Checks the shortcut before saving; returns an error to show, or null when it is fine.</summary>
     public Func<string?, Task<string?>>? ValidateShortcut { get; init; }
 
-    public string NamePlaceholder => _isTextTemplate ? "z. B. Anrufnotiz, Terminbestätigung, Absage" : "z. B. Standard, Kurz, Englisch";
+    public string NamePlaceholder => _isTextTemplate ? T("z. B. Anrufnotiz, Terminbestätigung, Absage") : T("z. B. Standard, Kurz, Englisch");
 
     public FormattingViewModel Formatting { get; }
 
@@ -257,8 +258,8 @@ internal sealed partial class SignatureEditorViewModel : ViewModelBase
         var font = await _settings.GetAsync(SettingKeys.ComposeFont) is { Length: > 0 } configured ? configured : FontCatalog.DefaultFont;
         var size = double.TryParse(await _settings.GetAsync(SettingKeys.ComposeFontSize), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var pt) ? pt : 11;
         Formatting.Attach(editor, _original.Html, font, size, _isTextTemplate
-            ? "Text der Vorlage – z. B. eine Tabelle für eine Anrufnotiz (Name, Nummer, Grund) oder eine Standardantwort …"
-            : "Signatur hier eingeben – z. B. Name, Funktion, Firma, Telefon, Logo …");
+            ? T("Text der Vorlage – z. B. eine Tabelle für eine Anrufnotiz (Name, Nummer, Grund) oder eine Standardantwort …")
+            : T("Signatur hier eingeben – z. B. Name, Funktion, Firma, Telefon, Logo …"));
     }
 
     [RelayCommand(CanExecute = nameof(CanSave))]

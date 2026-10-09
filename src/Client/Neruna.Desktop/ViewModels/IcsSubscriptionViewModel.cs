@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Neruna.Core.Accounts;
 using Neruna.Core.Providers;
 using Neruna.Providers.Ics;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -36,7 +37,7 @@ internal sealed partial class IcsSubscriptionViewModel(AccountSetupService setup
         }
         catch (Exception ex) when (ex is UriFormatException or ArgumentException)
         {
-            Error = "Bitte eine gültige https- oder webcal-Adresse eingeben.";
+            Error = T("Bitte eine gültige https- oder webcal-Adresse eingeben.");
             return;
         }
 
@@ -57,7 +58,7 @@ internal sealed partial class IcsSubscriptionViewModel(AccountSetupService setup
         }
         catch (AccountSetupException ex)
         {
-            Error = "Kalender konnte nicht geladen werden: " + ex.Message;
+            Error = T("Kalender konnte nicht geladen werden: ") + ex.Message;
         }
         finally
         {

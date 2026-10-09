@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -76,9 +77,9 @@ internal sealed partial class AppearanceViewModel(ISettingsStore settings, Nerun
 
     public IReadOnlyList<SchemeChoice> Schemes { get; } =
     [
-        new(ColorScheme.Blue, "Blau", "#0F6CBD"),
-        new(ColorScheme.Red, "Rot", "#C50F1F"),
-        new(ColorScheme.Green, "Grün", "#107C10"),
+        new(ColorScheme.Blue, T("Blau"), "#0F6CBD"),
+        new(ColorScheme.Red, T("Rot"), "#C50F1F"),
+        new(ColorScheme.Green, T("Grün"), "#107C10"),
     ];
 
     [ObservableProperty]

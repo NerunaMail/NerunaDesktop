@@ -7,6 +7,7 @@ using Neruna.Contracts.Discovery;
 using Neruna.Core.Accounts;
 using Neruna.Core.Security;
 using Neruna.Vault;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Cloud;
 
@@ -63,7 +64,7 @@ public sealed class CloudAccountSync(
         {
             logger.LogWarning("The organisation key changed; no accounts taken");
             Status = new CloudAccountStatus(0, response.Accounts.Count, [],
-                "Der Organisationsschlüssel hat sich geändert – aus Sicherheitsgründen werden keine Konten übernommen. Bitte die Cloud-Verbindung neu einrichten.");
+                T("Der Organisationsschlüssel hat sich geändert – aus Sicherheitsgründen werden keine Konten übernommen. Bitte die Cloud-Verbindung neu einrichten."));
             return false;
         }
 

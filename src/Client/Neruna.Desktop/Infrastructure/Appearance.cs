@@ -4,6 +4,7 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using Neruna.Core;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Infrastructure;
 

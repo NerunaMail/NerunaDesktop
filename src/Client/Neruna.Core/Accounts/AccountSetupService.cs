@@ -1,6 +1,7 @@
 using Neruna.Contracts.Discovery;
 using Neruna.Core.Providers;
 using Neruna.Core.Security;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Accounts;
 
@@ -144,10 +145,10 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
 
     private static string KindName(ServiceKind? kind) => kind switch
     {
-        ServiceKind.Mail => "E-Mail",
-        ServiceKind.Calendar => "Kalender",
-        ServiceKind.Contacts => "Kontakte",
-        _ => "Verbindung",
+        ServiceKind.Mail => T("E-Mail"),
+        ServiceKind.Calendar => T("Kalender"),
+        ServiceKind.Contacts => T("Kontakte"),
+        _ => T("Verbindung"),
     };
 
     public Account BuildAccount(string displayName, string emailAddress, MailProviderConfig config)

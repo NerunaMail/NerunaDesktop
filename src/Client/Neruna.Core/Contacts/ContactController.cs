@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Neruna.Core.Accounts;
 using Neruna.Core.Mail;
 using Neruna.Core.Providers;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Contacts;
 
@@ -267,7 +268,7 @@ public sealed class ContactController(
                     .ToList();
                 if (members.Count > 0)
                 {
-                    result.Add(new RecipientEntry(card.DisplayName, members, members.Count == 1 ? "Gruppe · 1 Mitglied" : $"Gruppe · {members.Count} Mitglieder", IsGroup: true));
+                    result.Add(new RecipientEntry(card.DisplayName, members, members.Count == 1 ? T("Gruppe · 1 Mitglied") : F("Gruppe · {0} Mitglieder", members.Count), IsGroup: true));
                 }
 
                 continue;

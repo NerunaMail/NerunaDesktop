@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core.Calendar;
 using Neruna.Core.Providers;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -77,7 +78,7 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    group.Error = "Server nicht erreichbar: " + ex.Message;
+                    group.Error = T("Server nicht erreichbar: ") + ex.Message;
                 }
 
                 group.UpdateSummary();
@@ -110,7 +111,7 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = "Übernehmen fehlgeschlagen: " + ex.Message;
+            Error = T("Übernehmen fehlgeschlagen: ") + ex.Message;
         }
         finally
         {
@@ -126,7 +127,7 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
         var text = group.NewUrl.Trim();
         if (!Uri.TryCreate(text, UriKind.Absolute, out var url) || url.Scheme is not ("https" or "http"))
         {
-            group.AddError = "Bitte die vollständige CalDAV-Adresse eingeben (https://…).";
+            group.AddError = T("Bitte die vollständige CalDAV-Adresse eingeben (https://…).");
             return;
         }
 
@@ -136,7 +137,7 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
             var added = await calendar.AddByUrlAsync(group.Source.Connection, url);
             if (added is null)
             {
-                group.AddError = "Unter dieser Adresse wurde kein Kalender gefunden, oder er ist für dieses Konto nicht freigegeben.";
+                group.AddError = T("Unter dieser Adresse wurde kein Kalender gefunden, oder er ist für dieses Konto nicht freigegeben.");
                 return;
             }
 
@@ -156,7 +157,7 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            group.AddError = "Hinzufügen fehlgeschlagen: " + ex.Message;
+            group.AddError = T("Hinzufügen fehlgeschlagen: ") + ex.Message;
         }
         finally
         {
@@ -212,9 +213,9 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
 
     public void UpdateSummary()
     {
-        Summary = Error is not null ? "nicht erreichbar"
-            : Calendars.Count == 0 ? "keine Kalender"
-            : $"{Calendars.Count(c => c.IsSelected)} von {Calendars.Count} angezeigt";
+        Summary = Error is not null ? T("nicht erreichbar")
+            : Calendars.Count == 0 ? T("keine Kalender")
+            : F("{0} von {1} angezeigt", Calendars.Count(c => c.IsSelected), Calendars.Count);
     }
 
     public void ApplyFilter(string filter)

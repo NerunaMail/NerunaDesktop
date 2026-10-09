@@ -4,6 +4,7 @@ using Ical.Net.DataTypes;
 using Microsoft.Extensions.Logging;
 using Neruna.Core.Accounts;
 using Neruna.Core.Providers;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Calendar;
 
@@ -106,7 +107,7 @@ public sealed class CalendarController(
         {
             if (provider is not ICalendarUrlLookup lookup)
             {
-                throw new NotSupportedException("Dieser Kalendertyp kann keine Kalender per Adresse hinzufügen.");
+                throw new NotSupportedException(T("Dieser Kalendertyp kann keine Kalender per Adresse hinzufügen."));
             }
 
             found = await lookup.GetCalendarAsync(url, cancellationToken);
@@ -404,7 +405,7 @@ public sealed class CalendarController(
             calendar,
             item.RemoteId,
             evt.Uid ?? item.RemoteId,
-            string.IsNullOrWhiteSpace(evt.Summary) ? "(ohne Titel)" : evt.Summary,
+            string.IsNullOrWhiteSpace(evt.Summary) ? T("(ohne Titel)") : evt.Summary,
             evt.Location,
             start,
             end,

@@ -5,6 +5,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Providers.Dav;
 
@@ -140,7 +141,7 @@ internal sealed class DavClient(HttpClient http, string username, string passwor
 
             if (status == HttpStatusCode.Unauthorized)
             {
-                throw new AuthenticationException($"Anmeldung am DAV-Server {current.Host} fehlgeschlagen (Benutzername/Passwort prüfen).");
+                throw new AuthenticationException(F("Anmeldung am DAV-Server {0} fehlgeschlagen (Benutzername/Passwort prüfen).", current.Host));
             }
 
             var body = await response.Content.ReadAsStringAsync(cancellationToken);

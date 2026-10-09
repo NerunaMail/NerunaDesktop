@@ -13,6 +13,7 @@ using CoreFlags = Neruna.Core.Mail.MessageFlags;
 using MailFolder = Neruna.Core.Mail.MailFolder;
 using MessageSummary = Neruna.Core.Mail.MessageSummary;
 using ImapFlags = MailKit.MessageFlags;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Providers.Imap;
 
@@ -383,7 +384,7 @@ public sealed class ImapMailProvider(
         var imap = await GetImapAsync(cancellationToken);
         var root = imap.GetFolder(imap.PersonalNamespaces[0]);
         var created = await root.CreateAsync(name, true, cancellationToken)
-                      ?? throw new InvalidOperationException($"Ordner «{name}» konnte nicht angelegt werden.");
+                      ?? throw new InvalidOperationException(F("Ordner «{0}» konnte nicht angelegt werden.", name));
         return ToMailFolder(created, role);
     }
 

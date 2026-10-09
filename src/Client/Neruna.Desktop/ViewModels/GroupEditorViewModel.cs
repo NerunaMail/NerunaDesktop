@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using MimeKit;
 using Neruna.Core;
 using Neruna.Core.Contacts;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -71,7 +72,7 @@ internal sealed partial class GroupEditorViewModel : ViewModelBase
 
     public bool IsExisting => _existing is not null;
 
-    public string Heading => IsReadOnly ? "Gruppe (schreibgeschützt)" : IsExisting ? "Gruppe bearbeiten" : "Neue Gruppe";
+    public string Heading => IsReadOnly ? T("Gruppe (schreibgeschützt)") : IsExisting ? T("Gruppe bearbeiten") : T("Neue Gruppe");
 
     public ObservableCollection<GroupMemberRow> Members { get; } = [];
 
@@ -84,8 +85,8 @@ internal sealed partial class GroupEditorViewModel : ViewModelBase
     public int MembersColumnSpan => IsReadOnly ? 3 : 1;
 
     public string AvailableHint => SearchText.Trim().Length > 0
-        ? "Kein passender Kontakt (oder bereits in der Gruppe)."
-        : "Alle Kontakte mit E-Mail-Adresse sind bereits in der Gruppe.";
+        ? T("Kein passender Kontakt (oder bereits in der Gruppe).")
+        : T("Alle Kontakte mit E-Mail-Adresse sind bereits in der Gruppe.");
 
     public bool HasNoAvailable => Available.Count == 0;
 
@@ -111,7 +112,7 @@ internal sealed partial class GroupEditorViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool ConfirmDelete { get; set; }
 
-    public string MemberCountText => Members.Count == 1 ? "1 Mitglied" : $"{Members.Count} Mitglieder";
+    public string MemberCountText => Members.Count == 1 ? T("1 Mitglied") : F("{0} Mitglieder", Members.Count);
 
     partial void OnSearchTextChanged(string value) => UpdateAvailable();
 
@@ -155,14 +156,14 @@ internal sealed partial class GroupEditorViewModel : ViewModelBase
         var address = ExternalAddress.Trim();
         if (!MailboxAddress.TryParse(address, out var mailbox) || !mailbox.Address.Contains('@', StringComparison.Ordinal))
         {
-            Error = "Bitte eine gültige E-Mail-Adresse eingeben.";
+            Error = T("Bitte eine gültige E-Mail-Adresse eingeben.");
             return;
         }
 
         Error = null;
         if (Members.Any(m => m.Addresses.Contains(mailbox.Address, StringComparer.OrdinalIgnoreCase)))
         {
-            Error = $"{mailbox.Address} ist bereits in der Gruppe.";
+            Error = F("{0} ist bereits in der Gruppe.", mailbox.Address);
             return;
         }
 
@@ -180,13 +181,13 @@ internal sealed partial class GroupEditorViewModel : ViewModelBase
         Error = null;
         if (SelectedAddressBook is null)
         {
-            Error = "Kein beschreibbares Adressbuch vorhanden.";
+            Error = T("Kein beschreibbares Adressbuch vorhanden.");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(Name))
         {
-            Error = "Bitte einen Namen für die Gruppe eingeben.";
+            Error = T("Bitte einen Namen für die Gruppe eingeben.");
             return;
         }
 
@@ -226,11 +227,11 @@ internal sealed partial class GroupEditorViewModel : ViewModelBase
         }
         catch (RemoteConflictException)
         {
-            Error = "Die Gruppe wurde inzwischen auf dem Server geändert. Bitte synchronisieren (F5) und erneut bearbeiten.";
+            Error = T("Die Gruppe wurde inzwischen auf dem Server geändert. Bitte synchronisieren (F5) und erneut bearbeiten.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = "Speichern fehlgeschlagen: " + ex.Message;
+            Error = T("Speichern fehlgeschlagen: ") + ex.Message;
         }
         finally
         {
@@ -281,7 +282,7 @@ internal sealed partial class GroupMemberRow : ObservableObject
     // An address without contact already shows as the name.
     public bool HasSingleAddress => Addresses.Count <= 1 && ContactUid is not null;
 
-    public string SingleAddress => Addresses.FirstOrDefault() ?? "(keine E-Mail-Adresse)";
+    public string SingleAddress => Addresses.FirstOrDefault() ?? T("(keine E-Mail-Adresse)");
 
     public string? Hint { get; }
 
@@ -295,15 +296,15 @@ internal sealed partial class GroupMemberRow : ObservableObject
         if (contact is null)
         {
             // Not (yet) in a local address book: keep the reference and its chosen address untouched.
-            return new GroupMemberRow(uid, chosen ?? uid, chosen is null ? [] : [chosen], chosen, "Kontakt nicht gefunden", unresolved: true);
+            return new GroupMemberRow(uid, chosen ?? uid, chosen is null ? [] : [chosen], chosen, T("Kontakt nicht gefunden"), unresolved: true);
         }
 
         var addresses = contact.Card.EmailAddresses;
         var selected = addresses.FirstOrDefault(a => string.Equals(a, chosen, StringComparison.OrdinalIgnoreCase)) ?? addresses.FirstOrDefault();
-        return new GroupMemberRow(uid, contact.Card.DisplayName, addresses, selected, addresses.Count == 0 ? "Kontakt hat keine E-Mail-Adresse" : null);
+        return new GroupMemberRow(uid, contact.Card.DisplayName, addresses, selected, addresses.Count == 0 ? T("Kontakt hat keine E-Mail-Adresse") : null);
     }
 
-    public static GroupMemberRow ForAddress(string address) => new(null, address, [address], address, "Adresse ohne Kontakt");
+    public static GroupMemberRow ForAddress(string address) => new(null, address, [address], address, T("Adresse ohne Kontakt"));
 
     // With only one address the reference follows the contact (no fixed address stored).
     public GroupMember ToMember() => ContactUid is null

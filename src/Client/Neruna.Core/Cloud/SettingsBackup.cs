@@ -6,6 +6,7 @@ using Neruna.Core.Accounts;
 using Neruna.Core.Mail;
 using Neruna.Core.Security;
 using Neruna.Vault;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Cloud;
 
@@ -119,7 +120,7 @@ public sealed class SettingsBackupService(
     {
         if ((await cloud.GetVaultAsync(cancellationToken)).Vault is not null)
         {
-            throw new BackupException("Es gibt bereits einen Tresor. Entsperre ihn mit dem Tresor-Passwort.");
+            throw new BackupException(T("Es gibt bereits einen Tresor. Entsperre ihn mit dem Tresor-Passwort."));
         }
 
         using var vault = UnlockedVault.Create(password, out var recoveryCode);
@@ -131,7 +132,7 @@ public sealed class SettingsBackupService(
     /// <summary>On another device: unlock with the vault password or the recovery code; the key is then kept here.</summary>
     public async Task UnlockAsync(string passwordOrRecoveryCode, CancellationToken cancellationToken = default)
     {
-        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException("Es ist noch kein Tresor eingerichtet.");
+        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
         var envelope = new VaultEnvelope(VaultFormat.CurrentVersion, info.VaultId, Keys(info), string.Empty, string.Empty);
         UnlockedVault vault;
         try
@@ -146,7 +147,7 @@ public sealed class SettingsBackupService(
             }
             catch (VaultUnlockException ex)
             {
-                throw new BackupException("Passwort bzw. Wiederherstellungscode ist falsch.", ex);
+                throw new BackupException(T("Passwort bzw. Wiederherstellungscode ist falsch."), ex);
             }
         }
 
@@ -158,8 +159,8 @@ public sealed class SettingsBackupService(
 
     public async Task<BackupEntry> CreateBackupAsync(string? note, CancellationToken cancellationToken = default)
     {
-        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException("Es ist noch kein Tresor eingerichtet.");
-        using var vault = await LocalVaultAsync(info, cancellationToken) ?? throw new BackupException("Der Tresor ist auf diesem Gerät nicht entsperrt.");
+        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
+        using var vault = await LocalVaultAsync(info, cancellationToken) ?? throw new BackupException(T("Der Tresor ist auf diesem Gerät nicht entsperrt."));
         var content = await CollectAsync(cancellationToken);
         var document = JsonSerializer.SerializeToUtf8Bytes(new BackupDocument(Format, clock.GetUtcNow(), content), NerunaJson.Options);
         var envelope = vault.Seal(document);
@@ -173,8 +174,8 @@ public sealed class SettingsBackupService(
     /// <summary>Downloads and opens a backup and compares it with this device – the preview before restoring.</summary>
     public async Task<RestorePlan> PrepareRestoreAsync(string backupId, CancellationToken cancellationToken = default)
     {
-        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException("Es ist noch kein Tresor eingerichtet.");
-        using var vault = await LocalVaultAsync(info, cancellationToken) ?? throw new BackupException("Der Tresor ist auf diesem Gerät nicht entsperrt.");
+        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
+        using var vault = await LocalVaultAsync(info, cancellationToken) ?? throw new BackupException(T("Der Tresor ist auf diesem Gerät nicht entsperrt."));
         var backup = await cloud.GetVaultBackupAsync(backupId, cancellationToken);
         BackupDocument document;
         try
@@ -184,12 +185,12 @@ public sealed class SettingsBackupService(
         }
         catch (Exception ex) when (ex is VaultUnlockException or JsonException)
         {
-            throw new BackupException("Die Sicherung lässt sich nicht öffnen (beschädigt oder aus einem anderen Tresor).", ex);
+            throw new BackupException(T("Die Sicherung lässt sich nicht öffnen (beschädigt oder aus einem anderen Tresor)."), ex);
         }
 
         if (document.Format > Format)
         {
-            throw new BackupException("Die Sicherung stammt aus einer neueren Neruna-Version. Bitte zuerst aktualisieren.");
+            throw new BackupException(T("Die Sicherung stammt aus einer neueren Neruna-Version. Bitte zuerst aktualisieren."));
         }
 
         var entry = new BackupEntry(backup.Id, backup.CreatedAt, backup.DeviceName, vault.DecryptText(backup.Note), backup.Size);
@@ -379,24 +380,24 @@ public sealed class SettingsBackupService(
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(backup);
         var changes = new List<BackupChange>();
-        Diff(changes, "Konten", current.Accounts, backup.Accounts, a => a.Id.ToString(), a => a.Title, Same);
-        Diff(changes, "Signaturen", current.Signatures, backup.Signatures, s => s.Id.ToString(), s => s.Name, (a, b) => a.Name == b.Name && a.Html == b.Html);
-        Diff(changes, "Textvorlagen", current.TextTemplates, backup.TextTemplates, t => t.Id.ToString(), t => t.Name,
+        Diff(changes, T("Konten"), current.Accounts, backup.Accounts, a => a.Id.ToString(), a => a.Title, Same);
+        Diff(changes, T("Signaturen"), current.Signatures, backup.Signatures, s => s.Id.ToString(), s => s.Name, (a, b) => a.Name == b.Name && a.Html == b.Html);
+        Diff(changes, T("Textvorlagen"), current.TextTemplates, backup.TextTemplates, t => t.Id.ToString(), t => t.Name,
             (a, b) => a.Name == b.Name && a.Html == b.Html && a.Shortcut == b.Shortcut);
-        Diff(changes, "Zertifikate", current.Certificates, backup.Certificates, c => c.Thumbprint, CertificateName, (a, b) => a.Password == b.Password && a.Source == b.Source);
+        Diff(changes, T("Zertifikate"), current.Certificates, backup.Certificates, c => c.Thumbprint, CertificateName, (a, b) => a.Password == b.Password && a.Source == b.Source);
 
         var currentPasswords = current.CloudPasswords ?? new Dictionary<string, string>();
         var changedPasswords = (backup.CloudPasswords ?? new Dictionary<string, string>()).Count(p => currentPasswords.GetValueOrDefault(p.Key) != p.Value);
         if (changedPasswords > 0)
         {
-            changes.Add(new BackupChange("Konten", changedPasswords == 1 ? "Passwort eines Kontos der Organisation" : $"Passwörter von {changedPasswords} Konten der Organisation", BackupChangeKind.Changed));
+            changes.Add(new BackupChange(T("Konten"), changedPasswords == 1 ? T("Passwort eines Kontos der Organisation") : F("Passwörter von {0} Konten der Organisation", changedPasswords), BackupChangeKind.Changed));
         }
 
         var changedSettings = current.Settings.Keys.Union(backup.Settings.Keys)
             .Count(k => current.Settings.GetValueOrDefault(k) != backup.Settings.GetValueOrDefault(k));
         if (changedSettings > 0)
         {
-            changes.Add(new BackupChange("Einstellungen", changedSettings == 1 ? "1 Einstellung" : $"{changedSettings} Einstellungen", BackupChangeKind.Changed));
+            changes.Add(new BackupChange(T("Einstellungen"), changedSettings == 1 ? T("1 Einstellung") : F("{0} Einstellungen", changedSettings), BackupChangeKind.Changed));
         }
 
         return changes;

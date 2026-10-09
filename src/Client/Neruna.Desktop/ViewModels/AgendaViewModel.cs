@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Neruna.Core;
 using Neruna.Core.Calendar;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -175,8 +176,8 @@ internal sealed partial class AgendaViewModel : ViewModelBase
 
     private static string DayTitle(DateTime day, DateTime today) => (day - today).Days switch
     {
-        0 => "Heute · " + day.ToString("d. MMMM", Culture),
-        1 => "Morgen · " + day.ToString("d. MMMM", Culture),
+        0 => T("Heute · ") + day.ToString("d. MMMM", Culture),
+        1 => T("Morgen · ") + day.ToString("d. MMMM", Culture),
         _ => day.ToString("dddd, d. MMMM", Culture),
     };
 }
@@ -203,7 +204,7 @@ internal sealed class AgendaItem(CalendarOccurrence occurrence, string color, Da
 
     public IBrush Brush { get; } = Avalonia.Media.Brush.Parse(color);
 
-    public string Title => string.IsNullOrWhiteSpace(Occurrence.Summary) ? "(ohne Titel)" : Occurrence.Summary;
+    public string Title => string.IsNullOrWhiteSpace(Occurrence.Summary) ? T("(ohne Titel)") : Occurrence.Summary;
 
     public string? Location => string.IsNullOrWhiteSpace(Occurrence.Location) ? null : Occurrence.Location;
 
@@ -215,7 +216,7 @@ internal sealed class AgendaItem(CalendarOccurrence occurrence, string color, Da
         {
             if (Occurrence.IsAllDay)
             {
-                return "Ganztägig";
+                return T("Ganztägig");
             }
 
             var start = Occurrence.Start.LocalDateTime;

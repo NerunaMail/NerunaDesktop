@@ -3,6 +3,7 @@ using ICalendar = Ical.Net.Calendar;
 using Ical.Net.CalendarComponents;
 using Ical.Net.DataTypes;
 using Ical.Net.Serialization;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Calendar;
 
@@ -244,7 +245,7 @@ public sealed record EventDraft(
             master.Alarms.Add(new Alarm
             {
                 Action = "DISPLAY",
-                Description = string.IsNullOrWhiteSpace(Summary) ? "Erinnerung" : Summary,
+                Description = string.IsNullOrWhiteSpace(Summary) ? T("Erinnerung") : Summary,
                 Trigger = new Trigger(Duration.FromMinutes(-minutes)),
             });
         }

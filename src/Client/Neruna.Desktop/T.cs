@@ -6,7 +6,7 @@ namespace Neruna.Desktop;
 /// <summary>
 /// <c>{l:T 'Neue E-Mail'}</c> in XAML: the German text in the language chosen at start (see <see cref="Texts"/>).
 /// </summary>
-internal sealed class T(string text) : MarkupExtension
+internal sealed class TExtension(string text) : MarkupExtension
 {
     public string Text { get; } = text;
 

@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using Neruna.Core;
 using Neruna.Core.Security;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -47,11 +48,11 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
     public partial AlgorithmChoice Cipher { get; set; } = CipherChoices[0];
 
     /// <summary>Tab headers with counts.</summary>
-    public string OwnHeader => $"Eigene Zertifikate ({Own.Count})";
+    public string OwnHeader => F("Eigene Zertifikate ({0})", Own.Count);
 
-    public string ContactsHeader => $"Zertifikate von Kontakten ({Contacts.Count})";
+    public string ContactsHeader => F("Zertifikate von Kontakten ({0})", Contacts.Count);
 
-    public string AuthoritiesHeader => $"Zertifizierungsstellen ({Authorities.Count})";
+    public string AuthoritiesHeader => F("Zertifizierungsstellen ({0})", Authorities.Count);
 
     [ObservableProperty]
     public partial string? Message { get; set; }
@@ -139,7 +140,7 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
     private async Task ImportAsync()
     {
         Message = null;
-        foreach (var path in await files.PickFilesAsync("Zertifikat importieren (.p12, .pfx, .cer, .crt, .pem, .p7b)"))
+        foreach (var path in await files.PickFilesAsync(T("Zertifikat importieren (.p12, .pfx, .cer, .crt, .pem, .p7b)")))
         {
             byte[] data;
             try
@@ -148,7 +149,7 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
             }
             catch (IOException ex)
             {
-                Show($"«{Path.GetFileName(path)}» konnte nicht gelesen werden: {ex.Message}", error: true);
+                Show(F("«{0}» konnte nicht gelesen werden: {1}", Path.GetFileName(path), ex.Message), error: true);
                 continue;
             }
 
@@ -163,8 +164,8 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
         {
             var imported = await manager.ImportAsync(data, password);
             Show(imported.Count == 1
-                ? $"Zertifikat «{imported[0].SubjectName}» importiert."
-                : $"{imported.Count} Zertifikate aus «{fileName}» importiert.", error: false);
+                ? F("Zertifikat «{0}» importiert.", imported[0].SubjectName)
+                : F("{0} Zertifikate aus «{1}» importiert.", imported.Count, fileName), error: false);
             IsPasswordPromptVisible = false;
             _pendingImport = null;
             await ReloadAsync();
@@ -205,7 +206,7 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
             return;
         }
 
-        var target = await files.SaveFileAsync("Öffentliches Zertifikat exportieren", FileService.SanitizeFileName(item.FileBaseName) + ".cer");
+        var target = await files.SaveFileAsync(T("Öffentliches Zertifikat exportieren"), FileService.SanitizeFileName(item.FileBaseName) + ".cer");
         if (target is null)
         {
             return;
@@ -216,7 +217,7 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
             await target.WriteAsync(await manager.ExportPublicAsync(item.Info.Thumbprint));
         }
 
-        Show("Öffentliches Zertifikat exportiert (enthält keinen privaten Schlüssel).", error: false);
+        Show(T("Öffentliches Zertifikat exportiert (enthält keinen privaten Schlüssel)."), error: false);
     }
 
     [RelayCommand]
@@ -229,7 +230,7 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
         }
 
         await manager.RemoveAsync(item.Info.Thumbprint);
-        Show($"Zertifikat «{item.Name}» entfernt.", error: false);
+        Show(F("Zertifikat «{0}» entfernt.", item.Name), error: false);
         await ReloadAsync();
     }
 
@@ -269,27 +270,27 @@ internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffs
 
     public string FileBaseName => Info.EmailAddresses.FirstOrDefault() ?? Info.SubjectName;
 
-    public string Issuer => "Ausgestellt von " + Info.IssuerName;
+    public string Issuer => T("Ausgestellt von ") + Info.IssuerName;
 
-    public string ValidUntil => Info.NotAfter.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture);
+    public string ValidUntil => Info.NotAfter.LocalDateTime.ToString("d", CultureInfo.CurrentCulture);
 
     public string ValidRange =>
-        $"{Info.NotBefore.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)} – {ValidUntil}";
+        $"{Info.NotBefore.LocalDateTime.ToString("d", CultureInfo.CurrentCulture)} – {ValidUntil}";
 
     public CertificateStatus Status => Info.StatusAt(now);
 
     public string StatusText => Status switch
     {
-        CertificateStatus.Valid => "Gültig",
-        CertificateStatus.ExpiringSoon => $"Läuft in {Math.Max(0, (int)(Info.NotAfter - now).TotalDays)} Tagen ab",
-        CertificateStatus.Expired => "Abgelaufen",
-        _ => "Noch nicht gültig",
+        CertificateStatus.Valid => T("Gültig"),
+        CertificateStatus.ExpiringSoon => F("Läuft in {0} Tagen ab", Math.Max(0, (int)(Info.NotAfter - now).TotalDays)),
+        CertificateStatus.Expired => T("Abgelaufen"),
+        _ => T("Noch nicht gültig"),
     };
 
     public string RemainingText => Status switch
     {
-        CertificateStatus.Valid => $"noch {(int)(Info.NotAfter - now).TotalDays} Tage",
-        CertificateStatus.Expired => $"seit {(int)(now - Info.NotAfter).TotalDays} Tagen",
+        CertificateStatus.Valid => F("noch {0} Tage", (int)(Info.NotAfter - now).TotalDays),
+        CertificateStatus.Expired => F("seit {0} Tagen", (int)(now - Info.NotAfter).TotalDays),
         _ => string.Empty,
     };
 
@@ -307,29 +308,29 @@ internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffs
         {
             if (Info.IsAuthority)
             {
-                return "Zertifizierungsstelle (vertrauenswürdig)";
+                return T("Zertifizierungsstelle (vertrauenswürdig)");
             }
 
             var usages = new List<string>();
             if (Info.CanSign)
             {
-                usages.Add(Info.HasPrivateKey ? "Signieren" : "Signaturen prüfen");
+                usages.Add(Info.HasPrivateKey ? T("Signieren") : T("Signaturen prüfen"));
             }
 
             if (Info.CanEncrypt)
             {
-                usages.Add(Info.HasPrivateKey ? "Entschlüsseln" : "Verschlüsseln an");
+                usages.Add(Info.HasPrivateKey ? T("Entschlüsseln") : T("Verschlüsseln an"));
             }
 
-            return usages.Count > 0 ? string.Join(" · ", usages) : "nicht für E-Mail geeignet";
+            return usages.Count > 0 ? string.Join(" · ", usages) : T("nicht für E-Mail geeignet");
         }
     }
 
     public string SourceText => Info.Source switch
     {
-        CertificateSource.CollectedFromMail => "Aus signierter Nachricht übernommen am " + Info.AddedAt.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
-        CertificateSource.Cloud => "Cloud – von der Organisation bereitgestellt am " + Info.AddedAt.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
-        _ => "Importiert am " + Info.AddedAt.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
+        CertificateSource.CollectedFromMail => T("Aus signierter Nachricht übernommen am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
+        CertificateSource.Cloud => T("Cloud – von der Organisation bereitgestellt am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
+        _ => T("Importiert am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
     };
 
     /// <summary>SHA-1 fingerprint in groups of four, as Windows shows it.</summary>
@@ -339,5 +340,5 @@ internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffs
     [NotifyPropertyChangedFor(nameof(RemoveText))]
     public partial bool ConfirmRemove { get; set; }
 
-    public string RemoveText => ConfirmRemove ? "Wirklich entfernen?" : "Entfernen";
+    public string RemoveText => ConfirmRemove ? T("Wirklich entfernen?") : T("Entfernen");
 }

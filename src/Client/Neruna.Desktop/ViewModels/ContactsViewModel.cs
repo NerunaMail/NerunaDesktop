@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using Neruna.Core;
 using Neruna.Core.Contacts;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -256,7 +257,7 @@ internal sealed class ContactItem(ContactEntry entry, string color)
     public bool HasNote => !string.IsNullOrWhiteSpace(Note);
 
     public string Subtitle => IsGroup
-        ? $"Gruppe · {Entry.Card.Members.Count} Mitglied{(Entry.Card.Members.Count == 1 ? string.Empty : "er")}"
+        ? (Entry.Card.Members.Count == 1 ? T("Gruppe · 1 Mitglied") : F("Gruppe · {0} Mitglieder", Entry.Card.Members.Count))
         : string.Join(" · ", new[] { Entry.Card.Title, Entry.Card.Organization }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
     public string PrimaryEmail => IsGroup ? Subtitle : Entry.Card.Emails.FirstOrDefault()?.Value ?? string.Empty;
@@ -301,13 +302,13 @@ internal sealed class MemberItem(ResolvedMember member)
 {
     public string Name => member.DisplayName;
 
-    public string Address => member.Address ?? "(keine E-Mail-Adresse)";
+    public string Address => member.Address ?? T("(keine E-Mail-Adresse)");
 
     public bool IsExternal => member.Member.IsExternal;
 
     public bool IsMissing => !member.Member.IsExternal && member.Contact is null;
 
-    public string Hint => IsExternal ? "Adresse ohne Kontakt" : IsMissing ? "Kontakt nicht gefunden" : string.Empty;
+    public string Hint => IsExternal ? T("Adresse ohne Kontakt") : IsMissing ? T("Kontakt nicht gefunden") : string.Empty;
 }
 
 internal static class ContactPhotoBitmap

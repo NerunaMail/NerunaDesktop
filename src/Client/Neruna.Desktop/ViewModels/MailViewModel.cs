@@ -10,6 +10,7 @@ using Neruna.Core.Calendar;
 using Neruna.Core.Mail;
 using Neruna.Core.Security;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -451,17 +452,17 @@ internal sealed partial class MailViewModel(
     }
 
     /// <summary>"3 ausgewählt" above the list when more than one message is selected.</summary>
-    public string? SelectionText => SelectedMessages.Count > 1 ? $"{SelectedMessages.Count} ausgewählt" : null;
+    public string? SelectionText => SelectedMessages.Count > 1 ? F("{0} ausgewählt", SelectedMessages.Count) : null;
 
     // What actions work on: every selected message, at least the open one.
     private IReadOnlyList<MessageItemViewModel> ActionTargets =>
         SelectedMessages.Count > 0 ? SelectedMessages : SelectedMessage is { } message ? [message] : [];
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private async Task DeleteAsync() => await RunOnMessagesAsync(ActionTargets, "Löschen", (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true);
+    private async Task DeleteAsync() => await RunOnMessagesAsync(ActionTargets, T("Löschen"), (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true);
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private async Task ArchiveAsync() => await RunOnMessagesAsync(ActionTargets, "Archivieren", (connection, folder, ids) => mail.ArchiveAsync(connection, folder, ids), removesMessages: true);
+    private async Task ArchiveAsync() => await RunOnMessagesAsync(ActionTargets, T("Archivieren"), (connection, folder, ids) => mail.ArchiveAsync(connection, folder, ids), removesMessages: true);
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private async Task ToggleFlagAsync()
@@ -469,7 +470,7 @@ internal sealed partial class MailViewModel(
         // The first selected message decides whether all get flagged or unflagged.
         var targets = ActionTargets;
         var flag = !targets[0].IsFlagged;
-        await RunOnMessagesAsync(targets, "Kennzeichnen", async (connection, folder, ids) =>
+        await RunOnMessagesAsync(targets, T("Kennzeichnen"), async (connection, folder, ids) =>
         {
             await mail.SetFlagsAsync(connection, folder, ids, MessageFlags.Flagged, flag);
             foreach (var message in targets)
@@ -511,7 +512,7 @@ internal sealed partial class MailViewModel(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report("Gelesen-Status konnte nicht gesetzt werden", ex);
+            Report(T("Gelesen-Status konnte nicht gesetzt werden"), ex);
         }
     }
 
@@ -533,7 +534,7 @@ internal sealed partial class MailViewModel(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report("Markierung «" + (flag == MessageFlags.Forwarded ? "weitergeleitet" : "beantwortet") + "» konnte nicht gesetzt werden", ex);
+            Report(flag == MessageFlags.Forwarded ? T("Markierung «weitergeleitet» konnte nicht gesetzt werden") : T("Markierung «beantwortet» konnte nicht gesetzt werden"), ex);
         }
     }
 
@@ -543,7 +544,7 @@ internal sealed partial class MailViewModel(
     {
         if (CurrentAccount is not { Account.EmailAddress: not null } account)
         {
-            StatusMessage?.Invoke(this, "Kein E-Mail-Konto vorhanden.");
+            StatusMessage?.Invoke(this, T("Kein E-Mail-Konto vorhanden."));
             return;
         }
 
@@ -557,7 +558,7 @@ internal sealed partial class MailViewModel(
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            Report("Verfassen konnte nicht geöffnet werden", ex);
+            Report(T("Verfassen konnte nicht geöffnet werden"), ex);
         }
     }
 
@@ -578,7 +579,7 @@ internal sealed partial class MailViewModel(
 
             if (sent)
             {
-                StatusMessage?.Invoke(this, "Nachricht gesendet.");
+                StatusMessage?.Invoke(this, T("Nachricht gesendet."));
             }
 
             await RefreshDraftsAsync(compose.Connection.Id, folderMayBeNew: false);
@@ -685,7 +686,7 @@ internal sealed partial class MailViewModel(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report("Nachricht konnte nicht geöffnet werden", ex);
+            Report(T("Nachricht konnte nicht geöffnet werden"), ex);
         }
     }
 
@@ -705,7 +706,7 @@ internal sealed partial class MailViewModel(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report("Antworten fehlgeschlagen", ex);
+            Report(T("Antworten fehlgeschlagen"), ex);
         }
     }
 
@@ -714,7 +715,7 @@ internal sealed partial class MailViewModel(
         // Still in the list: delete like from the toolbar (the list and counters follow).
         if (_allMessages.Contains(message))
         {
-            return await RunOnMessagesAsync([message], "Löschen", (connection, f, ids) => mail.DeleteAsync(connection, f, ids), removesMessages: true);
+            return await RunOnMessagesAsync([message], T("Löschen"), (connection, f, ids) => mail.DeleteAsync(connection, f, ids), removesMessages: true);
         }
 
         try
@@ -724,7 +725,7 @@ internal sealed partial class MailViewModel(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report("Löschen fehlgeschlagen", ex);
+            Report(T("Löschen fehlgeschlagen"), ex);
             return false;
         }
     }
@@ -754,7 +755,7 @@ internal sealed partial class MailViewModel(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report("Entwurf konnte nicht geöffnet werden", ex);
+            Report(T("Entwurf konnte nicht geöffnet werden"), ex);
         }
     }
 
@@ -799,10 +800,10 @@ internal sealed partial class MailViewModel(
 
         var sameAccount = messages.All(m => FolderOf(m)!.Account.Connection.Id == target.Account.Connection.Id);
         var unread = messages.Count(m => m.IsUnread);
-        var what = messages.Count == 1 ? "Nachricht" : $"{messages.Count} Nachrichten";
+        var what = messages.Count == 1 ? T("Nachricht") : F("{0} Nachrichten", messages.Count);
         if (!sameAccount)
         {
-            StatusMessage?.Invoke(this, $"{what} werden ins Konto {target.Account.Title} verschoben …");
+            StatusMessage?.Invoke(this, F("{0} werden ins Konto {1} verschoben …", what, target.Account.Title));
         }
 
         Func<ServiceConnection, MailFolder, IReadOnlyCollection<string>, Task> operation = sameAccount
@@ -811,12 +812,12 @@ internal sealed partial class MailViewModel(
                 ? mail.MoveAsync(connection, folder, ids, target.Folder)
                 : mail.MoveToAccountAsync(connection, folder, messages.Where(m => ids.Contains(m.Summary.RemoteId) && FolderOf(m)!.Folder == folder).Select(m => m.Summary).ToList(), target.Account.Connection, target.Folder);
 
-        if (await RunOnMessagesAsync(messages, "Verschieben", operation, removesMessages: true))
+        if (await RunOnMessagesAsync(messages, T("Verschieben"), operation, removesMessages: true))
         {
             target.UnreadCount += unread;
             StatusMessage?.Invoke(this, sameAccount
-                ? $"{what} nach «{target.Name}» verschoben."
-                : $"{what} nach «{target.Name}» ({target.Account.Title}) verschoben.");
+                ? F("{0} nach «{1}» verschoben.", what, target.Name)
+                : F("{0} nach «{1}» ({2}) verschoben.", what, target.Name, target.Account.Title));
         }
     }
 
@@ -1077,7 +1078,7 @@ internal sealed partial class MailViewModel(
         var total = (await mail.GetFoldersAsync(folder.Folder.ConnectionId)).FirstOrDefault(f => f.RemoteId == folder.Folder.RemoteId)?.TotalCount ?? 0;
         total = Math.Max(total, _storedCount);
         HasMore = !IsSearchMode && (_allMessages.Count < _storedCount || _storedCount < total);
-        LoadedText = IsSearchMode || total == 0 ? null : $"{_allMessages.Count:N0} von {total:N0} Nachrichten";
+        LoadedText = IsSearchMode || total == 0 ? null : F("{0:N0} von {1:N0} Nachrichten", _allMessages.Count, total);
     }
 
     /// <summary>The next messages: from the local store first, then older ones from the server.</summary>
@@ -1122,7 +1123,7 @@ internal sealed partial class MailViewModel(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report("Ältere Nachrichten konnten nicht geladen werden", ex);
+            Report(T("Ältere Nachrichten konnten nicht geladen werden"), ex);
         }
         finally
         {
@@ -1174,7 +1175,7 @@ internal sealed partial class MailViewModel(
     [NotifyPropertyChangedFor(nameof(ListTitle))]
     public partial string? SearchTitle { get; set; }
 
-    public string ListTitle => IsSearchMode ? SearchTitle ?? "Suchergebnisse" : CurrentFolder?.Name ?? string.Empty;
+    public string ListTitle => IsSearchMode ? SearchTitle ?? T("Suchergebnisse") : CurrentFolder?.Name ?? string.Empty;
 
     /// <summary>Under a quick search: the loaded messages were filtered; offer the whole folder on the server.</summary>
     public bool ShowServerSearchHint => !IsSearchMode && SearchText.Trim().Length > 0 && CurrentFolder is not null;
@@ -1226,12 +1227,12 @@ internal sealed partial class MailViewModel(
     {
         if (query.IsEmpty)
         {
-            StatusMessage?.Invoke(this, "Bitte mindestens einen Suchbegriff eingeben.");
+            StatusMessage?.Invoke(this, T("Bitte mindestens einen Suchbegriff eingeben."));
             return;
         }
 
         IsSearching = true;
-        SearchInfo = "Suche läuft …";
+        SearchInfo = T("Suche läuft …");
         try
         {
             var nodes = folders.ToDictionary(f => (f.Folder.ConnectionId, f.Folder.RemoteId));
@@ -1251,7 +1252,7 @@ internal sealed partial class MailViewModel(
             try
             {
                 IsSearchMode = true;
-                SearchTitle = $"Suche in {where}";
+                SearchTitle = F("Suche in {0}", where);
                 _serverTerm = keepTerm;
                 SearchText = keepTerm ?? string.Empty;
                 _allMessages = items;
@@ -1271,14 +1272,14 @@ internal sealed partial class MailViewModel(
 
             HasMore = false;
             LoadedText = null;
-            SearchInfo = (items.Count == 1 ? "1 Treffer" : $"{items.Count} Treffer")
-                         + (result.IsTruncated ? " – nur die neuesten pro Ordner, bitte genauer suchen" : string.Empty)
-                         + (result.FailedFolders.Count > 0 ? $" – {result.FailedFolders.Count} Ordner konnten nicht durchsucht werden" : string.Empty);
+            SearchInfo = (items.Count == 1 ? T("1 Treffer") : F("{0} Treffer", items.Count))
+                         + (result.IsTruncated ? T(" – nur die neuesten pro Ordner, bitte genauer suchen") : string.Empty)
+                         + (result.FailedFolders.Count > 0 ? F(" – {0} Ordner konnten nicht durchsucht werden", result.FailedFolders.Count) : string.Empty);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Report("Suche fehlgeschlagen", ex);
-            SearchInfo = "Suche fehlgeschlagen: " + ex.Message;
+            Report(T("Suche fehlgeschlagen"), ex);
+            SearchInfo = T("Suche fehlgeschlagen: ") + ex.Message;
         }
         finally
         {
@@ -1365,7 +1366,7 @@ internal sealed partial class MailViewModel(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Loading message {RemoteId} failed", message.Summary.RemoteId);
-            ReadingPane = ReadingPaneViewModel.Info("Die Nachricht konnte nicht geladen werden: " + ex.Message);
+            ReadingPane = ReadingPaneViewModel.Info(T("Die Nachricht konnte nicht geladen werden: ") + ex.Message);
         }
     }
 
@@ -1447,9 +1448,9 @@ internal sealed partial class MailViewModel(
                 await UpdateInvitationAsync(banner!, account);
                 await TidyAnsweredInvitationAsync(summary, answer switch
                 {
-                    Participation.Accepted => "Zugesagt – der Termin steht im Kalender.",
-                    Participation.Tentative => "Mit Vorbehalt zugesagt – der Termin steht im Kalender.",
-                    _ => "Abgesagt.",
+                    Participation.Accepted => T("Zugesagt – der Termin steht im Kalender."),
+                    Participation.Tentative => T("Mit Vorbehalt zugesagt – der Termin steht im Kalender."),
+                    _ => T("Abgesagt."),
                 });
             },
             async () =>
@@ -1457,7 +1458,7 @@ internal sealed partial class MailViewModel(
                 await invitations.ApplyCancelAsync(invitation);
                 CalendarChanged?.Invoke(this, EventArgs.Empty);
                 await UpdateInvitationAsync(banner!, account);
-                await TidyAnsweredInvitationAsync(summary, "Der abgesagte Termin wurde aus dem Kalender entfernt.");
+                await TidyAnsweredInvitationAsync(summary, T("Der abgesagte Termin wurde aus dem Kalender entfernt."));
             });
         _invitation = (summary.RemoteId, banner);
         pane.Invitation = banner;
@@ -1475,7 +1476,7 @@ internal sealed partial class MailViewModel(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Checking the invitation {Uid} failed", invitation.Uid);
-            banner.Error = "Der Kalender konnte nicht geprüft werden: " + ex.Message;
+            banner.Error = T("Der Kalender konnte nicht geprüft werden: ") + ex.Message;
         }
     }
 
@@ -1493,9 +1494,9 @@ internal sealed partial class MailViewModel(
             return;
         }
 
-        if (await RunOnMessagesAsync([message], "Einladung in den Papierkorb verschieben", (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true))
+        if (await RunOnMessagesAsync([message], T("Einladung in den Papierkorb verschieben"), (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true))
         {
-            StatusMessage?.Invoke(this, done + " Die Einladung liegt im Papierkorb.");
+            StatusMessage?.Invoke(this, done + T(" Die Einladung liegt im Papierkorb."));
         }
     }
 
@@ -1515,39 +1516,39 @@ internal sealed partial class MailViewModel(
         {
             case InvitationMethod.Reply:
                 var answer = invitation.Attendees.FirstOrDefault();
-                var who = answer?.Name ?? answer?.Email ?? "Jemand";
+                var who = answer?.Name ?? answer?.Email ?? T("Jemand");
                 banner.Status = answer?.Status switch
                 {
                     Participation.Accepted => $"{who} hat zugesagt.",
-                    Participation.Tentative => $"{who} hat mit Vorbehalt zugesagt.",
+                    Participation.Tentative => F("{0} hat mit Vorbehalt zugesagt.", who),
                     Participation.Declined => $"{who} hat abgesagt.",
                     _ => $"{who} hat geantwortet.",
-                } + (state.Item is null ? " Der Termin ist nicht (mehr) in Ihrem Kalender." : " Die Antwort ist in Ihrem Termin eingetragen.");
+                } + (state.Item is null ? T(" Der Termin ist nicht (mehr) in Ihrem Kalender.") : T(" Die Antwort ist in Ihrem Termin eingetragen."));
                 banner.CanRespond = false;
                 break;
 
             case InvitationMethod.Cancel:
-                banner.Status = state.Item is null ? "Der Termin ist nicht (mehr) in Ihrem Kalender." : "Der Termin steht noch in Ihrem Kalender.";
+                banner.Status = state.Item is null ? T("Der Termin ist nicht (mehr) in Ihrem Kalender.") : T("Der Termin steht noch in Ihrem Kalender.");
                 banner.CanRemove = state.Item is not null && state.Calendar is { IsReadOnly: false };
                 break;
 
             default:
-                banner.Status = mine ? "Sie sind der Organisator dieses Termins."
-                    : state.IsOutdated ? "Diese Einladung ist veraltet – im Kalender steht bereits eine neuere Fassung."
+                banner.Status = mine ? T("Sie sind der Organisator dieses Termins.")
+                    : state.IsOutdated ? T("Diese Einladung ist veraltet – im Kalender steht bereits eine neuere Fassung.")
                     : state.MyAnswer switch
                     {
-                        Participation.Accepted when state.Item is not null => "Sie haben zugesagt.",
-                        Participation.Tentative when state.Item is not null => "Sie haben mit Vorbehalt zugesagt.",
-                        Participation.Declined => "Sie haben abgesagt.",
-                        _ when state.Item is not null => "Steht in Ihrem Kalender – noch nicht beantwortet.",
-                        _ => "Noch nicht beantwortet.",
+                        Participation.Accepted when state.Item is not null => T("Sie haben zugesagt."),
+                        Participation.Tentative when state.Item is not null => T("Sie haben mit Vorbehalt zugesagt."),
+                        Participation.Declined => T("Sie haben abgesagt."),
+                        _ when state.Item is not null => T("Steht in Ihrem Kalender – noch nicht beantwortet."),
+                        _ => T("Noch nicht beantwortet."),
                     };
                 banner.CanRespond = !mine && !state.IsOutdated;
                 break;
         }
 
         banner.Conflicts = invitation.Method == InvitationMethod.Request && state.Conflicts.Count > 0
-            ? "Überschneidet sich mit: " + string.Join(", ", state.Conflicts.Take(3).Select(c => $"{c.Summary} ({c.Start:HH:mm}–{c.End:HH:mm})"))
+            ? T("Überschneidet sich mit: ") + string.Join(", ", state.Conflicts.Take(3).Select(c => $"{c.Summary} ({c.Start:HH:mm}–{c.End:HH:mm})"))
             : null;
     }
 
@@ -1635,7 +1636,7 @@ internal sealed partial class MailAccountNode : ObservableObject
 /// <summary>"Favoriten" at the top of the folder tree: folders of any account the user picked (e.g. all inboxes).</summary>
 internal sealed partial class FavoritesNode : ObservableObject
 {
-    public string Title { get; } = "Favoriten";
+    public string Title { get; } = T("Favoriten");
 
     public ObservableCollection<FavoriteFolderNode> Items { get; } = [];
 
@@ -1697,12 +1698,12 @@ internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObje
 
     public static string DisplayName(MailFolder folder) => folder.Role switch
     {
-        FolderRole.Inbox => "Posteingang",
-        FolderRole.Drafts => "Entwürfe",
-        FolderRole.Sent => "Gesendete Elemente",
-        FolderRole.Trash => "Gelöschte Elemente",
-        FolderRole.Junk => "Junk-E-Mail",
-        FolderRole.Archive => "Archiv",
+        FolderRole.Inbox => T("Posteingang"),
+        FolderRole.Drafts => T("Entwürfe"),
+        FolderRole.Sent => T("Gesendete Elemente"),
+        FolderRole.Trash => T("Gelöschte Elemente"),
+        FolderRole.Junk => T("Junk-E-Mail"),
+        FolderRole.Archive => T("Archiv"),
         _ => folder.Name,
     };
 
@@ -1748,11 +1749,11 @@ internal sealed partial class MessageItemViewModel(MessageSummary summary, MailF
 
     public string Sender => Summary.From?.DisplayText ?? "(unbekannt)";
 
-    public string Subject => string.IsNullOrWhiteSpace(Summary.Subject) ? "(kein Betreff)" : Summary.Subject;
+    public string Subject => string.IsNullOrWhiteSpace(Summary.Subject) ? T("(kein Betreff)") : Summary.Subject;
 
     public string Preview => MailPreview.Clean(Summary.Preview) is { Length: > 0 } preview
         ? preview
-        : IsEncrypted ? "Verschlüsselte Nachricht – Inhalt wird beim Öffnen entschlüsselt" : string.Empty;
+        : IsEncrypted ? T("Verschlüsselte Nachricht – Inhalt wird beim Öffnen entschlüsselt") : string.Empty;
 
     public bool HasAttachments => Summary.HasAttachments;
 
@@ -1793,20 +1794,20 @@ internal static class DateGroup
 
         if (day >= today)
         {
-            return "Heute";
+            return T("Heute");
         }
 
         if (day == today.AddDays(-1))
         {
-            return "Gestern";
+            return T("Gestern");
         }
 
         if (day >= startOfWeek)
         {
-            return "Diese Woche";
+            return T("Diese Woche");
         }
 
-        return day >= startOfWeek.AddDays(-7) ? "Letzte Woche" : "Älter";
+        return day >= startOfWeek.AddDays(-7) ? T("Letzte Woche") : T("Älter");
     }
 
     public static string ShortTime(DateTimeOffset date)
@@ -1819,7 +1820,7 @@ internal static class DateGroup
 
         return local.Date > DateTime.Today.AddDays(-7)
             ? local.ToString("ddd HH:mm", CultureInfo.CurrentCulture)
-            : local.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture);
+            : local.ToString("d", CultureInfo.CurrentCulture);
     }
 }
 
@@ -1834,8 +1835,8 @@ internal sealed record SearchScope(string Label, MailAccountNode Account, MailFo
         : [Folder];
 
     public string Describe(bool withSubfolders) =>
-        Folder is null ? $"allen Ordnern von {Account.Title}"
-        : withSubfolders && Folder.Children.Count > 0 ? $"{Folder.Name} und Unterordnern"
+        Folder is null ? F("allen Ordnern von {0}", Account.Title)
+        : withSubfolders && Folder.Children.Count > 0 ? F("{0} und Unterordnern", Folder.Name)
         : Folder.Name;
 
     /// <summary>Per account: "Alle Ordner", then its folders indented by depth.</summary>
@@ -1844,7 +1845,7 @@ internal sealed record SearchScope(string Label, MailAccountNode Account, MailFo
         var result = new List<SearchScope>();
         foreach (var account in accounts)
         {
-            result.Add(new SearchScope($"Alle Ordner – {account.Title}", account, null));
+            result.Add(new SearchScope(F("Alle Ordner – {0}", account.Title), account, null));
             void Add(IEnumerable<MailFolderNode> folders, int depth)
             {
                 foreach (var folder in folders)

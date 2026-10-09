@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Storage.Credentials;
 
@@ -14,7 +15,7 @@ internal sealed class MacKeychainBackend : ISecretBackend
     private const int ErrSecItemNotFound = -25300;
     private static readonly byte[] Service = Encoding.UTF8.GetBytes(CredentialStoreSelector.Service);
 
-    public string Name => "macOS-Schlüsselbund";
+    public string Name => T("macOS-Schlüsselbund");
 
     public string? Get(string key)
     {
@@ -96,7 +97,7 @@ internal sealed class MacKeychainBackend : ISecretBackend
     {
         if (status != 0)
         {
-            throw new InvalidOperationException($"Schlüsselbund-Fehler {status}");
+            throw new InvalidOperationException(F("Schlüsselbund-Fehler {0}", status));
         }
     }
 

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Neruna.Core;
 using Neruna.Core.Mail;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -40,7 +41,7 @@ internal sealed partial class TextTemplatesViewModel(TextTemplateService templat
     }
 
     [RelayCommand]
-    private Task NewAsync() => OpenEditorAsync(new TextTemplate(Guid.NewGuid(), Templates.Count == 0 ? "Anrufnotiz" : $"Textvorlage {Templates.Count + 1}", string.Empty, DateTimeOffset.Now), isNew: true);
+    private Task NewAsync() => OpenEditorAsync(new TextTemplate(Guid.NewGuid(), Templates.Count == 0 ? T("Anrufnotiz") : F("Textvorlage {0}", Templates.Count + 1), string.Empty, DateTimeOffset.Now), isNew: true);
 
     [RelayCommand(CanExecute = nameof(CanModify))]
     private Task EditAsync() => OpenEditorAsync(Selected!, isNew: false);
@@ -62,7 +63,7 @@ internal sealed partial class TextTemplatesViewModel(TextTemplateService templat
         {
             Shortcut = template.Shortcut,
             ValidateShortcut = async shortcut => await templates.IsShortcutTakenAsync(shortcut, template.Id)
-                ? $"Das Kürzel «{TextTemplate.NormalizeShortcut(shortcut)}» hat bereits eine andere Textvorlage."
+                ? F("Das Kürzel «{0}» hat bereits eine andere Textvorlage.", TextTemplate.NormalizeShortcut(shortcut))
                 : null,
         };
         if (await windows.ShowSignatureEditorAsync(editor) is { } saved)

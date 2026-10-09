@@ -3,6 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core.Calendar;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -14,20 +15,20 @@ internal sealed record SnoozeOption(string Label, Func<Reminder, DateTimeOffset,
     {
         var options = new List<SnoozeOption>
         {
-            new("5 Minuten", (_, n) => n.AddMinutes(5)),
-            new("10 Minuten", (_, n) => n.AddMinutes(10)),
-            new("15 Minuten", (_, n) => n.AddMinutes(15)),
-            new("30 Minuten", (_, n) => n.AddMinutes(30)),
-            new("1 Stunde", (_, n) => n.AddHours(1)),
-            new("2 Stunden", (_, n) => n.AddHours(2)),
-            new("4 Stunden", (_, n) => n.AddHours(4)),
-            new("1 Tag", (_, n) => n.AddDays(1)),
+            new(T("5 Minuten"), (_, n) => n.AddMinutes(5)),
+            new(T("10 Minuten"), (_, n) => n.AddMinutes(10)),
+            new(T("15 Minuten"), (_, n) => n.AddMinutes(15)),
+            new(T("30 Minuten"), (_, n) => n.AddMinutes(30)),
+            new(T("1 Stunde"), (_, n) => n.AddHours(1)),
+            new(T("2 Stunden"), (_, n) => n.AddHours(2)),
+            new(T("4 Stunden"), (_, n) => n.AddHours(4)),
+            new(T("1 Tag"), (_, n) => n.AddDays(1)),
         };
 
         if (reminder is { } r && r.Occurrence.Start > now.AddMinutes(5) && !r.Occurrence.IsAllDay)
         {
-            options.Insert(0, new("5 Minuten vor Beginn", (x, _) => x.Occurrence.Start.AddMinutes(-5)));
-            options.Insert(1, new("Bei Beginn", (x, _) => x.Occurrence.Start));
+            options.Insert(0, new(T("5 Minuten vor Beginn"), (x, _) => x.Occurrence.Start.AddMinutes(-5)));
+            options.Insert(1, new(T("Bei Beginn"), (x, _) => x.Occurrence.Start));
         }
 
         return options;
@@ -51,10 +52,10 @@ internal sealed class ReminderItem(Reminder reminder, DateTimeOffset now)
         get
         {
             var o = Reminder.Occurrence;
-            var day = o.Start.Date == now.LocalDateTime.Date ? "Heute"
-                : o.Start.Date == now.LocalDateTime.Date.AddDays(1) ? "Morgen"
+            var day = o.Start.Date == now.LocalDateTime.Date ? T("Heute")
+                : o.Start.Date == now.LocalDateTime.Date.AddDays(1) ? T("Morgen")
                 : o.Start.ToString("ddd d. MMM", Culture);
-            var time = o.IsAllDay ? "ganztägig" : $"{o.Start:HH:mm}–{o.End:HH:mm}";
+            var time = o.IsAllDay ? T("ganztägig") : $"{o.Start:HH:mm}–{o.End:HH:mm}";
             return string.IsNullOrWhiteSpace(o.Location) ? $"{day} {time}" : $"{day} {time} · {o.Location}";
         }
     }
@@ -67,12 +68,12 @@ internal sealed class ReminderItem(Reminder reminder, DateTimeOffset now)
             var minutes = (int)Math.Round((Reminder.Occurrence.Start - now).TotalMinutes);
             return minutes switch
             {
-                > 1440 => $"in {minutes / 1440} Tag(en)",
-                > 90 => $"in {Math.Round(minutes / 60.0)} Stunden",
-                > 1 => $"in {minutes} Minuten",
+                > 1440 => F("in {0} Tag(en)", minutes / 1440),
+                > 90 => F("in {0} Stunden", Math.Round(minutes / 60.0)),
+                > 1 => F("in {0} Minuten", minutes),
                 >= -1 => "jetzt",
-                > -90 => $"seit {-minutes} Minuten",
-                _ => $"seit {Math.Round(-minutes / 60.0)} Stunden",
+                > -90 => F("seit {0} Minuten", -minutes),
+                _ => F("seit {0} Stunden", Math.Round(-minutes / 60.0)),
             };
         }
     }
@@ -105,7 +106,7 @@ internal sealed partial class ReminderWindowViewModel(
 
     public bool HasSelection => Selected is not null;
 
-    public string WindowTitle => Items.Count == 1 ? "1 Erinnerung" : $"{Items.Count} Erinnerungen";
+    public string WindowTitle => Items.Count == 1 ? T("1 Erinnerung") : F("{0} Erinnerungen", Items.Count);
 
     /// <summary>Raised when nothing is left to show.</summary>
     public event EventHandler? Emptied;
@@ -133,7 +134,7 @@ internal sealed partial class ReminderWindowViewModel(
     {
         var label = SnoozeChoice?.Label;
         SnoozeOptions = SnoozeOption.For(value?.Reminder, clock.GetUtcNow());
-        SnoozeChoice = SnoozeOptions.FirstOrDefault(o => o.Label == label) ?? SnoozeOptions.First(o => o.Label == "5 Minuten");
+        SnoozeChoice = SnoozeOptions.FirstOrDefault(o => o.Label == label) ?? SnoozeOptions.First(o => o.Label == T("5 Minuten"));
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]

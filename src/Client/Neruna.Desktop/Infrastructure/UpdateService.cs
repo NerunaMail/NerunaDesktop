@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Velopack;
 using Velopack.Sources;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Infrastructure;
 
@@ -38,8 +39,8 @@ internal sealed partial class UpdateService : ObservableObject
 
         CurrentVersion = _manager?.CurrentVersion?.ToString() ?? AppVersion;
         StatusText = _manager is null
-            ? "Automatische Updates gibt es nur in der installierten Version (Setup von neruna.org)."
-            : "Noch nicht nach Updates gesucht.";
+            ? T("Automatische Updates gibt es nur in der installierten Version (Setup von neruna.org).")
+            : T("Noch nicht nach Updates gesucht.");
         _timer = new DispatcherTimer { Interval = Interval };
         _timer.Tick += async (_, _) => await CheckAsync();
     }
@@ -95,30 +96,30 @@ internal sealed partial class UpdateService : ObservableObject
         }
 
         IsChecking = true;
-        StatusText = "Suche nach Updates …";
+        StatusText = T("Suche nach Updates …");
         try
         {
             var update = await _manager.CheckForUpdatesAsync();
             if (update is null)
             {
-                StatusText = $"Neruna ist aktuell (geprüft um {DateTime.Now:HH:mm}).";
+                StatusText = F("Neruna ist aktuell (geprüft um {0:t}).", DateTime.Now);
                 return;
             }
 
             var version = update.TargetFullRelease.Version.ToString();
-            StatusText = $"Version {version} wird heruntergeladen …";
+            StatusText = F("Version {0} wird heruntergeladen …", version);
             await _manager.DownloadUpdatesAsync(update, progress => Dispatcher.UIThread.Post(() =>
-                StatusText = $"Version {version} wird heruntergeladen … {progress} %"));
+                StatusText = F("Version {0} wird heruntergeladen … {1} %", version, progress)));
             _ready = update;
-            ReadyText = $"Version {version} ist bereit";
-            StatusText = $"Version {version} ist heruntergeladen – sie wird beim nächsten Start installiert, oder gleich mit «Jetzt neu starten».";
+            ReadyText = F("Version {0} ist bereit", version);
+            StatusText = F("Version {0} ist heruntergeladen – sie wird beim nächsten Start installiert, oder gleich mit «Jetzt neu starten».", version);
             IsReady = true;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             // Offline or GitHub not reachable: quietly try again later; a manual check says what happened.
             _logger.LogWarning(ex, "Update check failed");
-            StatusText = manual ? $"Updates konnten nicht geprüft werden: {ex.Message}" : "Updates konnten zuletzt nicht geprüft werden (offline?).";
+            StatusText = manual ? F("Updates konnten nicht geprüft werden: {0}", ex.Message) : T("Updates konnten zuletzt nicht geprüft werden (offline?).");
         }
         finally
         {

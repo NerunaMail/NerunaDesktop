@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Views;
 
@@ -8,6 +9,6 @@ internal sealed partial class AboutView : UserControl
     public AboutView()
     {
         InitializeComponent();
-        this.FindControl<TextBlock>("VersionText")!.Text = $"Version {Infrastructure.UpdateService.AppVersion} (Beta)";
+        this.FindControl<TextBlock>("VersionText")!.Text = F("Version {0} (Beta)", Infrastructure.UpdateService.AppVersion);
     }
 }

@@ -5,6 +5,7 @@ using System.Text;
 using Neruna.Core.Accounts;
 using Neruna.Core.Calendar;
 using Neruna.Core.Providers;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Providers.Ics;
 
@@ -82,7 +83,7 @@ public sealed class IcsProviderFactory(HttpClient http) : IProviderFactory<ICale
 {
     public string ProviderId => ProviderIds.Ics;
 
-    public string DisplayName => "Internet-Kalender (ICS)";
+    public string DisplayName => T("Internet-Kalender (ICS)");
 
     public ICalendarProvider Create(ServiceConnection connection)
     {

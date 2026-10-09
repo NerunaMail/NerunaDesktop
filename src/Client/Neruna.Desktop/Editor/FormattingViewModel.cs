@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Desktop.Infrastructure;
 using Neruna.Desktop.ViewModels;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Editor;
 
@@ -140,17 +141,17 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
     [RelayCommand]
     private async Task InsertImageAsync()
     {
-        foreach (var path in await files.PickFilesAsync("Bild einfügen"))
+        foreach (var path in await files.PickFilesAsync(T("Bild einfügen")))
         {
             if (!ImageTypes.TryGetValue(Path.GetExtension(path), out var mimeType))
             {
-                Problem?.Invoke(this, $"«{Path.GetFileName(path)}» ist kein unterstütztes Bild (PNG, JPG, GIF, WebP).");
+                Problem?.Invoke(this, F("«{0}» ist kein unterstütztes Bild (PNG, JPG, GIF, WebP).", Path.GetFileName(path)));
                 continue;
             }
 
             if (new FileInfo(path).Length > MaxImageBytes)
             {
-                Problem?.Invoke(this, $"«{Path.GetFileName(path)}» ist grösser als 2 MB – bitte verkleinern.");
+                Problem?.Invoke(this, F("«{0}» ist grösser als 2 MB – bitte verkleinern.", Path.GetFileName(path)));
                 continue;
             }
 

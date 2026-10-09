@@ -13,6 +13,7 @@ using Neruna.Core.Mail;
 using Neruna.Core.Security;
 using Neruna.Desktop.Editor;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -170,7 +171,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(DiscardLabel))]
     public partial bool ConfirmDiscard { get; set; }
 
-    public string DiscardLabel => ConfirmDiscard ? "Wirklich?" : "Verwerfen";
+    public string DiscardLabel => ConfirmDiscard ? T("Wirklich?") : T("Verwerfen");
 
     /// <summary>Carries unsaved edits over when the draft moves to its own window.</summary>
     public void MarkChanged() => _changes++;
@@ -214,7 +215,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     public bool CanPopOut => !IsWindow;
 
-    public string WindowTitle => string.IsNullOrWhiteSpace(Subject) ? "Neue E-Mail" : Subject;
+    public string WindowTitle => string.IsNullOrWhiteSpace(Subject) ? T("Neue E-Mail") : Subject;
 
     public ObservableCollection<ComposeAttachment> Attachments { get; } = [];
 
@@ -253,9 +254,9 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     /// <summary>Tooltip of "Verschlüsseln": why it was switched on or off automatically.</summary>
     [ObservableProperty]
-    public partial string EncryptHint { get; set; } = "Mit S/MIME verschlüsseln (Zertifikate aller Empfänger nötig)";
+    public partial string EncryptHint { get; set; } = T("Mit S/MIME verschlüsseln (Zertifikate aller Empfänger nötig)");
 
-    public string SignHint => CanSign ? "Digital signieren (S/MIME)" : "Kein eigenes S/MIME-Zertifikat für diese Adresse (Einstellungen → Zertifikate)";
+    public string SignHint => CanSign ? T("Digital signieren (S/MIME)") : T("Kein eigenes S/MIME-Zertifikat für diese Adresse (Einstellungen → Zertifikate)");
 
     /// <summary>The formatting toolbar, connected to the editor in <see cref="AttachEditorAsync"/>.</summary>
     public FormattingViewModel Formatting { get; }
@@ -319,7 +320,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         if (recipients.Count == 0)
         {
             SetEncryptAutomatically(false);
-            EncryptHint = "Wird automatisch eingeschaltet, sobald für alle Empfänger ein Zertifikat bekannt ist";
+            EncryptHint = T("Wird automatisch eingeschaltet, sobald für alle Empfänger ein Zertifikat bekannt ist");
             return;
         }
 
@@ -334,8 +335,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         var missing = capabilities.RecipientsWithoutCertificate;
         SetEncryptAutomatically(missing.Count == 0);
         EncryptHint = missing.Count == 0
-            ? "Automatisch verschlüsselt: Zertifikate aller Empfänger sind bekannt"
-            : "Nicht automatisch verschlüsselt – kein Zertifikat für: " + string.Join(", ", missing);
+            ? T("Automatisch verschlüsselt: Zertifikate aller Empfänger sind bekannt")
+            : T("Nicht automatisch verschlüsselt – kein Zertifikat für: ") + string.Join(", ", missing);
     }
 
     private void SetEncryptAutomatically(bool value)
@@ -371,7 +372,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             SignatureMenu.Add(new SignatureMenuItem(signature.Name, signature, ChooseSignatureCommand));
         }
 
-        SignatureMenu.Add(new SignatureMenuItem("Keine Signatur", null, ChooseSignatureCommand));
+        SignatureMenu.Add(new SignatureMenuItem(T("Keine Signatur"), null, ChooseSignatureCommand));
     }
 
     public ComposeKind Kind => _kind;
@@ -399,7 +400,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             ? _draft
             : SignatureBlock.Apply(_draft, await _signatures.ResolveAsync(_account.Id, _kind));
         var html = draft.HtmlBody ?? (string.IsNullOrEmpty(draft.Body) ? string.Empty : PlainToHtml(draft.Body));
-        Formatting.Attach(editor, html, font, size, "Nachricht verfassen …");
+        Formatting.Attach(editor, html, font, size, T("Nachricht verfassen …"));
         _editorDraft = draft;
         await LoadTemplatesAsync(editor);
     }
@@ -464,11 +465,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         {
             var version = _changes;
             await StoreDraftAsync(await SnapshotAsync(), version);
-            DraftStatus = $"Entwurf gespeichert um {DateTime.Now:HH:mm}";
+            DraftStatus = F("Entwurf gespeichert um {0:t}", DateTime.Now);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            DraftStatus = "Entwurf nicht gespeichert: " + ex.Message;
+            DraftStatus = T("Entwurf nicht gespeichert: ") + ex.Message;
         }
         finally
         {
@@ -517,11 +518,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         try
         {
             await StoreDraftAsync(draft, version);
-            Notice?.Invoke(this, "Entwurf gespeichert (Ordner «Entwürfe»).");
+            Notice?.Invoke(this, T("Entwurf gespeichert (Ordner «Entwürfe»)."));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Notice?.Invoke(this, "Entwurf konnte nicht gespeichert werden: " + ex.Message);
+            Notice?.Invoke(this, T("Entwurf konnte nicht gespeichert werden: ") + ex.Message);
         }
     }
 
@@ -554,7 +555,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = "Entwurf nicht gespeichert: " + ex.Message;
+            Error = T("Entwurf nicht gespeichert: ") + ex.Message;
             _finished = false;
             return false;
         }
@@ -564,7 +565,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     public void DiscardOnExit() => Finish();
 
     /// <summary>"Offerte Netzwerk" or "(ohne Betreff)" for the question on closing.</summary>
-    public string Title => string.IsNullOrWhiteSpace(Subject) ? "(ohne Betreff)" : Subject.Trim();
+    public string Title => string.IsNullOrWhiteSpace(Subject) ? T("(ohne Betreff)") : Subject.Trim();
 
     private void Finish()
     {
@@ -593,7 +594,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Notice?.Invoke(this, "Der Entwurf konnte nicht aus «Entwürfe» entfernt werden: " + ex.Message);
+            Notice?.Invoke(this, T("Der Entwurf konnte nicht aus «Entwürfe» entfernt werden: ") + ex.Message);
         }
     }
 
@@ -606,7 +607,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         Error = null;
         if (!InternetAddressList.TryParse(To, out _) || (Cc.Trim().Length > 0 && !InternetAddressList.TryParse(Cc, out _)))
         {
-            Error = "Bitte gültige Empfängeradressen eingeben (mehrere mit Komma trennen).";
+            Error = T("Bitte gültige Empfängeradressen eingeben (mehrere mit Komma trennen).");
             return;
         }
 
@@ -627,11 +628,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
         catch (SecureMimeException ex)
         {
-            Error = ex.Message + (Encrypt ? " – ohne Verschlüsselung senden: Schalter «Verschlüsseln» ausschalten." : string.Empty);
+            Error = ex.Message + (Encrypt ? T(" – ohne Verschlüsselung senden: Schalter «Verschlüsseln» ausschalten.") : string.Empty);
         }
         catch (Exception ex)
         {
-            Error = "Senden fehlgeschlagen: " + ex.Message;
+            Error = T("Senden fehlgeschlagen: ") + ex.Message;
         }
         finally
         {
@@ -644,7 +645,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [RelayCommand]
     private async Task AddAttachmentAsync()
     {
-        foreach (var path in await _files.PickFilesAsync("Datei anhängen"))
+        foreach (var path in await _files.PickFilesAsync(T("Datei anhängen")))
         {
             try
             {
@@ -653,7 +654,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             }
             catch (IOException ex)
             {
-                Error = $"«{Path.GetFileName(path)}» konnte nicht gelesen werden: {ex.Message}";
+                Error = F("«{0}» konnte nicht gelesen werden: {1}", Path.GetFileName(path), ex.Message);
             }
         }
     }

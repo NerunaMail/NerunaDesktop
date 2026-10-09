@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core.Contacts;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -48,7 +49,7 @@ internal sealed partial class AddressBookSelectionViewModel(ContactController co
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    group.Error = "Server nicht erreichbar: " + ex.Message;
+                    group.Error = T("Server nicht erreichbar: ") + ex.Message;
                 }
             }
         }
@@ -77,7 +78,7 @@ internal sealed partial class AddressBookSelectionViewModel(ContactController co
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = "Übernehmen fehlgeschlagen: " + ex.Message;
+            Error = T("Übernehmen fehlgeschlagen: ") + ex.Message;
         }
         finally
         {

@@ -9,15 +9,17 @@ namespace Neruna.Desktop.ViewModels;
 /// </summary>
 internal sealed partial class MiniMonth : ObservableObject
 {
-    private static CultureInfo German => Neruna.Core.Localization.Texts.Culture;
+    private static CultureInfo Culture => Neruna.Core.Localization.Texts.Culture;
 
     public MiniMonth()
     {
         Weeks = Enumerable.Range(0, 6).Select(_ => new MiniWeek()).ToList();
     }
 
-    // Short German weekday names, Monday first (ISO 8601 / Switzerland).
-    public static IReadOnlyList<string> WeekdayHeaders { get; } = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+    // Short Culture weekday names, Monday first (ISO 8601 / Switzerland).
+    // Monday first, in the language of the app (two letters, as in the month overview).
+    public static IReadOnlyList<string> WeekdayHeaders { get; } =
+        [.. Enumerable.Range(1, 7).Select(d => Culture.DateTimeFormat.GetShortestDayName((DayOfWeek)(d % 7)))];
 
     [ObservableProperty]
     public partial string Title { get; set; } = string.Empty;
@@ -32,7 +34,7 @@ internal sealed partial class MiniMonth : ObservableObject
     public void Show(DateTime month, bool isFirst, DateTime selectedWeekStart, IReadOnlySet<DateTime> daysWithEvents)
     {
         var first = new DateTime(month.Year, month.Month, 1);
-        Title = first.ToString("MMMM yyyy", German);
+        Title = first.ToString("MMMM yyyy", Culture);
         IsFirst = isFirst;
 
         var start = first.AddDays(-(((int)first.DayOfWeek + 6) % 7));
@@ -70,7 +72,7 @@ internal sealed partial class MiniWeek : ObservableObject
 
 internal sealed partial class MiniDay : ObservableObject
 {
-    private static CultureInfo German => Neruna.Core.Localization.Texts.Culture;
+    private static CultureInfo Culture => Neruna.Core.Localization.Texts.Culture;
 
     [ObservableProperty]
     public partial DateTime Date { get; set; }
@@ -90,7 +92,7 @@ internal sealed partial class MiniDay : ObservableObject
 
     public bool IsOtherMonth => !IsCurrentMonth;
 
-    public string Tooltip => Date.ToString("dddd, d. MMMM yyyy", German);
+    public string Tooltip => Date.ToString("dddd, d. MMMM yyyy", Culture);
 
     public void Show(DateTime date, bool isCurrentMonth, bool isToday, bool hasEvents)
     {

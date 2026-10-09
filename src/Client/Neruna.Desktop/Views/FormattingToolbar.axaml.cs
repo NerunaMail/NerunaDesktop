@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Views;
 

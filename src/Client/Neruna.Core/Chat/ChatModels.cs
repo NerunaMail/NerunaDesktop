@@ -1,3 +1,4 @@
+using static Neruna.Core.Localization.Texts;
 namespace Neruna.Core.Chat;
 
 /// <summary>A chat message kept on this computer (until the organisation's retention has passed).</summary>
@@ -35,11 +36,11 @@ public static class Presence
 
     public static string Label(string presence) => presence switch
     {
-        Away => "Abwesend",
-        BeRightBack => "Bin gleich zurück",
-        DoNotDisturb => "Nicht stören",
-        Offline => "Offline",
-        _ => "Verfügbar",
+        Away => T("Abwesend"),
+        BeRightBack => T("Bin gleich zurück"),
+        DoNotDisturb => T("Nicht stören"),
+        Offline => T("Offline"),
+        _ => T("Verfügbar"),
     };
 }
 

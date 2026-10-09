@@ -1,4 +1,5 @@
 using System.Text;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Contacts;
 
@@ -111,7 +112,7 @@ public static class VCardReader
         }
 
         var structuredName = $"{given} {family}".Trim();
-        var displayName = FirstNonEmpty(formattedName, structuredName, organization, emails.FirstOrDefault()?.Value) ?? "(ohne Namen)";
+        var displayName = FirstNonEmpty(formattedName, structuredName, organization, emails.FirstOrDefault()?.Value) ?? T("(ohne Namen)");
         return new ContactCard(uid ?? string.Empty, displayName, given, family, organization, title, note, emails, phones)
         {
             Kind = kind,

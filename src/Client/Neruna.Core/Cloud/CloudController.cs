@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Neruna.Contracts;
 using Neruna.Contracts.Cloud;
 using Neruna.Core.Security;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Cloud;
 
@@ -62,7 +63,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         if (!Uri.TryCreate(value.TrimEnd('/') + "/", UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttps && !(uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)))
         {
-            throw new CloudException("invalid_server", "Bitte die Serveradresse prüfen (https://…).");
+            throw new CloudException("invalid_server", T("Bitte die Serveradresse prüfen (https://…)."));
         }
 
         return uri;
@@ -244,7 +245,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         }
 
         var secret = await credentials.GetSecretAsync(KeyId, cancellationToken)
-                     ?? throw new CloudException("no_key", "Der Geräteschlüssel fehlt. Bitte die Cloud-Verbindung neu einrichten.");
+                     ?? throw new CloudException("no_key", T("Der Geräteschlüssel fehlt. Bitte die Cloud-Verbindung neu einrichten."));
         using var key = DeviceKey.Import(secret);
         var tokenUrl = new Uri(connection.Server, "api/v1/token");
         var assertion = key.CreateAssertion(connection.DeviceId, tokenUrl, DateTimeOffset.UtcNow);
@@ -259,7 +260,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     }
 
     private async Task<CloudConnection> RequireConnectionAsync(CancellationToken cancellationToken) =>
-        await GetConnectionAsync(cancellationToken) ?? throw new CloudException("not_connected", "Neruna ist nicht mit einer Cloud verbunden.");
+        await GetConnectionAsync(cancellationToken) ?? throw new CloudException("not_connected", T("Neruna ist nicht mit einer Cloud verbunden."));
 
     private async Task<T> SendAsync<T>(Func<HttpRequestMessage> request, CancellationToken cancellationToken)
     {
@@ -280,7 +281,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
             }
             catch (HttpRequestException ex)
             {
-                throw new CloudException("unreachable", $"Der Server {request.RequestUri?.Host} ist nicht erreichbar ({ex.Message}).", ex);
+                throw new CloudException("unreachable", F("Der Server {0} ist nicht erreichbar ({1}).", request.RequestUri?.Host, ex.Message), ex);
             }
         }
     }
@@ -290,7 +291,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<T>(NerunaJson.Options, cancellationToken)
-                   ?? throw new CloudException("invalid_response", "Unerwartete Antwort des Servers.");
+                   ?? throw new CloudException("invalid_response", Localization.Texts.T("Unerwartete Antwort des Servers."));
         }
 
         CloudError? error = null;
@@ -305,6 +306,6 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
 
         throw error is { Message.Length: > 0 }
             ? new CloudException(error.Error ?? "invalid_request", error.Message)
-            : new CloudException("http_" + (int)response.StatusCode, $"Der Server antwortet mit Fehler {(int)response.StatusCode}. Stimmt die Serveradresse?");
+            : new CloudException("http_" + (int)response.StatusCode, F("Der Server antwortet mit Fehler {0}. Stimmt die Serveradresse?", (int)response.StatusCode));
     }
 }

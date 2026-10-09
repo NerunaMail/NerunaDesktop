@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using MimeKit;
 using Neruna.Core;
 using Neruna.Core.Calendar;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -10,12 +11,12 @@ internal sealed record RecurrenceOption(RecurrenceKind Kind, string Label)
 {
     public static IReadOnlyList<RecurrenceOption> All { get; } =
     [
-        new(RecurrenceKind.None, "Keine"),
-        new(RecurrenceKind.Daily, "Täglich"),
-        new(RecurrenceKind.Weekly, "Wöchentlich"),
-        new(RecurrenceKind.Monthly, "Monatlich"),
-        new(RecurrenceKind.Yearly, "Jährlich"),
-        new(RecurrenceKind.Custom, "Benutzerdefiniert (unverändert)"),
+        new(RecurrenceKind.None, T("Keine")),
+        new(RecurrenceKind.Daily, T("Täglich")),
+        new(RecurrenceKind.Weekly, T("Wöchentlich")),
+        new(RecurrenceKind.Monthly, T("Monatlich")),
+        new(RecurrenceKind.Yearly, T("Jährlich")),
+        new(RecurrenceKind.Custom, T("Benutzerdefiniert (unverändert)")),
     ];
 }
 
@@ -23,21 +24,21 @@ internal sealed record ReminderOption(int? Minutes, string Label)
 {
     public static IReadOnlyList<ReminderOption> Standard { get; } =
     [
-        new(null, "Keine"),
-        new(0, "Bei Beginn"),
-        new(5, "5 Minuten vorher"),
-        new(10, "10 Minuten vorher"),
-        new(15, "15 Minuten vorher"),
-        new(30, "30 Minuten vorher"),
-        new(60, "1 Stunde vorher"),
-        new(120, "2 Stunden vorher"),
-        new(1440, "1 Tag vorher"),
-        new(10080, "1 Woche vorher"),
+        new(null, T("Keine")),
+        new(0, T("Bei Beginn")),
+        new(5, T("5 Minuten vorher")),
+        new(10, T("10 Minuten vorher")),
+        new(15, T("15 Minuten vorher")),
+        new(30, T("30 Minuten vorher")),
+        new(60, T("1 Stunde vorher")),
+        new(120, T("2 Stunden vorher")),
+        new(1440, T("1 Tag vorher")),
+        new(10080, T("1 Woche vorher")),
     ];
 
     /// <summary>The standard choices, plus the event's own value if it is none of them (set elsewhere).</summary>
     public static IReadOnlyList<ReminderOption> For(int? minutes) =>
-        Standard.Any(o => o.Minutes == minutes) ? Standard : [.. Standard, new(minutes, $"{minutes} Minuten vorher")];
+        Standard.Any(o => o.Minutes == minutes) ? Standard : [.. Standard, new(minutes, F("{0} Minuten vorher", minutes))];
 }
 
 /// <summary>One invited person with their answer, shown below the attendee field.</summary>
@@ -96,9 +97,9 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             .Select(a => new AttendeeStatus(string.IsNullOrWhiteSpace(a.Name) ? a.Email : a.Name, a.Status switch
             {
                 Participation.Accepted => "zugesagt",
-                Participation.Tentative => "mit Vorbehalt",
+                Participation.Tentative => T("mit Vorbehalt"),
                 Participation.Declined => "abgesagt",
-                _ => "keine Antwort",
+                _ => T("keine Antwort"),
             }))
             .ToList();
         IsOrganizer = Organizer is null || string.Equals(Organizer, me, StringComparison.OrdinalIgnoreCase);
@@ -129,11 +130,11 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     /// <summary>The second click on "Löschen" says whether mail goes out.</summary>
     public string DeleteConfirmText =>
-        !IsOrganizer ? "Löschen und absagen?"
-        : _attendees.Any(a => !string.Equals(a.Email, Organizer, StringComparison.OrdinalIgnoreCase)) ? "Löschen und Absage an alle?"
-        : "Wirklich löschen?";
+        !IsOrganizer ? T("Löschen und absagen?")
+        : _attendees.Any(a => !string.Equals(a.Email, Organizer, StringComparison.OrdinalIgnoreCase)) ? T("Löschen und Absage an alle?")
+        : T("Wirklich löschen?");
 
-    public string OrganizerText => $"Organisiert von {Organizer} – Ihre Antwort geben Sie in der Einladungsmail.";
+    public string OrganizerText => F("Organisiert von {0} – Ihre Antwort geben Sie in der Einladungsmail.", Organizer);
 
     /// <summary>Raised with true when something was saved or deleted.</summary>
     public event EventHandler<bool>? Finished;
@@ -146,7 +147,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     public bool IsExisting => !IsNew;
 
-    public string Heading => IsReadOnly ? "Termin (schreibgeschützt)" : IsNew ? "Neuer Termin" : "Termin bearbeiten";
+    public string Heading => IsReadOnly ? T("Termin (schreibgeschützt)") : IsNew ? T("Neuer Termin") : T("Termin bearbeiten");
 
     public bool IsReadOnly { get; }
 
@@ -222,7 +223,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         Error = null;
         if (SelectedCalendar is null || StartDate is null || EndDate is null)
         {
-            Error = "Bitte Kalender, Beginn und Ende angeben.";
+            Error = T("Bitte Kalender, Beginn und Ende angeben.");
             return;
         }
 
@@ -230,13 +231,13 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         var end = IsAllDay ? EndDate.Value.Date.AddDays(1) : EndDate.Value.Date + (EndTime ?? TimeSpan.FromHours(10));
         if (end <= start)
         {
-            Error = "Das Ende muss nach dem Beginn liegen.";
+            Error = T("Das Ende muss nach dem Beginn liegen.");
             return;
         }
 
         if (!TryParseAttendees(out var attendees))
         {
-            Error = "Bitte gültige E-Mail-Adressen bei den Teilnehmern eingeben (mehrere mit Komma trennen).";
+            Error = T("Bitte gültige E-Mail-Adressen bei den Teilnehmern eingeben (mehrere mit Komma trennen).");
             return;
         }
 
@@ -256,11 +257,11 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             try
             {
                 var sent = await _invitations.SendAfterSaveAsync(target, previous, saved.ICalendarData);
-                ResultMessage = sent > 0 ? $"Gespeichert – Einladung an {sent} Person(en) gesendet." : null;
+                ResultMessage = sent > 0 ? F("Gespeichert – Einladung an {0} Person(en) gesendet.", sent) : null;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                ResultMessage = "Gespeichert, aber die Einladungen konnten nicht gesendet werden: " + ex.Message;
+                ResultMessage = T("Gespeichert, aber die Einladungen konnten nicht gesendet werden: ") + ex.Message;
             }
         });
     }
@@ -312,12 +313,12 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
                 try
                 {
                     ResultMessage = await _invitations.SendDeclineAsync(existing.Calendar, invited.ICalendarData)
-                        ? $"Gelöscht – Absage an {Organizer} gesendet."
+                        ? F("Gelöscht – Absage an {0} gesendet.", Organizer)
                         : null;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    Error = "Die Absage an den Organisator konnte nicht gesendet werden: " + ex.Message;
+                    Error = T("Die Absage an den Organisator konnte nicht gesendet werden: ") + ex.Message;
                     return false;
                 }
             }
@@ -328,11 +329,11 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
                 try
                 {
                     var sent = await _invitations.SendCancellationAsync(existing.Calendar, current.ICalendarData);
-                    ResultMessage = sent > 0 ? $"Gelöscht – Absage an {sent} Person(en) gesendet." : null;
+                    ResultMessage = sent > 0 ? F("Gelöscht – Absage an {0} Person(en) gesendet.", sent) : null;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    Error = "Die Absage konnte nicht gesendet werden: " + ex.Message;
+                    Error = T("Die Absage konnte nicht gesendet werden: ") + ex.Message;
                     return false;
                 }
             }
@@ -364,11 +365,11 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         }
         catch (RemoteConflictException)
         {
-            Error = "Der Termin wurde inzwischen auf dem Server geändert. Bitte synchronisieren (F5) und erneut bearbeiten.";
+            Error = T("Der Termin wurde inzwischen auf dem Server geändert. Bitte synchronisieren (F5) und erneut bearbeiten.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = "Speichern fehlgeschlagen: " + ex.Message;
+            Error = T("Speichern fehlgeschlagen: ") + ex.Message;
         }
         finally
         {

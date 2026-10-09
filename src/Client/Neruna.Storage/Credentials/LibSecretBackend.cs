@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Storage.Credentials;
 
@@ -32,7 +33,7 @@ internal sealed class LibSecretBackend : ISecretBackend
         _strEqual = NativeLibrary.GetExport(glib, "g_str_equal");
     }
 
-    public string Name => "Linux Secret Service (Schlüsselbund)";
+    public string Name => T("Linux Secret Service (Schlüsselbund)");
 
     /// <summary>Null if libsecret is not installed.</summary>
     public static LibSecretBackend? TryCreate(ILogger logger)
@@ -124,7 +125,7 @@ internal sealed class LibSecretBackend : ISecretBackend
         }
 
         // GError: domain (uint32), code (int32), message (char*).
-        var message = Marshal.PtrToStringUTF8(Marshal.ReadIntPtr(error, 8)) ?? "unbekannter Fehler";
+        var message = Marshal.PtrToStringUTF8(Marshal.ReadIntPtr(error, 8)) ?? T("unbekannter Fehler");
         NativeMethods.g_error_free(error);
         throw new InvalidOperationException("Secret Service: " + message);
     }

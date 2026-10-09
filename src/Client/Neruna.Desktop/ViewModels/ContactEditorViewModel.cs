@@ -5,12 +5,13 @@ using Neruna.Core;
 using Avalonia.Media.Imaging;
 using Neruna.Core.Contacts;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
 internal sealed record FieldKind(string? Value, string Label)
 {
-    public static IReadOnlyList<FieldKind> EmailKinds { get; } = [new(null, "—"), new("work", "Geschäftlich"), new("home", "Privat")];
+    public static IReadOnlyList<FieldKind> EmailKinds { get; } = [new(null, "—"), new("work", T("Geschäftlich")), new("home", T("Privat"))];
 
     public static IReadOnlyList<FieldKind> PhoneKinds { get; } =
         [new(null, "—"), new("work", "Geschäftlich"), new("home", "Privat"), new("cell", "Mobil"), new("fax", "Fax")];
@@ -85,7 +86,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
 
     public bool IsExisting => _existing is not null;
 
-    public string Heading => IsReadOnly ? "Kontakt (schreibgeschützt)" : IsExisting ? "Kontakt bearbeiten" : "Neuer Kontakt";
+    public string Heading => IsReadOnly ? T("Kontakt (schreibgeschützt)") : IsExisting ? T("Kontakt bearbeiten") : T("Neuer Kontakt");
 
     public bool NoAddressBook => AddressBooks.Count == 0;
 
@@ -132,7 +133,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task ChoosePhotoAsync()
     {
-        var path = (await _files.PickFilesAsync("Kontaktbild wählen")).FirstOrDefault();
+        var path = (await _files.PickFilesAsync(T("Kontaktbild wählen"))).FirstOrDefault();
         if (path is null)
         {
             return;
@@ -141,7 +142,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
         var jpeg = await Task.Run(() => AvatarImage.FromFile(path));
         if (jpeg is null)
         {
-            Error = $"«{Path.GetFileName(path)}» ist kein lesbares Bild.";
+            Error = F("«{0}» ist kein lesbares Bild.", Path.GetFileName(path));
             return;
         }
 
@@ -178,7 +179,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
         Error = null;
         if (SelectedAddressBook is null)
         {
-            Error = "Kein beschreibbares Adressbuch vorhanden.";
+            Error = T("Kein beschreibbares Adressbuch vorhanden.");
             return;
         }
 
@@ -197,7 +198,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
 
         if (draft.DisplayName.Length == 0)
         {
-            Error = "Bitte mindestens einen Namen, eine Firma oder eine E-Mail-Adresse angeben.";
+            Error = T("Bitte mindestens einen Namen, eine Firma oder eine E-Mail-Adresse angeben.");
             return;
         }
 
@@ -236,11 +237,11 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
         }
         catch (RemoteConflictException)
         {
-            Error = "Der Kontakt wurde inzwischen auf dem Server geändert. Bitte synchronisieren (F5) und erneut bearbeiten.";
+            Error = T("Der Kontakt wurde inzwischen auf dem Server geändert. Bitte synchronisieren (F5) und erneut bearbeiten.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Error = "Speichern fehlgeschlagen: " + ex.Message;
+            Error = T("Speichern fehlgeschlagen: ") + ex.Message;
         }
         finally
         {

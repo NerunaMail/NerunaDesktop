@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Views;
 

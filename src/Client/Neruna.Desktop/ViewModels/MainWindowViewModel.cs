@@ -10,6 +10,7 @@ using Neruna.Core.Discovery;
 using Neruna.Core.Mail;
 
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -211,7 +212,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             try
             {
                 _notifications.Show(new NotificationViewModel(
-                    "Neue E-Mail · Test", "Neruna", "So sehen Benachrichtigungen aus", "Ein Klick holt Neruna nach vorne.",
+                    T("Neue E-Mail · Test"), "Neruna", "So sehen Benachrichtigungen aus", T("Ein Klick holt Neruna nach vorne."),
                     () =>
                     {
                         NotificationService.ActivateMainWindow();
@@ -221,7 +222,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "Showing the test notification failed");
-                StatusText = "Test-Benachrichtigung fehlgeschlagen: " + ex.Message;
+                StatusText = T("Test-Benachrichtigung fehlgeschlagen: ") + ex.Message;
             }
         };
 
@@ -273,7 +274,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     public bool IsSettings => CurrentPage == SettingsPage;
 
     /// <summary>Shown in the header bar; the window title already says "Neruna".</summary>
-    public string SectionTitle => IsCalendar ? "Kalender" : IsContacts ? "Kontakte" : IsChat ? "Chat" : IsSettings ? "Einstellungen" : "E-Mails";
+    public string SectionTitle => IsCalendar ? T("Kalender") : IsContacts ? T("Kontakte") : IsChat ? "Chat" : IsSettings ? T("Einstellungen") : T("E-Mails");
 
     /// <summary>Modal content shown above the shell, or null.</summary>
     [ObservableProperty]
@@ -295,7 +296,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     public partial bool IsSyncing { get; set; }
 
     [ObservableProperty]
-    public partial string StatusText { get; set; } = "Bereit";
+    public partial string StatusText { get; set; } = T("Bereit");
 
     [ObservableProperty]
     public partial bool HasAccounts { get; set; } = true;
@@ -405,7 +406,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         {
             var newest = e.Messages[0];
             _notifications.Show(new NotificationViewModel(
-                $"{e.Messages.Count} neue E-Mails · {account}",
+                F("{0} neue E-Mails · {1}", e.Messages.Count, account),
                 string.Join(", ", e.Messages.Select(m => m.From?.DisplayText).Where(n => n is not null).Distinct().Take(3)),
                 newest.Subject,
                 null,
@@ -416,9 +417,9 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         foreach (var message in e.Messages.Reverse())
         {
             _notifications.Show(new NotificationViewModel(
-                "Neue E-Mail · " + account,
+                T("Neue E-Mail · ") + account,
                 message.From?.DisplayText ?? "(unbekannt)",
-                string.IsNullOrWhiteSpace(message.Subject) ? "(kein Betreff)" : message.Subject,
+                string.IsNullOrWhiteSpace(message.Subject) ? T("(kein Betreff)") : message.Subject,
                 message.Preview,
                 () => OpenMessageAsync(e.Folder, message.RemoteId)));
         }
@@ -531,7 +532,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private async Task SyncAsync()
     {
         IsSyncing = true;
-        StatusText = "Synchronisiere …";
+        StatusText = T("Synchronisiere …");
         try
         {
             // The three areas are independent; one failing never blocks the others.
@@ -549,13 +550,13 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
             var failures = reports.SelectMany(r => r.Failures).ToList();
             StatusText = failures.Count == 0
-                ? $"Synchronisiert um {DateTime.Now:HH:mm}"
-                : $"Synchronisiert um {DateTime.Now:HH:mm} – {failures.Count} Verbindung(en) fehlgeschlagen: {failures[0].Error.Message} (Details im Log)";
+                ? F("Synchronisiert um {0:t}", DateTime.Now)
+                : F("Synchronisiert um {0:t} – {1} Verbindung(en) fehlgeschlagen: {2} (Details im Log)", DateTime.Now, failures.Count, failures[0].Error.Message);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Sync failed");
-            StatusText = "Synchronisierung fehlgeschlagen: " + ex.Message;
+            StatusText = T("Synchronisierung fehlgeschlagen: ") + ex.Message;
         }
         finally
         {
@@ -582,7 +583,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         switch (await ask(drafts.Select(d => d.Title).ToList()))
         {
             case CloseChoice.Save:
-                StatusText = drafts.Count == 1 ? "Entwurf wird gespeichert …" : "Entwürfe werden gespeichert …";
+                StatusText = drafts.Count == 1 ? T("Entwurf wird gespeichert …") : T("Entwürfe werden gespeichert …");
                 var saved = true;
                 foreach (var draft in drafts)
                 {
@@ -591,7 +592,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
                 if (!saved)
                 {
-                    StatusText = "Nicht alle Entwürfe konnten gespeichert werden – Neruna bleibt offen.";
+                    StatusText = T("Nicht alle Entwürfe konnten gespeichert werden – Neruna bleibt offen.");
                 }
 
                 return saved;
@@ -672,7 +673,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             if (changed)
             {
                 await CalendarPage.ReloadAsync();
-                StatusText = $"Kalender aktualisiert um {DateTime.Now:HH:mm}";
+                StatusText = F("Kalender aktualisiert um {0:t}", DateTime.Now);
             }
         };
         // Several accounts: the two-column layout needs more room once they are known.
@@ -696,7 +697,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             if (changed)
             {
                 await ContactsPage.ReloadAsync();
-                StatusText = $"Adressbücher aktualisiert um {DateTime.Now:HH:mm}";
+                StatusText = F("Adressbücher aktualisiert um {0:t}", DateTime.Now);
             }
         };
         Overlay = selection;
@@ -712,7 +713,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             if (changed)
             {
                 _ = reload();
-                StatusText = (sender as EventEditorViewModel)?.ResultMessage ?? $"Gespeichert um {DateTime.Now:HH:mm}";
+                StatusText = (sender as EventEditorViewModel)?.ResultMessage ?? F("Gespeichert um {0:t}", DateTime.Now);
             }
         }
 

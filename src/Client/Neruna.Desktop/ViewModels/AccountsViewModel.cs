@@ -9,6 +9,7 @@ using Neruna.Desktop.Infrastructure;
 using Neruna.Providers.Dav;
 using Neruna.Providers.Ics;
 using Neruna.Providers.Imap;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -32,8 +33,8 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, ICredent
     public string LogDirectory => options.LogDirectory;
 
     public string ProtocolLogText => options.ProtocolLog
-        ? "Protokoll-Mitschnitt ist AKTIV (IMAP/SMTP/DAV, Passwörter geschwärzt) – nur zur Fehlersuche verwenden."
-        : "Protokoll-Mitschnitt aus. Zum Aktivieren mit --protocol-log oder NERUNA_PROTOCOL_LOG=1 starten.";
+        ? T("Protokoll-Mitschnitt ist AKTIV (IMAP/SMTP/DAV, Passwörter geschwärzt) – nur zur Fehlersuche verwenden.")
+        : T("Protokoll-Mitschnitt aus. Zum Aktivieren mit --protocol-log oder NERUNA_PROTOCOL_LOG=1 starten.");
 
     public bool HasAccounts => Items.Count > 0;
 
@@ -141,7 +142,7 @@ internal sealed partial class AccountItem(Account account) : ObservableObject
     [NotifyPropertyChangedFor(nameof(RemoveText))]
     public partial bool ConfirmRemove { get; set; }
 
-    public string RemoveText => ConfirmRemove ? "Wirklich entfernen?" : "Entfernen";
+    public string RemoveText => ConfirmRemove ? T("Wirklich entfernen?") : T("Entfernen");
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanMoveUp))]
@@ -162,9 +163,9 @@ internal sealed record ConnectionLine(string Kind, string Provider, string Detai
     {
         var kind = connection.Kind switch
         {
-            ServiceKind.Mail => "E-Mail",
-            ServiceKind.Calendar => "Kalender",
-            _ => "Kontakte",
+            ServiceKind.Mail => T("E-Mail"),
+            ServiceKind.Calendar => T("Kalender"),
+            _ => T("Kontakte"),
         };
 
         var detail = connection.ProviderId switch

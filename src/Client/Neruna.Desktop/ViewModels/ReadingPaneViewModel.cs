@@ -7,6 +7,7 @@ using MimeKit;
 using Neruna.Core.Mail;
 using Neruna.Core.Security;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -141,7 +142,7 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     public static ReadingPaneViewModel Loading(MessageSummary summary) =>
         new(summary.Subject, summary.From?.DisplayText ?? string.Empty, string.Join("; ", summary.To.Select(a => a.DisplayText)), string.Empty,
-            FormatDate(summary.Date), "Wird geladen …", null, null, [], (SecurityLevel.None, string.Empty, null), null, null, false);
+            FormatDate(summary.Date), T("Wird geladen …"), null, null, [], (SecurityLevel.None, string.Empty, null), null, null, false);
 
     public static ReadingPaneViewModel ForMessage(
         MessageSummary summary,
@@ -216,26 +217,26 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     {
         if (security.DecryptionError is { } error)
         {
-            return (SecurityLevel.Bad, "Verschlüsselte Nachricht – kann nicht gelesen werden", error);
+            return (SecurityLevel.Bad, T("Verschlüsselte Nachricht – kann nicht gelesen werden"), error);
         }
 
-        var encrypted = security.WasEncrypted ? " · Verschlüsselt" : string.Empty;
+        var encrypted = security.WasEncrypted ? T(" · Verschlüsselt") : string.Empty;
         if (security.Signatures.FirstOrDefault() is not { } signature)
         {
-            return security.WasEncrypted ? (SecurityLevel.Good, "Verschlüsselt (S/MIME)", null) : (SecurityLevel.None, string.Empty, null);
+            return security.WasEncrypted ? (SecurityLevel.Good, T("Verschlüsselt (S/MIME)"), null) : (SecurityLevel.None, string.Empty, null);
         }
 
         var signer = signature.SignerEmails.Count > 0 ? $"{signature.SignerName} <{signature.SignerEmails[0]}>" : signature.SignerName;
         return signature.Status switch
         {
             SignatureStatus.Valid when signature.EmailMatchesSender =>
-                (SecurityLevel.Good, $"Digital signiert von {signer} · Signatur gültig{encrypted}", $"Ausgestellt von {signature.IssuerName}"),
+                (SecurityLevel.Good, F("Digital signiert von {0} · Signatur gültig{1}", signer, encrypted), F("Ausgestellt von {0}", signature.IssuerName)),
             SignatureStatus.Valid =>
-                (SecurityLevel.Warning, $"Signatur gültig, aber das Zertifikat ({signer}) gehört nicht zur Absenderadresse{encrypted}", null),
+                (SecurityLevel.Warning, F("Signatur gültig, aber das Zertifikat ({0}) gehört nicht zur Absenderadresse{1}", signer, encrypted), null),
             SignatureStatus.ValidUntrusted =>
-                (SecurityLevel.Warning, $"Signiert von {signer} · Aussteller «{signature.IssuerName}» ist nicht vertrauenswürdig{encrypted}",
-                    "Die Nachricht ist unverändert. Um dem Aussteller zu vertrauen, dessen Stammzertifikat unter Einstellungen → Zertifikate importieren."),
-            _ => (SecurityLevel.Bad, "Ungültige Signatur – die Nachricht wurde nach dem Signieren verändert oder die Signatur ist beschädigt", signature.Detail),
+                (SecurityLevel.Warning, F("Signiert von {0} · Aussteller «{1}» ist nicht vertrauenswürdig{2}", signer, signature.IssuerName, encrypted),
+                    T("Die Nachricht ist unverändert. Um dem Aussteller zu vertrauen, dessen Stammzertifikat unter Einstellungen → Zertifikate importieren.")),
+            _ => (SecurityLevel.Bad, T("Ungültige Signatur – die Nachricht wurde nach dem Signieren verändert oder die Signatur ist beschädigt"), signature.Detail),
         };
     }
 
@@ -275,7 +276,7 @@ internal sealed partial class AttachmentViewModel(MimeEntity entity, IFileServic
     [RelayCommand]
     private async Task SaveAsync()
     {
-        var target = await files.SaveFileAsync("Anhang speichern", FileName);
+        var target = await files.SaveFileAsync(T("Anhang speichern"), FileName);
         if (target is not null)
         {
             await using (target)

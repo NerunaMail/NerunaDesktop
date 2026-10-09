@@ -69,13 +69,13 @@
 
       <Border Classes="group-separator" />
       <ToggleButton Classes="fmt" IsChecked="{Binding IsBold, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="bold" ToolTip.Tip="{l:T 'Fett (Ctrl+B)'}">
-        <TextBlock Text="F" FontWeight="Bold" FontSize="15" />
+        <TextBlock Text="{l:T 'F'}" FontWeight="Bold" FontSize="15" />
       </ToggleButton>
       <ToggleButton Classes="fmt" IsChecked="{Binding IsItalic, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="italic" ToolTip.Tip="{l:T 'Kursiv (Ctrl+I)'}">
-        <TextBlock Text="K" FontStyle="Italic" FontSize="15" FontFamily="Georgia, Times New Roman, serif" />
+        <TextBlock Text="{l:T 'K'}" FontStyle="Italic" FontSize="15" FontFamily="Georgia, Times New Roman, serif" />
       </ToggleButton>
       <ToggleButton Classes="fmt" IsChecked="{Binding IsUnderline, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="underline" ToolTip.Tip="{l:T 'Unterstrichen (Ctrl+U)'}">
-        <TextBlock Text="U" TextDecorations="Underline" FontSize="15" />
+        <TextBlock Text="{l:T 'U'}" TextDecorations="Underline" FontSize="15" />
       </ToggleButton>
       <ToggleButton Classes="fmt" IsChecked="{Binding IsStrikethrough, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="strikeThrough" ToolTip.Tip="{l:T 'Durchgestrichen'}">
         <TextBlock Text="{l:T 'abc'}" TextDecorations="Strikethrough" FontSize="14" />

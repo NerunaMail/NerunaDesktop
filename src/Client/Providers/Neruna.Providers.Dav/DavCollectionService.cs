@@ -4,6 +4,7 @@ using System.Text;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Neruna.Core;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Providers.Dav;
 
@@ -151,7 +152,7 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
             }
         }
 
-        throw new DavException(HttpStatusCode.NotFound, $"Unter {startUrl} wurde kein {flavor.WellKnown.ToUpperInvariant()}-Dienst gefunden.");
+        throw new DavException(HttpStatusCode.NotFound, F("Unter {0} wurde kein {1}-Dienst gefunden.", startUrl, flavor.WellKnown.ToUpperInvariant()));
     }
 
     public async Task<DavSyncResult> SyncAsync(Uri collection, string? state, IReadOnlyDictionary<string, string?> known, CancellationToken cancellationToken)
@@ -224,7 +225,7 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
 
         if ((int)response.Status is < 200 or >= 300 && response.Status != HttpStatusCode.NotFound)
         {
-            throw new DavException(response.Status, $"Löschen fehlgeschlagen: {(int)response.Status} {response.Status}.");
+            throw new DavException(response.Status, F("Löschen fehlgeschlagen: {0} {1}.", (int)response.Status, response.Status));
         }
     }
 

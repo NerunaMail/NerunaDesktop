@@ -5,6 +5,7 @@ using Neruna.Contracts.Discovery;
 using Neruna.Core.Accounts;
 using Neruna.Core.Discovery;
 using Neruna.Providers.Dav;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -45,17 +46,17 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     /// <summary>Set up by the organisation: servers, sender and aliases are read-only here.</summary>
     public bool IsCloud => Editing?.IsFromCloud == true;
 
-    public string Title => IsEditing ? "Konto bearbeiten" : "Konto hinzufügen";
+    public string Title => IsEditing ? T("Konto bearbeiten") : T("Konto hinzufügen");
 
-    public string SaveText => IsEditing ? "Speichern" : "Konto hinzufügen";
+    public string SaveText => IsEditing ? T("Speichern") : T("Konto hinzufügen");
 
     public string Subtitle => IsCloud
-        ? "Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten."
+        ? T("Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten.")
         : IsEditing
-        ? "Namen, Passwort und Server ändern. Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten. Leeres Kalender- oder Kontaktfeld entfernt diesen Dienst."
-        : "E-Mail (IMAP/SMTP), Kalender (CalDAV) und Kontakte (CardDAV) – z. B. SOGo, Nextcloud, Mailcow oder Ihr Provider. Die Servereinstellungen werden automatisch gesucht.";
+        ? T("Namen, Passwort und Server ändern. Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten. Leeres Kalender- oder Kontaktfeld entfernt diesen Dienst.")
+        : T("E-Mail (IMAP/SMTP), Kalender (CalDAV) und Kontakte (CardDAV) – z. B. SOGo, Nextcloud, Mailcow oder Ihr Provider. Die Servereinstellungen werden automatisch gesucht.");
 
-    public string PasswordHint => IsEditing ? "leer lassen = unverändert" : string.Empty;
+    public string PasswordHint => IsEditing ? T("leer lassen = unverändert") : string.Empty;
 
     /// <summary>Shows an existing account for editing: names and the servers its connections describe.</summary>
     public void LoadForEditing(Account account)
@@ -161,7 +162,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     {
         Error = null;
         IsBusy = true;
-        BusyText = "Suche Servereinstellungen …";
+        BusyText = T("Suche Servereinstellungen …");
         try
         {
             var email = Email.Trim();
@@ -172,7 +173,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
                 DiscoverySource = null;
                 ImapHost = SmtpHost = "mail." + domain;
                 Username = email;
-                Error = "Keine automatische Konfiguration gefunden. Bitte Serverdaten prüfen.";
+                Error = T("Keine automatische Konfiguration gefunden. Bitte Serverdaten prüfen.");
             }
             else
             {
@@ -180,7 +181,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             }
 
             // Many SOGo/Nextcloud setups publish DAV only via /.well-known, not in autoconfig.
-            BusyText = "Suche Kalender- und Kontaktdienst …";
+            BusyText = T("Suche Kalender- und Kontaktdienst …");
             string[] hosts = [domain, ImapHost.Trim()];
             if (CalDavUrl.Length == 0 && await DavProbe.FindAsync(davProbeClient, hosts, "caldav") is { } caldav)
             {
@@ -196,7 +197,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
         catch (FormatException)
         {
-            Error = "Bitte eine gültige E-Mail-Adresse eingeben.";
+            Error = T("Bitte eine gültige E-Mail-Adresse eingeben.");
         }
         finally
         {
@@ -219,7 +220,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
         catch (FormatException)
         {
-            Error = "Bitte eine gültige E-Mail-Adresse eingeben.";
+            Error = T("Bitte eine gültige E-Mail-Adresse eingeben.");
             return;
         }
 
@@ -231,7 +232,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             if (!int.TryParse(ImapPort, NumberStyles.None, CultureInfo.InvariantCulture, out var imapPort)
                 || !int.TryParse(SmtpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var smtpPort))
             {
-                Error = "Ports müssen Zahlen sein.";
+                Error = T("Ports müssen Zahlen sein.");
                 return;
             }
 
@@ -242,7 +243,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         var dav = new List<DavServerSettings>();
         if (!TryAddDav(dav, ServerProtocol.CalDav, CalDavUrl, username) || !TryAddDav(dav, ServerProtocol.CardDav, CardDavUrl, username))
         {
-            Error = "Die CalDAV-/CardDAV-Adresse muss mit https:// oder http:// beginnen.";
+            Error = T("Die CalDAV-/CardDAV-Adresse muss mit https:// oder http:// beginnen.");
             return;
         }
 
@@ -255,7 +256,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             var address = row.Email.Trim();
             if (!MimeKit.MailboxAddress.TryParse(address, out var parsed) || parsed.Address != address || !address.Contains('@', StringComparison.Ordinal))
             {
-                Error = $"«{address}» ist keine gültige E-Mail-Adresse.";
+                Error = F("«{0}» ist keine gültige E-Mail-Adresse.", address);
                 return;
             }
 
@@ -268,12 +269,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         var account = setup.BuildAccount(name, email, config) with { Label = label, Aliases = aliases.Count > 0 ? aliases : null };
         if (account.Connections.Count == 0)
         {
-            Error = "Bitte mindestens einen IMAP-Server oder eine CalDAV-/CardDAV-Adresse angeben.";
+            Error = T("Bitte mindestens einen IMAP-Server oder eine CalDAV-/CardDAV-Adresse angeben.");
             return;
         }
 
         IsBusy = true;
-        BusyText = "Verbindungen werden geprüft …";
+        BusyText = T("Verbindungen werden geprüft …");
         try
         {
             if (Editing is { } existing)
@@ -289,7 +290,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
         catch (AccountSetupException ex)
         {
-            Error = "Verbindung fehlgeschlagen – " + ex.Message;
+            Error = T("Verbindung fehlgeschlagen – ") + ex.Message;
         }
         finally
         {
@@ -322,8 +323,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     private void Apply(DiscoveryResult result)
     {
         DiscoverySource = result.OrganizationName is { } org
-            ? $"Konfiguration von {org} (Neruna) übernommen"
-            : $"Konfiguration gefunden über {result.Source}";
+            ? F("Konfiguration von {0} (Neruna) übernommen", org)
+            : F("Konfiguration gefunden über {0}", result.Source);
 
         var email = Email.Trim();
         if (result.Config.IncomingServers.FirstOrDefault(s => s.Protocol == ServerProtocol.Imap) is { } imap)

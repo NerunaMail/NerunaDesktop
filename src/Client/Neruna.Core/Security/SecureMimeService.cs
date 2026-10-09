@@ -6,6 +6,7 @@ using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Pkix;
 using Org.BouncyCastle.Utilities.Collections;
 using BcCertificate = Org.BouncyCastle.X509.X509Certificate;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Security;
 
@@ -101,14 +102,14 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             return;
         }
 
-        var from = message.From.Mailboxes.FirstOrDefault() ?? throw new SecureMimeException("Die Nachricht hat keinen Absender.");
+        var from = message.From.Mailboxes.FirstOrDefault() ?? throw new SecureMimeException(T("Die Nachricht hat keinen Absender."));
         using var context = await CreateContextAsync(cancellationToken);
-        var body = message.Body ?? throw new SecureMimeException("Die Nachricht hat keinen Inhalt.");
+        var body = message.Body ?? throw new SecureMimeException(T("Die Nachricht hat keinen Inhalt."));
 
         if (sign)
         {
             var signer = context.FindSigner(from.Address)
-                         ?? throw new SecureMimeException($"Kein gültiges eigenes S/MIME-Zertifikat für {from.Address} vorhanden.");
+                         ?? throw new SecureMimeException(F("Kein gültiges eigenes S/MIME-Zertifikat für {0} vorhanden.", from.Address));
             body = await MultipartSigned.CreateAsync(context, signer, body, cancellationToken);
         }
 
@@ -135,7 +136,7 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
 
             if (missing.Count > 0)
             {
-                throw new SecureMimeException("Für folgende Empfänger ist kein gültiges Zertifikat vorhanden: " + string.Join(", ", missing));
+                throw new SecureMimeException(T("Für folgende Empfänger ist kein gültiges Zertifikat vorhanden: ") + string.Join(", ", missing));
             }
 
             body = await ApplicationPkcs7Mime.EncryptAsync(context, recipients, body, cancellationToken);
@@ -179,8 +180,8 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
                 {
                     logger.LogInformation(ex, "Could not decrypt S/MIME message");
                     decryptionError = ex is PrivateKeyNotFoundException or CertificateNotFoundException
-                        ? "Kein passender privater Schlüssel vorhanden. Bitte das eigene Zertifikat (.p12/.pfx) unter Einstellungen → Zertifikate importieren."
-                        : "Die Nachricht konnte nicht entschlüsselt werden: " + ex.Message;
+                        ? T("Kein passender privater Schlüssel vorhanden. Bitte das eigene Zertifikat (.p12/.pfx) unter Einstellungen → Zertifikate importieren.")
+                        : T("Die Nachricht konnte nicht entschlüsselt werden: ") + ex.Message;
                     break;
                 }
             }
@@ -224,7 +225,7 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         {
             var certificate = (signature.SignerCertificate as SecureMimeDigitalCertificate)?.Certificate;
             var emails = certificate is null ? [] : CertificateParser.EmailAddresses(certificate);
-            var name = certificate is null ? "Unbekannt" : CertificateParser.Describe(certificate, false, CertificateSource.CollectedFromMail, clock.GetUtcNow()).SubjectName;
+            var name = certificate is null ? T("Unbekannt") : CertificateParser.Describe(certificate, false, CertificateSource.CollectedFromMail, clock.GetUtcNow()).SubjectName;
             var issuer = certificate is null ? null : CertificateParser.Describe(certificate, false, CertificateSource.CollectedFromMail, clock.GetUtcNow()).IssuerName;
 
             SignatureStatus status;
@@ -309,13 +310,13 @@ internal sealed class NerunaSecureMimeContext : TemporarySecureMimeContext
     protected override CmsSigner GetCmsSigner(MailboxAddress mailbox, DigestAlgorithm digestAlgo)
     {
         ArgumentNullException.ThrowIfNull(mailbox);
-        return FindSigner(mailbox.Address) ?? throw new CertificateNotFoundException(mailbox, "Kein Signaturzertifikat gefunden.");
+        return FindSigner(mailbox.Address) ?? throw new CertificateNotFoundException(mailbox, T("Kein Signaturzertifikat gefunden."));
     }
 
     protected override CmsRecipient GetCmsRecipient(MailboxAddress mailbox)
     {
         ArgumentNullException.ThrowIfNull(mailbox);
-        return FindRecipient(mailbox.Address) ?? throw new CertificateNotFoundException(mailbox, "Kein Verschlüsselungszertifikat gefunden.");
+        return FindRecipient(mailbox.Address) ?? throw new CertificateNotFoundException(mailbox, T("Kein Verschlüsselungszertifikat gefunden."));
     }
 
     // MimeKit asks once per recipient of an encrypted message and expects null for "not mine" so it can try the

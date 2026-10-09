@@ -7,6 +7,7 @@ using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.OpenSsl;
 using Org.BouncyCastle.Pkcs;
 using Org.BouncyCastle.X509;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Security;
 
@@ -148,7 +149,7 @@ public static class CertificateParser
         }
         catch (Exception ex) when (ex is IOException or ArgumentException or InvalidCastException or Org.BouncyCastle.Security.GeneralSecurityException)
         {
-            throw new CertificatePasswordException("Das Passwort ist falsch oder die Datei ist kein gültiges PKCS#12-Zertifikat (.p12/.pfx).", ex);
+            throw new CertificatePasswordException(T("Das Passwort ist falsch oder die Datei ist kein gültiges PKCS#12-Zertifikat (.p12/.pfx)."), ex);
         }
 
         var entries = new List<PrivateKeyEntry>();
@@ -269,7 +270,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         var entries = CertificateParser.ReadPkcs12(data, password ?? string.Empty);
         if (entries.Count == 0)
         {
-            throw new FormatException("Die Datei enthält kein Zertifikat mit privatem Schlüssel.");
+            throw new FormatException(T("Die Datei enthält kein Zertifikat mit privatem Schlüssel."));
         }
 
         var result = new List<CertificateInfo>();
@@ -301,7 +302,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
     /// <summary>The public certificate (DER), e.g. to send it to a contact.</summary>
     public async Task<byte[]> ExportPublicAsync(string thumbprint, CancellationToken cancellationToken = default) =>
         (await store.GetAllAsync(cancellationToken)).FirstOrDefault(c => c.Thumbprint == thumbprint)?.Der
-        ?? throw new InvalidOperationException("Zertifikat nicht gefunden.");
+        ?? throw new InvalidOperationException(T("Zertifikat nicht gefunden."));
 
     public async Task RemoveAsync(string thumbprint, CancellationToken cancellationToken = default)
     {

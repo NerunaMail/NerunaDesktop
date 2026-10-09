@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core.Calendar;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -17,14 +18,14 @@ internal sealed partial class InvitationBannerViewModel(
 
     public string Heading => Invitation.Method switch
     {
-        InvitationMethod.Cancel => "Termin abgesagt",
-        InvitationMethod.Reply => "Antwort auf Ihre Einladung",
-        _ => (Invitation.OrganizerName ?? Invitation.Organizer) is { } organizer ? "Einladung von " + organizer : "Einladung",
+        InvitationMethod.Cancel => T("Termin abgesagt"),
+        InvitationMethod.Reply => T("Antwort auf Ihre Einladung"),
+        _ => (Invitation.OrganizerName ?? Invitation.Organizer) is { } organizer ? T("Einladung von ") + organizer : T("Einladung"),
     };
 
     public string Summary => Invitation.Summary;
 
-    public string When => ITip.When(Invitation.Start, Invitation.End, Invitation.IsAllDay) + (Invitation.IsRecurring ? " · Serie" : string.Empty);
+    public string When => ITip.When(Invitation.Start, Invitation.End, Invitation.IsAllDay) + (Invitation.IsRecurring ? T(" · Serie") : string.Empty);
 
     public string? Location => Invitation.Location;
 

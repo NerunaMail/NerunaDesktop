@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Neruna.Contracts.Cloud;
 using Neruna.Core.Security;
 using Neruna.Vault;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Cloud;
 
@@ -64,7 +65,7 @@ public sealed class CloudCertificateSync(
         {
             logger.LogWarning("The organisation key for certificates changed; no certificates taken");
             Status = new CloudCertificateStatus(true, response.Device.Approved, 0, response.Certificates.Count,
-                "Der Organisationsschlüssel hat sich geändert – aus Sicherheitsgründen werden keine Zertifikate übernommen. Bitte die Cloud-Verbindung neu einrichten.");
+                T("Der Organisationsschlüssel hat sich geändert – aus Sicherheitsgründen werden keine Zertifikate übernommen. Bitte die Cloud-Verbindung neu einrichten."));
             return false;
         }
 

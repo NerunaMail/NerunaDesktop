@@ -6,6 +6,7 @@ using Avalonia.LogicalTree;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Neruna.Desktop.ViewModels;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Views;
 

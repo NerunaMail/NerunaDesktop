@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Neruna.Desktop.Infrastructure;
 using Neruna.Desktop.ViewModels;
 using TheArtOfDev.HtmlRenderer.Avalonia;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Views;
 

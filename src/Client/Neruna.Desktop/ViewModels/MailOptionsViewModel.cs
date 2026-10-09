@@ -3,6 +3,7 @@ using Avalonia.Data.Converters;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Neruna.Core;
 using Neruna.Desktop.Editor;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -17,10 +18,10 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         _settings = settings;
         MarkAsReadOptions =
         [
-            new(MarkAsReadMode.OnSelect, "Beim Anklicken (sofort)", Select),
-            new(MarkAsReadMode.AfterDelay, "Nach 10 Sekunden im Lesebereich", Select),
-            new(MarkAsReadMode.OnReply, "Erst beim Antworten oder Weiterleiten", Select),
-            new(MarkAsReadMode.Never, "Nie automatisch (nur manuell)", Select),
+            new(MarkAsReadMode.OnSelect, T("Beim Anklicken (sofort)"), Select),
+            new(MarkAsReadMode.AfterDelay, T("Nach 10 Sekunden im Lesebereich"), Select),
+            new(MarkAsReadMode.OnReply, T("Erst beim Antworten oder Weiterleiten"), Select),
+            new(MarkAsReadMode.Never, T("Nie automatisch (nur manuell)"), Select),
         ];
     }
 

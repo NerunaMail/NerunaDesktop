@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Neruna.Contracts.Cloud;
 using Neruna.Core.Cloud;
 using Neruna.Core.Discovery;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -92,10 +93,12 @@ internal sealed partial class CloudViewModel(
     public bool RestoreIsEmpty => RestorePlan is { Changes.Count: 0 };
 
     public string? RestoreTitle => RestorePlan is { } plan
-        ? $"Sicherung vom {plan.Backup.CreatedAt.ToLocalTime():dd.MM.yyyy HH:mm}{(plan.Backup.Note is { } note ? $" – «{note}»" : string.Empty)} wiederherstellen?"
+        ? (plan.Backup.Note is { } note
+            ? F("Sicherung vom {0:g} – «{1}» wiederherstellen?", plan.Backup.CreatedAt.ToLocalTime(), note)
+            : F("Sicherung vom {0:g} wiederherstellen?", plan.Backup.CreatedAt.ToLocalTime()))
         : null;
 
-    public string BackupCountText => BackupState is { } state ? $"{state.Backups.Count} von {state.MaxBackups} Sicherungen – bei einer weiteren wird die älteste gelöscht." : string.Empty;
+    public string BackupCountText => BackupState is { } state ? F("{0} von {1} Sicherungen – bei einer weiteren wird die älteste gelöscht.", state.Backups.Count, state.MaxBackups) : string.Empty;
 
     /// <summary>Loads the vault state from the cloud (when connected).</summary>
     public async Task LoadBackupsAsync()
@@ -122,12 +125,12 @@ internal sealed partial class CloudViewModel(
     {
         if (VaultPassword.Length < 10)
         {
-            throw new BackupException("Das Tresor-Passwort braucht mindestens 10 Zeichen.");
+            throw new BackupException(T("Das Tresor-Passwort braucht mindestens 10 Zeichen."));
         }
 
         if (VaultPassword != VaultPasswordRepeat)
         {
-            throw new BackupException("Die beiden Passwörter stimmen nicht überein.");
+            throw new BackupException(T("Die beiden Passwörter stimmen nicht überein."));
         }
 
         RecoveryCode = await backup.SetUpAsync(VaultPassword);
@@ -171,7 +174,7 @@ internal sealed partial class CloudViewModel(
         IsWritingNote = false;
         BackupNote = string.Empty;
         ShowOverview(await backup.GetOverviewAsync());
-        BackupMessage = $"Sicherung erstellt ({created.Size / 1024.0:0.#} KB).";
+        BackupMessage = F("Sicherung erstellt ({0:0.#} KB).", created.Size / 1024.0);
         BackedUp?.Invoke(this, EventArgs.Empty);
     });
 
@@ -205,7 +208,7 @@ internal sealed partial class CloudViewModel(
 
         await backup.RestoreAsync(plan);
         RestorePlan = null;
-        BackupMessage = "Sicherung wiederhergestellt. Die Konten werden jetzt neu synchronisiert.";
+        BackupMessage = T("Sicherung wiederhergestellt. Die Konten werden jetzt neu synchronisiert.");
         Restored?.Invoke(this, EventArgs.Empty);
     });
 
@@ -282,12 +285,12 @@ internal sealed partial class CloudViewModel(
         CertificatesNeedAttention = status.Problem is not null || (status.Available && !status.Approved);
         CertificatesText = !status.Available ? null
             : status.Problem ?? (!status.Approved
-                ? "Zertifikate: Dieses Gerät wartet auf die Freigabe im Portal (Zertifikate → Ausstehende Freigaben)."
+                ? T("Zertifikate: Dieses Gerät wartet auf die Freigabe im Portal (Zertifikate → Ausstehende Freigaben).")
                 : status.Waiting > 0
-                    ? $"Zertifikate: {status.Received} auf diesem Gerät, {status.Waiting} warten noch auf die Zustellung im Portal."
+                    ? F("Zertifikate: {0} auf diesem Gerät, {1} warten noch auf die Zustellung im Portal.", status.Received, status.Waiting)
                     : status.Received == 0
-                        ? "Zertifikate: Ihnen ist noch kein Zertifikat zugeordnet."
-                        : $"Zertifikate: {status.Received} von der Organisation auf diesem Gerät.");
+                        ? T("Zertifikate: Ihnen ist noch kein Zertifikat zugeordnet.")
+                        : F("Zertifikate: {0} von der Organisation auf diesem Gerät.", status.Received));
 
         var mail = accounts.Status;
         AccountsNeedAttention = mail.Problem is not null || mail.Waiting > 0 || mail.Pending.Count > 0;
@@ -295,9 +298,9 @@ internal sealed partial class CloudViewModel(
             ?? (mail.Received + mail.Waiting + mail.Pending.Count == 0 ? null
                 : string.Join(" ", new[]
                 {
-                    mail.Received > 0 ? $"E-Mail-Konten: {mail.Received} von der Organisation eingerichtet." : "E-Mail-Konten:",
-                    mail.Waiting > 0 ? $"{mail.Waiting} warten auf die Freigabe dieses Geräts im Portal." : null,
-                    mail.Pending.Count > 0 ? $"{mail.Pending.Count} brauchen noch Ihr Passwort." : null,
+                    mail.Received > 0 ? F("E-Mail-Konten: {0} von der Organisation eingerichtet.", mail.Received) : T("E-Mail-Konten:"),
+                    mail.Waiting > 0 ? F("{0} warten auf die Freigabe dieses Geräts im Portal.", mail.Waiting) : null,
+                    mail.Pending.Count > 0 ? F("{0} brauchen noch Ihr Passwort.", mail.Pending.Count) : null,
                 }.Where(t => t is not null)));
     }
 
@@ -337,7 +340,7 @@ internal sealed partial class CloudViewModel(
     /// <summary>"Windows 11 (Build 26100) · AD\anna · Neruna 0.1.2" – what the portal will show about this computer.</summary>
     public string DeviceDescription { get; } = Describe(DeviceInfo.Current());
 
-    private static string Describe(DeviceInfo info) => $"{info.OsName} {info.OsVersion} · angemeldet als {info.OsUser} · Neruna {info.AppVersion}";
+    private static string Describe(DeviceInfo info) => F("{0} {1} · angemeldet als {2} · Neruna {3}", info.OsName, info.OsVersion, info.OsUser, info.AppVersion);
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(RefreshCommand), nameof(DisconnectCommand))]
@@ -359,7 +362,7 @@ internal sealed partial class CloudViewModel(
         : null;
 
     public string? Phones => Profile is { } p
-        ? string.Join("   ", new[] { p.Member.PhoneDirect is { Length: > 0 } d ? "Direkt " + d : null, p.Member.PhoneMobile is { Length: > 0 } m ? "Mobile " + m : null }.OfType<string>())
+        ? string.Join("   ", new[] { p.Member.PhoneDirect is { Length: > 0 } d ? T("Direkt ") + d : null, p.Member.PhoneMobile is { Length: > 0 } m ? T("Mobile ") + m : null }.OfType<string>())
         : null;
 
     public string? Address => Profile is { } p
@@ -371,7 +374,7 @@ internal sealed partial class CloudViewModel(
         : null;
 
     public string? ConnectedText => Connection is { } c
-        ? $"Verbunden mit {c.Server.Host} seit {c.ConnectedAt.LocalDateTime:d.M.yyyy} · dieses Gerät heisst dort «{Profile?.Device.Name ?? DeviceName}»"
+        ? F("Verbunden mit {0} seit {1:d} · dieses Gerät heisst dort «{2}»", c.Server.Host, c.ConnectedAt.LocalDateTime, Profile?.Device.Name ?? DeviceName)
         : null;
 
     partial void OnProfileChanged(MeResponse? value)
@@ -490,7 +493,7 @@ internal sealed partial class CloudViewModel(
         }
         catch (Exception ex) when (ex is CloudException or HttpRequestException)
         {
-            Error = "Zertifikate konnten nicht abgeglichen werden: " + ex.Message;
+            Error = T("Zertifikate konnten nicht abgeglichen werden: ") + ex.Message;
         }
 
         try
@@ -503,7 +506,7 @@ internal sealed partial class CloudViewModel(
         }
         catch (Exception ex) when (ex is CloudException or HttpRequestException)
         {
-            Error = "E-Mail-Konten der Organisation konnten nicht abgeglichen werden: " + ex.Message;
+            Error = T("E-Mail-Konten der Organisation konnten nicht abgeglichen werden: ") + ex.Message;
         }
 
         UpdateCertificateStatus();
@@ -523,15 +526,15 @@ internal sealed partial class BackupItem(BackupEntry entry) : ObservableObject
 
     public string When => Entry.CreatedAt.ToLocalTime().ToString("g", Neruna.Core.Localization.Texts.Culture);
 
-    public string Details => $"{Entry.DeviceName ?? "Unbekanntes Gerät"} · {Entry.Size / 1024.0:0.#} KB";
+    public string Details => $"{Entry.DeviceName ?? T("Unbekanntes Gerät")} · {Entry.Size / 1024.0:0.#} KB";
 
-    public string Note => string.IsNullOrWhiteSpace(Entry.Note) ? "(ohne Kommentar)" : Entry.Note;
+    public string Note => string.IsNullOrWhiteSpace(Entry.Note) ? T("(ohne Kommentar)") : Entry.Note;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DeleteText))]
     public partial bool ConfirmDelete { get; set; }
 
-    public string DeleteText => ConfirmDelete ? "Wirklich löschen?" : "Löschen";
+    public string DeleteText => ConfirmDelete ? T("Wirklich löschen?") : T("Löschen");
 }
 
 /// <summary>Restore preview: what is created, changed or removed here.</summary>
@@ -539,9 +542,9 @@ internal sealed record RestoreGroup(BackupChangeKind Kind, IReadOnlyList<string>
 {
     public string Title => Kind switch
     {
-        BackupChangeKind.Added => "Wird erstellt",
-        BackupChangeKind.Changed => "Wird überschrieben",
-        _ => "Wird entfernt",
+        BackupChangeKind.Added => T("Wird erstellt"),
+        BackupChangeKind.Changed => T("Wird überschrieben"),
+        _ => T("Wird entfernt"),
     };
 
     public bool IsRemoval => Kind == BackupChangeKind.Removed;

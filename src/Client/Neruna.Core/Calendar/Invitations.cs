@@ -9,6 +9,7 @@ using MimeKit;
 using Neruna.Core.Accounts;
 using Neruna.Core.Mail;
 using ICalendar = Ical.Net.Calendar;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Calendar;
 
@@ -117,7 +118,7 @@ public static class ITip
             method.Value,
             evt.Uid,
             evt.Sequence,
-            string.IsNullOrWhiteSpace(evt.Summary) ? "(ohne Titel)" : evt.Summary,
+            string.IsNullOrWhiteSpace(evt.Summary) ? T("(ohne Titel)") : evt.Summary,
             evt.Location,
             start,
             end,
@@ -185,7 +186,7 @@ public static class ITip
                 evt.Alarms.Add(new Alarm
                 {
                     Action = "DISPLAY",
-                    Description = evt.Summary ?? "Erinnerung",
+                    Description = evt.Summary ?? T("Erinnerung"),
                     Trigger = new Trigger(Duration.FromMinutes(-minutes)),
                 });
             }
@@ -251,7 +252,7 @@ public static class ITip
     {
         var culture = Localization.Texts.Culture;
         var day = start.ToString("ddd, d. MMM yyyy", culture);
-        return isAllDay ? day + " (ganztägig)" : $"{day} {start:HH:mm}–{end:HH:mm}";
+        return isAllDay ? day + T(" (ganztägig)") : $"{day} {start:HH:mm}–{end:HH:mm}";
     }
 
     private static string WithMethod(string eventData, string method, Action<CalendarEvent> change)
@@ -333,7 +334,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
     {
         ArgumentNullException.ThrowIfNull(invitation);
         ArgumentNullException.ThrowIfNull(account);
-        var me = account.EmailAddress ?? throw new InvalidOperationException("Das Konto hat keine E-Mail-Adresse.");
+        var me = account.EmailAddress ?? throw new InvalidOperationException(T("Das Konto hat keine E-Mail-Adresse."));
         var existing = await calendars.FindByUidAsync(invitation.Uid, cancellationToken);
         if (existing is null && target is not null)
         {
@@ -368,15 +369,15 @@ public sealed class InvitationService(CalendarController calendars, MailControll
 
         var verb = answer switch
         {
-            Participation.Accepted => "Zugesagt",
-            Participation.Tentative => "Mit Vorbehalt zugesagt",
-            _ => "Abgelehnt",
+            Participation.Accepted => T("Zugesagt"),
+            Participation.Tentative => T("Mit Vorbehalt zugesagt"),
+            _ => T("Abgelehnt"),
         };
         var text = answer switch
         {
-            Participation.Accepted => "hat die Einladung angenommen.",
-            Participation.Tentative => "hat die Einladung mit Vorbehalt angenommen.",
-            _ => "hat die Einladung abgelehnt.",
+            Participation.Accepted => T("hat die Einladung angenommen."),
+            Participation.Tentative => T("hat die Einladung mit Vorbehalt angenommen."),
+            _ => T("hat die Einladung abgelehnt."),
         };
         var sender = new MailboxAddress(account.DisplayName, me);
         var message = ITip.Mail(
@@ -424,7 +425,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
     {
         ArgumentNullException.ThrowIfNull(calendar);
         var account = await AccountOfAsync(calendar.ConnectionId, cancellationToken);
-        var me = account.EmailAddress ?? throw new InvalidOperationException("Das Konto hat keine E-Mail-Adresse.");
+        var me = account.EmailAddress ?? throw new InvalidOperationException(T("Das Konto hat keine E-Mail-Adresse."));
         var current = ITip.Parse(AsRequest(newData));
         var before = previousData is null ? null : ITip.Parse(AsRequest(previousData));
         if (current is null || !IsMine(current, me) || await calendars.SchedulesItselfAsync(calendar, cancellationToken))
@@ -451,7 +452,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
 
         if (removed.Count > 0)
         {
-            await mail.SendAsync(MailConnection(account), ITip.Mail(sender, removed.Select(ToMailbox), $"Abgesagt: {current.Summary} ({when})", $"{account.DisplayName} hat Sie von diesem Termin ausgeladen:\n\n{current.Summary}\n{when}", ITip.Cancel(previousData!), "CANCEL"), cancellationToken);
+            await mail.SendAsync(MailConnection(account), ITip.Mail(sender, removed.Select(ToMailbox), F("Abgesagt: {0} ({1})", current.Summary, when), F("{0} hat Sie von diesem Termin ausgeladen:\n\n{1}\n{2}", account.DisplayName, current.Summary, when), ITip.Cancel(previousData!), "CANCEL"), cancellationToken);
         }
 
         logger.LogInformation("Invitations for {Uid}: {Invited} invited, {Removed} cancelled", current.Uid, invited.Count, removed.Count);
@@ -472,7 +473,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         var when = ITip.When(evt.Start, evt.End, evt.IsAllDay);
         await mail.SendAsync(MailConnection(account), ITip.Mail(
             new MailboxAddress(account.DisplayName, account.EmailAddress), attendees.Select(ToMailbox),
-            $"Abgesagt: {evt.Summary} ({when})", $"{account.DisplayName} hat diesen Termin abgesagt:\n\n{evt.Summary}\n{when}",
+            F("Abgesagt: {0} ({1})", evt.Summary, when), F("{0} hat diesen Termin abgesagt:\n\n{1}\n{2}", account.DisplayName, evt.Summary, when),
             ITip.Cancel(data), "CANCEL"), cancellationToken);
         return attendees.Count;
     }
@@ -498,8 +499,8 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         var message = ITip.Mail(
             new MailboxAddress(account.DisplayName, me),
             [new MailboxAddress(evt.OrganizerName, evt.Organizer)],
-            $"Abgelehnt: {evt.Summary}",
-            $"{account.DisplayName} nimmt nicht teil.\n\n{evt.Summary}\n{ITip.When(evt.Start, evt.End, evt.IsAllDay)}",
+            F("Abgelehnt: {0}", evt.Summary),
+            F("{0} nimmt nicht teil.\n\n{1}\n{2}", account.DisplayName, evt.Summary, ITip.When(evt.Start, evt.End, evt.IsAllDay)),
             ITip.Reply(evt, me, account.DisplayName, Participation.Declined),
             "REPLY");
         await mail.SendAsync(MailConnection(account), message, cancellationToken);
@@ -524,11 +525,11 @@ public sealed class InvitationService(CalendarController calendars, MailControll
 
     private static ServiceConnection MailConnection(Account account) =>
         account.ConnectionsOf(ServiceKind.Mail).FirstOrDefault()
-        ?? throw new InvalidOperationException($"Das Konto {account.EmailAddress} hat keine E-Mail-Verbindung – Einladungen und Antworten können nicht versendet werden.");
+        ?? throw new InvalidOperationException(F("Das Konto {0} hat keine E-Mail-Verbindung – Einladungen und Antworten können nicht versendet werden.", account.EmailAddress));
 
     private async Task<Account> AccountOfAsync(Guid connectionId, CancellationToken cancellationToken) =>
         (await accounts.GetAccountsAsync(cancellationToken)).FirstOrDefault(a => a.Connections.Any(c => c.Id == connectionId))
-        ?? throw new InvalidOperationException("Das Konto dieses Kalenders existiert nicht mehr.");
+        ?? throw new InvalidOperationException(T("Das Konto dieses Kalenders existiert nicht mehr."));
 
     /// <summary>Writable calendars an accepted invitation can go into, the best choice first.</summary>
     public async Task<IReadOnlyList<CalendarInfo>> TargetCalendarsAsync(Account account, CancellationToken cancellationToken = default)
@@ -564,7 +565,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
 
     public async Task<CalendarInfo> DefaultCalendarAsync(Account account, CancellationToken cancellationToken = default) =>
         (await TargetCalendarsAsync(account, cancellationToken)).FirstOrDefault()
-        ?? throw new InvalidOperationException("Kein beschreibbarer Kalender vorhanden, in den der Termin eingetragen werden kann.");
+        ?? throw new InvalidOperationException(T("Kein beschreibbarer Kalender vorhanden, in den der Termin eingetragen werden kann."));
 
     private static string DefaultKey(Account account) => $"invitations.calendar.{account.Id:N}";
 }

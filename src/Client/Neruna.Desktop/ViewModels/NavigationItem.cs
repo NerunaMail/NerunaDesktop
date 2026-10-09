@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -28,9 +29,9 @@ internal sealed partial class NavigationItem(Section section, string label, stri
 
     public static IEnumerable<NavigationItem> Defaults() =>
     [
-        new(Section.Mail, "E-Mail", "IconMail"),
-        new(Section.Calendar, "Kalender", "IconCalendar"),
-        new(Section.Contacts, "Kontakte", "IconPeople"),
+        new(Section.Mail, T("E-Mail"), "IconMail"),
+        new(Section.Calendar, T("Kalender"), "IconCalendar"),
+        new(Section.Contacts, T("Kontakte"), "IconPeople"),
         new(Section.Chat, "Chat", "IconChat"),
     ];
 }

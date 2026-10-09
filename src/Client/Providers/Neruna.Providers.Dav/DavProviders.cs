@@ -6,6 +6,7 @@ using Neruna.Core.Calendar;
 using Neruna.Core.Contacts;
 using Neruna.Core.Providers;
 using Neruna.Core.Security;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Providers.Dav;
 
@@ -125,8 +126,8 @@ internal sealed class CalDavCalendarProvider : DavProviderBase, ICalendarProvide
         var service = await ServiceAsync(cancellationToken);
         var collections = await service.DiscoverAsync(cancellationToken);
         DiscoveryDetails = service.Home is { } home
-            ? $"Kalender-Ordner {home.AbsoluteUri} · angemeldet als {Settings.Username}"
-            : $"Nur die eingetragene Adresse {Settings.Url.AbsoluteUri} (kein Kalender-Ordner gefunden) · angemeldet als {Settings.Username}";
+            ? F("Kalender-Ordner {0} · angemeldet als {1}", home.AbsoluteUri, Settings.Username)
+            : F("Nur die eingetragene Adresse {0} (kein Kalender-Ordner gefunden) · angemeldet als {1}", Settings.Url.AbsoluteUri, Settings.Username);
         return collections
             .Where(c => c.SupportsEvents)
             .Select(c => new CalendarInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.Color, c.IsReadOnly))

@@ -250,10 +250,10 @@
             <Grid RowDefinitions="Auto,Auto">
               <StackPanel Orientation="Horizontal" Spacing="2">
                 <Button Classes="format" Click="OnBold" ToolTip.Tip="{l:T 'Fett (Ctrl+B) – erscheint als **Text**'}">
-                  <TextBlock Text="B" FontWeight="Bold" />
+                  <TextBlock Text="{l:T 'F'}" FontWeight="Bold" />
                 </Button>
                 <Button Classes="format" Click="OnUnderline" ToolTip.Tip="{l:T 'Unterstrichen (Ctrl+U) – erscheint als __Text__'}">
-                  <TextBlock Text="U" TextDecorations="Underline" />
+                  <TextBlock Text="{l:T 'U'}" TextDecorations="Underline" />
                 </Button>
                 <Button x:Name="EmojiButton" Classes="format" ToolTip.Tip="{l:T 'Smiley einfügen'}">
                   <TextBlock Text="🙂" />

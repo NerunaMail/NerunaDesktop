@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core;
 using Neruna.Core.Calendar;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -409,7 +410,7 @@ internal sealed partial class CalendarListItem(CalendarInfo info, string color) 
     public partial string EditName { get; set; } = info.Name;
 
     /// <summary>"Auf dem Server: Personal" when the calendar has an own name.</summary>
-    public string? ServerNameText => Info.ServerName is { } server ? "Auf dem Server: " + server : null;
+    public string? ServerNameText => Info.ServerName is { } server ? T("Auf dem Server: ") + server : null;
 
     public bool IsRenamed => Info.ServerName is not null;
 
@@ -455,7 +456,7 @@ internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string co
     public IBrush Background { get; } = new SolidColorBrush(Avalonia.Media.Color.Parse(color), 0.14);
 
     public string TimeText => Occurrence.IsAllDay
-        ? "Ganztägig"
+        ? T("Ganztägig")
         : $"{Occurrence.Start.LocalDateTime:HH:mm}–{Occurrence.End.LocalDateTime:HH:mm}";
 
     /// <summary>Hover text: title, location (if any) and time, one per line.</summary>

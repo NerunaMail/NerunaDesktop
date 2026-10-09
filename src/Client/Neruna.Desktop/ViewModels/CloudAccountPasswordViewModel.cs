@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core.Accounts;
 using Neruna.Core.Cloud;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -14,7 +15,7 @@ internal sealed partial class CloudAccountPasswordViewModel(PendingCloudAccount 
     public event EventHandler<bool>? Finished;
 
     public string Intro =>
-        $"Ihre Organisation hat das Konto «{pending.DisplayName} <{pending.Email}>» für Sie eingerichtet. Geben Sie das Passwort ein, um die Einrichtung abzuschliessen – es wird nur auf diesem Gerät gespeichert.";
+        F("Ihre Organisation hat das Konto «{0} <{1}>» für Sie eingerichtet. Geben Sie das Passwort ein, um die Einrichtung abzuschliessen – es wird nur auf diesem Gerät gespeichert.", pending.DisplayName, pending.Email);
 
     public string Email => pending.Email;
 
@@ -41,7 +42,7 @@ internal sealed partial class CloudAccountPasswordViewModel(PendingCloudAccount 
         }
         catch (AccountSetupException ex)
         {
-            Error = "Anmeldung fehlgeschlagen – " + ex.Message;
+            Error = T("Anmeldung fehlgeschlagen – ") + ex.Message;
         }
         finally
         {

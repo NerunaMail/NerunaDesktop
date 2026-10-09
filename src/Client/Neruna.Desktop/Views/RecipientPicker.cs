@@ -9,6 +9,7 @@ using Avalonia.Media;
 using Neruna.Core.Contacts;
 using Neruna.Desktop.Controls;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Views;
 
@@ -29,7 +30,7 @@ internal static class RecipientPicker
 
         var dialog = new Window
         {
-            Title = $"Kontakte auswählen – {field}",
+            Title = F("Kontakte auswählen – {0}", field),
             Width = 520,
             Height = 600,
             MinWidth = 400,
@@ -40,7 +41,7 @@ internal static class RecipientPicker
         };
         dialog.Bind(Window.BackgroundProperty, dialog.GetResourceObservable("PaneBackgroundBrush"));
 
-        var search = new TextBox { PlaceholderText = "Name, Firma oder Adresse suchen", Text = preset };
+        var search = new TextBox { PlaceholderText = T("Name, Firma oder Adresse suchen"), Text = preset };
         var list = new ListBox
         {
             SelectionMode = SelectionMode.Multiple | SelectionMode.Toggle,
@@ -48,15 +49,15 @@ internal static class RecipientPicker
         };
         var empty = new TextBlock
         {
-            Text = all.Count == 0 ? "In den Adressbüchern gibt es noch keine Kontakte mit E-Mail-Adresse." : "Keine Treffer.",
+            Text = all.Count == 0 ? T("In den Adressbüchern gibt es noch keine Kontakte mit E-Mail-Adresse.") : T("Keine Treffer."),
             Opacity = 0.7,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(4, 8),
         };
         var count = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Opacity = 0.75 };
-        var take = new Button { Content = $"Zu «{field}» hinzufügen", IsDefault = true, IsEnabled = false };
+        var take = new Button { Content = F("Zu «{0}» hinzufügen", field), IsDefault = true, IsEnabled = false };
         take.Classes.Add("accent");
-        var cancel = new Button { Content = "Abbrechen", IsCancel = true };
+        var cancel = new Button { Content = T("Abbrechen"), IsCancel = true };
 
         var refilling = false;
         void Refill()
@@ -77,9 +78,9 @@ internal static class RecipientPicker
         {
             count.Text = chosen.Count switch
             {
-                0 => "Kontakte anklicken, um sie auszuwählen.",
-                1 => "1 ausgewählt",
-                var n => $"{n} ausgewählt",
+                0 => T("Kontakte anklicken, um sie auszuwählen."),
+                1 => T("1 ausgewählt"),
+                var n => F("{0} ausgewählt", n),
             };
             take.IsEnabled = chosen.Count > 0;
         }
