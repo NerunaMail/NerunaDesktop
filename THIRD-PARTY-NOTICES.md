@@ -70,6 +70,14 @@ project pages and in the NuGet packages.
 | System.Security.Cryptography.Pkcs | 10.0.0 | MIT | Microsoft | https://dot.net/ |
 | Tmds.DBus.Protocol | 0.94.1 | MIT | Tom Deseyn |  |
 
+## Icons
+
+Several icons of the app (`src/Client/Neruna.Desktop/App.axaml`) – among them reply, reply all, forward, send, edit,
+attach, delete, archive, search, settings, folder, flag and lock – are based on **Material Icons** by Google, licensed
+under the Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0, https://github.com/google/material-design-icons).
+Some were adapted (e.g. slightly redrawn or recentred). The Neruna-specific icons (chat, clock, signature, text
+template, add account …) were drawn for Neruna and are covered by the MPL like the rest of the code.
+
 Not included in release builds: `AvaloniaUI.DiagnosticsSupport` (connects debug builds to the Avalonia developer
 tools; referenced for the Debug configuration only).
 
