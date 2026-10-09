@@ -64,6 +64,36 @@ public class SecureMimeTests
     }
 
     [Fact]
+    public async Task Chosen_hash_and_cipher_are_used_and_still_readable()
+    {
+        await using var annaEnv = await TestEnvironment.CreateAsync();
+        await using var bobEnv = await TestEnvironment.CreateAsync();
+        var ct = TestContext.Current.CancellationToken;
+        await annaEnv.Get<CertificateManager>().ImportAsync(TestPki.Pkcs12(Anna.Value, "a"), "a", cancellationToken: ct);
+        await annaEnv.Get<CertificateManager>().ImportAsync(Bob.Value.Certificate.GetEncoded(), null, cancellationToken: ct);
+        await bobEnv.Get<CertificateManager>().ImportAsync(TestPki.Pkcs12(Bob.Value, "b"), "b", cancellationToken: ct);
+        await bobEnv.Get<CertificateManager>().ImportAsync(TestPki.Ca.GetEncoded(), null, cancellationToken: ct);
+        await annaEnv.Get<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.SettingKeys.SmimeDigest, "sha512", ct);
+        await annaEnv.Get<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.SettingKeys.SmimeCipher, "aes128", ct);
+
+        // Signature: SHA-512 (announced as micalg).
+        var signed = Message("Signiert", "Hallo Bob");
+        await annaEnv.Get<SecureMimeService>().ProtectAsync(signed, sign: true, encrypt: false, ct);
+        Assert.Equal("sha-512", Assert.IsType<MultipartSigned>(signed.Body).ContentType.Parameters["micalg"]);
+        Assert.Equal(SignatureStatus.Valid, Assert.Single((await bobEnv.Get<SecureMimeService>().OpenAsync(Reparse(signed), ct)).Security.Signatures).Status);
+
+        // Encryption: AES-128-CBC (OID in the CMS envelope).
+        var encrypted = Message("Verschlüsselt", "Geheim");
+        await annaEnv.Get<SecureMimeService>().ProtectAsync(encrypted, sign: false, encrypt: true, ct);
+        using var content = new MemoryStream();
+        await Assert.IsType<ApplicationPkcs7Mime>(encrypted.Body).Content!.DecodeToAsync(content, ct);
+        Assert.Equal("2.16.840.1.101.3.4.1.2", new Org.BouncyCastle.Cms.CmsEnvelopedData(content.ToArray()).EncryptionAlgOid);
+        var opened = await bobEnv.Get<SecureMimeService>().OpenAsync(Reparse(encrypted), ct);
+        Assert.Null(opened.Security.DecryptionError);
+        Assert.Contains("Geheim", MessageContent.From(opened.Readable).PlainText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Signed_and_encrypted_mail_round_trips_between_two_people()
     {
         await using var annaEnv = await TestEnvironment.CreateAsync();

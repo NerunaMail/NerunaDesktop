@@ -18,6 +18,12 @@ public static class SettingKeys
     /// <summary>Encrypt automatically when certificates of all recipients are known (default: on).</summary>
     public const string AutoEncrypt = "smime.autoEncrypt";
 
+    /// <summary>Hash of S/MIME signatures: "sha256" (default), "sha384" or "sha512" (see SecureMimeAlgorithms).</summary>
+    public const string SmimeDigest = "smime.digest";
+
+    /// <summary>Cipher of S/MIME encryption: "aes256" (default), "aes192" or "aes128" (see SecureMimeAlgorithms).</summary>
+    public const string SmimeCipher = "smime.cipher";
+
     /// <summary>"true": new mails, replies and forwards open in their own window instead of the reading pane.</summary>
     public const string ComposeInWindow = "compose.openInWindow";
 

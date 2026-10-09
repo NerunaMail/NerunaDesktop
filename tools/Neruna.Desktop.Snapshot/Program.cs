@@ -387,6 +387,7 @@ internal static class Snapshots
         vm.SettingsPage.SelectedTab = 4;
         await vm.SettingsPage.TextTemplates.ReloadAsync();
         await SaveAsync(window, output, "settings-text-templates.png");
+        await CertificateTabsAsync(vm, window, services, output);
         vm.SettingsPage.SelectedTab = 6;
         await SaveAsync(window, output, "settings-design.png");
         var preferences = services.GetRequiredService<UiPreferences>();
@@ -629,6 +630,30 @@ internal static class Snapshots
     }
 
     // Column widths and window size survive a restart: drag, save, load into a fresh layout, restore.
+    // Einstellungen → Zertifikate: own certificates with details, contacts as a short list, authorities apart.
+    private static async Task CertificateTabsAsync(MainWindowViewModel vm, Window window, IServiceProvider services, string output)
+    {
+        var manager = services.GetRequiredService<Neruna.Core.Security.CertificateManager>();
+        await manager.ImportAsync(Neruna.Client.Tests.TestPki.Pkcs12(Neruna.Client.Tests.TestPki.User("Anna Muster", "anna@example.com"), "a"), "a");
+        await manager.ImportAsync(Neruna.Client.Tests.TestPki.Ca.GetEncoded(), null);
+        foreach (var (name, days) in new[] { ("Lea Keller", 400), ("Marco Bernasconi", 20), ("Beat Brunner", -30), ("Sara Rossi", 700), ("Jonas Weber", 90) })
+        {
+            var notAfter = DateTime.UtcNow.AddDays(days);
+            var user = Neruna.Client.Tests.TestPki.User(name, name.Split(' ')[0].ToLowerInvariant() + "@example.com", notAfter.AddYears(-2), notAfter);
+            await manager.ImportAsync(user.Certificate.GetEncoded(), null);
+        }
+
+        vm.SettingsPage.SelectedTab = 5;
+        await vm.SettingsPage.Certificates.ReloadAsync();
+        await SaveAsync(window, output, "settings-certificates.png");
+        var tabs = window.GetVisualDescendants().OfType<TabControl>().Last(t => t.Items.Count == 3);
+        tabs.SelectedIndex = 1;
+        await SaveAsync(window, output, "settings-certificates-contacts.png");
+        tabs.SelectedIndex = 2;
+        await SaveAsync(window, output, "settings-certificates-authorities.png");
+        Console.WriteLine($"Certificates: {vm.SettingsPage.Certificates.OwnHeader}, {vm.SettingsPage.Certificates.ContactsHeader}, {vm.SettingsPage.Certificates.AuthoritiesHeader}");
+    }
+
     private static async Task CheckLayoutAsync(MainWindowViewModel vm, MainWindow window, ISettingsStore settings)
     {
         var grid = window.GetVisualDescendants().OfType<Grid>().First(g => g.Name == "Columns" && g.FindAncestorOfType<MailView>() is not null);

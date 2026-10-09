@@ -50,7 +50,34 @@ public sealed class SecureMimeException(string message, Exception? inner = null)
 /// S/MIME for Neruna: sign/encrypt outgoing mail, decrypt/verify incoming mail.
 /// Uses MimeKit with a context fed from the user's <see cref="CertificateManager"/>.
 /// </summary>
-public sealed class SecureMimeService(CertificateManager certificates, TimeProvider clock, ILogger<SecureMimeService> logger)
+/// <summary>
+/// The algorithms Neruna offers for S/MIME (Einstellungen → Zertifikate). Only current, widely supported ones: SHA-2 for
+/// signatures, AES for encryption – the defaults are what most mail programs use today.
+/// </summary>
+public static class SecureMimeAlgorithms
+{
+    public static IReadOnlyList<(string Key, string Label)> Digests { get; } =
+        [("sha256", "SHA-256 (Standard)"), ("sha384", "SHA-384"), ("sha512", "SHA-512")];
+
+    public static IReadOnlyList<(string Key, string Label)> Ciphers { get; } =
+        [("aes256", "AES-256 (Standard)"), ("aes192", "AES-192"), ("aes128", "AES-128 (für ältere Programme)")];
+
+    public static DigestAlgorithm Digest(string? key) => key switch
+    {
+        "sha384" => DigestAlgorithm.Sha384,
+        "sha512" => DigestAlgorithm.Sha512,
+        _ => DigestAlgorithm.Sha256,
+    };
+
+    public static EncryptionAlgorithm Cipher(string? key) => key switch
+    {
+        "aes192" => EncryptionAlgorithm.Aes192,
+        "aes128" => EncryptionAlgorithm.Aes128,
+        _ => EncryptionAlgorithm.Aes256,
+    };
+}
+
+public sealed class SecureMimeService(CertificateManager certificates, ISettingsStore settings, TimeProvider clock, ILogger<SecureMimeService> logger)
 {
     public async Task<SecureMimeCapabilities> GetCapabilitiesAsync(string fromAddress, IEnumerable<string> recipients, CancellationToken cancellationToken = default)
     {
@@ -233,7 +260,9 @@ public sealed class SecureMimeService(CertificateManager certificates, TimeProvi
     }
 
     private async Task<NerunaSecureMimeContext> CreateContextAsync(CancellationToken cancellationToken) =>
-        new(await certificates.LoadMaterialAsync(cancellationToken), clock.GetUtcNow());
+        new(await certificates.LoadMaterialAsync(cancellationToken), clock.GetUtcNow(),
+            SecureMimeAlgorithms.Digest(await settings.GetAsync(SettingKeys.SmimeDigest, cancellationToken)),
+            SecureMimeAlgorithms.Cipher(await settings.GetAsync(SettingKeys.SmimeCipher, cancellationToken)));
 }
 
 /// <summary>
@@ -246,11 +275,15 @@ internal sealed class NerunaSecureMimeContext : TemporarySecureMimeContext
 
     private readonly SecureMimeMaterial _material;
     private readonly DateTimeOffset _now;
+    private readonly DigestAlgorithm _digest;
+    private readonly EncryptionAlgorithm _cipher;
 
-    public NerunaSecureMimeContext(SecureMimeMaterial material, DateTimeOffset now)
+    public NerunaSecureMimeContext(SecureMimeMaterial material, DateTimeOffset now, DigestAlgorithm digest = DigestAlgorithm.Sha256, EncryptionAlgorithm cipher = EncryptionAlgorithm.Aes256)
     {
         _material = material;
         _now = now;
+        _digest = digest;
+        _cipher = cipher;
         CheckCertificateRevocation = false;
 
         foreach (var certificate in material.Certificates.Concat(material.PrivateKeys.SelectMany(k => k.Chain)))
@@ -263,14 +296,14 @@ internal sealed class NerunaSecureMimeContext : TemporarySecureMimeContext
     {
         var info = Best(c => c.HasPrivateKey && c.CanSign && c.Covers(address));
         var entry = info is null ? null : _material.PrivateKeys.FirstOrDefault(k => CertificateParser.Thumbprint(k.Certificate) == info.Thumbprint);
-        return entry is null ? null : new CmsSigner(entry.Chain, entry.PrivateKey) { DigestAlgorithm = DigestAlgorithm.Sha256 };
+        return entry is null ? null : new CmsSigner(entry.Chain, entry.PrivateKey) { DigestAlgorithm = _digest };
     }
 
     public CmsRecipient? FindRecipient(string address)
     {
         var info = Best(c => c.CanEncrypt && c.Covers(address));
         var certificate = info is null ? null : _material.Certificates.FirstOrDefault(c => CertificateParser.Thumbprint(c) == info.Thumbprint);
-        return certificate is null ? null : new CmsRecipient(certificate) { EncryptionAlgorithms = [EncryptionAlgorithm.Aes256, EncryptionAlgorithm.Aes128] };
+        return certificate is null ? null : new CmsRecipient(certificate) { EncryptionAlgorithms = [_cipher] };
     }
 
     protected override CmsSigner GetCmsSigner(MailboxAddress mailbox, DigestAlgorithm digestAlgo)

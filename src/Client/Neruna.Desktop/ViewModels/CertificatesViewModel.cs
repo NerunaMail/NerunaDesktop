@@ -33,6 +33,26 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
     [ObservableProperty]
     public partial bool AutoEncrypt { get; set; } = true;
 
+    /// <summary>Signature hash and encryption cipher (see SecureMimeAlgorithms).</summary>
+    public static IReadOnlyList<AlgorithmChoice> DigestChoices { get; } =
+        SecureMimeAlgorithms.Digests.Select(d => new AlgorithmChoice(d.Key, d.Label)).ToList();
+
+    public static IReadOnlyList<AlgorithmChoice> CipherChoices { get; } =
+        SecureMimeAlgorithms.Ciphers.Select(c => new AlgorithmChoice(c.Key, c.Label)).ToList();
+
+    [ObservableProperty]
+    public partial AlgorithmChoice Digest { get; set; } = DigestChoices[0];
+
+    [ObservableProperty]
+    public partial AlgorithmChoice Cipher { get; set; } = CipherChoices[0];
+
+    /// <summary>Tab headers with counts.</summary>
+    public string OwnHeader => $"Eigene Zertifikate ({Own.Count})";
+
+    public string ContactsHeader => $"Zertifikate von Kontakten ({Contacts.Count})";
+
+    public string AuthoritiesHeader => $"Zertifizierungsstellen ({Authorities.Count})";
+
     [ObservableProperty]
     public partial string? Message { get; set; }
 
@@ -55,6 +75,10 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
         {
             AutoSign = await settings.GetBoolAsync(SettingKeys.AutoSign, fallback: true);
             AutoEncrypt = await settings.GetBoolAsync(SettingKeys.AutoEncrypt, fallback: true);
+            var digest = await settings.GetAsync(SettingKeys.SmimeDigest);
+            Digest = DigestChoices.FirstOrDefault(d => d.Key == digest) ?? DigestChoices[0];
+            var cipher = await settings.GetAsync(SettingKeys.SmimeCipher);
+            Cipher = CipherChoices.FirstOrDefault(c => c.Key == cipher) ?? CipherChoices[0];
         }
         finally
         {
@@ -74,6 +98,25 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
         OnPropertyChanged(nameof(HasOwn));
         OnPropertyChanged(nameof(HasContacts));
         OnPropertyChanged(nameof(HasAuthorities));
+        OnPropertyChanged(nameof(OwnHeader));
+        OnPropertyChanged(nameof(ContactsHeader));
+        OnPropertyChanged(nameof(AuthoritiesHeader));
+    }
+
+    partial void OnDigestChanged(AlgorithmChoice value)
+    {
+        if (!_loading && value is not null)
+        {
+            _ = settings.SetAsync(SettingKeys.SmimeDigest, value.Key);
+        }
+    }
+
+    partial void OnCipherChanged(AlgorithmChoice value)
+    {
+        if (!_loading && value is not null)
+        {
+            _ = settings.SetAsync(SettingKeys.SmimeCipher, value.Key);
+        }
     }
 
     partial void OnAutoSignChanged(bool value)
@@ -157,6 +200,11 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
     [RelayCommand]
     private async Task ExportAsync(CertificateItem item)
     {
+        if (!item.CanExport)
+        {
+            return;
+        }
+
         var target = await files.SaveFileAsync("Öffentliches Zertifikat exportieren", FileService.SanitizeFileName(item.FileBaseName) + ".cer");
         if (target is null)
         {
@@ -192,8 +240,19 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
     }
 }
 
+internal sealed record AlgorithmChoice(string Key, string Label)
+{
+    public override string ToString() => Label;
+}
+
 internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffset now) : ObservableObject
 {
+    /// <summary>
+    /// Certificates from the organisation are not offered for export – no absolute protection, but it keeps them from
+    /// being passed on casually.
+    /// </summary>
+    public bool CanExport => Info.Source != CertificateSource.Cloud;
+
     private static readonly IBrush GoodBrush = Brush.Parse("#107C10");
     private static readonly IBrush WarnBrush = Brush.Parse("#BC4B09");
     private static readonly IBrush BadBrush = Brush.Parse("#C50F1F");

@@ -11,5 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Client\Neruna.Desktop\Neruna.Desktop.csproj" />
+    <!-- Test certificates for the S/MIME settings page -->
+    <Compile Include="..\..\tests\Neruna.Client.Tests\TestPki.cs" Link="TestPki.cs" />
   </ItemGroup>
 </Project>

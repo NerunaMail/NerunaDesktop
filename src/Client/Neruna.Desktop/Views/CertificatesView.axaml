@@ -33,11 +33,29 @@
           </StackPanel>
 
           <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
-            <Button Classes="command" Content="Exportieren" FontSize="12" ToolTip.Tip="Öffentliches Zertifikat (.cer) speichern, z. B. um es weiterzugeben"
+            <Button Classes="command" Content="Exportieren" FontSize="12" ToolTip.Tip="Öffentliches Zertifikat (.cer) speichern, z. B. um es weiterzugeben" IsVisible="{Binding CanExport}"
                     Command="{Binding $parent[UserControl].((vm:CertificatesViewModel)DataContext).ExportCommand}" CommandParameter="{Binding}" />
             <Button Content="{Binding RemoveText}" FontSize="12"
                     Command="{Binding $parent[UserControl].((vm:CertificatesViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
           </StackPanel>
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+    <!-- Contacts: just whether it is valid, for which address, until when – and delete -->
+    <DataTemplate x:Key="ContactRow" x:DataType="vm:CertificateItem">
+      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="4,7">
+        <Grid ColumnDefinitions="170,*,140,Auto">
+          <Border Background="{Binding StatusBrush}" CornerRadius="10" Padding="10,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+            <TextBlock Text="{Binding StatusText}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+          </Border>
+          <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+            <SelectableTextBlock Text="{Binding Emails}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Name}" Classes="subtle" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasSecondaryName}" />
+          </StackPanel>
+          <TextBlock Grid.Column="2" Text="{Binding ValidUntil}" VerticalAlignment="Center" />
+          <Button Grid.Column="3" Content="{Binding RemoveText}" FontSize="12" VerticalAlignment="Center"
+                  Command="{Binding $parent[UserControl].((vm:CertificatesViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
         </Grid>
       </Border>
     </DataTemplate>
@@ -78,22 +96,40 @@
       <StackPanel Spacing="4" Margin="0,8,0,0">
         <CheckBox Content="Automatisch signieren, wenn ein eigenes Zertifikat für den Absender vorhanden ist" IsChecked="{Binding AutoSign}" />
         <CheckBox Content="Automatisch verschlüsseln, wenn für alle Empfänger ein Zertifikat bekannt ist" IsChecked="{Binding AutoEncrypt}" />
+        <!-- Algorithms: current ones only; the defaults are what most mail programs expect -->
+        <Grid ColumnDefinitions="Auto,240,24,Auto,240" Margin="0,8,0,0">
+          <TextBlock Text="Signatur" VerticalAlignment="Center" Margin="0,0,10,0" />
+          <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:CertificatesViewModel.DigestChoices}" SelectedItem="{Binding Digest}"
+                    ToolTip.Tip="Hash-Verfahren der Signatur" />
+          <TextBlock Grid.Column="3" Text="Verschlüsselung" VerticalAlignment="Center" Margin="0,0,10,0" />
+          <ComboBox Grid.Column="4" HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:CertificatesViewModel.CipherChoices}" SelectedItem="{Binding Cipher}"
+                    ToolTip.Tip="Verfahren für den Inhalt verschlüsselter Nachrichten" />
+        </Grid>
       </StackPanel>
 
-      <TextBlock Text="Eigene Zertifikate" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
-      <TextBlock Classes="subtle" IsVisible="{Binding !HasOwn}" TextWrapping="Wrap"
-                 Text="Noch kein eigenes Zertifikat. Importieren Sie Ihre .p12- oder .pfx-Datei, um Nachrichten zu signieren und verschlüsselte Nachrichten zu lesen." />
-      <ItemsControl ItemsSource="{Binding Own}" ItemTemplate="{StaticResource CertificateRow}" />
-
-      <TextBlock Text="Zertifikate von Kontakten" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
-      <TextBlock Classes="subtle" IsVisible="{Binding !HasContacts}" TextWrapping="Wrap"
-                 Text="Noch keine. Sie werden aus signierten Nachrichten übernommen oder können importiert werden." />
-      <ItemsControl ItemsSource="{Binding Contacts}" ItemTemplate="{StaticResource CertificateRow}" />
-
-      <TextBlock Text="Vertrauenswürdige Zertifizierungsstellen" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
-      <TextBlock Classes="subtle" TextWrapping="Wrap"
-                 Text="Zusätzlich zu den Stammzertifizierungsstellen des Betriebssystems, z. B. die interne CA Ihrer Firma." />
-      <ItemsControl ItemsSource="{Binding Authorities}" ItemTemplate="{StaticResource CertificateRow}" />
+      <TabControl Margin="0,12,0,0">
+        <TabItem Header="{Binding OwnHeader}">
+          <StackPanel Margin="0,8,0,0">
+            <TextBlock Classes="subtle" IsVisible="{Binding !HasOwn}" TextWrapping="Wrap"
+                       Text="Noch kein eigenes Zertifikat. Importieren Sie Ihre .p12- oder .pfx-Datei, um Nachrichten zu signieren und verschlüsselte Nachrichten zu lesen." />
+            <ItemsControl ItemsSource="{Binding Own}" ItemTemplate="{StaticResource CertificateRow}" />
+          </StackPanel>
+        </TabItem>
+        <TabItem Header="{Binding ContactsHeader}">
+          <StackPanel Margin="0,8,0,0">
+            <TextBlock Classes="subtle" IsVisible="{Binding !HasContacts}" TextWrapping="Wrap"
+                       Text="Noch keine. Sie werden aus signierten Nachrichten übernommen oder können importiert werden." />
+            <ItemsControl ItemsSource="{Binding Contacts}" ItemTemplate="{StaticResource ContactRow}" />
+          </StackPanel>
+        </TabItem>
+        <TabItem Header="{Binding AuthoritiesHeader}">
+          <StackPanel Margin="0,8,0,0">
+            <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,0,0,6"
+                       Text="Zusätzlich zu den Stammzertifizierungsstellen des Betriebssystems, z. B. die interne CA Ihrer Firma." />
+            <ItemsControl ItemsSource="{Binding Authorities}" ItemTemplate="{StaticResource CertificateRow}" />
+          </StackPanel>
+        </TabItem>
+      </TabControl>
     </StackPanel>
   </ScrollViewer>
 </UserControl>
