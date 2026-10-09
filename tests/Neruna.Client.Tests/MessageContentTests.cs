@@ -42,6 +42,23 @@ public class MessageContentTests
     }
 
     [Fact]
+    public void Picture_sizes_in_inches_and_points_become_pixels()
+    {
+        // Outlook signatures: the renderer ignored these units and showed the pictures at full size.
+        var message = Message(new TextPart("html")
+        {
+            Text = "<img width=\"45\" height=\"66\" style=\"width:.4687in;height:.6875in\" src=\"cid:a@x\">"
+                   + "<img style=\"width:34pt; max-height:1.2cm\" src=\"cid:a@x\"><p style=\"font-size:11.0pt\">Text</p>",
+        });
+
+        var html = MessageContent.From(message).Html;
+
+        Assert.Contains("style=\"width:45px;height:66px\"", html, StringComparison.Ordinal);
+        Assert.Contains("width:45.3px; max-height:45.4px", html, StringComparison.Ordinal);
+        Assert.Contains("font-size:11.0pt", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Attributes_of_broken_html_do_not_stop_the_message()
     {
         // Unquoted style with a space: the tokenizer sees an attribute named "ui',sans-serif;".

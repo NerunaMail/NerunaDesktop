@@ -330,6 +330,25 @@ public sealed partial class MessageContent
             css = RemoteCssUrl().Replace(css, "none");
         }
 
+        // The renderer ignores inches, centimetres and millimetres – Outlook sizes pictures in signatures that way
+        // ("width:.4687in"), which showed them at full size. In pixels (96 per inch) they keep their size.
+        css = AbsoluteLength().Replace(css, m =>
+        {
+            var value = double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            var pixels = value * m.Groups[2].Value.ToLowerInvariant() switch
+            {
+                "in" => 96,
+                "cm" => 96 / 2.54,
+                "mm" => 96 / 25.4,
+                _ => 16, // pc
+            };
+            return Math.Round(pixels, 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+        });
+
+        // Points work for fonts, but not for sizes ("width:34pt" also showed a picture at full size).
+        css = PointSize().Replace(css, m => m.Groups[1].Value
+            + Math.Round(double.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture) * 96 / 72, 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + "px");
+
         // The renderer understands background-color but not a color in the "background" shorthand.
         return BackgroundShorthandColor().Replace(css, m => m.Value.TrimEnd(';') + "; background-color: " + m.Groups[1].Value + ";");
     }
@@ -363,6 +382,12 @@ public sealed partial class MessageContent
     // RFC 3676 4.3: the signature separator "-- " is never a soft line break.
     [GeneratedRegex(@"^-- $", RegexOptions.Multiline)]
     private static partial Regex SignatureSeparator();
+
+    [GeneratedRegex(@"(?<![\w.#-])(\d*\.?\d+)(in|cm|mm|pc)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex AbsoluteLength();
+
+    [GeneratedRegex(@"((?<![\w-])(?:min-|max-)?(?:width|height)\s*:\s*)(\d*\.?\d+)pt\b", RegexOptions.IgnoreCase)]
+    private static partial Regex PointSize();
 
     [GeneratedRegex(@"url\(\s*['""]?\s*(https?:|//)[^)]*\)", RegexOptions.IgnoreCase)]
     private static partial Regex RemoteCssUrl();

@@ -11,8 +11,15 @@ namespace Neruna.Desktop.Infrastructure;
 /// </summary>
 internal static partial class MailPaper
 {
+    // Lines a little apart; a hard Enter (paragraph, line of a text mail) half a line more than a line that merely wraps.
     private const string Common =
-        " pre, code { font-family: Consolas, 'Cascadia Mono', monospace; }";
+        " pre, code { font-family: Consolas, 'Cascadia Mono', monospace; }" +
+        " body { line-height: 1.35; } p { margin-top: 0; margin-bottom: 0.6em; } .neruna-text > div { margin-bottom: 0.6em; }";
+
+    // Outlook writes every line as its own paragraph with margin 0 (p.MsoNormal in the mail's own <style>), so a
+    // hard Enter looked like a wrapped line; this comes after the mail's styles and wins.
+    private const string ParagraphSpacing =
+        "<style>p.MsoNormal, li.MsoNormal, div.MsoNormal, p.MsoPlainText { margin-bottom: 0.6em; }</style>";
 
     public const string LightStylesheet =
         "body { font-family: 'Segoe UI', Inter, Arial, sans-serif; font-size: 10.5pt; color: #1b1b1b; margin: 0; }" +
@@ -33,6 +40,8 @@ internal static partial class MailPaper
     public static (string Html, bool Dark) Prepare(string html, bool darkTheme)
     {
         ArgumentNullException.ThrowIfNull(html);
+        // An empty paragraph (Outlook: <p><o:p>&nbsp;</o:p></p>) is a blank line; the renderer let it collapse.
+        html = EmptyParagraph().Replace(html, "${open}<br>${close}") + ParagraphSpacing;
         if (!darkTheme || OwnBackground().IsMatch(html))
         {
             return (html, false);
@@ -43,6 +52,9 @@ internal static partial class MailPaper
         var light = TextColor().Replace(html, m => ForDarkPage(m.Value, m.Groups["value"].Value));
         return ("<div style=\"color: #E6E6E6\">" + light + "</div>", true);
     }
+
+    [GeneratedRegex(@"(?<open><p\b[^>]*>)(?:\s|&nbsp;|&#160;|\u00a0|</?o:p>|<span\b[^>]*>|</span>)*(?<close></p>)", RegexOptions.IgnoreCase)]
+    private static partial Regex EmptyParagraph();
 
     // Backgrounds a mail sets itself (not "background: transparent / none").
     [GeneratedRegex(@"bgcolor\s*=|background(-color|-image)?\s*:\s*(?!\s*(transparent|none|inherit|initial)\b)", RegexOptions.IgnoreCase)]

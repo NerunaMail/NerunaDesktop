@@ -494,10 +494,27 @@ internal static class Snapshots
         {
             var message = await MimeKit.MimeMessage.LoadAsync(file);
             var content = Neruna.Core.Mail.MessageContent.From(message);
-            var view = new TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel { BaseStylesheet = MessageBodyView.BaseStylesheet, Text = content.Html, Background = Brushes.White };
+            var view = new TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel { BaseStylesheet = MessageBodyView.BaseStylesheet, Background = Brushes.White };
+            // Embedded pictures (cid:) from the message itself, as in the reading pane.
+            view.ImageLoad += (_, e) =>
+            {
+                var cid = Neruna.Core.Mail.MessageContent.ContentIdOf(e.Event.Src);
+                if (cid is null || message.BodyParts.OfType<MimeKit.MimePart>().FirstOrDefault(p => p.ContentId == cid) is not { Content: { } data })
+                {
+                    return;
+                }
+
+                e.Event.Handled = true;
+                using var stream = new MemoryStream();
+                data.DecodeTo(stream);
+                stream.Position = 0;
+                e.Event.Callback(new Avalonia.Media.Imaging.Bitmap(stream));
+            };
+            view.Text = Neruna.Desktop.Infrastructure.MailPaper.Prepare(content.Html, darkTheme: false).Html;
             var window = new Window { Width = 720, Height = 520, Content = view, Background = Brushes.White };
             window.Show();
-            await Task.Delay(100);
+            await Task.Delay(300);
+            Dispatcher.UIThread.RunJobs();
             Dispatcher.UIThread.RunJobs();
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             var path = Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".png");
