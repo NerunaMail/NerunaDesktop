@@ -196,3 +196,25 @@ def test_a_shortcut_with_two_colons_becomes_the_template(page):
     # Unknown shortcuts and words without "::" stay as typed.
     page.keyboard.type(" xy:: tel:")
     assert "xy:: tel:" in page.evaluate("document.getElementById('editor').textContent")
+
+
+FORM = ('<p>Anruf</p><table><tbody>'
+        '<tr><td><p>Name</p></td><td><p><br></p></td></tr>'
+        '<tr><td><p>Tel</p></td><td><p><br></p></td></tr></tbody></table>')
+
+
+def test_a_template_with_a_form_is_filled_in_with_tab(page):
+    page.click("#editor")
+    page.evaluate(f"neruna.insertHtml('{FORM}')")
+    # The caret lands in the first empty cell; Tab moves on (to the end of a filled cell), Tab in the last cell adds a row.
+    page.keyboard.type("Anna Muster")
+    page.keyboard.press("Tab")
+    page.keyboard.type("x")
+    page.keyboard.press("Shift+Tab")
+    page.keyboard.press("Tab")
+    page.keyboard.press("Tab")
+    page.keyboard.type("044 123 45 67")
+    page.keyboard.press("Tab")
+    page.keyboard.type("Firma")
+    rows = page.evaluate("[...document.querySelectorAll('#editor tr')].map(r => [...r.cells].map(c => c.textContent.trim()))")
+    assert rows == [["Name", "Anna Muster"], ["Telx", "044 123 45 67"], ["Firma", ""]], rows

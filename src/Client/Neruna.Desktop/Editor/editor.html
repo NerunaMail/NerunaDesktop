@@ -16,6 +16,8 @@
   #editor > div, #editor > p { margin: 0 0 0.5em 0; }
   #editor blockquote { margin: 0 0 0 4px; padding-left: 10px; border-left: 2px solid #c8c8c8; }
   #editor img { max-width: 100%; }
+  /* An empty cell (a form from a text template) stays wide enough to click into. */
+  #editor td, #editor th { min-width: 3em; }
   #editor a { color: #0f6cbd; }
   #editor:empty::before { content: attr(data-placeholder); color: #8a8a8a; }
   /* Dark theme: the page is shown inverted (so quoted mails with their own colours turn dark too), pictures are turned
@@ -159,6 +161,9 @@
     } else if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
       e.preventDefault();
       post({ type: "save" });
+    } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey && currentCell()) {
+      e.preventDefault();
+      nextCell(currentCell(), e.shiftKey ? -1 : 1);
     } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       exec(e.shiftKey ? "outdent" : "insertText", e.shiftKey ? undefined : "    ");
@@ -201,6 +206,54 @@
     if (anchor && anchor.node && editor.contains(anchor.node)) selection.collapse(anchor.node, anchor.offset);
   }
 
+  // Tables (forms from text templates): Tab goes to the next cell, Shift+Tab back; Tab in the last cell adds a row.
+  function currentCell() {
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+    var node = selection.getRangeAt(0).startContainer;
+    var el = node.nodeType === 1 ? node : node.parentNode;
+    var cell = el && el.closest ? el.closest("td, th") : null;
+    return cell && editor.contains(cell) ? cell : null;
+  }
+
+  function caretInto(cell) {
+    var block = cell.lastElementChild && /^(P|DIV)$/.test(cell.lastElementChild.nodeName) ? cell.lastElementChild : cell;
+    var range = document.createRange();
+    if (block.textContent.replace(/[\s\u00a0\u200b]/g, "") === "") range.setStart(block, 0);
+    else { range.selectNodeContents(block); range.collapse(false); }
+    var selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function nextCell(cell, step) {
+    var table = cell.closest("table");
+    var cells = Array.prototype.filter.call(table.querySelectorAll("td, th"), function (c) { return c.closest("table") === table; });
+    var index = cells.indexOf(cell) + step;
+    if (index < 0) return;
+    if (index >= cells.length) {
+      var row = cell.closest("tr").cloneNode(true);
+      Array.prototype.forEach.call(row.children, function (c) { c.innerHTML = '<p style="margin: 0"><br></p>'; });
+      cell.closest("tr").parentNode.appendChild(row);
+      caretInto(row.firstElementChild);
+      post({ type: "changed" });
+      return;
+    }
+    caretInto(cells[index]);
+  }
+
+  /** insertHTML; a table that comes with it (a form) gets the caret in its first empty cell, ready to fill in. */
+  function insertWithTables(html) {
+    var before = Array.prototype.slice.call(editor.querySelectorAll("table"));
+    document.execCommand("insertHTML", false, html);
+    var added = Array.prototype.filter.call(editor.querySelectorAll("table"), function (t) { return before.indexOf(t) < 0; });
+    if (added.length === 0) return;
+    var empty = Array.prototype.filter.call(added[0].querySelectorAll("td, th"), function (c) {
+      return c.textContent.replace(/[\s\u00a0\u200b]/g, "") === "" && !c.querySelector("img");
+    })[0];
+    if (empty) caretInto(empty);
+  }
+
   // Text template shortcuts: "tel::" typed right after a word becomes the template (set by the app, case-insensitive).
   var shortcuts = {};
   var expanding = false;
@@ -220,7 +273,7 @@
     selection.removeAllRanges();
     selection.addRange(range);
     expanding = true;
-    try { document.execCommand("insertHTML", false, html); } finally { expanding = false; }
+    try { insertWithTables(html); } finally { expanding = false; }
     return true;
   }
 
@@ -300,7 +353,7 @@
       range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);
-      document.execCommand("insertHTML", false, html);
+      insertWithTables(html);
       scheduleState();
       post({ type: "changed" });
       return "ok";
