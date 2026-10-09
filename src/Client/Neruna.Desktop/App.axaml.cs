@@ -61,6 +61,8 @@ internal sealed partial class App : Application
             desktop.MainWindow = main;
             main.Show();
             splash.Close();
+            Infrastructure.CrashHandler.InstallUi();
+            Infrastructure.CrashHandler.UiReady = true;
 
             await viewModel.StartAsync();
         }

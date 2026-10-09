@@ -101,4 +101,16 @@ public class CloudContractTests
         Assert.Equal("""{"conversation":"pm:01B","lastId":7}""", JsonSerializer.Serialize(new ChatReadRequest("pm:01B", 7), NerunaJson.Options));
         Assert.Equal("""{"presence":"dnd"}""", JsonSerializer.Serialize(new PresenceRequest("dnd"), NerunaJson.Options));
     }
+
+    [Fact]
+    public void Crash_report_fixture_matches_the_request_record()
+    {
+        var report = JsonSerializer.Deserialize<CrashReportRequest>(ContractFixtures.Read("crash-report-example.json"), NerunaJson.Options)!;
+        Assert.Equal(64, report.Fingerprint.Length);
+        Assert.True(report.Fatal);
+        Assert.Equal("System.ComponentModel.Win32Exception", report.ExceptionType);
+        Assert.Contains("WindowsCredentialBackend", report.Stack, StringComparison.Ordinal);
+        Assert.Equal("0.1.11", report.AppVersion);
+        Assert.NotNull(report.Log);
+    }
 }

@@ -77,8 +77,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Cloud.CloudAccountSync cloudAccounts,
         Neruna.Providers.Graph.GraphConnectionFactory graph,
         Neruna.Core.Auth.IBrowserLauncher browser,
+        Neruna.Core.Diagnostics.CrashReportService crashReports,
         ILogger<MainWindowViewModel> logger)
     {
+        _crashReports = crashReports;
+        // Caught on the UI thread: Neruna keeps running and offers the report now (after the dialog shown at the moment).
+        CrashHandler.Caught += (_, _) => Dispatcher.UIThread.Post(async () => await OfferCrashReportsAsync());
         _graph = graph;
         _browser = browser;
         _backup = backup;
@@ -326,6 +330,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     /// <summary>Once the window is visible: account setup for a first start, otherwise sync with the servers.</summary>
     public async Task StartAsync()
     {
+        // Crashed last time: offer the report first (or send it / drop it, as set).
+        await OfferCrashReportsAsync();
         // The chat needs no mail account, only the cloud connection.
         _ = ChatPage.StartAsync();
         if (!HasAccounts)
@@ -506,6 +512,48 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         }
 
         AskForCloudAccountPassword();
+    }
+
+    private readonly Neruna.Core.Diagnostics.CrashReportService _crashReports;
+    private bool _crashOfferWaiting;
+
+    /// <summary>Waiting crash reports: send or drop as set, else ask – never over another dialog (then afterwards).</summary>
+    private async Task OfferCrashReportsAsync()
+    {
+        try
+        {
+            var mode = await _crashReports.GetModeAsync();
+            var pending = await _crashReports.GetPendingAsync();
+            if (pending.Count == 0 || Overlay is CrashReportViewModel)
+            {
+                return;
+            }
+
+            switch (mode)
+            {
+                case Neruna.Core.Diagnostics.CrashReportMode.Never:
+                    _crashReports.Discard(pending);
+                    return;
+                case Neruna.Core.Diagnostics.CrashReportMode.Always:
+                    await _crashReports.SendAsync(pending);
+                    StatusText = T("Ein Fehler ist aufgetreten – der Bericht wurde an Neruna gesendet.");
+                    return;
+            }
+
+            if (Overlay is not null)
+            {
+                _crashOfferWaiting = true;
+                return;
+            }
+
+            var dialog = new CrashReportViewModel(pending, _crashReports);
+            dialog.Finished += (_, _) => Overlay = null;
+            Overlay = dialog;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Crash reports not offered");
+        }
     }
 
     // An account of the organisation without password: ask for it (one at a time, not over another dialog).
@@ -793,6 +841,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     partial void OnOverlayChanged(ViewModelBase? value)
     {
         UpdateChatActive();
+        if (value is null && _crashOfferWaiting)
+        {
+            _crashOfferWaiting = false;
+            Dispatcher.UIThread.Post(async () => await OfferCrashReportsAsync());
+        }
+
         if (value is null && CurrentPage != SettingsPage)
         {
             _ = CheckBackupHintAsync();

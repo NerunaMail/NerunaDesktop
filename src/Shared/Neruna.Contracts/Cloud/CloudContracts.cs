@@ -172,3 +172,17 @@ public sealed record VaultBackupRequest(Guid VaultId, int Version, string Nonce,
 public sealed record MailAccountsResponse(bool Available, CloudOrganizationKey? OrganizationKey, CloudCertificateDevice Device, IReadOnlyList<CloudMailAccount> Accounts);
 
 public sealed record CloudMailAccount(string Id, string Email, string DisplayName, string Payload, string PayloadSignature, string? Envelope);
+
+/// <summary>POST /api/v1/crash-reports – only with the user's consent, already cleaned of addresses, hosts and paths.</summary>
+public sealed record CrashReportRequest(
+    string Fingerprint,
+    string AppVersion,
+    string Os,
+    string? Runtime,
+    string? Language,
+    bool Fatal,
+    string ExceptionType,
+    string Message,
+    string Stack,
+    string? Log,
+    DateTimeOffset OccurredAt);

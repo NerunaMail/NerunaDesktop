@@ -544,6 +544,27 @@ internal static class Snapshots
         vm.SettingsPage.SelectedTab = 8;
         await SaveAsync(window, output, "settings-about.png");
 
+        // Crash report offered after a crash: "Details anzeigen" shows exactly what is sent (cleaned).
+        var crashes = services.GetRequiredService<Neruna.Core.Diagnostics.CrashReportService>();
+        try
+        {
+            throw new InvalidOperationException("Sync failed for anna.muster@example.com on imap.example.com");
+        }
+        catch (InvalidOperationException ex)
+        {
+            crashes.Store.Save(Neruna.Core.Diagnostics.CrashReportBuilder.Capture(ex, fatal: true, "0.1.12", "2026-10-10 14:02:11 INF Sync anna.muster@example.com", DateTimeOffset.Now));
+        }
+
+        var crashDialog = new CrashReportViewModel(await crashes.GetPendingAsync(), crashes);
+        vm.NavigateCommand.Execute(Section.Mail);
+        vm.Overlay = crashDialog;
+        await SaveAsync(window, output, "crash-report.png");
+        crashDialog.ToggleDetailsCommand.Execute(null);
+        await SaveAsync(window, output, "crash-report-details.png");
+        crashDialog.DontSendCommand.Execute(null);
+        vm.Overlay = null;
+        vm.NavigateCommand.Execute(Section.Settings);
+
         // Color schemes and dark mode applied to the running app.
         vm.NavigateCommand.Execute(Section.Mail);
         Appearance.Apply(ThemeMode.Dark, ColorScheme.Red);

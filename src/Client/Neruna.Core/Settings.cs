@@ -111,6 +111,9 @@ public static class SettingKeys
     /// <summary>Language of the app: "auto" (system), "de", "en", "fr" or "it"; takes effect with the next start.</summary>
     public const string UiLanguage = "ui.language";
 
+    /// <summary>Crash reports to Neruna: null = ask (default), "always", "never".</summary>
+    public const string CrashReports = "crash.reports";
+
     /// <summary>"Blue", "Red" or "Green".</summary>
     public const string ColorScheme = "appearance.colorScheme";
 }

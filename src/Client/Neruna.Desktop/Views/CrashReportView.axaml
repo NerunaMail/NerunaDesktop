@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.CrashReportView"
+             x:DataType="vm:CrashReportViewModel">
+
+  <StackPanel>
+    <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,8" Text="{Binding Intro}" />
+
+    <Button Classes="command" Content="{Binding DetailsLabel}" Command="{Binding ToggleDetailsCommand}" HorizontalAlignment="Left" Padding="0,2" />
+    <TextBox IsVisible="{Binding ShowDetails}" Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True"
+             FontFamily="Cascadia Mono, Consolas, DejaVu Sans Mono, monospace" FontSize="11" Height="260" Margin="0,8,0,0"
+             ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+
+    <CheckBox IsChecked="{Binding AlwaysSend}" Margin="0,12,0,0" Content="{l:T 'Künftig ohne Nachfrage senden'}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"
+               Text="{l:T 'Änderbar unter Einstellungen → Info.'}" />
+
+    <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0" TextWrapping="Wrap"
+               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,20,0,0">
+      <ProgressBar IsIndeterminate="True" Width="80" MinWidth="0" Height="4" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+      <Button Grid.Column="2" Content="{l:T 'Nicht senden'}" Command="{Binding DontSendCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Classes="accent" Content="{l:T 'Bericht senden'}" Command="{Binding SendCommand}" IsDefault="True" />
+    </Grid>
+  </StackPanel>
+</UserControl>

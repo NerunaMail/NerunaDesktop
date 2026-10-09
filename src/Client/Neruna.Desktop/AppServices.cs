@@ -101,6 +101,9 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Cloud.SettingsBackupService>();
         services.AddSingleton<Neruna.Core.Cloud.CloudAccountSync>();
         services.AddSingleton<Neruna.Core.Chat.ChatController>();
+        services.AddSingleton(_ => CrashHandler.Store);
+        services.AddSingleton<Neruna.Core.Diagnostics.CrashReportService>();
+        services.AddSingleton<CrashReportsOptionsViewModel>();
         services.AddSingleton<IFileService, FileService>();
         services.AddSingleton<IWindowService, WindowService>();
         services.AddSingleton<UiLayout>();
@@ -136,10 +139,12 @@ internal static class AppServices
         var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("Neruna");
         logger.LogInformation("Neruna Desktop {Version} started (data: {DataDirectory}, demo: {Demo}, protocol log: {ProtocolLog})",
             typeof(AppServices).Assembly.GetName().Version, options.DataDirectory, options.Demo, options.ProtocolLog);
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => logger.LogCritical(e.ExceptionObject as Exception, "Unhandled exception");
+        // Crashes: logged and kept for a report (CrashHandler, installed in Main).
+        CrashHandler.Logger = logger;
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
             logger.LogError(e.Exception, "Unobserved task exception");
+            CrashHandler.RecordUnobserved(e.Exception);
             e.SetObserved();
         };
 

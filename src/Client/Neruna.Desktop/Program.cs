@@ -13,6 +13,7 @@ internal static class Program
         // was downloaded before the last exit.
         Velopack.VelopackApp.Build().SetArgs(args).Run();
         App.Options = AppOptions.FromArgs(args);
+        Infrastructure.CrashHandler.Install(App.Options);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

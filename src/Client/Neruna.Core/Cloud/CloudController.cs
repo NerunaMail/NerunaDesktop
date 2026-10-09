@@ -168,6 +168,56 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         }
     }
 
+    /// <summary>Where crash reports go when this computer is not connected to a cloud.</summary>
+    public static readonly Uri DefaultServer = new("https://neruna.cloud/");
+
+    /// <summary>
+    /// A crash report (only with the user's consent): connected, with the device token, so the organisation and device
+    /// are known; otherwise – or if the token fails – anonymous.
+    /// </summary>
+    /// <exception cref="CloudException">Code "invalid": the server refused the report (it won't take it later either).</exception>
+    public async Task SendCrashReportAsync(CrashReportRequest report, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        const string path = "api/v1/crash-reports";
+        var connection = await GetConnectionAsync(cancellationToken);
+        HttpResponseMessage? response = null;
+        try
+        {
+            if (connection is not null)
+            {
+                try
+                {
+                    response = await SendAuthorizedAsync(connection, HttpMethod.Post, path, cancellationToken, report);
+                }
+                catch (CloudException ex)
+                {
+                    logger.LogInformation(ex, "No device token for the crash report; sending it anonymously");
+                }
+            }
+
+            if (response is null || response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                response?.Dispose();
+                response = await SendRawAsync(new HttpRequestMessage(HttpMethod.Post, new Uri(connection?.Server ?? DefaultServer, path))
+                {
+                    Content = JsonContent.Create(report, options: NerunaJson.Options),
+                }, cancellationToken);
+            }
+
+            if (response.StatusCode is HttpStatusCode.UnprocessableEntity or HttpStatusCode.BadRequest)
+            {
+                throw new CloudException("invalid", F("Der Server antwortet mit Fehler {0}. Stimmt die Serveradresse?", (int)response.StatusCode));
+            }
+
+            response.EnsureSuccessStatusCode();
+        }
+        finally
+        {
+            response?.Dispose();
+        }
+    }
+
     /// <summary>The person's photo from the portal, if there is one.</summary>
     public async Task<byte[]?> GetPhotoAsync(CancellationToken cancellationToken = default)
     {
