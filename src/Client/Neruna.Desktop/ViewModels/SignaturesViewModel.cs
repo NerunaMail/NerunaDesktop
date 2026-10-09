@@ -205,8 +205,12 @@ internal sealed partial class SignatureEditorViewModel : ViewModelBase
     private readonly Signature _original;
     private readonly ISettingsStore _settings;
 
-    public SignatureEditorViewModel(Signature original, bool isNew, IFileService files, ISettingsStore settings)
+    private readonly bool _isTextTemplate;
+
+    /// <param name="isTextTemplate">The same editor for a text template ("Textvorlage"): only its texts differ.</param>
+    public SignatureEditorViewModel(Signature original, bool isNew, IFileService files, ISettingsStore settings, bool isTextTemplate = false)
     {
+        _isTextTemplate = isTextTemplate;
         _original = original;
         _settings = settings;
         IsNew = isNew;
@@ -220,7 +224,24 @@ internal sealed partial class SignatureEditorViewModel : ViewModelBase
 
     public bool IsNew { get; }
 
-    public string Title => IsNew ? "Neue Signatur" : "Signatur bearbeiten";
+    public string Title => (_isTextTemplate, IsNew) switch
+    {
+        (true, true) => "Neue Textvorlage",
+        (true, false) => "Textvorlage bearbeiten",
+        (false, true) => "Neue Signatur",
+        _ => "Signatur bearbeiten",
+    };
+
+    public bool IsTextTemplate => _isTextTemplate;
+
+    /// <summary>Text templates: "tel" → typing "tel::" while writing inserts the template.</summary>
+    [ObservableProperty]
+    public partial string? Shortcut { get; set; }
+
+    /// <summary>Checks the shortcut before saving; returns an error to show, or null when it is fine.</summary>
+    public Func<string?, Task<string?>>? ValidateShortcut { get; init; }
+
+    public string NamePlaceholder => _isTextTemplate ? "z. B. Anrufnotiz, Terminbestätigung, Absage" : "z. B. Standard, Kurz, Englisch";
 
     public FormattingViewModel Formatting { get; }
 
@@ -235,12 +256,20 @@ internal sealed partial class SignatureEditorViewModel : ViewModelBase
     {
         var font = await _settings.GetAsync(SettingKeys.ComposeFont) is { Length: > 0 } configured ? configured : FontCatalog.DefaultFont;
         var size = double.TryParse(await _settings.GetAsync(SettingKeys.ComposeFontSize), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var pt) ? pt : 11;
-        Formatting.Attach(editor, _original.Html, font, size, "Signatur hier eingeben – z. B. Name, Funktion, Firma, Telefon, Logo …");
+        Formatting.Attach(editor, _original.Html, font, size, _isTextTemplate
+            ? "Text der Vorlage – z. B. eine Tabelle für eine Anrufnotiz (Name, Nummer, Grund) oder eine Standardantwort …"
+            : "Signatur hier eingeben – z. B. Name, Funktion, Firma, Telefon, Logo …");
     }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
+        if (ValidateShortcut is not null && await ValidateShortcut(Shortcut) is { } problem)
+        {
+            Error = problem;
+            return;
+        }
+
         var editor = Formatting.Editor;
         var html = editor is null ? _original.Html
             : await editor.GetBodyHtmlAsync() ?? MessageContent.PlainTextToHtml(editor.GetPlainText());

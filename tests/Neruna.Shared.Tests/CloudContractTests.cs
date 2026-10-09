@@ -49,4 +49,14 @@ public class CloudContractTests
         Assert.StartsWith("Freundliche Grüsse", signature.Text, StringComparison.Ordinal);
         Assert.Equal(2026, signature.UpdatedAt.Year);
     }
+
+    [Fact]
+    public void Client_reads_the_text_templates()
+    {
+        var response = JsonSerializer.Deserialize<TextTemplatesResponse>(ContractFixtures.Read("text-templates-example.json"), NerunaJson.Options)!;
+
+        var template = Assert.Single(response.Templates);
+        Assert.Equal(("Anrufnotiz", "tel"), (template.Name, template.Shortcut));
+        Assert.Contains("<table", template.Html, StringComparison.Ordinal);
+    }
 }

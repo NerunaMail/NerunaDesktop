@@ -94,6 +94,10 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task<SignaturesResponse> GetSignaturesAsync(CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<SignaturesResponse>("api/v1/signatures", cancellationToken);
 
+    /// <summary>The organisation's text templates, filled in for this person.</summary>
+    public async Task<TextTemplatesResponse> GetTextTemplatesAsync(CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<TextTemplatesResponse>("api/v1/text-templates", cancellationToken);
+
     /// <summary>The person's photo from the portal, if there is one.</summary>
     public async Task<byte[]?> GetPhotoAsync(CancellationToken cancellationToken = default)
     {

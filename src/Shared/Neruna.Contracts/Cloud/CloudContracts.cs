@@ -59,3 +59,9 @@ public sealed record SignaturesResponse(bool Available, IReadOnlyList<CloudSigna
 /// <param name="Html">Mail-safe HTML (inline styles, images as data: URIs).</param>
 /// <param name="UpdatedAt">Also moves when the person's or the organisation's details change.</param>
 public sealed record CloudSignature(string Id, string Name, string Html, string Text, DateTimeOffset UpdatedAt);
+
+/// <summary>Response of <c>GET /api/v1/text-templates</c>: the organisation's text templates, filled in for this person.</summary>
+public sealed record TextTemplatesResponse(bool Available, IReadOnlyList<CloudTextTemplate> Templates);
+
+/// <param name="Shortcut">Typed with "::" while writing (may be null).</param>
+public sealed record CloudTextTemplate(string Id, string Name, string? Shortcut, string Html, string Text, DateTimeOffset UpdatedAt);

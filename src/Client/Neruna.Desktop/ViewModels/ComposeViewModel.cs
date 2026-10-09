@@ -222,6 +222,14 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>The formatting toolbar, connected to the editor in <see cref="AttachEditorAsync"/>.</summary>
     public FormattingViewModel Formatting { get; }
 
+    /// <summary>The text templates (own and the organisation's); none when composing without them (tests).</summary>
+    public TextTemplateService? TextTemplates { get; init; }
+
+    /// <summary>The "Textvorlage" menu: inserted at the caret, nothing replaced.</summary>
+    public ObservableCollection<TextTemplateMenuItem> TemplateMenu { get; } = [];
+
+    public bool HasTemplates => TemplateMenu.Count > 0;
+
     /// <summary>The "Signatur" menu: every signature plus "Keine Signatur".</summary>
     public ObservableCollection<SignatureMenuItem> SignatureMenu { get; } = [];
 
@@ -354,6 +362,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         var html = draft.HtmlBody ?? (string.IsNullOrEmpty(draft.Body) ? string.Empty : PlainToHtml(draft.Body));
         Formatting.Attach(editor, html, font, size, "Nachricht verfassen …");
         _editorDraft = draft;
+        await LoadTemplatesAsync(editor);
     }
 
     /// <summary>
@@ -625,6 +634,39 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [RelayCommand]
     private void PopOut() => PopOutRequested?.Invoke(this, EventArgs.Empty);
 
+    // Menu and "kürzel::" shortcuts of the text templates.
+    private async Task LoadTemplatesAsync(IHtmlEditor editor)
+    {
+        if (TextTemplates is null)
+        {
+            return;
+        }
+
+        TemplateMenu.Clear();
+        foreach (var template in await TextTemplates.GetAllAsync())
+        {
+            var title = template.Shortcut is { } key ? $"{template.Name}   ({key}::)" : template.Name;
+            TemplateMenu.Add(new TextTemplateMenuItem(title, template, InsertTemplateCommand));
+        }
+
+        OnPropertyChanged(nameof(HasTemplates));
+        var shortcuts = (await TextTemplates.GetShortcutsAsync()).ToDictionary(
+            p => p.Key, p => (p.Value.Html, HtmlText.ToPlainText(p.Value.Html)), StringComparer.OrdinalIgnoreCase);
+        editor.SetShortcuts(shortcuts);
+    }
+
+    [RelayCommand]
+    private async Task InsertTemplate(TextTemplate? template)
+    {
+        if (template is null || _editor is null)
+        {
+            return;
+        }
+
+        MarkChanged();
+        await _editor.InsertAsync(template.Html, HtmlText.ToPlainText(template.Html));
+    }
+
     [RelayCommand]
     private Task ChooseSignature(Signature? signature)
     {
@@ -639,3 +681,5 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 internal sealed record ComposeAttachment(string FileName, MimeEntity Entity);
 
 internal sealed record SignatureMenuItem(string Title, Signature? Signature, System.Windows.Input.ICommand Command);
+
+internal sealed record TextTemplateMenuItem(string Title, TextTemplate Template, System.Windows.Input.ICommand Command);

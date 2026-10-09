@@ -171,3 +171,28 @@ def test_dark_theme_inverts_the_page_but_not_the_mail(page):
     assert "color: #000000" in html and "invert" not in html
     page.evaluate("neruna.setDark(false)")
     assert page.evaluate("getComputedStyle(document.documentElement).filter") == "none"
+
+
+def test_a_text_template_goes_to_the_last_caret_position(page):
+    page.click("#editor")
+    page.keyboard.type("Hallo Welt")
+    for _ in range(4):
+        page.keyboard.press("ArrowLeft")
+    # Focus leaves the page (the template menu); the caret position is remembered.
+    page.evaluate("document.activeElement.blur()")
+    page.evaluate("neruna.insertHtml('<b>schöne </b>')")
+    text = page.evaluate("document.getElementById('editor').textContent").replace("\u200b", "").replace("\xa0", " ")
+    # Exactly between "Hallo " and "Welt" (trailing spaces of inserted HTML are the browser's business).
+    assert text.startswith("Hallo schöne") and text.endswith("Welt"), text
+
+
+def test_a_shortcut_with_two_colons_becomes_the_template(page):
+    page.evaluate("neruna.setShortcuts({'TEL': '<table><tr><td>Name</td><td></td></tr></table>'})")
+    page.click("#editor")
+    page.keyboard.type("Notiz: tel::")
+    html = page.evaluate("neruna.getBodyHtml()")
+    assert "<table" in html and "tel::" not in html, html
+    assert "Notiz:" in html
+    # Unknown shortcuts and words without "::" stay as typed.
+    page.keyboard.type(" xy:: tel:")
+    assert "xy:: tel:" in page.evaluate("document.getElementById('editor').textContent")

@@ -26,6 +26,7 @@ internal sealed partial class MailViewModel(
     InvitationService invitations,
     UiPreferences preferences,
     RecipientDirectory recipients,
+    TextTemplateService textTemplates,
     AgendaViewModel agenda,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable
 {
@@ -389,6 +390,7 @@ internal sealed partial class MailViewModel(
         var compose = new ComposeViewModel(mail, account, connection, draft, files, secureMime, settings, signatures, kind, encrypt, inWindow)
         {
             Recipients = recipients,
+            TextTemplates = textTemplates,
         };
         compose.Closed += async (_, sent) =>
         {

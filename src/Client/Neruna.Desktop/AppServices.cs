@@ -90,6 +90,7 @@ internal static class AppServices
         services.AddSingleton<AccountDiscovery>();
         services.AddSingleton<Neruna.Core.Cloud.CloudController>();
         services.AddSingleton<Neruna.Core.Cloud.CloudSignatureSync>();
+        services.AddSingleton<Neruna.Core.Cloud.CloudTextTemplateSync>();
         services.AddSingleton<IFileService, FileService>();
         services.AddSingleton<IWindowService, WindowService>();
         services.AddSingleton<UiLayout>();
@@ -113,6 +114,8 @@ internal static class AppServices
         services.AddSingleton<SignaturesViewModel>();
         services.AddSingleton<AppearanceViewModel>();
         services.AddSingleton<CloudViewModel>();
+        services.AddSingleton<TextTemplatesViewModel>();
+        services.AddSingleton<TextTemplateService>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
 

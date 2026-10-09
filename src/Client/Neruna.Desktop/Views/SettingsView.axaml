@@ -26,6 +26,9 @@
       <TabItem Header="Signaturen">
         <ContentControl Content="{Binding Signatures}" Margin="0,12,0,0" />
       </TabItem>
+      <TabItem Header="Textvorlagen">
+        <ContentControl Content="{Binding TextTemplates}" Margin="0,12,0,0" />
+      </TabItem>
       <TabItem Header="Zertifikate (S/MIME)">
         <ContentControl Content="{Binding Certificates}" Margin="0,12,0,0" />
       </TabItem>

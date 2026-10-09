@@ -61,10 +61,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         ReminderScheduler reminders,
         ISettingsStore settings,
         Neruna.Core.Cloud.CloudSignatureSync cloudSignatures,
+        Neruna.Core.Cloud.CloudTextTemplateSync cloudTemplates,
         ILogger<MainWindowViewModel> logger)
     {
         _cloudSignatures = cloudSignatures;
-        settingsPage.Attach(cloudSignatures);
+        _cloudTemplates = cloudTemplates;
+        settingsPage.Attach(cloudSignatures, cloudTemplates);
         Layout = layout;
         _push = push;
         _notifications = notifications;
@@ -324,6 +326,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     };
 
     private readonly Neruna.Core.Cloud.CloudSignatureSync _cloudSignatures;
+    private readonly Neruna.Core.Cloud.CloudTextTemplateSync _cloudTemplates;
     private DateTime _cloudSyncedAt;
 
     // The organisation's central signatures: with the sync, at most every 10 minutes; offline or unreachable is no error.
@@ -337,6 +340,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         try
         {
             await Task.Run(() => _cloudSignatures.SyncAsync());
+            await Task.Run(() => _cloudTemplates.SyncAsync());
             _cloudSyncedAt = DateTime.UtcNow;
         }
         catch (Exception ex) when (ex is Neruna.Core.Cloud.CloudException or HttpRequestException or TaskCanceledException)

@@ -115,6 +115,13 @@ internal static class Snapshots
         var demoAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync()).First();
         await signatures.SetAssignmentAsync(demoAccount.Id, new Neruna.Core.Mail.SignatureAssignment(signature.Id, null));
 
+        // Own text templates (inserted at the caret, or by "kürzel::").
+        var textTemplates = services.GetRequiredService<Neruna.Core.Mail.TextTemplateService>();
+        await textTemplates.SaveAsync(new Neruna.Core.Mail.TextTemplate(Guid.NewGuid(), "Anrufnotiz",
+            "<p><strong>Anrufnotiz</strong></p><table><tr><td>Name</td><td>&nbsp;</td></tr><tr><td>Nummer</td><td>&nbsp;</td></tr><tr><td>Grund</td><td>&nbsp;</td></tr></table>",
+            DateTimeOffset.Now, Shortcut: "tel"));
+        await textTemplates.SaveAsync(new Neruna.Core.Mail.TextTemplate(Guid.NewGuid(), "Terminbestätigung", "<p>Gerne bestätige ich Ihnen den Termin.</p>", DateTimeOffset.Now, Shortcut: "termin"));
+
         // The editor shows a formatted preview here (no WebView headless): toolbar, text and signature as on Windows.
         await vm.MailPage.NewMailCommand.ExecuteAsync(null);
         vm.MailPage.Compose!.To = "Marco Bernasconi <marco@bernasconi.example>";
@@ -352,7 +359,10 @@ internal static class Snapshots
         }
         vm.SettingsPage.SelectedTab = 3;
         await SaveAsync(window, output, "settings-signatures.png");
-        vm.SettingsPage.SelectedTab = 5;
+        vm.SettingsPage.SelectedTab = 4;
+        await vm.SettingsPage.TextTemplates.ReloadAsync();
+        await SaveAsync(window, output, "settings-text-templates.png");
+        vm.SettingsPage.SelectedTab = 6;
         await SaveAsync(window, output, "settings-design.png");
         var preferences = services.GetRequiredService<UiPreferences>();
         preferences.ShowAddAccountButton = false;
@@ -364,7 +374,7 @@ internal static class Snapshots
         preferences.ShowAddAccountButton = true;
         // Einstellungen → Cloud: not connected; connected when a code for a running server is given
         // (NERUNA_SNAPSHOT_CLOUD=<url> NERUNA_SNAPSHOT_CLOUD_CODE=… NERUNA_SNAPSHOT_CLOUD_PIN=…).
-        vm.SettingsPage.SelectedTab = 6;
+        vm.SettingsPage.SelectedTab = 7;
         vm.SettingsPage.Cloud.DeviceName = "Anna – Notebook";
         await SaveAsync(window, output, "settings-cloud.png");
         if (Environment.GetEnvironmentVariable("NERUNA_SNAPSHOT_CLOUD") is { Length: > 0 } cloudUrl)
@@ -384,7 +394,7 @@ internal static class Snapshots
             await SaveAsync(window, output, "settings-signatures-cloud.png");
         }
 
-        vm.SettingsPage.SelectedTab = 7;
+        vm.SettingsPage.SelectedTab = 8;
         await SaveAsync(window, output, "settings-about.png");
 
         // Color schemes and dark mode applied to the running app.

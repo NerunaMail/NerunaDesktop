@@ -37,6 +37,8 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
 
     internal DbSet<SignatureEntity> Signatures => Set<SignatureEntity>();
 
+    internal DbSet<TextTemplateEntity> TextTemplates => Set<TextTemplateEntity>();
+
     internal DbSet<ReminderStateEntity> ReminderStates => Set<ReminderStateEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -262,6 +264,22 @@ internal sealed class ReminderStateEntity
     public bool Dismissed { get; set; }
 
     public long ExpiresUnixMs { get; set; }
+}
+
+internal sealed class TextTemplateEntity
+{
+    public Guid Id { get; set; }
+
+    public required string Name { get; set; }
+
+    /// <summary>"tel" → typing "tel::" while writing inserts the template.</summary>
+    public string? Shortcut { get; set; }
+
+    public required string Html { get; set; }
+
+    public required string Source { get; set; }
+
+    public long UpdatedUnixMs { get; set; }
 }
 
 internal sealed class SignatureEntity

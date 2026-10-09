@@ -11,7 +11,7 @@ namespace Neruna.Desktop.ViewModels;
 /// Einstellungen → Cloud: connect Neruna with the organisation's Neruna Cloud/Control (server, one-time code and PIN from
 /// the portal), show the profile kept there, disconnect.
 /// </summary>
-internal sealed partial class CloudViewModel(CloudController cloud, CloudSignatureSync signatures, AccountDiscovery discovery) : ViewModelBase
+internal sealed partial class CloudViewModel(CloudController cloud, CloudSignatureSync signatures, CloudTextTemplateSync textTemplates, AccountDiscovery discovery) : ViewModelBase
 {
     public const string DefaultServer = "https://neruna.cloud";
 
@@ -159,6 +159,7 @@ internal sealed partial class CloudViewModel(CloudController cloud, CloudSignatu
         {
             await cloud.DisconnectAsync();
             await signatures.RemoveAllAsync();
+            await textTemplates.RemoveAllAsync();
             Connection = null;
             Profile = null;
             Photo = null;
@@ -176,6 +177,7 @@ internal sealed partial class CloudViewModel(CloudController cloud, CloudSignatu
     {
         Profile = await cloud.GetProfileAsync();
         await signatures.SyncAsync();
+        await textTemplates.SyncAsync();
         Photo = null;
         if (Profile.Member.HasPhoto && await cloud.GetPhotoAsync() is { } bytes)
         {

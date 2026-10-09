@@ -201,8 +201,43 @@
     if (anchor && anchor.node && editor.contains(anchor.node)) selection.collapse(anchor.node, anchor.offset);
   }
 
-  editor.addEventListener("input", function () { ensureBlocks(); post({ type: "changed" }); scheduleState(); });
+  // Text template shortcuts: "tel::" typed right after a word becomes the template (set by the app, case-insensitive).
+  var shortcuts = {};
+  var expanding = false;
+  function expandShortcut() {
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return false;
+    var caret = selection.getRangeAt(0);
+    if (!caret.collapsed || caret.startContainer.nodeType !== 3) return false;
+    var before = caret.startContainer.nodeValue.slice(0, caret.startOffset);
+    var match = /(?:^|[^\p{L}\p{N}_-])([\p{L}\p{N}_-]+)::$/u.exec(before);
+    if (!match) return false;
+    var html = shortcuts[match[1].toLowerCase()];
+    if (html === undefined) return false;
+    var range = document.createRange();
+    range.setStart(caret.startContainer, caret.startOffset - match[1].length - 2);
+    range.setEnd(caret.startContainer, caret.startOffset);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    expanding = true;
+    try { document.execCommand("insertHTML", false, html); } finally { expanding = false; }
+    return true;
+  }
+
+  editor.addEventListener("input", function (e) {
+    if (!expanding && e.inputType === "insertText" && e.data === ":") expandShortcut();
+    ensureBlocks(); post({ type: "changed" }); scheduleState();
+  });
   document.addEventListener("selectionchange", scheduleState);
+
+  // The last caret position in the text: a text template chosen from a menu outside the page goes exactly there.
+  var lastRange = null;
+  document.addEventListener("selectionchange", function () {
+    var selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && editor.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+      lastRange = selection.getRangeAt(0).cloneRange();
+    }
+  });
 
   // Links are never followed inside the editor.
   document.addEventListener("click", function (e) {
@@ -244,6 +279,32 @@
     link: function (url) { exec("createLink", url); },
     /** Inserts an image (data: URI) at the caret, e.g. a logo for a signature. */
     insertImage: function (url) { exec("insertImage", url); },
+    /** Shortcut → html of the text templates (see expandShortcut). */
+    setShortcuts: function (map) {
+      shortcuts = {};
+      Object.keys(map || {}).forEach(function (key) { shortcuts[key.toLowerCase()] = map[key]; });
+      return "ok";
+    },
+    /** Inserts html at the last caret position (start of the text if there never was one); nothing is replaced. */
+    insertHtml: function (html) {
+      var selection = window.getSelection();
+      // The current caret if it is in the text (most exact), else the remembered one.
+      var range = selection && selection.rangeCount > 0 && editor.contains(selection.getRangeAt(0).commonAncestorContainer)
+        ? selection.getRangeAt(0).cloneRange() : lastRange;
+      editor.focus();
+      if (!range || !editor.contains(range.commonAncestorContainer)) {
+        range = document.createRange();
+        range.setStart(editor, 0);
+        range.collapse(true);
+      }
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand("insertHTML", false, html);
+      scheduleState();
+      post({ type: "changed" });
+      return "ok";
+    },
     /** Replaces the signature (the first #neruna-signature, always above a quote); empty html removes it. */
     setSignature: function (html) {
       var el = editor.querySelector("#neruna-signature");

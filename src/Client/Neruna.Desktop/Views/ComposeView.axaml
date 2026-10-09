@@ -38,6 +38,24 @@
             <TextBlock Text="Verschlüsseln" />
           </StackPanel>
         </ToggleButton>
+        <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
+        <Button Classes="command" ToolTip.Tip="Textvorlage an der Cursorposition einfügen – oder «kürzel::» tippen" IsEnabled="{Binding HasTemplates}">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconTextTemplate}" />
+            <TextBlock Text="Textvorlage" />
+          </StackPanel>
+          <Button.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding TemplateMenu}">
+              <MenuFlyout.ItemContainerTheme>
+                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:TextTemplateMenuItem">
+                  <Setter Property="Header" Value="{Binding Title}" />
+                  <Setter Property="Command" Value="{Binding Command}" />
+                  <Setter Property="CommandParameter" Value="{Binding Template}" />
+                </ControlTheme>
+              </MenuFlyout.ItemContainerTheme>
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
         <!-- Signatur: swap or remove the signature in the text -->
         <Button Classes="command" IsVisible="{Binding Formatting.IsRichText}" ToolTip.Tip="Signatur einfügen oder wechseln">
           <StackPanel Orientation="Horizontal">

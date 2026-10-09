@@ -53,6 +53,13 @@ internal interface IHtmlEditor
 
     Task RunAsync(string script);
 
+    /// <summary>Inserts at the caret without replacing anything: <paramref name="html"/> when formatting is available,
+    /// otherwise <paramref name="text"/> in the plain-text box.</summary>
+    Task InsertAsync(string html, string text);
+
+    /// <summary>Text template shortcuts: typing "key::" replaces it with the template (html; text in plain mode).</summary>
+    void SetShortcuts(IReadOnlyDictionary<string, (string Html, string Text)> shortcuts);
+
     void FocusEditor();
 }
 
@@ -201,6 +208,58 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
     public string GetPlainText() => _fallback?.Text ?? string.Empty;
 
+    private IReadOnlyDictionary<string, (string Html, string Text)> _shortcuts = new Dictionary<string, (string Html, string Text)>();
+
+    public void SetShortcuts(IReadOnlyDictionary<string, (string Html, string Text)> shortcuts)
+    {
+        _shortcuts = shortcuts;
+        _ = PushShortcutsAsync();
+    }
+
+    private async Task PushShortcutsAsync()
+    {
+        if (_web is not null && _ready)
+        {
+            var map = System.Text.Json.JsonSerializer.Serialize(_shortcuts.ToDictionary(p => p.Key, p => p.Value.Html));
+            await _web.InvokeScript($"neruna.setShortcuts({map})");
+        }
+    }
+
+    // Plain-text mode: "key::" right before the caret becomes the template's text.
+    private void ExpandPlainShortcut()
+    {
+        if (_fallback is null || _shortcuts.Count == 0)
+        {
+            return;
+        }
+
+        var text = _fallback.Text ?? string.Empty;
+        var caret = Math.Clamp(_fallback.CaretIndex, 0, text.Length);
+        var match = System.Text.RegularExpressions.Regex.Match(text[..caret], @"(?:^|[^\p{L}\p{N}_-])([\p{L}\p{N}_-]+)::$");
+        if (!match.Success || !_shortcuts.TryGetValue(match.Groups[1].Value, out var template))
+        {
+            return;
+        }
+
+        var start = caret - match.Groups[1].Length - 2;
+        _fallback.Text = text[..start] + template.Text + text[caret..];
+        _fallback.CaretIndex = start + template.Text.Length;
+    }
+
+    public async Task InsertAsync(string html, string text)
+    {
+        if (_fallback is not null)
+        {
+            var caret = Math.Clamp(_fallback.CaretIndex, 0, (_fallback.Text ?? string.Empty).Length);
+            _fallback.Text = (_fallback.Text ?? string.Empty).Insert(caret, text);
+            _fallback.CaretIndex = caret + text.Length;
+            _fallback.Focus();
+            return;
+        }
+
+        await RunAsync($"neruna.insertHtml({FormattingViewModel.Js(html)})");
+    }
+
     public async Task RunAsync(string script)
     {
         if (IsRich && _web is not null)
@@ -301,6 +360,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             case "ready":
                 _ready = true;
                 _ = PushContentAsync();
+                _ = PushShortcutsAsync();
                 ModeChanged?.Invoke(this, true);
                 break;
             case "send":
@@ -369,6 +429,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         };
         _fallback.TextChanged += (_, _) =>
         {
+            ExpandPlainShortcut();
             if (Normalize(_fallback.Text) != Normalize(_loadedText))
             {
                 ContentChanged?.Invoke(this, EventArgs.Empty);

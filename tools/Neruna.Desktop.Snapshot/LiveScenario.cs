@@ -315,7 +315,7 @@ internal static class LiveScenario
         vm.NavigateCommand.Execute(Section.Settings);
         await Snapshots.SaveAsync(window, output, "live-accounts.png");
         await vm.SettingsPage.ReloadAsync();
-        vm.SettingsPage.SelectedTab = 4;
+        vm.SettingsPage.SelectedTab = 5;
         Console.WriteLine($"Certificates: own={vm.SettingsPage.Certificates.Own.Count}, contacts={vm.SettingsPage.Certificates.Contacts.Count} ({string.Join(", ", vm.SettingsPage.Certificates.Contacts.Select(c => c.Emails))}), CAs={vm.SettingsPage.Certificates.Authorities.Count}");
         await Snapshots.SaveAsync(window, output, "live-certificates.png");
         vm.SettingsPage.SelectedTab = 0;
