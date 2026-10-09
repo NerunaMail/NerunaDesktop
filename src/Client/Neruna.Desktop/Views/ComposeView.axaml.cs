@@ -25,10 +25,15 @@ internal sealed partial class ComposeView : UserControl
                 _attached = vm;
                 await vm.AttachEditorAsync(this.FindControl<HtmlEditor>("Editor")!);
 
-                // New mail or forward (no recipient yet): start in "An"; replies already have one.
+                // New mail or forward (no recipient yet): start in "An". A reply has its recipient: start typing the answer.
                 if (string.IsNullOrWhiteSpace(vm.To))
                 {
                     Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<Neruna.Desktop.Controls.RecipientBox>("ToBox")?.FocusText(),
+                        Avalonia.Threading.DispatcherPriority.Loaded);
+                }
+                else
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<HtmlEditor>("Editor")?.FocusEditor(),
                         Avalonia.Threading.DispatcherPriority.Loaded);
                 }
             }

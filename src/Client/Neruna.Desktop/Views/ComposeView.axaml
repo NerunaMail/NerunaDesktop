@@ -41,9 +41,8 @@
         </Button>
         <ctl:ToolButton Icon="{StaticResource IconAttach}" Label="Anhängen" Hint="Datei anhängen" Command="{Binding AddAttachmentCommand}"
                         ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <ctl:ToolToggleButton Icon="{StaticResource IconCertificate}" Label="Signieren" Hint="{Binding SignHint}" IsChecked="{Binding Sign}" IsEnabled="{Binding CanSign}"
-                              ToolTip.ShowOnDisabled="True" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <ctl:ToolToggleButton Icon="{StaticResource IconLock}" Label="Verschlüsseln" Hint="{Binding EncryptHint}" IsChecked="{Binding Encrypt}"
+        <ctl:ToolToggleButton Icon="{StaticResource IconCertificate}" Label="Signieren" Hint="{Binding SignHint}" IsChecked="{Binding Sign}" IsVisible="{Binding CanSign}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+        <ctl:ToolToggleButton Icon="{StaticResource IconLock}" Label="Verschlüsseln" Hint="{Binding EncryptHint}" IsChecked="{Binding Encrypt}" IsVisible="{Binding ShowEncrypt}"
                               ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
         <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="Textvorlage" Hint="Textvorlage an der Cursorposition einfügen – oder «kürzel::» tippen"

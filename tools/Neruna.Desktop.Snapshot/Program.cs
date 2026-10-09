@@ -188,6 +188,14 @@ internal static class Snapshots
         vm.MailPage.Compose = null;
 
         // Reply to the opened message: HTML quote with reply header (shown as text in the headless fallback).
+        // Focus check with the editor's plain-text mode (the screenshot preview takes no focus).
+        HtmlEditor.ScreenshotPreview = false;
+        await vm.MailPage.ReplyCommand.ExecuteAsync(null);
+        await Task.Delay(300);
+        var replyFocus = window.FocusManager?.GetFocusedElement() as Control;
+        Console.WriteLine($"Reply focus: {replyFocus?.GetType().Name} in editor: {replyFocus?.FindAncestorOfType<HtmlEditor>() is not null}");
+        vm.MailPage.Compose = null;
+        HtmlEditor.ScreenshotPreview = true;
         await vm.MailPage.ReplyCommand.ExecuteAsync(null);
         await Task.Delay(300);
         await SaveAsync(window, output, "reply.png");

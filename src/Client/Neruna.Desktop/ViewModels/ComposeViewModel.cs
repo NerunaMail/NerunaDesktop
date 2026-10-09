@@ -219,8 +219,13 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool Encrypt { get; set; }
 
+    /// <summary>An own S/MIME certificate for the sender exists – only then are Signieren and Verschlüsseln offered.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowEncrypt))]
     public partial bool CanSign { get; set; }
+
+    /// <summary>Verschlüsseln: with an own certificate – or while switched on (a reply to encrypted mail), so it can be switched off.</summary>
+    public bool ShowEncrypt => CanSign || Encrypt;
 
     /// <summary>Tooltip of "Verschlüsseln": why it was switched on or off automatically.</summary>
     [ObservableProperty]
@@ -247,6 +252,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     // Once the user switches encryption themselves, recipients no longer change it.
     partial void OnEncryptChanged(bool value)
     {
+        OnPropertyChanged(nameof(ShowEncrypt));
         if (!_settingEncrypt)
         {
             _encryptChosen = true;

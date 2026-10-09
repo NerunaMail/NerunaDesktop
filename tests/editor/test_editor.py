@@ -218,3 +218,14 @@ def test_a_template_with_a_form_is_filled_in_with_tab(page):
     page.keyboard.type("Firma")
     rows = page.evaluate("[...document.querySelectorAll('#editor tr')].map(r => [...r.cells].map(c => c.textContent.trim()))")
     assert rows == [["Name", "Anna Muster"], ["Telx", "044 123 45 67"], ["Firma", ""]], rows
+
+
+def test_focus_without_caret_starts_above_signature_and_quote(page):
+    # A fresh reply: empty line, signature, quote – focus puts the caret at the very start.
+    page.evaluate("""neruna.setContent('<div><br></div><div id="neruna-signature">Anna</div><blockquote>Original</blockquote>', 'Arial', 11, '')""")
+    page.evaluate("document.activeElement && document.activeElement.blur(); getSelection().removeAllRanges()")
+    page.evaluate("neruna.focus()")
+    page.keyboard.type("Danke!")
+    text = page.evaluate("document.getElementById('editor').innerText")
+    assert text.lstrip().startswith("Danke!"), text
+    assert text.index("Danke!") < text.index("Anna") < text.index("Original")

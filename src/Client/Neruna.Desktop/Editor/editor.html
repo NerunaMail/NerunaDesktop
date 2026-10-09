@@ -375,7 +375,19 @@
       post({ type: "changed" });
       return "ok";
     },
-    focus: function () { editor.focus(); return "ok"; },
+    /** Focus into the text; without a caret there yet (a fresh reply) at the very start, above signature and quote. */
+    focus: function () {
+      editor.focus();
+      var selection = window.getSelection();
+      if (!selection.rangeCount || !editor.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+        var range = document.createRange();
+        range.setStart(editor.firstChild && editor.firstChild.nodeType === 1 ? editor.firstChild : editor, 0);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      return "ok";
+    },
     state: function () { lastState = ""; reportState(); return "ok"; }
   };
 
