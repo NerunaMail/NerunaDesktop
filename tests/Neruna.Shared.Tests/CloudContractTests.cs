@@ -24,7 +24,7 @@ public class CloudContractTests
         Assert.Equal(("Anna", "Muster", "Projektleiterin", "+41 79 123 45 67"), (me.Member.FirstName, me.Member.LastName, me.Member.Position, me.Member.PhoneMobile));
         Assert.False(me.Member.HasPhoto);
         Assert.Equal(("Example AG", "Zürich", "https://example.com"), (me.Organization.Name, me.Organization.City, me.Organization.Website));
-        Assert.Equal(["signatures", "chat"], me.Addons);
+        Assert.Equal(["signatures", "chat", "certificates"], me.Addons);
         Assert.Equal("Anna – Notebook", me.Device.Name);
     }
 

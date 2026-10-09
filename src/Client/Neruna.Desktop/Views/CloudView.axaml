@@ -7,7 +7,7 @@
     <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,20">
       <TextBlock Text="Neruna Cloud" FontSize="18" FontWeight="SemiBold" />
       <TextBlock Classes="subtle" TextWrapping="Wrap"
-                 Text="Verbindet Neruna mit dem Portal deiner Organisation – für zentral verwaltete Signaturen, Vorlagen und Einstellungen. Deine Mails, Termine und Kontakte bleiben auf deinem Mailserver." />
+                 Text="Verbindet Neruna mit dem Portal deiner Organisation – für zentral verwaltete Signaturen, Textvorlagen, S/MIME-Zertifikate und den Chat. Deine Mails, Termine und Kontakte bleiben auf deinem Mailserver." />
 
       <!-- Not connected: server, code and PIN from the portal -->
       <StackPanel Spacing="10" IsVisible="{Binding IsNotConnected}" Margin="0,8,0,0">
@@ -52,6 +52,15 @@
             <TextBlock Text="{Binding Address}" />
             <TextBlock Text="{Binding OrganizationContact}" Classes="subtle" />
           </StackPanel>
+          <!-- Waiting for approval or a changed organisation key: in the warning colour -->
+          <TextBlock Text="{Binding CertificatesText}" TextWrapping="Wrap" IsVisible="{Binding CertificatesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                     Classes.attention="{Binding CertificatesNeedAttention}">
+            <TextBlock.Styles>
+              <Style Selector="TextBlock.attention">
+                <Setter Property="Foreground" Value="#CA5010" />
+              </Style>
+            </TextBlock.Styles>
+          </TextBlock>
           <TextBlock Text="{Binding ConnectedText}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="Aktualisieren" Command="{Binding RefreshCommand}" />

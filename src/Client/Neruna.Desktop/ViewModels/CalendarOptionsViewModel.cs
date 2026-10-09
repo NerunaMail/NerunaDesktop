@@ -118,7 +118,7 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
             var reminder = await settings.GetDefaultReminderAsync();
             DefaultReminder = ReminderOption.Standard.FirstOrDefault(o => o.Minutes == reminder) ?? ReminderOption.Standard.First(o => o.Minutes == EventDraft.DefaultReminderMinutes);
             TwoMonths = await settings.GetAsync(SettingKeys.CalendarNavigatorMonths) == "2";
-            TimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) == "timegrid";
+            TimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) != "list"; // default: time grid
             GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
         }
         finally

@@ -27,6 +27,12 @@ public static class SettingKeys
     /// <summary>Connection to a Neruna Cloud/Control server (JSON of CloudConnection; the device key is in the keychain).</summary>
     public const string CloudConnection = "cloud.connection";
 
+    /// <summary>
+    /// The organisation's signing key for certificates (base64 SPKI), remembered the first time: certificates signed
+    /// with another key are not taken – a server could otherwise slip in a key of its own.
+    /// </summary>
+    public const string CloudOrganizationSigningKey = "cloud.organizationSigningKey";
+
     /// <summary>Chat: rooms, people, read markers and retention from the last answer (JSON), for a start without network.</summary>
     public const string ChatState = "chat.state";
 
@@ -63,7 +69,7 @@ public static class SettingKeys
     /// <summary>How many months the date navigator in the calendar shows (1 or 2).</summary>
     public const string CalendarNavigatorMonths = "calendar.navigatorMonths";
 
-    /// <summary>Week view: "list" (events per day, default) or "timegrid" (hourly time grid).</summary>
+    /// <summary>Week view: "timegrid" (hourly time grid, default) or "list" (events per day).</summary>
     public const string CalendarLayout = "calendar.layout";
 
     /// <summary>Time grid subdivision in minutes: 60, 30 (default) or 15.</summary>

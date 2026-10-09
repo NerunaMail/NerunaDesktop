@@ -266,9 +266,12 @@ internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffs
         }
     }
 
-    public string SourceText => Info.Source == CertificateSource.CollectedFromMail
-        ? "Aus signierter Nachricht übernommen am " + Info.AddedAt.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)
-        : "Importiert am " + Info.AddedAt.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture);
+    public string SourceText => Info.Source switch
+    {
+        CertificateSource.CollectedFromMail => "Aus signierter Nachricht übernommen am " + Info.AddedAt.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
+        CertificateSource.Cloud => "Cloud – von der Organisation bereitgestellt am " + Info.AddedAt.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
+        _ => "Importiert am " + Info.AddedAt.LocalDateTime.ToString("dd.MM.yyyy", CultureInfo.CurrentCulture),
+    };
 
     /// <summary>SHA-1 fingerprint in groups of four, as Windows shows it.</summary>
     public string Fingerprint => string.Join(' ', Enumerable.Range(0, Info.Thumbprint.Length / 4).Select(i => Info.Thumbprint.Substring(i * 4, 4)));

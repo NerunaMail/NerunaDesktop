@@ -11,8 +11,35 @@ namespace Neruna.Desktop.ViewModels;
 /// Einstellungen → Cloud: connect Neruna with the organisation's Neruna Cloud/Control (server, one-time code and PIN from
 /// the portal), show the profile kept there, disconnect.
 /// </summary>
-internal sealed partial class CloudViewModel(CloudController cloud, CloudSignatureSync signatures, CloudTextTemplateSync textTemplates, AccountDiscovery discovery) : ViewModelBase
+internal sealed partial class CloudViewModel(
+    CloudController cloud,
+    CloudSignatureSync signatures,
+    CloudTextTemplateSync textTemplates,
+    CloudCertificateSync certificates,
+    AccountDiscovery discovery) : ViewModelBase
 {
+    /// <summary>Certificates from the organisation: how many arrived, whether the portal still has to approve this device.</summary>
+    [ObservableProperty]
+    public partial string? CertificatesText { get; set; }
+
+    [ObservableProperty]
+    public partial bool CertificatesNeedAttention { get; set; }
+
+    /// <summary>After each certificate sync (here or in the background).</summary>
+    public void UpdateCertificateStatus()
+    {
+        var status = certificates.Status;
+        CertificatesNeedAttention = status.Problem is not null || (status.Available && !status.Approved);
+        CertificatesText = !status.Available ? null
+            : status.Problem ?? (!status.Approved
+                ? "Zertifikate: Dieses Gerät wartet auf die Freigabe im Portal (Zertifikate → Ausstehende Freigaben)."
+                : status.Waiting > 0
+                    ? $"Zertifikate: {status.Received} auf diesem Gerät, {status.Waiting} warten noch auf die Zustellung im Portal."
+                    : status.Received == 0
+                        ? "Zertifikate: Ihnen ist noch kein Zertifikat zugeordnet."
+                        : $"Zertifikate: {status.Received} von der Organisation auf diesem Gerät.");
+    }
+
     public const string DefaultServer = "https://neruna.cloud";
 
     /// <summary>"AM" for "Anna Muster" (shown until the photo is there).</summary>
@@ -160,6 +187,8 @@ internal sealed partial class CloudViewModel(CloudController cloud, CloudSignatu
             await cloud.DisconnectAsync();
             await signatures.RemoveAllAsync();
             await textTemplates.RemoveAllAsync();
+            await certificates.RemoveAllAsync();
+            UpdateCertificateStatus();
             Connection = null;
             Profile = null;
             Photo = null;
@@ -178,6 +207,16 @@ internal sealed partial class CloudViewModel(CloudController cloud, CloudSignatu
         Profile = await cloud.GetProfileAsync();
         await signatures.SyncAsync();
         await textTemplates.SyncAsync();
+        try
+        {
+            await certificates.SyncAsync();
+        }
+        catch (Exception ex) when (ex is CloudException or HttpRequestException)
+        {
+            Error = "Zertifikate konnten nicht abgeglichen werden: " + ex.Message;
+        }
+
+        UpdateCertificateStatus();
         Photo = null;
         if (Profile.Member.HasPhoto && await cloud.GetPhotoAsync() is { } bytes)
         {

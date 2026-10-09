@@ -115,7 +115,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     public async Task ReloadAsync()
     {
         NavigatorMonthCount = int.TryParse(await settings.GetAsync(SettingKeys.CalendarNavigatorMonths), out var months) && months is 1 or 2 ? months : 1;
-        IsTimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) == "timegrid";
+        IsTimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) != "list"; // default: time grid
         _loadingSettings = true;
         IsWorkWeek = await settings.GetBoolAsync(SettingKeys.CalendarWorkWeek);
         _loadingSettings = false;

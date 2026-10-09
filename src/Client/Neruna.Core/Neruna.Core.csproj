@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\Neruna.Contracts\Neruna.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\Neruna.Vault\Neruna.Vault.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Neruna.Client.Tests" />

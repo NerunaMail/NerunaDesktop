@@ -16,6 +16,9 @@ public enum CertificateSource
 
     /// <summary>Taken automatically from a validly signed message (common practice for S/MIME clients).</summary>
     CollectedFromMail,
+
+    /// <summary>Provided by the organisation through Neruna Cloud/Control (removed here when it is no longer assigned).</summary>
+    Cloud,
 }
 
 public enum CertificateStatus
@@ -274,8 +277,8 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         {
             var thumbprint = CertificateParser.Thumbprint(entry.Certificate);
             await secrets.SetSecretAsync(SecretId(thumbprint), password ?? string.Empty, cancellationToken);
-            await store.SaveAsync(new StoredCertificate(thumbprint, entry.Certificate.GetEncoded(), data, CertificateSource.Imported, now), cancellationToken);
-            result.Add(CertificateParser.Describe(entry.Certificate, true, CertificateSource.Imported, now));
+            await store.SaveAsync(new StoredCertificate(thumbprint, entry.Certificate.GetEncoded(), data, source, now), cancellationToken);
+            result.Add(CertificateParser.Describe(entry.Certificate, true, source, now));
         }
 
         return result;

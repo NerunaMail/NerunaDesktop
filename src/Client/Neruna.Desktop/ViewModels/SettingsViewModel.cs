@@ -36,8 +36,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     public partial int SelectedTab { get; set; }
 
     /// <summary>Central signatures arrived or went: the list here follows.</summary>
-    public void Attach(Neruna.Core.Cloud.CloudSignatureSync cloudSignatures, Neruna.Core.Cloud.CloudTextTemplateSync cloudTemplates)
+    public void Attach(Neruna.Core.Cloud.CloudSignatureSync cloudSignatures, Neruna.Core.Cloud.CloudTextTemplateSync cloudTemplates, Neruna.Core.Cloud.CloudCertificateSync cloudCertificates)
     {
+        ArgumentNullException.ThrowIfNull(cloudCertificates);
+        cloudCertificates.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(async () => await Certificates.ReloadAsync());
         ArgumentNullException.ThrowIfNull(cloudSignatures);
         ArgumentNullException.ThrowIfNull(cloudTemplates);
         cloudSignatures.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(async () => await Signatures.ReloadAsync());

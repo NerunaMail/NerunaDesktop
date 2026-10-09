@@ -33,6 +33,60 @@ internal static class LiveScenario
     private static readonly string CertDir = Path.GetFullPath(Path.Combine("tools", "testlab", "certs"));
 
     /// <summary>
+    /// Certificates from the organisation, end to end: connect, register the device key, then wait while an admin
+    /// sets up the organisation key, uploads a certificate and approves this device in the portal (a browser, run
+    /// alongside) – until the certificate is here.
+    /// </summary>
+    public static async Task CertificatesAsync(string output, string server, string code, string pin)
+    {
+        var dataDir = Path.Combine(Path.GetTempPath(), "neruna-certificates-" + Guid.NewGuid().ToString("N"));
+        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: true));
+        var vm = services.GetRequiredService<MainWindowViewModel>();
+        var window = new MainWindow { DataContext = vm, Width = 1440, Height = 880 };
+        window.Show();
+        await vm.InitializeAsync();
+
+        var cloud = vm.SettingsPage.Cloud;
+        cloud.Server = server;
+        cloud.Code = code;
+        cloud.Pin = pin;
+        cloud.DeviceName = "Anna – Notebook";
+        await cloud.ConnectCommand.ExecuteAsync(null);
+        vm.NavigateCommand.Execute(Section.Settings);
+        vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        Console.WriteLine($"Connected: {cloud.ConnectedText ?? cloud.Error}");
+        Console.WriteLine($"Status: {cloud.CertificatesText}");
+        await Snapshots.SaveAsync(window, output, "certificates-waiting.png");
+        Console.WriteLine("DEVICE READY");
+
+        var sync = services.GetRequiredService<Neruna.Core.Cloud.CloudCertificateSync>();
+        var manager = services.GetRequiredService<Neruna.Core.Security.CertificateManager>();
+        for (var i = 0; i < 120 && sync.Status.Received == 0; i++)
+        {
+            await Task.Delay(2000);
+            try
+            {
+                await sync.SyncAsync();
+            }
+            catch (Exception ex) when (ex is Neruna.Core.Cloud.CloudException or HttpRequestException)
+            {
+                Console.WriteLine("Sync: " + ex.Message);
+            }
+        }
+
+        cloud.UpdateCertificateStatus();
+        var own = (await manager.GetAllAsync()).Where(c => c.Source == Neruna.Core.Security.CertificateSource.Cloud).ToList();
+        Console.WriteLine($"Status: {cloud.CertificatesText}");
+        Console.WriteLine($"Cloud certificates: {string.Join("; ", own.Select(c => $"{string.Join(",", c.EmailAddresses)} key={c.HasPrivateKey}"))}");
+        await Snapshots.SaveAsync(window, output, "certificates-cloud-status.png");
+        vm.SettingsPage.SelectedTab = 5;
+        await vm.SettingsPage.Certificates.ReloadAsync();
+        await Task.Delay(300);
+        await Snapshots.SaveAsync(window, output, "certificates-received.png");
+        window.Close();
+    }
+
+    /// <summary>
     /// First start: no account yet, the setup dialog creates one (as a user would) – afterwards the mail page must show
     /// folders and messages without a restart.
     /// </summary>

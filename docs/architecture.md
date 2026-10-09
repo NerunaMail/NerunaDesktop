@@ -449,13 +449,32 @@ DEK (256 bit, zufällig)
 - Optionaler Admin-Escrow-Schlüssel der Organisation (X25519) als weiterer Wrap: Entscheid offen.
 - Implementiert und getestet in `Neruna.Vault`; Anbindung an Client-UI und Server folgt.
 
+## 6b. S/MIME-Zertifikate aus dem Portal (Zero-Knowledge)
+
+```
+Organisationsschlüssel (P-256: ECDH + ECDSA), privat nur verschlüsselt:
+  Passphrase ──PBKDF2-SHA256(600 000)──► KEK · Recovery-Code (256 bit) ──HKDF──► KEK₂   (im Browser des Admins)
+Zertifikat: CEK (256 bit, zufällig)
+  ├─ AES-256-GCM(CEK, {PKCS#12, Passwort})        → payload   + ECDSA-Signatur der Organisation
+  ├─ ECDH(ephemer, Org)    → HKDF → AES-GCM(CEK)   → organization_envelope (zum Nachverteilen)
+  └─ ECDH(ephemer, Gerät)  → HKDF → AES-GCM(CEK)   → envelope je freigegebenem Gerät
+Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Signatur freigegeben
+```
+
+- Alles Geheime entsteht im Browser (`server/public/js/neruna-certificates.js`, WebCrypto + node-forge für
+  PKCS#12) bzw. auf dem Gerät (`Neruna.Vault.CertificateEnvelopes`); der Server prüft nur Formate und Signaturen.
+- Die App übernimmt nur, was der beim ersten Mal gemerkte Organisations-Signaturschlüssel signiert hat; neue Geräte
+  erhalten Zertifikate erst nach Freigabe im Portal. Entfernen wirkt nur für die Zukunft (bei Austritt widerrufen).
+- Grenze: Die Portalseite selbst kommt vom Server – ein kompromittierter Server könnte veränderten Code ausliefern.
+- Vertragstest: Die Fixtures erzeugt das Browser-Modul (Node), die App muss sie öffnen.
+
 ## 7. Offene Entscheide
 
 | # | Thema | Optionen |
 |---|---|---|
 | 1 | Lizenz Client/Shared | ✔ MPL 2.0 (Beiträge mit CLA) |
 | 2 | Endbenutzer-Auth gegenüber Cloud | ✔ Geräte-Code aus dem Portal + PIN, danach Geräteschlüssel |
-| 3 | Admin-Escrow für Tresor | ja/nein, optional pro Mandant |
+| 3 | Admin-Escrow für Tresor | Für S/MIME-Zertifikate ✔ Organisationsschlüssel (6b); Config-Tresor offen |
 | 4 | Preismodell | pro User · pro Domain · Staffeln |
 | 5 | UI-Sprachen | heute nur Deutsch; `.resx` de/en vor Release |
 | 6 | HTML-Darstellung von Mails | ✔ Lesen: Avalonia.HtmlRenderer; Verfassen: native WebView (WebView2/WebKit). Avalonias RichTextEditor ist kommerziell → nicht verwendet |

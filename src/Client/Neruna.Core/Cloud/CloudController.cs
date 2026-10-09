@@ -27,6 +27,9 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     /// <summary>Where the device key is kept in the credential store (not a mail/DAV connection).</summary>
     public static readonly Guid KeyId = new("6e657275-6e61-436c-6f75-640000000001");
 
+    /// <summary>Where this device's encryption key for certificates is kept (P-256 ECDH, PKCS#8).</summary>
+    public static readonly Guid EncryptionKeyId = new("6e657275-6e61-436c-6f75-640000000002");
+
     /// <summary>Language of the server's messages: the app's UI language.</summary>
     public const string UiLanguage = "de-CH";
 
@@ -121,6 +124,15 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task SetPresenceAsync(string presence, CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<PresenceRequest>(HttpMethod.Put, "api/v1/presence", new PresenceRequest(presence), cancellationToken);
 
+    /// <summary>Registers this device's encryption key for certificates; true when an admin has approved it.</summary>
+    public async Task<bool> SetDeviceEncryptionKeyAsync(string publicKey, CancellationToken cancellationToken = default) =>
+        (await AuthorizedAsync<JsonElement>(HttpMethod.Put, "api/v1/device/encryption-key", new DeviceEncryptionKeyRequest(publicKey), cancellationToken))
+        .TryGetProperty("approved", out var approved) && approved.GetBoolean();
+
+    /// <summary>The S/MIME certificates assigned to this person, encrypted for this device.</summary>
+    public async Task<CertificatesResponse> GetCertificatesAsync(CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<CertificatesResponse>("api/v1/certificates", cancellationToken);
+
     /// <summary>The person's photo from the portal, if there is one.</summary>
     public async Task<byte[]?> GetPhotoAsync(CancellationToken cancellationToken = default)
     {
@@ -146,7 +158,9 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         }
 
         await credentials.DeleteSecretAsync(KeyId, cancellationToken);
+        await credentials.DeleteSecretAsync(EncryptionKeyId, cancellationToken);
         await settings.SetAsync(SettingKeys.CloudConnection, null, cancellationToken);
+        await settings.SetAsync(SettingKeys.CloudOrganizationSigningKey, null, cancellationToken);
         _token = null;
     }
 

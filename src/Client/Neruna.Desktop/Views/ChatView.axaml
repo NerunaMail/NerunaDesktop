@@ -186,7 +186,7 @@
 
       <!-- Right: the conversation -->
       <Border Grid.Column="2" Classes="pane">
-        <Grid RowDefinitions="Auto,*,Auto,Auto">
+        <Grid RowDefinitions="Auto,*,Auto,Auto,Auto">
           <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="16,10">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel>
@@ -235,8 +235,17 @@
           <TextBlock Grid.Row="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
                      Margin="16,0,16,4" TextWrapping="Wrap" />
 
+          <!-- The chat is stored on the organisation's server without end-to-end encryption: say so where one writes -->
+          <Border Grid.Row="3" Background="{DynamicResource WarnBackgroundBrush}" CornerRadius="6" Padding="10,6" Margin="12,0,12,6">
+            <Grid ColumnDefinitions="Auto,*">
+              <PathIcon Data="{StaticResource IconWarning}" Width="13" Height="13" Foreground="#CA5010" VerticalAlignment="Top" Margin="0,2,8,0" />
+              <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap"
+                         Text="Der Chat ist nicht Ende-zu-Ende-verschlüsselt – bitte keine vertraulichen Daten senden. Dafür E-Mail mit S/MIME-Verschlüsselung oder einen Ende-zu-Ende-verschlüsselten Messenger verwenden." />
+            </Grid>
+          </Border>
+
           <!-- Writing: bold, underlined, smileys; Enter sends, Shift+Enter makes a new line -->
-          <Border Grid.Row="3" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Margin="12,0,12,12" Padding="4">
+          <Border Grid.Row="4" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Margin="12,0,12,12" Padding="4">
             <Grid RowDefinitions="Auto,Auto">
               <StackPanel Orientation="Horizontal" Spacing="2">
                 <Button Classes="format" Click="OnBold" ToolTip.Tip="Fett (Ctrl+B) – erscheint als **Text**">

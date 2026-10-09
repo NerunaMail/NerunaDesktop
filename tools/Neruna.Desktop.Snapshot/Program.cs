@@ -19,6 +19,7 @@ using Neruna.Desktop.Views;
 var output = Path.GetFullPath(args.Length > 0 ? args[0] : "artifacts/screenshots");
 var theme = args.Length > 1 && args[1] == "dark" ? ThemeVariant.Dark : ThemeVariant.Light;
 var mailFiles = Array.IndexOf(args, "--eml") is var e and >= 0 ? args[(e + 1)..] : null;
+var certificates = Array.IndexOf(args, "--certificates") is var ce and >= 0 ? args[(ce + 1)..(ce + 4)] : null;
 var firstStart = Array.IndexOf(args, "--first-start") is var fs and >= 0 ? args[fs + 1] : null;
 var live = Array.IndexOf(args, "--live") is var i and >= 0 ? (Host: args[i + 1], Dav: new Uri(args[i + 2])) : ((string Host, Uri Dav)?)null;
 Directory.CreateDirectory(output);
@@ -44,6 +45,10 @@ Dispatcher.UIThread.Post(async () =>
         if (mailFiles is not null)
         {
             await Snapshots.RenderMailsAsync(output, mailFiles);
+        }
+        else if (certificates is [var certServer, var certCode, var certPin])
+        {
+            await LiveScenario.CertificatesAsync(output, certServer, certCode, certPin);
         }
         else if (firstStart is { } host)
         {

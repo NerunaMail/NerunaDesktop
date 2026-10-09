@@ -102,3 +102,35 @@ public sealed record ChatReadRequest(string Conversation, long LastId);
 
 /// <summary>Body of <c>PUT /api/v1/presence</c>.</summary>
 public sealed record PresenceRequest(string Presence);
+
+/// <summary>
+/// Response of <c>GET /api/v1/certificates</c>: the S/MIME certificates assigned to the connected person, encrypted
+/// in the portal (zero knowledge; see Neruna.Vault.CertificateEnvelopes).
+/// </summary>
+/// <param name="Available">The licence includes certificates.</param>
+/// <param name="OrganizationKey">Null until an admin set up the organisation key in the portal.</param>
+/// <param name="Device">Whether an admin approved this device's encryption key (only then do envelopes come).</param>
+public sealed record CertificatesResponse(bool Available, CloudOrganizationKey? OrganizationKey, CloudCertificateDevice Device, IReadOnlyList<CloudCertificate> Certificates);
+
+/// <param name="EncryptionPublicKey">Base64 SPKI, P-256 ECDH.</param>
+/// <param name="SigningPublicKey">Base64 SPKI, P-256 ECDSA – signs every certificate payload.</param>
+public sealed record CloudOrganizationKey(string EncryptionPublicKey, string SigningPublicKey);
+
+public sealed record CloudCertificateDevice(bool Approved);
+
+/// <param name="Fingerprint">SHA-256 of the certificate (DER), lower-case hex.</param>
+/// <param name="Payload">JSON {v, iv, ct}: the PKCS#12 and its password, AES-256-GCM.</param>
+/// <param name="PayloadSignature">Base64 ECDSA P-256 (IEEE P1363) of "neruna-cert-v1|id|payload".</param>
+/// <param name="Envelope">The certificate key for this device (JSON {v, epk, iv, ct}); null while it waits for approval.</param>
+public sealed record CloudCertificate(
+    string Id,
+    string Subject,
+    IReadOnlyList<string> EmailAddresses,
+    DateTimeOffset? NotAfter,
+    string Fingerprint,
+    string Payload,
+    string PayloadSignature,
+    string? Envelope);
+
+/// <summary>Body of <c>PUT /api/v1/device/encryption-key</c>.</summary>
+public sealed record DeviceEncryptionKeyRequest(string PublicKey);
