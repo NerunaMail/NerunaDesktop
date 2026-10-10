@@ -118,12 +118,13 @@ public sealed partial class MessageContent
         src is not null && src.StartsWith("cid:", StringComparison.OrdinalIgnoreCase) ? Uri.UnescapeDataString(src[4..]).Trim('<', '>') : null;
 
     /// <summary>File name shown for an attachment.</summary>
-    public static string FileNameOf(MimeEntity entity) => entity switch
+    /// <summary>The attachment's name as shown and saved – without invisible characters that could disguise its type.</summary>
+    public static string FileNameOf(MimeEntity entity) => Security.OpenedAttachments.CleanName(entity switch
     {
         MessagePart { Message.Subject: { Length: > 0 } subject } => subject + ".eml",
         MessagePart => "Nachricht.eml",
         _ => entity.ContentDisposition?.FileName ?? entity.ContentType.Name ?? DefaultName(entity.ContentType),
-    };
+    });
 
     private static string DefaultName(ContentType type) => type.MediaType switch
     {

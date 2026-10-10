@@ -40,6 +40,19 @@ internal sealed partial class App : Application
             _services = await Task.Run(() => AppServices.BuildAsync(Options));
             desktop.ShutdownRequested += (_, _) => _services.Dispose();
 
+            // Copies of opened attachments (also decrypted ones) are kept a day, for the program that opened them.
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    Neruna.Core.Security.OpenedAttachments.CleanUp(TimeSpan.FromDays(1));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Next start.
+                }
+            });
+
             // The setting decides (e.g. restored from a backup); before any view or view model exists.
             if (await _services.GetRequiredService<Neruna.Core.ISettingsStore>().GetAsync(Neruna.Core.SettingKeys.UiLanguage) is { } language
                 && language != LanguageFile.Read(Options.DataDirectory))
