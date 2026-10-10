@@ -147,20 +147,25 @@ public sealed class ImapMailProvider(
         var flagUpdates = new Dictionary<string, CoreFlags>();
         var removed = new List<string>();
 
+        uint floor;
         if (isFull)
         {
             toFetch = allUids.Skip(Math.Max(0, allUids.Count - maxInitialMessages)).ToList();
+            floor = toFetch.Count > 0 ? toFetch[0].Id : imapFolder.UidNext?.Id ?? 1;
         }
         else
         {
             var present = allUids.Select(u => u.Id.ToString(CultureInfo.InvariantCulture)).ToHashSet();
             removed.AddRange(knownRemoteIds.Where(id => !present.Contains(id)));
 
-            // New mail – plus messages that were hidden as \Deleted and have been restored since.
+            // New mail – plus messages that were hidden as \Deleted and have been restored since. "Restored" means anywhere
+            // in the synced range, which starts at the stored floor: the oldest message still known is no measure, as the
+            // restored message may itself have been the oldest (or the only) one.
             var known = knownRemoteIds.ToHashSet(StringComparer.Ordinal);
             var oldestKnown = known.Count == 0 ? uint.MaxValue : known.Min(id => uint.Parse(id, CultureInfo.InvariantCulture));
+            floor = Math.Min(previous!.Value.Floor ?? (known.Count == 0 ? previous.Value.UidNext : oldestKnown), oldestKnown); // older ones loaded on request widen it
             toFetch = allUids
-                .Where(u => u.Id >= previous!.Value.UidNext || (u.Id >= oldestKnown && !known.Contains(u.Id.ToString(CultureInfo.InvariantCulture))))
+                .Where(u => u.Id >= previous.Value.UidNext || (u.Id >= floor && !known.Contains(u.Id.ToString(CultureInfo.InvariantCulture))))
                 .ToList();
 
             var knownUids = knownRemoteIds.Where(present.Contains).Select(id => new UniqueId(uint.Parse(id, CultureInfo.InvariantCulture))).ToList();
@@ -183,7 +188,7 @@ public sealed class ImapMailProvider(
         }
 
         var uidNext = imapFolder.UidNext?.Id ?? (allUids.Count > 0 ? allUids[^1].Id + 1 : 1);
-        var newState = new SyncState(imapFolder.UidValidity, uidNext).ToString();
+        var newState = new SyncState(imapFolder.UidValidity, uidNext, floor).ToString();
 
         logger.LogDebug("IMAP {Folder}: full={Full}, fetched={Fetched}, removed={Removed}", folder.RemoteId, isFull, added.Count, removed.Count);
         return new FolderSyncResult(newState, isFull, added, flagUpdates, removed, allUids.Count, unread);
@@ -646,18 +651,26 @@ public sealed class ImapMailProvider(
 
     private static UniqueId ParseUid(string remoteId) => new(uint.Parse(remoteId, CultureInfo.InvariantCulture));
 
-    internal readonly record struct SyncState(uint UidValidity, uint UidNext)
+    /// <summary>"UIDVALIDITY:UIDNEXT:FLOOR" – floor: the oldest UID of the synced range (missing in states before 0.1.16).</summary>
+    internal readonly record struct SyncState(uint UidValidity, uint UidNext, uint? Floor = null)
     {
-        public override string ToString() => string.Create(CultureInfo.InvariantCulture, $"{UidValidity}:{UidNext}");
+        public override string ToString() => Floor is { } floor
+            ? string.Create(CultureInfo.InvariantCulture, $"{UidValidity}:{UidNext}:{floor}")
+            : string.Create(CultureInfo.InvariantCulture, $"{UidValidity}:{UidNext}");
 
         public static SyncState? Parse(string? value)
         {
             var parts = value?.Split(':');
-            return parts is [var validity, var next]
-                   && uint.TryParse(validity, NumberStyles.None, CultureInfo.InvariantCulture, out var v)
-                   && uint.TryParse(next, NumberStyles.None, CultureInfo.InvariantCulture, out var n)
-                ? new SyncState(v, n)
-                : null;
+            if (parts is not ([_, _] or [_, _, _])
+                || !uint.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var v)
+                || !uint.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var n))
+            {
+                return null;
+            }
+
+            return parts.Length == 3 && uint.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var f)
+                ? new SyncState(v, n, f)
+                : new SyncState(v, n);
         }
     }
 }

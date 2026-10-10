@@ -142,48 +142,55 @@ public class ImapIntegrationTests
         await credentials.SetSecretAsync(connection.Id, "geheim", ct);
         await env.Accounts.SaveAccountAsync(new Account(Guid.NewGuid(), "Marco", "marco@example.com", [connection]), ct);
 
-        var subject = "Woanders gelöscht " + Guid.NewGuid().ToString("N")[..8];
-        var message = new MimeMessage { Subject = subject, Body = new TextPart("plain") { Text = "x" } };
-        message.From.Add(new MailboxAddress("Marco", "marco@example.com"));
-        message.To.Add(new MailboxAddress("Marco", "marco@example.com"));
-        await controller.SendAsync(connection, message, ct);
-
-        // SMTP delivery into the mailbox takes a moment.
-        MailFolder inbox = null!;
-        for (var attempt = 0; attempt < 20; attempt++)
-        {
-            await controller.SyncAllAsync(ct);
-            inbox = Assert.Single(await controller.GetFoldersAsync(connection.Id, ct), f => f.Role == FolderRole.Inbox);
-            if ((await controller.GetMessagesAsync(inbox, cancellationToken: ct)).Any(m => m.Subject == subject))
-            {
-                break;
-            }
-
-            await Task.Delay(250, ct);
-        }
-
-        Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
-
-        // Another program marks it \Deleted without expunging (deferred purge).
-        async Task SetDeletedAsync(bool deleted)
+        // Another program works on the mailbox: an own, fresh folder, so the message is the only (and oldest) one there –
+        // the case that once kept a restored message away for good.
+        var folderName = "Wiederherstellen-" + Guid.NewGuid().ToString("N")[..8];
+        const string subject = "Woanders gelöscht";
+        async Task OtherProgramAsync(Func<MailKit.IMailFolder, Task> action)
         {
             using var imap = new MailKit.Net.Imap.ImapClient();
             await imap.ConnectAsync(Host!, 3143, MailKit.Security.SecureSocketOptions.None, ct);
             await imap.AuthenticateAsync("marco@example.com", "geheim", ct);
-            await imap.Inbox.OpenAsync(MailKit.FolderAccess.ReadWrite, ct);
-            var uids = await imap.Inbox.SearchAsync(MailKit.Search.SearchQuery.SubjectContains(subject), ct);
-            var request = new MailKit.StoreFlagsRequest(deleted ? MailKit.StoreAction.Add : MailKit.StoreAction.Remove, MailKit.MessageFlags.Deleted) { Silent = true };
-            await imap.Inbox.StoreAsync(uids, request, ct);
+            var personal = imap.GetFolder(imap.PersonalNamespaces[0]);
+            var folder = (await personal.GetSubfoldersAsync(false, ct)).FirstOrDefault(f => f.Name == folderName)
+                         ?? await personal.CreateAsync(folderName, true, ct)
+                         ?? throw new InvalidOperationException("Folder not created");
+            await action(folder);
             await imap.DisconnectAsync(true, ct);
         }
 
-        await SetDeletedAsync(true);
-        await controller.SyncAllAsync(ct);
-        Assert.DoesNotContain(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+        async Task SetDeletedAsync(bool deleted) => await OtherProgramAsync(async folder =>
+        {
+            await folder.OpenAsync(MailKit.FolderAccess.ReadWrite, ct);
+            var uids = await folder.SearchAsync(MailKit.Search.SearchQuery.All, ct);
+            var request = new MailKit.StoreFlagsRequest(deleted ? MailKit.StoreAction.Add : MailKit.StoreAction.Remove, MailKit.MessageFlags.Deleted) { Silent = true };
+            await folder.StoreAsync(uids, request, ct);
+        });
 
+        await OtherProgramAsync(async folder =>
+        {
+            await folder.SubscribeAsync(ct);
+            var message = new MimeMessage { Subject = subject, Body = new TextPart("plain") { Text = "x" } };
+            message.From.Add(new MailboxAddress("Marco", "marco@example.com"));
+            await folder.AppendAsync(new MailKit.AppendRequest(message), ct);
+        });
+
+        async Task<IReadOnlyList<string>> SubjectsAsync()
+        {
+            Assert.Empty((await controller.SyncAllAsync(ct)).Failures);
+            var folder = Assert.Single(await controller.GetFoldersAsync(connection.Id, ct), f => f.Name == folderName);
+            return [.. (await controller.GetMessagesAsync(folder, cancellationToken: ct)).Select(m => m.Subject)];
+        }
+
+        Assert.Equal([subject], await SubjectsAsync());
+
+        // Marked \Deleted without expunging (deferred purge): gone in Neruna …
+        await SetDeletedAsync(true);
+        Assert.Empty(await SubjectsAsync());
+
+        // … and back once restored – also as the only and oldest message of the folder.
         await SetDeletedAsync(false);
-        await controller.SyncAllAsync(ct);
-        Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+        Assert.Equal([subject], await SubjectsAsync());
     }
 
     [Fact]
