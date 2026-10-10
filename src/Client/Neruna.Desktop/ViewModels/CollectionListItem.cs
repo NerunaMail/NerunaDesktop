@@ -51,6 +51,10 @@ internal abstract partial class CollectionListItem(CalendarInfo info, string col
     public partial bool IsDimmed { get; set; }
 
     public abstract string SoloTip { get; }
+
+    /// <summary>A calendar that is an account of its own (birthdays, holidays, an ICS subscription): it can go from here.</summary>
+    [ObservableProperty]
+    public partial bool CanRemove { get; set; }
 }
 
 /// <summary>The page that owns the list items: applies a colour or name chosen in the menu.</summary>
@@ -59,6 +63,9 @@ internal interface ICollectionListHost
     Task SetColorAsync(CollectionListItem item, string? color);
 
     Task RenameAsync(CollectionListItem item, string? name);
+
+    /// <summary>"Kalender entfernen" (only where <see cref="CollectionListItem.CanRemove"/>).</summary>
+    Task RemoveAsync(CollectionListItem item) => Task.CompletedTask;
 }
 
 /// <summary>

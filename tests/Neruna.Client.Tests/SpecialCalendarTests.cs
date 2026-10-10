@@ -85,11 +85,11 @@ public class SpecialCalendarTests
 
         var result = await provider.SyncCalendarAsync(calendar, new Dictionary<string, string?>(), ct);
         Assert.Equal(8, result.AddedOrChanged.Count); // 2 people × 2025–2028
-        var anna2026 = Assert.Single(result.AddedOrChanged, o => o.ICalendarData.Contains("SUMMARY:41. Geburtstag: Anna Muster\r\n", StringComparison.Ordinal));
+        var anna2026 = Assert.Single(result.AddedOrChanged, o => o.ICalendarData.Contains("SUMMARY:Geburtstag Anna Muster (41)\r\n", StringComparison.Ordinal));
         Assert.Contains("DTSTART;VALUE=DATE:20260415", anna2026.ICalendarData, StringComparison.Ordinal);
         Assert.Contains("TRIGGER:-PT15H", anna2026.ICalendarData, StringComparison.Ordinal);
         Assert.Contains("TRANSP:TRANSPARENT", anna2026.ICalendarData, StringComparison.Ordinal);
-        Assert.Contains(result.AddedOrChanged, o => o.ICalendarData.Contains("SUMMARY:Geburtstag: Beat Beispiel\r\n", StringComparison.Ordinal));
+        Assert.Contains(result.AddedOrChanged, o => o.ICalendarData.Contains("SUMMARY:Geburtstag Beat Beispiel\r\n", StringComparison.Ordinal));
 
         // Nothing changed: nothing to store. A new birthday: everything again.
         var unchanged = await provider.SyncCalendarAsync(calendar with { SyncState = result.NewSyncState }, new Dictionary<string, string?>(), ct);

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core;
 using Neruna.Core.Calendar;
+using Neruna.Core.Providers;
 using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
@@ -31,6 +32,16 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
     /// <summary>The shell shows the editor as an overlay and reloads the week when it reports a change.</summary>
     public event EventHandler<EventEditorViewModel>? EditorRequested;
+
+    /// <summary>"Kalender entfernen" on a calendar that is an account of its own: the shell asks and removes the account.</summary>
+    public event EventHandler<CalendarInfo>? RemoveRequested;
+
+    public Task RemoveAsync(CollectionListItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        RemoveRequested?.Invoke(this, item.Info);
+        return Task.CompletedTask;
+    }
 
     /// <summary>"Aufgaben im Kalender anzeigen" was changed here: the tasks page shows the same switch.</summary>
     public event EventHandler? TaskListsChanged;
@@ -136,6 +147,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var items = new List<CalendarListItem>();
         var all = await calendar.GetCalendarsAsync();
         var colors = await ColorsAsync(settings, all);
+        // Calendars that are an account of their own (birthdays, holidays, ICS) can be removed right here.
+        var removable = (await calendar.GetSourcesAsync())
+            .Where(s => s.Account.Connections.Count == 1 && !s.Account.IsFromCloud
+                        && s.Connection.ProviderId is ProviderIds.Birthdays or ProviderIds.Holidays or ProviderIds.Ics)
+            .Select(s => s.Connection.Id).ToHashSet();
         var tasksShown = await tasks.GetListsInCalendarAsync();
         // Pure task lists belong under "Aufgaben", not in the calendar list.
         foreach (var info in all.Where(c => c.HasEvents))
@@ -145,6 +161,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             {
                 IsVisible = !hidden.Contains(CalendarController.CalendarKey(info)),
                 ShowTasks = tasksShown.Contains(CalendarController.CalendarKey(info)),
+                CanRemove = removable.Contains(info.ConnectionId),
             };
             _solo.Apply(item);
             item.PropertyChanged += async (_, e) =>

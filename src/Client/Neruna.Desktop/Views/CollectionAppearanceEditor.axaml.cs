@@ -35,6 +35,15 @@ internal sealed partial class CollectionAppearanceEditor : UserControl
         }
     }
 
+    private async void OnRemove(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is CollectionListItem item && Host is { } host)
+        {
+            Close();
+            await host.RemoveAsync(item);
+        }
+    }
+
     private async void OnRename(object? sender, RoutedEventArgs e) =>
         await RenameAsync(reset: Equals((sender as Control)?.Tag, "reset"));
 

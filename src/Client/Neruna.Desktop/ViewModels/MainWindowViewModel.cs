@@ -190,6 +190,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         CalendarPage.ManageRequested += (_, _) => ShowCalendarSelection();
         CalendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
+        CalendarPage.RemoveRequested += async (_, info) => await RemoveCalendarAccountAsync(info);
         CalendarPage.EditorRequested += (_, editor) => ShowEditor(editor, CalendarChangedAsync);
         CalendarPage.TaskListsChanged += async (_, _) => await TasksPage.ReloadAsync();
         CalendarPage.TaskOpenRequested += async (_, occurrence) =>
@@ -811,6 +812,30 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     {
         _autoRepliesCheckedAt = DateTime.UtcNow;
         await AutoReplies.RefreshAsync([.. MailPage.Accounts.Select(a => (a.Account, a.Connection))]);
+    }
+
+    // Birthdays, holidays or an ICS subscription: an account with just this calendar – asked, then removed.
+    private async Task RemoveCalendarAccountAsync(Neruna.Core.Calendar.CalendarInfo info)
+    {
+        var account = (await _accounts.GetAccountsAsync()).FirstOrDefault(a => a.Connections.Any(c => c.Id == info.ConnectionId));
+        if (account is null)
+        {
+            return;
+        }
+
+        var sure = await Views.ChoiceDialog.ShowInFrontAsync(T("Kalender entfernen"),
+            F("«{0}» aus Neruna entfernen? Bei einem abonnierten Kalender bleibt er beim Anbieter bestehen und kann jederzeit wieder abonniert werden.", info.Name),
+            (T("Entfernen"), true, false), (T("Abbrechen"), false, true));
+        if (!sure)
+        {
+            return;
+        }
+
+        await _accounts.DeleteAccountAsync(account.Id);
+        StatusText = F("«{0}» entfernt.", info.Name);
+        await SettingsPage.Accounts.ReloadAsync();
+        HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
+        await RefreshPagesAsync();
     }
 
     private void ShowIcsSubscription()

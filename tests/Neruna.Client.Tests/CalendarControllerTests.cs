@@ -144,4 +144,22 @@ public class CalendarControllerTests
         await env.Calendar.SetCalendarVisibleAsync(calendar, true, ct);
         Assert.Empty(await env.Calendar.GetHiddenCalendarsAsync(ct));
     }
+
+    [Fact]
+    public async Task A_removed_calendar_account_takes_its_calendars_and_events_along()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Calendar, ProviderIds.Birthdays, new Dictionary<string, string>());
+        var account = new Account(Guid.NewGuid(), "Geburtstage", null, [connection]);
+        await env.Accounts.SaveAccountAsync(account, ct);
+        var store = env.Get<ICalendarStore>();
+        var calendar = Assert.Single(await store.MergeCalendarsAsync(connection.Id, [new CalendarInfo(connection.Id, "birthdays", "Geburtstage", null, true)], ct));
+        await store.ApplySyncResultAsync(calendar, new CalendarSyncResult("s", true, [new CalendarObject("b1", null, "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:b1\r\nDTSTAMP:20260101T000000Z\r\nDTSTART;VALUE=DATE:20261028\r\nSUMMARY:Geburtstag Sandra Muster (40)\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")], []), ct);
+        Assert.Single(await env.Calendar.GetCalendarsAsync(ct));
+
+        await env.Accounts.DeleteAccountAsync(account.Id, ct);
+        Assert.Empty(await env.Calendar.GetCalendarsAsync(ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.GetObjectsAsync(connection.Id, "birthdays", ct)); // not even known any more
+    }
 }

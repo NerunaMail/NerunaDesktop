@@ -458,7 +458,7 @@ internal static class Snapshots
         await SaveAsync(window, output, "calendar-tasks.png");
 
         // The colour/name menu (a popup in the app), on its own: the same control in the calendar and under "Aufgaben".
-        var menuItem = vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "personal");
+        var menuItem = vm.CalendarPage.Calendars.FirstOrDefault(c => c.CanRemove) ?? vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "personal");
         var menu = new Window
         {
             Width = 260,
