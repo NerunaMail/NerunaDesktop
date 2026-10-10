@@ -288,16 +288,16 @@ internal static class LiveScenario
         var mailPage = vm.MailPage;
         foreach (var folder in mailPage.Accounts[0].AllFolders().Where(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox || f.Name == "Projekte"))
         {
-            await mailPage.AddFavoriteCommand.ExecuteAsync(folder);
+            await mailPage.Tree.AddFavoriteCommand.ExecuteAsync(folder);
         }
 
         await Task.Delay(300);
-        Console.WriteLine($"Favourites: {string.Join(", ", mailPage.Favorites.Items.Select(f => f.Name + "/" + f.AccountTitle))}, roots={mailPage.TreeRoots.Count}");
-        mailPage.SelectedTreeItem = mailPage.Favorites.Items[^1];
+        Console.WriteLine($"Favourites: {string.Join(", ", mailPage.Tree.Favorites.Items.Select(f => f.Name + "/" + f.AccountTitle))}, roots={mailPage.Tree.TreeRoots.Count}");
+        mailPage.Tree.SelectedTreeItem = mailPage.Tree.Favorites.Items[^1];
         await Task.Delay(800);
         Console.WriteLine($"Opened from favourites: {mailPage.CurrentFolder?.Name}");
         await Snapshots.SaveAsync(window, output, "favorites.png");
-        mailPage.SubscribeFoldersCommand.Execute(mailPage.Accounts[0]);
+        mailPage.Tree.SubscribeFoldersCommand.Execute(mailPage.Accounts[0]);
         for (var i = 0; i < 50 && (vm.Overlay as FolderSubscriptionsViewModel)?.IsBusy != false; i++)
         {
             await Task.Delay(100);
@@ -620,9 +620,9 @@ internal static class LiveScenario
         var inbox = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
             .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox && f.Account.Account.EmailAddress == user);
         MailViewModel.PageSize = 5;
-        vm.MailPage.SelectedTreeItem = vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).First(f => f != inbox);
+        vm.MailPage.Tree.SelectedTreeItem = vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).First(f => f != inbox);
         await WaitAsync(() => vm.MailPage.CurrentFolder != inbox);
-        vm.MailPage.SelectedTreeItem = inbox;
+        vm.MailPage.Tree.SelectedTreeItem = inbox;
         await WaitAsync(() => vm.MailPage.CurrentFolder == inbox && vm.MailPage.LoadedText is not null);
         Console.WriteLine($"Paging: {vm.MailPage.LoadedText}, more={vm.MailPage.HasMore}");
         await vm.MailPage.LoadMoreCommand.ExecuteAsync(null);
@@ -693,7 +693,7 @@ internal static class LiveScenario
 
         var inbox = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
             .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox && f.Account.Account.EmailAddress == user);
-        vm.MailPage.SelectedTreeItem = inbox;
+        vm.MailPage.Tree.SelectedTreeItem = inbox;
         await WaitAsync(() => vm.MailPage.CurrentFolder == inbox && vm.MailPage.Entries.OfType<MessageItemViewModel>().Any(m => m.Subject.EndsWith(tag, StringComparison.Ordinal)));
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.Subject.EndsWith(tag, StringComparison.Ordinal));
         await WaitAsync(() => vm.MailPage.ReadingPane?.Invitation?.CanRespond == true);
@@ -788,7 +788,7 @@ internal static class LiveScenario
     {
         var inbox = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
             .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox && f.Account.Account.EmailAddress == user);
-        vm.MailPage.SelectedTreeItem = inbox;
+        vm.MailPage.Tree.SelectedTreeItem = inbox;
         await WaitAsync(() => vm.MailPage.CurrentFolder == inbox && vm.MailPage.Entries.OfType<MessageItemViewModel>().Any(m => m.Subject == "Vertrag zur Unterschrift"));
         await OpenAsync(vm, "Vertrag zur Unterschrift");
         await vm.MailPage.ReplyCommand.ExecuteAsync(null);
@@ -881,7 +881,7 @@ internal static class LiveScenario
 
         var drafts = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
             .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Drafts && f.Account.Account.EmailAddress == user);
-        vm.MailPage.SelectedTreeItem = drafts;
+        vm.MailPage.Tree.SelectedTreeItem = drafts;
         await WaitAsync(() => vm.MailPage.CurrentFolder == drafts && vm.MailPage.Entries.OfType<MessageItemViewModel>().Any(m => m.Subject.StartsWith(subject, StringComparison.Ordinal)));
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.Subject.StartsWith(subject, StringComparison.Ordinal));
         await WaitAsync(() => vm.MailPage.EditDraftCommand.CanExecute(null));

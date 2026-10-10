@@ -140,7 +140,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             await MailPage.Agenda.ReloadAsync();
             await _reminders.CheckAsync();
         };
-        mailPage.AccountsReordered += async (_, _) => await SettingsPage.Accounts.ReloadAsync();
+        mailPage.Tree.AccountsReordered += async (_, _) => await SettingsPage.Accounts.ReloadAsync();
         mailPage.PropertyChanged += async (_, e) =>
         {
             // Opening a signed message may have collected a new certificate.
@@ -208,7 +208,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         };
         settingsPage.Cloud.BackedUp += (_, _) => ShowBackupHint = false;
         // Right-click on an account → "Ordner abonnieren …".
-        mailPage.FolderSubscriptionsRequested += async (_, node) =>
+        mailPage.Tree.FolderSubscriptionsRequested += async (_, node) =>
         {
             var dialog = new FolderSubscriptionsViewModel(_mail, node.Connection, node.Title);
             dialog.Finished += async (_, saved) =>
@@ -754,7 +754,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         var connections = account.ConnectionsOf(Neruna.Core.Accounts.ServiceKind.Mail).ToList();
         foreach (var connection in connections)
         {
-            MailPage.MarkSettingUp(connection.Id, true);
+            MailPage.Tree.MarkSettingUp(connection.Id, true);
         }
 
         IsSyncing = true;
@@ -779,7 +779,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
             finally
             {
-                MailPage.MarkSettingUp(connection.Id, false);
+                MailPage.Tree.MarkSettingUp(connection.Id, false);
             }
         }
     }

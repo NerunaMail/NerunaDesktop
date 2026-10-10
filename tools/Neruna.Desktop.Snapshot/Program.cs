@@ -113,7 +113,7 @@ internal static class Snapshots
         foreach (var folder in vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).Where(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox).Take(2)
                      .Concat(vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).Where(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.None).Take(1)))
         {
-            await vm.MailPage.AddFavoriteCommand.ExecuteAsync(folder);
+            await vm.MailPage.Tree.AddFavoriteCommand.ExecuteAsync(folder);
         }
 
         // Mail: open the first message in the inbox.
@@ -123,10 +123,10 @@ internal static class Snapshots
 
         // A freshly added account: in the tree at once, "Ordner werden geladen …" until its first sync is done.
         var newAccount = vm.MailPage.Accounts[0].Connection.Id;
-        vm.MailPage.MarkSettingUp(newAccount, true);
+        vm.MailPage.Tree.MarkSettingUp(newAccount, true);
         await Task.Delay(200);
         await SaveAsync(window, output, "mail-account-setting-up.png");
-        vm.MailPage.MarkSettingUp(newAccount, false);
+        vm.MailPage.Tree.MarkSettingUp(newAccount, false);
         vm.MailPage.Preferences.ToolbarLabels = false;
         await SaveAsync(window, output, "mail-icons-only.png");
         vm.MailPage.Preferences.ToolbarLabels = true;
