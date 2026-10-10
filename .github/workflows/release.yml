@@ -31,7 +31,7 @@ jobs:
 
       - name: Version from the tag
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.0.0-test" >> "$GITHUB_ENV"; fi
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.1.0-test" >> "$GITHUB_ENV"; fi
 
       - name: Tests
         run: dotnet test
@@ -47,8 +47,10 @@ jobs:
         run: |
           dotnet tool install -g vpk --version "$VPK_VERSION"
           # The previous release, so the update can be a small delta.
-          vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
-            --channel win --pre --outputDir releases || echo "No previous release."
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+              --channel win --pre --outputDir releases || echo "No previous release."
+          fi
           vpk "[win]" pack --packId Neruna --packVersion "$VERSION" --packDir publish --mainExe neruna.exe \
             --packTitle Neruna --packAuthors Neruna --icon src/Client/Neruna.Desktop/Assets/app.ico --outputDir releases
 
@@ -76,7 +78,7 @@ jobs:
 
       - name: Version from the tag
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.0.0-test" >> "$GITHUB_ENV"; fi
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.1.0-test" >> "$GITHUB_ENV"; fi
 
       - name: Build
         run: |
@@ -89,8 +91,10 @@ jobs:
         run: |
           sudo apt-get install -y squashfs-tools
           dotnet tool install -g vpk --version "$VPK_VERSION"
-          vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
-            --channel linux --pre --outputDir releases || echo "No previous release."
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+              --channel linux --pre --outputDir releases || echo "No previous release."
+          fi
           vpk pack --packId Neruna --packVersion "$VERSION" --packDir publish --mainExe neruna --packTitle Neruna \
             --packAuthors Neruna --icon packaging/neruna.png --categories "Office;Email" --channel linux --outputDir releases
 
@@ -123,7 +127,7 @@ jobs:
 
       - name: Version from the tag
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.0.0-test" >> "$GITHUB_ENV"; fi
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.1.0-test" >> "$GITHUB_ENV"; fi
 
       - name: Build
         run: |
@@ -136,8 +140,10 @@ jobs:
       - name: Package
         run: |
           dotnet tool install -g vpk --version "$VPK_VERSION"
-          vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
-            --channel ${{ matrix.rid }} --pre --outputDir releases || echo "No previous release."
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+              --channel ${{ matrix.rid }} --pre --outputDir releases || echo "No previous release."
+          fi
           vpk pack --packId Neruna --packVersion "$VERSION" --packDir publish --mainExe neruna --packTitle Neruna \
             --packAuthors Neruna --icon packaging/neruna.icns --bundleId org.neruna.desktop --plist Info.plist \
             --channel ${{ matrix.rid }} --outputDir releases
