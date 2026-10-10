@@ -2,6 +2,7 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Neruna.Desktop.Infrastructure;
@@ -13,6 +14,7 @@ namespace Neruna.Desktop;
 internal sealed partial class App : Application
 {
     private ServiceProvider? _services;
+    private static readonly CancellationTokenSource Shutdown = new();
 
     public static AppOptions Options { get; set; } = AppOptions.FromArgs([]);
 
@@ -64,7 +66,42 @@ internal sealed partial class App : Application
             Infrastructure.CrashHandler.InstallUi();
             Infrastructure.CrashHandler.UiReady = true;
 
+            // mailto: links and .eml files: from the command line, from later starts (handed over) and – on macOS –
+            // as system events.
+            void Open(IReadOnlyList<string> items) => Dispatcher.UIThread.Post(async () =>
+            {
+                if (items.Any(SystemOpen.IsOpenable))
+                {
+                    main.Activate();
+                    if (main.WindowState == Avalonia.Controls.WindowState.Minimized)
+                    {
+                        main.WindowState = Avalonia.Controls.WindowState.Normal;
+                    }
+                }
+
+                await viewModel.OpenFromSystemAsync(items);
+            });
+            Infrastructure.SingleInstance.Listen(Options, args => Open(args.Length == 0 ? [SystemOpen.Activate] : args), Shutdown.Token);
+            if (this.TryGetFeature<Avalonia.Controls.ApplicationLifetimes.IActivatableLifetime>() is { } activatable)
+            {
+                activatable.Activated += (_, e) =>
+                {
+                    if (e is Avalonia.Controls.ApplicationLifetimes.ProtocolActivatedEventArgs protocol)
+                    {
+                        Open([protocol.Uri.OriginalString]);
+                    }
+                    else if (e is Avalonia.Controls.ApplicationLifetimes.FileActivatedEventArgs files)
+                    {
+                        Open([.. files.Files.Select(f => f.TryGetLocalPath()).OfType<string>()]);
+                    }
+                };
+            }
+
+            desktop.ShutdownRequested += (_, _) => Shutdown.Cancel();
+            Infrastructure.DefaultMailApp.Current?.Refresh();
+
             await viewModel.StartAsync();
+            Open(desktop.Args ?? []);
         }
 
         base.OnFrameworkInitializationCompleted();

@@ -84,6 +84,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
                ?? new MailIdentity(account.EmailAddress ?? string.Empty, account.DisplayName);
         To = draft.To;
         Cc = draft.Cc;
+        Bcc = draft.Bcc;
+        ShowBcc = draft.Bcc.Trim().Length > 0;
         Subject = draft.Subject;
         foreach (var attachment in draft.Attachments)
         {
@@ -94,7 +96,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         _messageId = draft.MessageId ?? MimeUtils.GenerateMessageId();
         PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(To) or nameof(Cc) or nameof(Subject) or nameof(From))
+            if (e.PropertyName is nameof(To) or nameof(Cc) or nameof(Bcc) or nameof(Subject) or nameof(From))
             {
                 MarkChanged();
             }
@@ -118,11 +120,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>Toolbar with or without text below the icons (Einstellungen → Design), as in the reading pane.</summary>
     public Neruna.Desktop.Infrastructure.UiPreferences? Preferences { get; init; }
 
-    /// <summary>Adds chosen contacts/groups to An or Cc; addresses already in the field are not added twice.</summary>
-    public void AddRecipients(bool cc, IEnumerable<RecipientEntry> entries)
+    /// <summary>Adds chosen contacts/groups to An, Cc or Bcc; addresses already in the field are not added twice.</summary>
+    public void AddRecipients(RecipientField target, IEnumerable<RecipientEntry> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
-        var field = (cc ? Cc : To) ?? string.Empty;
+        var field = (target switch { RecipientField.Cc => Cc, RecipientField.Bcc => Bcc, _ => To }) ?? string.Empty;
         var present = InternetAddressList.TryParse(field, out var parsed)
             ? parsed.Mailboxes.Select(m => m.Address).ToHashSet(StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -137,13 +139,17 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
         var head = field.TrimEnd().TrimEnd(',', ';').TrimEnd();
         var text = (head.Length == 0 ? string.Empty : head + ", ") + string.Join(", ", added);
-        if (cc)
+        switch (target)
         {
-            Cc = text;
-        }
-        else
-        {
-            To = text;
+            case RecipientField.Cc:
+                Cc = text;
+                break;
+            case RecipientField.Bcc:
+                Bcc = text;
+                break;
+            default:
+                To = text;
+                break;
         }
     }
 
@@ -225,6 +231,13 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial string Cc { get; set; }
+
+    /// <summary>Blind copies: sent, but not shown to the other recipients (kept in the own sent copy and draft).</summary>
+    [ObservableProperty]
+    public partial string Bcc { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool ShowBcc { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WindowTitle))]
@@ -313,7 +326,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             return;
         }
 
-        var recipients = new[] { To, Cc }
+        var recipients = new[] { To, Cc, Bcc }
             .Where(text => !string.IsNullOrWhiteSpace(text))
             .SelectMany(text => InternetAddressList.TryParse(text, out var list) ? list.Mailboxes.Select(m => m.Address) : [])
             .ToList();
@@ -441,6 +454,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             From = From.Email,
             To = To,
             Cc = Cc,
+            Bcc = Bcc,
             Subject = Subject,
             HtmlBody = html,
             Body = body,
@@ -605,7 +619,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     private async Task SendAsync()
     {
         Error = null;
-        if (!InternetAddressList.TryParse(To, out _) || (Cc.Trim().Length > 0 && !InternetAddressList.TryParse(Cc, out _)))
+        if (!InternetAddressList.TryParse(To, out _) || (Cc.Trim().Length > 0 && !InternetAddressList.TryParse(Cc, out _))
+            || (Bcc.Trim().Length > 0 && !InternetAddressList.TryParse(Bcc, out _)))
         {
             Error = T("Bitte gültige Empfängeradressen eingeben (mehrere mit Komma trennen).");
             return;
@@ -729,3 +744,11 @@ internal sealed record ComposeAttachment(string FileName, MimeEntity Entity);
 internal sealed record SignatureMenuItem(string Title, Signature? Signature, System.Windows.Input.ICommand Command);
 
 internal sealed record TextTemplateMenuItem(string Title, TextTemplate Template, System.Windows.Input.ICommand Command);
+
+/// <summary>The recipient fields of the compose form.</summary>
+internal enum RecipientField
+{
+    To,
+    Cc,
+    Bcc,
+}

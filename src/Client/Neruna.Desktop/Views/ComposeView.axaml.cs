@@ -48,8 +48,10 @@ internal sealed partial class ComposeView : UserControl
             return;
         }
 
-        var cc = sender == this.FindControl<Button>("CcButton");
-        var chosen = await RecipientPicker.ShowAsync(owner, cc ? "Cc" : "An", directory);
-        vm.AddRecipients(cc, chosen);
+        var field = sender == this.FindControl<Button>("CcButton") ? RecipientField.Cc
+            : sender == this.FindControl<Button>("BccButton") ? RecipientField.Bcc
+            : RecipientField.To;
+        var chosen = await RecipientPicker.ShowAsync(owner, field switch { RecipientField.Cc => "Cc", RecipientField.Bcc => "Bcc", _ => "An" }, directory);
+        vm.AddRecipients(field, chosen);
     }
 }

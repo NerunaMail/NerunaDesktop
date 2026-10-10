@@ -27,7 +27,7 @@
     </Style>
   </UserControl.Styles>
 
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
 
     <!-- Actions -->
     <Grid Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
@@ -102,11 +102,21 @@
 
     <Button x:Name="CcButton" Grid.Row="3" Content="{l:T 'Cc …'}" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3"
             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Kontakte auswählen'}" />
-    <ctl:RecipientBox Grid.Row="3" Grid.Column="1" Text="{Binding Cc}" Directory="{Binding Recipients}" Margin="0,3" />
+    <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,Auto">
+      <ctl:RecipientBox Text="{Binding Cc}" Directory="{Binding Recipients}" Margin="0,3" />
+      <!-- Bcc only when wanted: shown by this button, or when the draft already has some -->
+      <ToggleButton Grid.Column="1" Content="{l:T 'Bcc'}" IsChecked="{Binding ShowBcc}" Padding="10,4" Margin="8,3,0,3" VerticalAlignment="Center"
+                    ToolTip.Tip="{l:T 'Blindkopie-Feld ein- oder ausblenden'}" />
+    </Grid>
 
-    <TextBox x:Name="SubjectBox" Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding Subject}" PlaceholderText="{l:T 'Betreff hinzufügen'}" Margin="0,10,0,6" FontWeight="SemiBold" />
+    <Button x:Name="BccButton" Grid.Row="4" Content="{l:T 'Bcc …'}" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3" IsVisible="{Binding ShowBcc}"
+            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Kontakte auswählen'}" />
+    <ctl:RecipientBox Grid.Row="4" Grid.Column="1" Text="{Binding Bcc}" Directory="{Binding Recipients}" Margin="0,3" IsVisible="{Binding ShowBcc}"
+                      PlaceholderText="{l:T 'Empfänger sehen diese Adressen nicht'}" />
 
-    <ItemsControl Grid.Row="5" Grid.ColumnSpan="2" ItemsSource="{Binding Attachments}" Margin="0,0,0,4">
+    <TextBox x:Name="SubjectBox" Grid.Row="5" Grid.ColumnSpan="2" Text="{Binding Subject}" PlaceholderText="{l:T 'Betreff hinzufügen'}" Margin="0,10,0,6" FontWeight="SemiBold" />
+
+    <ItemsControl Grid.Row="6" Grid.ColumnSpan="2" ItemsSource="{Binding Attachments}" Margin="0,0,0,4">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
           <WrapPanel />
@@ -129,16 +139,16 @@
     </ItemsControl>
 
     <!-- Formatting toolbar (hidden without WebView) -->
-    <views:FormattingToolbar Grid.Row="6" Grid.ColumnSpan="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
+    <views:FormattingToolbar Grid.Row="7" Grid.ColumnSpan="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
 
     <!-- Editor: a page in the app theme (dark: shown inverted; the mail is sent as written) -->
-    <Border Grid.Row="7" Grid.ColumnSpan="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
+    <Border Grid.Row="8" Grid.ColumnSpan="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
       <ed:HtmlEditor x:Name="Editor" />
     </Border>
 
-    <TextBlock Grid.Row="6" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Margin="0,0,0,6" TextWrapping="Wrap" IsVisible="{Binding Formatting.IsPlainTextFallback}"
+    <TextBlock Grid.Row="7" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Margin="0,0,0,6" TextWrapping="Wrap" IsVisible="{Binding Formatting.IsPlainTextFallback}"
                Text="{l:T 'Formatierung nicht verfügbar (keine WebView-Laufzeit gefunden) – die Nachricht wird als reiner Text gesendet.'}" />
 
-    <TextBlock Grid.Row="8" Grid.ColumnSpan="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
+    <TextBlock Grid.Row="9" Grid.ColumnSpan="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
   </Grid>
 </UserControl>

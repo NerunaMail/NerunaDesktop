@@ -23,6 +23,9 @@ internal sealed partial class MessageWindowViewModel(
 
     public Neruna.Desktop.Infrastructure.UiPreferences Preferences => preferences;
 
+    /// <summary>False for a message opened from a file (.eml): nothing to delete in a mailbox.</summary>
+    public bool CanDelete { get; init; } = true;
+
     /// <summary>The reading pane; replaced when the user allows remote images.</summary>
     [ObservableProperty]
     public partial ReadingPaneViewModel? Pane { get; set; }

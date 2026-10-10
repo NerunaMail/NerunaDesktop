@@ -63,8 +63,69 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
 
     public MarkAsReadMode MarkAsRead => MarkAsReadOptions.FirstOrDefault(o => o.IsSelected)?.Mode ?? MarkAsReadMode.OnSelect;
 
+    /// <summary>Only where Neruna knows how to register (Windows, macOS, Linux).</summary>
+    public static bool CanBeDefaultApp => Infrastructure.DefaultMailApp.Current is not null;
+
+    [ObservableProperty]
+    public partial bool IsDefaultApp { get; set; }
+
+    [ObservableProperty]
+    public partial string DefaultAppStatus { get; set; } = T("Wird geladen …");
+
+    /// <summary>After the button on Windows: what to do in the system settings.</summary>
+    [ObservableProperty]
+    public partial string? DefaultAppHint { get; set; }
+
+    /// <summary>Asks the system (xdg-mime on Linux is a process, so off the UI thread).</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    public async Task CheckDefaultAppAsync()
+    {
+        if (Infrastructure.DefaultMailApp.Current is not { } app)
+        {
+            return;
+        }
+
+        var status = await Task.Run(app.GetStatus);
+        IsDefaultApp = status.IsDefault;
+        DefaultAppStatus = status switch
+        {
+            { IsDefault: true } => T("Neruna ist das Standard-Mailprogramm: E-Mail-Links (mailto:) und .eml-Dateien öffnen sich in Neruna."),
+            { Mailto: true } => T("E-Mail-Links (mailto:) öffnen sich in Neruna, .eml-Dateien noch in einem anderen Programm."),
+            { Eml: true } => T(".eml-Dateien öffnen sich in Neruna, E-Mail-Links (mailto:) noch in einem anderen Programm."),
+            _ => T("Neruna ist nicht das Standard-Mailprogramm. E-Mail-Links (mailto:) und .eml-Dateien öffnen sich in einem anderen Programm."),
+        };
+        if (status.IsDefault)
+        {
+            DefaultAppHint = null;
+        }
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private async Task MakeDefaultAppAsync()
+    {
+        if (Infrastructure.DefaultMailApp.Current is not { } app)
+        {
+            return;
+        }
+
+        try
+        {
+            var userMustChoose = await Task.Run(app.MakeDefault);
+            DefaultAppHint = userMustChoose
+                ? T("Die Windows-Einstellungen sind geöffnet: Wählen Sie bei «MAILTO» und «.eml» Neruna aus und klicken Sie danach auf «Erneut prüfen».")
+                : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or System.Security.SecurityException)
+        {
+            DefaultAppHint = F("Neruna konnte sich nicht registrieren: {0}", ex.Message);
+        }
+
+        await CheckDefaultAppAsync();
+    }
+
     public async Task ReloadAsync()
     {
+        _ = CheckDefaultAppAsync();
         _loading = true;
         try
         {

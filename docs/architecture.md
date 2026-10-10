@@ -493,6 +493,16 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   und geht in die persönliche Sicherung, die Cloud-Konten selbst nicht.
 - Kalender und Adressbücher findet der Client mit den Zugangsdaten selbst (der Server kennt das Passwort nicht).
 
+## 6e. Standard-Mailprogramm (mailto:, .eml)
+
+- Einstellungen → E-Mail → «Neruna als Standard-Mailprogramm festlegen» (`DefaultMailApp`):
+  Windows: Registrierung pro Benutzer (ProgIDs, Capabilities, RegisteredApplications), den Standard wählt der Benutzer
+  in den Windows-Einstellungen (wird geöffnet). Linux: `.desktop`-Datei + `xdg-mime default`. macOS: Typen im
+  Info.plist (`scripts/publish.sh`), `LSSetDefaultHandlerForURLScheme` – macOS fragt nach.
+- Eine Instanz pro Datenordner (`SingleInstance`, lokale Pipe): ein zweiter Start reicht seine Argumente weiter.
+  macOS liefert Links/Dateien als Systemereignis (`IActivatableLifetime`).
+- Deinstallation (Velopack-Hook) entfernt die Windows-Registrierung.
+
 ## 6d. Anbieter mit eigener Anmeldung (OAuth2)
 
 - Kontodialog: zuerst die Art. «E-Mail-Konto» deckt alles mit IMAP/SMTP, CalDAV, CardDAV ab (automatische Erkennung);

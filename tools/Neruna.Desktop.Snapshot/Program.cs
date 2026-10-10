@@ -210,7 +210,7 @@ internal static class Snapshots
             var take = picker.GetVisualDescendants().OfType<Button>().First(b => b.IsDefault);
             take.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             var picked = await picking;
-            vm.MailPage.Compose!.AddRecipients(cc: false, picked);
+            vm.MailPage.Compose!.AddRecipients(RecipientField.To, picked);
             Console.WriteLine($"Picked into An: {vm.MailPage.Compose.To}");
         }
 

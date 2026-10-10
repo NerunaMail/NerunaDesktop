@@ -300,6 +300,46 @@ internal sealed partial class MailViewModel(
     private async Task<MarkAsReadMode> GetMarkAsReadModeAsync() =>
         Enum.TryParse<MarkAsReadMode>(await settings.GetAsync(SettingKeys.MarkAsRead), out var mode) ? mode : MarkAsReadMode.OnSelect;
 
+    /// <summary>A new mail prefilled from outside (a mailto: link from the system).</summary>
+    public Task ComposeAsync(ComposeDraft draft) => StartComposeAsync(draft, ComposeKind.New);
+
+    /// <summary>
+    /// An .eml file opened from the system: shown in a message window. Replies go out from the current account; the
+    /// file itself is not changed or deleted.
+    /// </summary>
+    public async Task OpenFileAsync(string path)
+    {
+        try
+        {
+            var opened = await secureMime.OpenAsync(await MimeKit.MimeMessage.LoadAsync(path));
+            var message = opened.Readable;
+            var summary = new MessageSummary(path, message.MessageId, message.InReplyTo, message.Subject ?? string.Empty, null, [],
+                message.Date == DateTimeOffset.MinValue ? File.GetLastWriteTime(path) : message.Date, MessageFlags.Seen, new FileInfo(path).Length, false, null);
+
+            Task RespondAsync(Func<Account, ComposeDraft> draft, ComposeKind kind) =>
+                CurrentAccount is { } account ? StartComposeAsync(draft(account.Account), kind) : Task.CompletedTask;
+
+            var window = new MessageWindowViewModel(
+                summary.Subject,
+                preferences,
+                _ => RespondAsync(a => MessageComposer.Reply(message, OwnAddresses(a), replyAll: false), ComposeKind.Reply),
+                _ => RespondAsync(a => MessageComposer.Reply(message, OwnAddresses(a), replyAll: true), ComposeKind.Reply),
+                _ => RespondAsync(_ => MessageComposer.Forward(message), ComposeKind.Forward),
+                _ => Task.FromResult(false))
+            {
+                CanDelete = false,
+            };
+            void Show(bool allowRemoteContent) =>
+                window.Pane = ReadingPaneViewModel.ForMessage(summary, opened, allowRemoteContent, files, _imageClient, () => Show(allowRemoteContent: true));
+            Show(allowRemoteContent: false);
+            windows.ShowMessage(window);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(T("Nachricht konnte nicht geöffnet werden"), ex);
+        }
+    }
+
     /// <summary>Starts a new mail to the given address, e.g. from a mailto: link in a message.</summary>
     public Task ComposeToAsync(string address) => StartComposeAsync(ComposeDraft.Empty with { To = address }, ComposeKind.New);
 

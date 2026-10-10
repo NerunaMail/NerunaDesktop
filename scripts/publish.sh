@@ -68,6 +68,24 @@ PY
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+  <!-- Standard-Mailprogramm: mailto: links and .eml files (Einstellungen → E-Mail) -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>E-Mail</string>
+      <key>CFBundleURLSchemes</key><array><string>mailto</string></array>
+    </dict>
+  </array>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>E-Mail</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key><array><string>com.apple.mail.email</string><string>public.email-message</string></array>
+      <key>CFBundleTypeExtensions</key><array><string>eml</string></array>
+    </dict>
+  </array>
 </dict>
 </plist>
 PLIST

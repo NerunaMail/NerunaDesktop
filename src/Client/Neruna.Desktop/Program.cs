@@ -11,8 +11,21 @@ internal static class Program
     {
         // Velopack first: during install/update/uninstall it runs its hooks and exits; it also applies an update that
         // was downloaded before the last exit.
-        Velopack.VelopackApp.Build().SetArgs(args).Run();
+        var velopack = Velopack.VelopackApp.Build();
+        if (OperatingSystem.IsWindows())
+        {
+            velopack = velopack.OnBeforeUninstallFastCallback(_ => Infrastructure.DefaultMailApp.Current?.Unregister());
+        }
+
+        velopack.SetArgs(args).Run();
         App.Options = AppOptions.FromArgs(args);
+
+        // Already running (e.g. a mailto: link or .eml file opened from the system): hand over and end.
+        if (Infrastructure.SingleInstance.TryHandOver(App.Options, args))
+        {
+            return;
+        }
+
         Infrastructure.CrashHandler.Install(App.Options);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

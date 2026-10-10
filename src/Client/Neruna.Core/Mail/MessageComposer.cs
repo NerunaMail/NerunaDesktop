@@ -28,6 +28,9 @@ public sealed record ComposeDraft(
     string? From = null)
 {
     public static ComposeDraft Empty { get; } = new(string.Empty, string.Empty, string.Empty, string.Empty, null, [], []);
+
+    /// <summary>Blind copies (Bcc): the transport delivers them without showing the header to the others.</summary>
+    public string Bcc { get; init; } = string.Empty;
 }
 
 /// <summary>Builds replies and forwards the way business users expect (AW:/WG:, header block above the original).</summary>
@@ -104,6 +107,7 @@ public static partial class MessageComposer
         message.From.Add(from);
         AddRecipients(message.To, draft.To, forDraft);
         AddRecipients(message.Cc, draft.Cc, forDraft);
+        AddRecipients(message.Bcc, draft.Bcc, forDraft);
 
         if (draft.InReplyTo is { } inReplyTo)
         {
@@ -175,7 +179,10 @@ public static partial class MessageComposer
             hasHtml ? InlineImagesAsDataUris(content) : null,
             remoteId,
             draft.MessageId,
-            draft.From.Mailboxes.FirstOrDefault()?.Address);
+            draft.From.Mailboxes.FirstOrDefault()?.Address)
+        {
+            Bcc = draft.Bcc.ToString(),
+        };
     }
 
     private static void AddRecipients(InternetAddressList list, string text, bool lenient)

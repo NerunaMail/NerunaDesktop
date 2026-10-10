@@ -329,6 +329,24 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>Once the window is visible: account setup for a first start, otherwise sync with the servers.</summary>
+    /// <summary>mailto: links (new mail) and .eml files (message window) handed over by the system.</summary>
+    public async Task OpenFromSystemAsync(IReadOnlyList<string> items)
+    {
+        foreach (var item in items)
+        {
+            if (SystemOpen.IsMailto(item))
+            {
+                Overlay = Overlay is CrashReportViewModel ? Overlay : null;
+                CurrentPage = MailPage;
+                await MailPage.ComposeAsync(Neruna.Core.Mail.MailtoLink.Parse(item));
+            }
+            else if (SystemOpen.IsEml(item))
+            {
+                await MailPage.OpenFileAsync(item);
+            }
+        }
+    }
+
     public async Task StartAsync()
     {
         // Crashed last time: offer the report first (or send it / drop it, as set).

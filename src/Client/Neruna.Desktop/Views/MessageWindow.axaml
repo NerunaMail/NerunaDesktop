@@ -24,7 +24,7 @@
         <ctl:ToolButton Icon="{StaticResource IconReplyAll}" Label="{l:T 'Allen antworten'}" Shortcut="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
         <ctl:ToolButton Icon="{StaticResource IconForward}" Label="{l:T 'Weiterleiten'}" Shortcut="Ctrl+F" Command="{Binding ForwardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
         <Separator Width="1" Height="28" Margin="6,0" VerticalAlignment="Center" Background="{DynamicResource DividerBrush}" />
-        <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{l:T 'Löschen'}" Shortcut="Entf" Command="{Binding DeleteCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+        <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{l:T 'Löschen'}" Shortcut="Entf" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
       </StackPanel>
     </Border>
     <Border Classes="pane">

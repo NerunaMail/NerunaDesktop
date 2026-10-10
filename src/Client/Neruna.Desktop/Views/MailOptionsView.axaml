@@ -8,6 +8,17 @@
   <ScrollViewer>
     <StackPanel Spacing="22" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,20">
 
+      <StackPanel Spacing="8" IsVisible="{x:Static vm:MailOptionsViewModel.CanBeDefaultApp}">
+        <TextBlock Text="{l:T 'Standard-Mailprogramm'}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding DefaultAppStatus}" TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Classes="accent" Content="{l:T 'Neruna als Standard-Mailprogramm festlegen'}" Command="{Binding MakeDefaultAppCommand}" IsVisible="{Binding !IsDefaultApp}" />
+          <Button Content="{l:T 'Erneut prüfen'}" Command="{Binding CheckDefaultAppCommand}" />
+        </StackPanel>
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding DefaultAppHint}"
+                   IsVisible="{Binding DefaultAppHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+
       <StackPanel Spacing="8">
         <TextBlock Text="{l:T 'Neue E-Mails'}" FontSize="16" FontWeight="SemiBold" />
         <CheckBox IsChecked="{Binding Push}" Content="{l:T 'Neue E-Mails sofort abrufen'}" />
