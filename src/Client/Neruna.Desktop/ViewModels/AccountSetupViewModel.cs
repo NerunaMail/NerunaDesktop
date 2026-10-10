@@ -94,6 +94,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             var account = new Account(Guid.NewGuid(), string.IsNullOrWhiteSpace(DisplayName) ? name : DisplayName.Trim(), email,
                 Neruna.Providers.Graph.GraphConnectionFactory.Connections(email, tokenId), string.IsNullOrWhiteSpace(Label) ? null : Label.Trim());
             await setup.CreateSignedInAsync(account);
+            CreatedAccount = account;
             Finished?.Invoke(this, true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -123,6 +124,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     /// <summary>Raised with true when an account was created, false when cancelled.</summary>
     public event EventHandler<bool>? Finished;
+
+    /// <summary>The account just set up (not when editing): the shell shows it at once and syncs it first.</summary>
+    public Account? CreatedAccount { get; private set; }
 
     public static IReadOnlyList<SocketSecurity> SecurityOptions { get; } = [SocketSecurity.SslOnConnect, SocketSecurity.StartTls, SocketSecurity.None];
 
@@ -393,6 +397,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             else
             {
                 await setup.CreateAsync(account, Password);
+                CreatedAccount = account;
             }
 
             Finished?.Invoke(this, true);

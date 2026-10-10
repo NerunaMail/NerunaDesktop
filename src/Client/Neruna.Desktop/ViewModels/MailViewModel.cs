@@ -200,7 +200,7 @@ internal sealed partial class MailViewModel(
             foreach (var connection in account.ConnectionsOf(ServiceKind.Mail))
             {
                 var folders = await mail.GetFoldersAsync(connection.Id);
-                var node = new MailAccountNode(account, connection, BuildTree(folders));
+                var node = new MailAccountNode(account, connection, BuildTree(folders)) { IsSettingUp = _settingUp.Contains(connection.Id) };
                 TrackExpansion(node, node.ExpansionKey);
                 foreach (var folder in node.AllFolders())
                 {
@@ -941,6 +941,20 @@ internal sealed partial class MailViewModel(
     /// their entry, so the selection, the reading pane and a draft being written stay as they are. Rebuilds the tree
     /// only when accounts or folders changed.
     /// </summary>
+    // Accounts just added whose first sync is still running: shown at once, with "Ordner werden geladen …".
+    private readonly HashSet<Guid> _settingUp = [];
+
+    public void MarkSettingUp(Guid connectionId, bool settingUp)
+    {
+        if (settingUp ? _settingUp.Add(connectionId) : _settingUp.Remove(connectionId))
+        {
+            foreach (var node in Accounts.Where(a => a.Connection.Id == connectionId))
+            {
+                node.IsSettingUp = settingUp;
+            }
+        }
+    }
+
     public async Task RefreshAfterSyncAsync()
     {
         var structure = new List<(MailAccountNode? Node, IReadOnlyList<MailFolder> Folders)>();
@@ -1669,6 +1683,10 @@ internal sealed partial class MailAccountNode : ObservableObject
     public partial bool IsExpanded { get; set; } = true;
 
     public string ExpansionKey => "account:" + Connection.Id.ToString("N");
+
+    /// <summary>Just added, first sync still running.</summary>
+    [ObservableProperty]
+    public partial bool IsSettingUp { get; set; }
 
     public IEnumerable<MailFolderNode> AllFolders() => Folders.SelectMany(f => f.SelfAndDescendants());
 }

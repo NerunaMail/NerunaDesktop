@@ -732,10 +732,54 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             if (created)
             {
                 HasAccounts = true;
+                if (setup.CreatedAccount is { } account)
+                {
+                    await ShowNewAccountAsync(account);
+                }
+
                 await StartServicesAsync();
             }
         };
         Overlay = setup;
+    }
+
+    /// <summary>
+    /// A new account shows up right after the sign-in (not only when every account is synced) and its mail is fetched
+    /// first – otherwise the closed dialog looks like a cancelled one and invites a second try.
+    /// </summary>
+    private async Task ShowNewAccountAsync(Neruna.Core.Accounts.Account account)
+    {
+        var connections = account.ConnectionsOf(Neruna.Core.Accounts.ServiceKind.Mail).ToList();
+        foreach (var connection in connections)
+        {
+            MailPage.MarkSettingUp(connection.Id, true);
+        }
+
+        IsSyncing = true;
+        StatusText = F("Konto «{0}» wird eingerichtet …", account.Title);
+        await SettingsPage.Accounts.ReloadAsync();
+        await MailPage.ReloadAsync();
+        if (connections.Count > 0)
+        {
+            CurrentPage = MailPage;
+        }
+
+        foreach (var connection in connections)
+        {
+            try
+            {
+                await Task.Run(() => _mail.SyncConnectionAsync(connection));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The full sync right after tries again and reports it in the status bar.
+                _logger.LogWarning(ex, "First sync of the new account failed");
+            }
+            finally
+            {
+                MailPage.MarkSettingUp(connection.Id, false);
+            }
+        }
     }
 
     private void ShowIcsSubscription()

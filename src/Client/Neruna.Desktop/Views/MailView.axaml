@@ -48,6 +48,7 @@
             </TreeView.Styles>
             <TreeView.DataTemplates>
               <TreeDataTemplate DataType="vm:MailAccountNode" ItemsSource="{Binding Folders}">
+                <StackPanel>
                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Background="Transparent">
                   <TextBlock.ContextMenu>
                     <ContextMenu>
@@ -58,6 +59,12 @@
                     </ContextMenu>
                   </TextBlock.ContextMenu>
                 </TextBlock>
+                <!-- Just added: visible at once, the folders follow -->
+                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsSettingUp}" Margin="0,2,0,0">
+                  <ProgressBar IsIndeterminate="True" Width="40" Height="3" MinWidth="0" VerticalAlignment="Center" />
+                  <TextBlock Classes="subtle" FontSize="11" Text="{l:T 'Ordner werden geladen …'}" />
+                </StackPanel>
+                </StackPanel>
               </TreeDataTemplate>
               <!-- Favoriten: folders of any account the user picked -->
               <TreeDataTemplate DataType="vm:FavoritesNode" ItemsSource="{Binding Items}">

@@ -120,6 +120,13 @@ internal static class Snapshots
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
+
+        // A freshly added account: in the tree at once, "Ordner werden geladen …" until its first sync is done.
+        var newAccount = vm.MailPage.Accounts[0].Connection.Id;
+        vm.MailPage.MarkSettingUp(newAccount, true);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "mail-account-setting-up.png");
+        vm.MailPage.MarkSettingUp(newAccount, false);
         vm.MailPage.Preferences.ToolbarLabels = false;
         await SaveAsync(window, output, "mail-icons-only.png");
         vm.MailPage.Preferences.ToolbarLabels = true;
