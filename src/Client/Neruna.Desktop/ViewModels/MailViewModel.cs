@@ -29,7 +29,7 @@ internal sealed partial class MailViewModel(
     RecipientDirectory recipients,
     TextTemplateService textTemplates,
     AgendaViewModel agenda,
-    ILogger<MailViewModel> logger) : ViewModelBase, IDisposable
+    ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost
 {
     /// <summary>Drafts with changes not yet stored – in the reading pane or in their own windows.</summary>
     public IReadOnlyList<ComposeViewModel> UnsavedDrafts =>
@@ -1167,43 +1167,16 @@ internal sealed partial class MailViewModel(
 
     private bool CanLoadMore() => HasMore && !IsLoadingMore;
 
-    // ---- Search -----------------------------------------------------------------------------------------------
+    // ---- Search (on the server: MailSearchViewModel; here the list shows its hits) ---------------------------------
+
+    private MailSearchViewModel? _search;
+
+    public MailSearchViewModel Search => _search ??= new MailSearchViewModel(mail, this);
 
     /// <summary>The list shows search results (from the server), not a folder.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ListTitle), nameof(ShowServerSearchHint))]
     public partial bool IsSearchMode { get; set; }
-
-    /// <summary>"Erweiterte Suche" is open above the list.</summary>
-    [ObservableProperty]
-    public partial bool IsAdvancedSearchOpen { get; set; }
-
-    [ObservableProperty]
-    public partial string SearchFrom { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string SearchSubject { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string SearchBody { get; set; } = string.Empty;
-
-    /// <summary>Where to search: a folder, or all folders of an account.</summary>
-    [ObservableProperty]
-    public partial IReadOnlyList<SearchScope> SearchScopes { get; set; } = [];
-
-    [ObservableProperty]
-    public partial SearchScope? SearchScopeChoice { get; set; }
-
-    [ObservableProperty]
-    public partial bool SearchSubfolders { get; set; } = true;
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RunSearchCommand), nameof(SearchServerCommand))]
-    public partial bool IsSearching { get; set; }
-
-    /// <summary>"23 Treffer in Posteingang und Unterordnern" above the results.</summary>
-    [ObservableProperty]
-    public partial string? SearchInfo { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ListTitle))]
@@ -1214,125 +1187,50 @@ internal sealed partial class MailViewModel(
     /// <summary>Under a quick search: the loaded messages were filtered; offer the whole folder on the server.</summary>
     public bool ShowServerSearchHint => !IsSearchMode && SearchText.Trim().Length > 0 && CurrentFolder is not null;
 
-    // The toggle button sets IsAdvancedSearchOpen itself (it must not also run a toggling command: that closed the
-    // panel again in the same click).
-    partial void OnIsAdvancedSearchOpenChanged(bool value)
+    IReadOnlyList<MailAccountNode> IMailSearchHost.SearchAccounts => Accounts;
+
+    void IMailSearchHost.ShowSearchResults(IReadOnlyList<MessageItemViewModel> hits, string title, string? keepTerm)
     {
-        if (value)
-        {
-            SearchScopes = SearchScope.For(Accounts);
-            SearchScopeChoice = SearchScopes.FirstOrDefault(s => s.Folder is { } f && f == CurrentFolder) ?? SearchScopes.FirstOrDefault();
-            if (SearchBody.Length == 0 && SearchFrom.Length == 0 && SearchSubject.Length == 0)
-            {
-                SearchBody = SearchText.Trim();
-            }
-        }
-    }
-
-    /// <summary>"Suchen" in the advanced search: sender, subject and text in the chosen folders, on the server.</summary>
-    [RelayCommand(CanExecute = nameof(CanSearch))]
-    private Task RunSearchAsync()
-    {
-        if (SearchScopeChoice is not { } scope)
-        {
-            return Task.CompletedTask;
-        }
-
-        var query = new MailSearchQuery(Clean(SearchFrom), Clean(SearchSubject), Clean(SearchBody));
-        return SearchAsync(query, scope.Folders(SearchSubfolders), scope.Describe(SearchSubfolders));
-    }
-
-    /// <summary>The quick search term in the whole open folder on the server (also the text of messages).</summary>
-    [RelayCommand(CanExecute = nameof(CanSearch))]
-    private Task SearchServerAsync() =>
-        CurrentFolder is { } folder && SearchText.Trim() is { Length: > 0 } term
-            ? SearchAsync(new MailSearchQuery(Anywhere: term), [folder], folder.Name, keepTerm: term)
-            : Task.CompletedTask;
-
-    // The term the server already searched for: it stays in the search box, but does not filter the results again
-    // (hits found in the message text would vanish). A changed term filters the results as usual.
-    private string? _serverTerm;
-
-    private bool CanSearch() => !IsSearching;
-
-    private static string? Clean(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private async Task SearchAsync(MailSearchQuery query, IReadOnlyList<MailFolderNode> folders, string where, string? keepTerm = null)
-    {
-        if (query.IsEmpty)
-        {
-            StatusMessage?.Invoke(this, T("Bitte mindestens einen Suchbegriff eingeben."));
-            return;
-        }
-
-        IsSearching = true;
-        SearchInfo = T("Suche läuft …");
+        _refreshing = true;
         try
         {
-            var nodes = folders.ToDictionary(f => (f.Folder.ConnectionId, f.Folder.RemoteId));
-            var searched = folders.Select(f => f.Folder).ToList();
-            var result = await Task.Run(() => mail.SearchAsync(searched, query));
-            var several = folders.Select(f => f.Folder.ConnectionId).Distinct().Count() > 1;
-            var items = result.Hits.Select(hit =>
-            {
-                var node = nodes[(hit.Folder.ConnectionId, hit.Folder.RemoteId)];
-                return new MessageItemViewModel(hit.Message, node)
-                {
-                    FolderText = folders.Count > 1 ? (several ? $"{node.Name} · {node.Account.Title}" : node.Name) : null,
-                };
-            }).ToList();
-
-            _refreshing = true;
-            try
-            {
-                IsSearchMode = true;
-                SearchTitle = F("Suche in {0}", where);
-                _serverTerm = keepTerm;
-                SearchText = keepTerm ?? string.Empty;
-                _allMessages = items;
-                SelectedMessages = [];
-                RebuildEntries();
-                SelectedEntry = null;
-            }
-            finally
-            {
-                _refreshing = false;
-            }
-
-            if (Compose is null)
-            {
-                ReadingPane = null;
-            }
-
-            HasMore = false;
-            LoadedText = null;
-            SearchInfo = (items.Count == 1 ? T("1 Treffer") : F("{0} Treffer", items.Count))
-                         + (result.IsTruncated ? T(" – nur die neuesten pro Ordner, bitte genauer suchen") : string.Empty)
-                         + (result.FailedFolders.Count > 0 ? F(" – {0} Ordner konnten nicht durchsucht werden", result.FailedFolders.Count) : string.Empty);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            Report(T("Suche fehlgeschlagen"), ex);
-            SearchInfo = T("Suche fehlgeschlagen: ") + ex.Message;
+            IsSearchMode = true;
+            SearchTitle = title;
+            SearchText = keepTerm ?? string.Empty;
+            _allMessages = [.. hits];
+            SelectedMessages = [];
+            RebuildEntries();
+            SelectedEntry = null;
         }
         finally
         {
-            IsSearching = false;
+            _refreshing = false;
         }
+
+        if (Compose is null)
+        {
+            ReadingPane = null;
+        }
+
+        HasMore = false;
+        LoadedText = null;
     }
+
+    void IMailSearchHost.ReportSearchFailure(Exception error) => Report(T("Suche fehlgeschlagen"), error);
+
+    void IMailSearchHost.ShowStatus(string message) => StatusMessage?.Invoke(this, message);
 
     /// <summary>Back from the results to the folder.</summary>
     [RelayCommand]
     private async Task CloseSearchAsync()
     {
-        EndSearch();
-        IsAdvancedSearchOpen = false;
-        if (_serverTerm is not null && SearchText.Trim() == _serverTerm)
+        IsSearchMode = false;
+        SearchTitle = null;
+        if (Search.Close())
         {
             SearchText = string.Empty;
         }
 
-        _serverTerm = null;
         if (CurrentFolder is { } folder)
         {
             await LoadFolderAsync(folder, null);
@@ -1343,7 +1241,7 @@ internal sealed partial class MailViewModel(
     {
         IsSearchMode = false;
         SearchTitle = null;
-        SearchInfo = null;
+        Search.SearchInfo = null;
     }
 
     private async Task OpenMessageAsync(MessageItemViewModel message)
@@ -1583,7 +1481,7 @@ internal sealed partial class MailViewModel(
     {
         Entries.Clear();
         var query = SearchText.Trim();
-        if (IsSearchMode && query == _serverTerm)
+        if (IsSearchMode && query == Search.ServerTerm)
         {
             query = string.Empty;
         }

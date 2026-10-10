@@ -633,18 +633,18 @@ internal static class LiveScenario
         var word = "Frage zum Vertrag";
         vm.MailPage.SearchText = word;
         Console.WriteLine($"Quick search (loaded only): {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()} hits, server hint={vm.MailPage.ShowServerSearchHint}");
-        await vm.MailPage.SearchServerCommand.ExecuteAsync(null);
-        Console.WriteLine($"Server search '{word}': {vm.MailPage.SearchInfo} | {string.Join(", ", vm.MailPage.Entries.OfType<MessageItemViewModel>().Select(m => m.Subject).Take(3))} | search box: '{vm.MailPage.SearchText}'");
+        await vm.MailPage.Search.SearchServerCommand.ExecuteAsync(null);
+        Console.WriteLine($"Server search '{word}': {vm.MailPage.Search.SearchInfo} | {string.Join(", ", vm.MailPage.Entries.OfType<MessageItemViewModel>().Select(m => m.Subject).Take(3))} | search box: '{vm.MailPage.SearchText}'");
 
         // Advanced: from Marco, all folders of Anna's account.
         await Snapshots.ClickAdvancedSearchAsync(window);
-        Console.WriteLine($"Advanced search open after a click on the button: {vm.MailPage.IsAdvancedSearchOpen}");
-        vm.MailPage.SearchBody = string.Empty;
-        vm.MailPage.SearchFrom = "marco@example.com";
-        vm.MailPage.SearchScopeChoice = vm.MailPage.SearchScopes.First(s => s.IsAccount && s.Account.Account.EmailAddress == user);
-        await vm.MailPage.RunSearchCommand.ExecuteAsync(null);
+        Console.WriteLine($"Advanced search open after a click on the button: {vm.MailPage.Search.IsAdvancedSearchOpen}");
+        vm.MailPage.Search.SearchBody = string.Empty;
+        vm.MailPage.Search.SearchFrom = "marco@example.com";
+        vm.MailPage.Search.SearchScopeChoice = vm.MailPage.Search.SearchScopes.First(s => s.IsAccount && s.Account.Account.EmailAddress == user);
+        await vm.MailPage.Search.RunSearchCommand.ExecuteAsync(null);
         var hits = vm.MailPage.Entries.OfType<MessageItemViewModel>().ToList();
-        Console.WriteLine($"Advanced search: {vm.MailPage.ListTitle} – {vm.MailPage.SearchInfo}; folders: {string.Join(", ", hits.Select(h => h.FolderText).Distinct())}");
+        Console.WriteLine($"Advanced search: {vm.MailPage.ListTitle} – {vm.MailPage.Search.SearchInfo}; folders: {string.Join(", ", hits.Select(h => h.FolderText).Distinct())}");
         await Snapshots.SaveAsync(window, output, "live-search.png");
 
         // An action on a hit from another folder than the open one goes to that folder.

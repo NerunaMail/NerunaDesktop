@@ -281,15 +281,15 @@ internal static class Snapshots
 
         // Advanced search across all folders of the account.
         await ClickAdvancedSearchAsync(window);
-        Console.WriteLine($"Advanced search open after a click on the button: {vm.MailPage.IsAdvancedSearchOpen}");
-        vm.MailPage.SearchBody = string.Empty;
-        vm.MailPage.SearchSubject = "Offerte";
-        vm.MailPage.SearchScopeChoice = vm.MailPage.SearchScopes.First(s => s.IsAccount);
-        await vm.MailPage.RunSearchCommand.ExecuteAsync(null);
+        Console.WriteLine($"Advanced search open after a click on the button: {vm.MailPage.Search.IsAdvancedSearchOpen}");
+        vm.MailPage.Search.SearchBody = string.Empty;
+        vm.MailPage.Search.SearchSubject = "Offerte";
+        vm.MailPage.Search.SearchScopeChoice = vm.MailPage.Search.SearchScopes.First(s => s.IsAccount);
+        await vm.MailPage.Search.RunSearchCommand.ExecuteAsync(null);
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault();
         await Task.Delay(400);
         await SaveAsync(window, output, "search.png");
-        Console.WriteLine($"Demo search: {vm.MailPage.SearchInfo}");
+        Console.WriteLine($"Demo search: {vm.MailPage.Search.SearchInfo}");
         await vm.MailPage.CloseSearchCommand.ExecuteAsync(null);
 
         // A desktop notification (shown on its own; the website puts it onto the main window).
