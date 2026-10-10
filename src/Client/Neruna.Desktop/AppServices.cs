@@ -94,6 +94,7 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Calendar.InvitationService>();
         services.AddSingleton<SignatureService>();
         services.AddSingleton<CalendarController>();
+        services.AddSingleton<TaskController>();
         services.AddSingleton<Neruna.Core.SyncCoordinator>();
         services.AddSingleton<ContactController>();
         services.AddSingleton<AccountSetupService>();

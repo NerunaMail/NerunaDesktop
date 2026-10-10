@@ -75,11 +75,14 @@ public class TaskTests
         await store.ApplySyncResultAsync(info, new CalendarSyncResult("s", true, [new CalendarObject("t2", null, ForeignTodo.Replace("task-1@other", "task-2@other", StringComparison.Ordinal).Replace("Bericht schreiben", "Rechnung prüfen", StringComparison.Ordinal))], []), ct);
 
         var calendar = env.Calendar;
-        Assert.Equal(2, (await calendar.GetTasksAsync(ct)).Count);
+        var tasks = env.Tasks;
+        Assert.Equal(2, (await tasks.GetTasksAsync(ct)).Count);
         var from = new DateTimeOffset(2026, 10, 12, 0, 0, 0, TimeSpan.FromHours(2));
         var to = from.AddDays(7);
+        async Task<IReadOnlyList<CalendarOccurrence>> CalendarViewAsync(bool includeTaskLists, params CalendarInfo[] calendars) =>
+            await tasks.AddToCalendarAsync(await calendar.GetOccurrencesAsync(calendars, from, to, ct), calendars, from, to, includeTaskLists, ct);
         async Task<string[]> TasksInCalendarAsync(params CalendarInfo[] calendars) =>
-            [.. (await calendar.GetOccurrencesAsync(calendars, from, to, ct)).Where(o => o.IsTask).Select(o => o.Summary).Order(StringComparer.Ordinal)];
+            [.. (await CalendarViewAsync(true, calendars)).Where(o => o.IsTask).Select(o => o.Summary).Order(StringComparer.Ordinal)];
 
         // Default: tasks stay under "Aufgaben".
         Assert.Equal(["Termin"], (await calendar.GetOccurrencesAsync([mixed], from, to, ct)).Select(o => o.Summary));
@@ -87,23 +90,26 @@ public class TaskTests
         // The one switch of 0.1.14 is carried over to every list once.
         await env.Get<ISettingsStore>().SetAsync(SettingKeys.CalendarShowTasks, "true", ct);
         Assert.Equal(["☐ Bericht schreiben", "☐ Rechnung prüfen"], await TasksInCalendarAsync(mixed));
-        Assert.True((await calendar.GetOccurrencesAsync([mixed], from, to, ct)).Single(o => o.Summary == "☐ Bericht schreiben").IsAllDay);
+        Assert.True((await CalendarViewAsync(true, mixed)).Single(o => o.Summary == "☐ Bericht schreiben").IsAllDay);
+
+        // Events alone (e.g. the conflict check of an invitation) never contain tasks.
+        Assert.Equal(["Termin"], (await calendar.GetOccurrencesAsync([mixed], from, to, ct)).Select(o => o.Summary));
         Assert.Null(await env.Get<ISettingsStore>().GetAsync(SettingKeys.CalendarShowTasks, ct));
 
         // info@ only under "Aufgaben", not in the calendar.
-        await calendar.SetTaskListInCalendarAsync(info, false, ct);
+        await tasks.SetListInCalendarAsync(info, false, ct);
         Assert.Equal(["☐ Bericht schreiben"], await TasksInCalendarAsync(mixed));
 
         // Independent of "Aufgaben": hidden there, still in the calendar if wanted there.
-        await calendar.SetTaskListVisibleAsync(mixed, false, ct);
+        await tasks.SetListVisibleAsync(mixed, false, ct);
         Assert.Equal(["☐ Bericht schreiben"], await TasksInCalendarAsync(mixed));
 
         // A mixed calendar switched off in the calendar takes its tasks with it.
         Assert.Empty(await TasksInCalendarAsync());
 
         // "Nur diesen Kalender anzeigen": pure task lists marked for the calendar step aside too.
-        await calendar.SetTaskListInCalendarAsync(info, true, ct);
+        await tasks.SetListInCalendarAsync(info, true, ct);
         Assert.Equal(["☐ Bericht schreiben", "☐ Rechnung prüfen"], await TasksInCalendarAsync(mixed));
-        Assert.Equal(["☐ Bericht schreiben"], (await calendar.GetOccurrencesAsync([mixed], from, to, includeTaskLists: false, ct)).Where(o => o.IsTask).Select(o => o.Summary));
+        Assert.Equal(["☐ Bericht schreiben"], (await CalendarViewAsync(false, mixed)).Where(o => o.IsTask).Select(o => o.Summary));
     }
 }

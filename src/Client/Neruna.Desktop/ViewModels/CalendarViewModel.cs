@@ -10,7 +10,7 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Week view across all calendars, whatever provider they come from.</summary>
-internal sealed partial class CalendarViewModel(CalendarController calendar, InvitationService invitations, ISettingsStore settings) : ViewModelBase, ICollectionListHost
+internal sealed partial class CalendarViewModel(CalendarController calendar, TaskController tasks, InvitationService invitations, ISettingsStore settings) : ViewModelBase, ICollectionListHost
 {
     internal static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
@@ -136,7 +136,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var items = new List<CalendarListItem>();
         var all = await calendar.GetCalendarsAsync();
         var colors = await ColorsAsync(settings, all);
-        var tasksShown = await calendar.GetTaskListsInCalendarAsync();
+        var tasksShown = await tasks.GetListsInCalendarAsync();
         // Pure task lists belong under "Aufgaben", not in the calendar list.
         foreach (var info in all.Where(c => c.HasEvents))
         {
@@ -162,7 +162,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
                 }
                 else if (e.PropertyName == nameof(CalendarListItem.ShowTasks))
                 {
-                    await calendar.SetTaskListInCalendarAsync(item.Info, item.ShowTasks);
+                    await tasks.SetListInCalendarAsync(item.Info, item.ShowTasks);
                     await LoadWeekAsync(dataChanged: true);
                     TaskListsChanged?.Invoke(this, EventArgs.Empty);
                 }
@@ -328,6 +328,10 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     /// <param name="dataChanged">Calendars, their visibility or events changed: busy days are recomputed.</param>
     private int _weekVersion;
 
+    // Events plus the tasks marked for the calendar; showing one calendar alone leaves the other task lists out.
+    private async Task<IReadOnlyList<CalendarOccurrence>> OccurrencesAsync(IReadOnlyList<CalendarInfo> shown, DateTimeOffset from, DateTimeOffset to) =>
+        await tasks.AddToCalendarAsync(await calendar.GetOccurrencesAsync(shown, from, to), shown, from, to, includeTaskLists: !_solo.IsActive);
+
     private async Task LoadWeekAsync(bool dataChanged = false)
     {
         var visible = Calendars.Where(IsShown).ToList();
@@ -335,7 +339,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var from = new DateTimeOffset(WeekStart);
         var shown = visible.Select(c => c.Info).ToList();
         var version = ++_weekVersion;
-        var occurrences = await Task.Run(() => calendar.GetOccurrencesAsync(shown, from, from.AddDays(7), includeTaskLists: !_solo.IsActive));
+        var occurrences = await Task.Run(() => OccurrencesAsync(shown, from, from.AddDays(7)));
         if (version != _weekVersion)
         {
             return; // A newer load (other week, calendars changed) is under way; an older result must not overwrite it.
@@ -412,7 +416,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var from = StartOfWeek(fromMonth);
         var to = toMonth.AddDays(7);
         var visible = Calendars.Where(IsShown).Select(c => c.Info).ToList();
-        var occurrences = visible.Count == 0 ? [] : await Task.Run(() => calendar.GetOccurrencesAsync(visible, new DateTimeOffset(from), new DateTimeOffset(to), includeTaskLists: !_solo.IsActive));
+        var occurrences = visible.Count == 0 ? [] : await Task.Run(() => OccurrencesAsync(visible, new DateTimeOffset(from), new DateTimeOffset(to)));
 
         var busy = await Task.Run(() =>
         {

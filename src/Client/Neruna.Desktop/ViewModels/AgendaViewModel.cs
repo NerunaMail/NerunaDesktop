@@ -22,15 +22,17 @@ internal sealed partial class AgendaViewModel : ViewModelBase
 
     private static CultureInfo Culture => Neruna.Core.Localization.Texts.Culture;
     private readonly CalendarController _calendar;
+    private readonly TaskController _tasks;
     private readonly ISettingsStore _settings;
     private readonly ILogger<AgendaViewModel> _logger;
     private readonly DispatcherTimer _clock;
     private bool _loadingState;
     private int _version;
 
-    public AgendaViewModel(CalendarController calendar, ISettingsStore settings, ILogger<AgendaViewModel> logger)
+    public AgendaViewModel(CalendarController calendar, TaskController tasks, ISettingsStore settings, ILogger<AgendaViewModel> logger)
     {
         _calendar = calendar;
+        _tasks = tasks;
         _settings = settings;
         _logger = logger;
 
@@ -100,7 +102,8 @@ internal sealed partial class AgendaViewModel : ViewModelBase
             var colors = await CalendarViewModel.ColorsAsync(_settings, calendars);
             var hidden = await HiddenAsync();
             var shown = calendars.Where(c => !hidden.Contains(Key(c))).ToList();
-            var occurrences = await Task.Run(() => _calendar.GetOccurrencesAsync(shown, today, today.AddDays(Days)));
+            var occurrences = await Task.Run(async () =>
+                await _tasks.AddToCalendarAsync(await _calendar.GetOccurrencesAsync(shown, today, today.AddDays(Days)), shown, today, today.AddDays(Days)));
             if (version != _version)
             {
                 return;

@@ -22,7 +22,7 @@ internal enum TaskFilter
 /// "Aufgaben": the tasks (VTODO) of all task lists – CalDAV calendars that hold tasks and Microsoft To Do. Each list can
 /// be shown or hidden on its own (hidden lists are also left out of the calendar); grouped by due date.
 /// </summary>
-internal sealed partial class TasksViewModel(CalendarController calendar, ISettingsStore settings, ILogger<TasksViewModel> logger) : ViewModelBase, ICollectionListHost
+internal sealed partial class TasksViewModel(CalendarController calendar, TaskController tasks, ISettingsStore settings, ILogger<TasksViewModel> logger) : ViewModelBase, ICollectionListHost
 {
     private IReadOnlyList<TaskItem> _all = [];
 
@@ -66,11 +66,11 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
         try
         {
             var lists = (await calendar.GetCalendarsAsync()).Where(c => c.HasTasks).ToList();
-            var hidden = await calendar.GetHiddenTaskListsAsync();
-            var inCalendar = await calendar.GetTaskListsInCalendarAsync();
+            var hidden = await tasks.GetHiddenListsAsync();
+            var inCalendar = await tasks.GetListsInCalendarAsync();
             var colors = await CalendarViewModel.ColorsAsync(settings, await calendar.GetCalendarsAsync());
             var accounts = (await calendar.GetSourcesAsync()).ToDictionary(s => s.Connection.Id, s => s.Account.Title);
-            _all = await Task.Run(() => calendar.GetTasksAsync());
+            _all = await Task.Run(() => tasks.GetTasksAsync());
 
             ListGroups.Clear();
             foreach (var group in lists.GroupBy(l => l.ConnectionId))
@@ -91,12 +91,12 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
                         {
                             // Ticking a list ends "only this list": the ticks are the selection again.
                             _solo.Set(null, AllLists);
-                            await calendar.SetTaskListVisibleAsync(item.Info, item.IsVisible);
+                            await tasks.SetListVisibleAsync(item.Info, item.IsVisible);
                             Rebuild();
                         }
                         else if (e.PropertyName == nameof(TaskListItem.ShowTasks))
                         {
-                            await calendar.SetTaskListInCalendarAsync(item.Info, item.ShowTasks);
+                            await tasks.SetListInCalendarAsync(item.Info, item.ShowTasks);
                             CalendarChanged?.Invoke(this, EventArgs.Empty);
                         }
                     };
@@ -202,7 +202,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
     {
         try
         {
-            await calendar.SetTaskCompletedAsync(row.Item, completed);
+            await tasks.SetCompletedAsync(row.Item, completed);
             await ReloadAsync();
             StatusMessage?.Invoke(this, completed ? F("«{0}» erledigt", row.Title) : F("«{0}» wieder offen", row.Title));
         }
@@ -260,7 +260,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
         NewTitle = string.Empty;
         try
         {
-            await calendar.SaveTaskAsync(list, TaskDraft.New(title));
+            await tasks.SaveAsync(list, TaskDraft.New(title));
             await ReloadAsync();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -300,7 +300,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
             return;
         }
 
-        var editor = new TaskEditorViewModel(calendar, settings, lists, draft, existing, target);
+        var editor = new TaskEditorViewModel(tasks, settings, lists, draft, existing, target);
         EditorRequested?.Invoke(this, editor);
     }
 }

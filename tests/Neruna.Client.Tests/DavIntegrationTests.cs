@@ -106,18 +106,18 @@ public sealed class DavIntegrationTests : IDisposable
         Assert.Equal(CalendarContent.Tasks, list.Content);
         Assert.True(calendars.Single(c => c.Name == "Privat").HasEvents);
 
-        await env.Calendar.SaveTaskAsync(list, new TaskDraft("Offerte schicken", "An Marco", new DateTime(2026, 10, 20), false, TaskPriority.High, false), null, ct);
+        await env.Tasks.SaveAsync(list, new TaskDraft("Offerte schicken", "An Marco", new DateTime(2026, 10, 20), false, TaskPriority.High, false), null, ct);
         Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
-        var task = Assert.Single(await env.Calendar.GetTasksAsync(ct));
+        var task = Assert.Single(await env.Tasks.GetTasksAsync(ct));
         Assert.Equal(("Offerte schicken", "An Marco", TaskPriority.High, false), (task.Summary, task.Notes, task.Priority, task.IsCompleted));
 
-        await env.Calendar.SetTaskCompletedAsync(task, true, ct);
+        await env.Tasks.SetCompletedAsync(task, true, ct);
         Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
-        Assert.True(Assert.Single(await env.Calendar.GetTasksAsync(ct)).IsCompleted);
+        Assert.True(Assert.Single(await env.Tasks.GetTasksAsync(ct)).IsCompleted);
 
-        await env.Calendar.DeleteTaskAsync(Assert.Single(await env.Calendar.GetTasksAsync(ct)), ct);
+        await env.Tasks.DeleteAsync(Assert.Single(await env.Tasks.GetTasksAsync(ct)), ct);
         Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
-        Assert.Empty(await env.Calendar.GetTasksAsync(ct));
+        Assert.Empty(await env.Tasks.GetTasksAsync(ct));
     }
 
     [Fact]

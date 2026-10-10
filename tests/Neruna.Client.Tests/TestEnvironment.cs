@@ -38,6 +38,8 @@ internal sealed class TestEnvironment : IAsyncDisposable
 
     public CalendarController Calendar => _services.GetRequiredService<CalendarController>();
 
+    public TaskController Tasks => _services.GetRequiredService<TaskController>();
+
     public ContactController Contacts => _services.GetRequiredService<ContactController>();
 
     public ProviderRegistry Providers => _services.GetRequiredService<ProviderRegistry>();
@@ -61,6 +63,7 @@ internal sealed class TestEnvironment : IAsyncDisposable
         services.AddSingleton<Neruna.Core.Calendar.ReminderService>();
         services.AddSingleton<Neruna.Core.Calendar.InvitationService>();
         services.AddSingleton<CalendarController>();
+        services.AddSingleton<TaskController>();
         services.AddSingleton<SyncCoordinator>();
         services.AddSingleton<ContactController>();
         services.AddSingleton<AccountSetupService>();

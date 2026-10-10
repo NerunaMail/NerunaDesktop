@@ -9,13 +9,13 @@ namespace Neruna.Desktop.ViewModels;
 /// <summary>Creates or edits a task: title, notes, due date (optionally with a time), priority, list, done.</summary>
 internal sealed partial class TaskEditorViewModel : ViewModelBase
 {
-    private readonly CalendarController _calendar;
+    private readonly TaskController _tasks;
     private readonly ISettingsStore _settings;
     private readonly TaskItem? _existing;
 
-    public TaskEditorViewModel(CalendarController calendar, ISettingsStore settings, IReadOnlyList<CalendarInfo> lists, TaskDraft draft, TaskItem? existing, CalendarInfo target)
+    public TaskEditorViewModel(TaskController tasks, ISettingsStore settings, IReadOnlyList<CalendarInfo> lists, TaskDraft draft, TaskItem? existing, CalendarInfo target)
     {
-        _calendar = calendar;
+        _tasks = tasks;
         _settings = settings;
         _existing = existing;
         Lists = lists;
@@ -89,7 +89,7 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
         var draft = new TaskDraft(Summary, Notes, due, HasDue && HasTime, (TaskPriority)Math.Clamp(PriorityIndex, 0, 3), IsCompleted);
         await RunAsync(async () =>
         {
-            await _calendar.SaveTaskAsync(SelectedList!, draft, _existing);
+            await _tasks.SaveAsync(SelectedList!, draft, _existing);
             // New tasks go where the last one went.
             await _settings.SetAsync(SettingKeys.TasksDefaultList, CalendarController.CalendarKey(SelectedList!));
         });
@@ -98,7 +98,7 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
     private bool CanDelete() => !IsBusy && IsExisting && CanEdit;
 
     [RelayCommand(CanExecute = nameof(CanDelete))]
-    private Task DeleteAsync() => RunAsync(() => _calendar.DeleteTaskAsync(_existing!));
+    private Task DeleteAsync() => RunAsync(() => _tasks.DeleteAsync(_existing!));
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, false);
