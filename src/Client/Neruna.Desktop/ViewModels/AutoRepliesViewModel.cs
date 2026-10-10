@@ -313,7 +313,9 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
     private string? _subject;
 
     public string Status => IsReachable == false
-        ? F("Server nicht erreichbar – zuletzt bekannt: {0}", KnownStatus) + (_checked is { } at ? F(" ({0:g})", at.LocalDateTime) : string.Empty)
+        ? _checked is { } at
+            ? F("Server nicht erreichbar – zuletzt bekannt: {0} (geprüft {1:g})", KnownStatus, at.LocalDateTime)
+            : F("Server nicht erreichbar – zuletzt bekannt: {0}", KnownStatus)
         : KnownStatus;
 
     private string KnownStatus => Reply switch

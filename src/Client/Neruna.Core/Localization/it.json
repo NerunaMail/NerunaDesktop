@@ -814,6 +814,8 @@
  "Server erneut abfragen": "Interroga di nuovo il server",
  "Server erneut nach Adressbüchern fragen und auswählen, welche angezeigt werden": "Chiedi di nuovo al server le rubriche e scegli quali mostrare",
  "Server erneut nach Kalendern fragen (auch im Webmail abonnierte) und auswählen": "Chiedi di nuovo ai server i calendari (anche quelli abbonati nella webmail) e scegli",
+ "Server nicht erreichbar – zuletzt bekannt: {0}": "Server non raggiungibile – ultimo stato noto: {0}",
+ "Server nicht erreichbar – zuletzt bekannt: {0} (geprüft {1:g})": "Server non raggiungibile – ultimo stato noto: {0} (verificato {1:g})",
  "Server nicht erreichbar: ": "Server non raggiungibile: ",
  "Sichern": "Salva backup",
  "Sichert deine persönlichen Einstellungen – Konten samt Passwörtern, eigene Signaturen, Textvorlagen und Zertifikate, Einstellungen – verschlüsselt mit deinem Tresor-Passwort. Die Cloud kann sie nicht lesen. Was von deiner Organisation kommt, ist nicht dabei: Es kommt nach dem Verbinden automatisch wieder.": "Salva le tue impostazioni personali – account con password, le tue firme, modelli di testo e certificati, preferenze – cifrate con la password della cassaforte. Il cloud non può leggerle. Ciò che viene dalla tua organizzazione non è incluso: torna automaticamente dopo il collegamento.",

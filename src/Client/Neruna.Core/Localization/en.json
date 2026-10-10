@@ -814,6 +814,8 @@
  "Server erneut abfragen": "Ask the server again",
  "Server erneut nach Adressbüchern fragen und auswählen, welche angezeigt werden": "Ask the server again for address books and choose which are shown",
  "Server erneut nach Kalendern fragen (auch im Webmail abonnierte) und auswählen": "Ask the servers again for calendars (also those subscribed in webmail) and choose",
+ "Server nicht erreichbar – zuletzt bekannt: {0}": "Server not reachable – last known: {0}",
+ "Server nicht erreichbar – zuletzt bekannt: {0} (geprüft {1:g})": "Server not reachable – last known: {0} (checked {1:g})",
  "Server nicht erreichbar: ": "Server unreachable: ",
  "Sichern": "Back up",
  "Sichert deine persönlichen Einstellungen – Konten samt Passwörtern, eigene Signaturen, Textvorlagen und Zertifikate, Einstellungen – verschlüsselt mit deinem Tresor-Passwort. Die Cloud kann sie nicht lesen. Was von deiner Organisation kommt, ist nicht dabei: Es kommt nach dem Verbinden automatisch wieder.": "Backs up your personal settings – accounts with passwords, your own signatures, text templates and certificates, preferences – encrypted with your vault password. The cloud cannot read them. What comes from your organisation is not included: it comes back automatically after connecting.",

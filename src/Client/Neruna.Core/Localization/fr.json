@@ -814,6 +814,8 @@
  "Server erneut abfragen": "Interroger à nouveau le serveur",
  "Server erneut nach Adressbüchern fragen und auswählen, welche angezeigt werden": "Redemander les carnets d'adresses au serveur et choisir ceux à afficher",
  "Server erneut nach Kalendern fragen (auch im Webmail abonnierte) und auswählen": "Redemander les agendas aux serveurs (aussi ceux abonnés dans le webmail) et choisir",
+ "Server nicht erreichbar – zuletzt bekannt: {0}": "Serveur injoignable – dernier état connu : {0}",
+ "Server nicht erreichbar – zuletzt bekannt: {0} (geprüft {1:g})": "Serveur injoignable – dernier état connu : {0} (vérifié {1:g})",
  "Server nicht erreichbar: ": "Serveur injoignable : ",
  "Sichern": "Sauvegarder",
  "Sichert deine persönlichen Einstellungen – Konten samt Passwörtern, eigene Signaturen, Textvorlagen und Zertifikate, Einstellungen – verschlüsselt mit deinem Tresor-Passwort. Die Cloud kann sie nicht lesen. Was von deiner Organisation kommt, ist nicht dabei: Es kommt nach dem Verbinden automatisch wieder.": "Sauvegarde vos réglages personnels – comptes avec mots de passe, vos signatures, modèles de texte et certificats, préférences – chiffrés avec le mot de passe de votre coffre. Le cloud ne peut pas les lire. Ce qui vient de votre organisation n'en fait pas partie : cela revient automatiquement après la connexion.",
