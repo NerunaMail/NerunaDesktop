@@ -35,13 +35,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     public bool CanGoBack => !IsChoosing && !IsEditing;
 
     /// <summary>Microsoft 365 needs Neruna's app registration; without its client id the choice stays off.</summary>
-    public static bool MicrosoftAvailable => Neruna.Providers.Graph.MicrosoftAccount.IsConfigured;
+    public bool MicrosoftAvailable => setup.CanSignIn(Neruna.Core.Providers.ProviderIds.Graph);
 
-    public static bool MicrosoftUnavailable => !MicrosoftAvailable;
-
-    /// <summary>Set by the shell: the Microsoft sign-in (browser, tokens).</summary>
-    public Neruna.Providers.Graph.GraphConnectionFactory? Graph { get; init; }
-
+    /// <summary>Set by the shell: opens the sign-in page in the system browser.</summary>
     public Neruna.Core.Auth.IBrowserLauncher? Browser { get; init; }
 
     [RelayCommand]
@@ -70,7 +66,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     [RelayCommand]
     private async Task SignInMicrosoftAsync()
     {
-        if (Graph is null || Browser is null)
+        if (Browser is null)
         {
             return;
         }
@@ -78,29 +74,24 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         Error = null;
         IsBusy = true;
         BusyText = T("Anmeldung im Browser …");
+        var loginHint = string.IsNullOrWhiteSpace(Email) ? null : Email.Trim();
         try
         {
-            var tokenId = Editing?.ConnectionsOf(ServiceKind.Mail).FirstOrDefault()?.Id ?? Guid.NewGuid();
-            await Graph.SignInAsync(tokenId, string.IsNullOrWhiteSpace(Email) ? null : Email.Trim(), Browser);
             if (Editing is { } existing)
             {
-                await setup.RenameAsync(existing, string.IsNullOrWhiteSpace(DisplayName) ? existing.DisplayName : DisplayName.Trim(), Label);
-                Finished?.Invoke(this, true);
-                return;
+                await setup.SignInAgainAsync(existing, string.IsNullOrWhiteSpace(DisplayName) ? existing.DisplayName : DisplayName.Trim(), Label, loginHint, Browser);
+            }
+            else
+            {
+                CreatedAccount = await setup.CreateBySignInAsync(Neruna.Core.Providers.ProviderIds.Graph, DisplayName, Label, loginHint, Browser);
             }
 
-            BusyText = T("Konto wird eingerichtet …");
-            var (email, name) = await Graph.WhoAmIAsync(tokenId);
-            var account = new Account(Guid.NewGuid(), string.IsNullOrWhiteSpace(DisplayName) ? name : DisplayName.Trim(), email,
-                Neruna.Providers.Graph.GraphConnectionFactory.Connections(email, tokenId), string.IsNullOrWhiteSpace(Label) ? null : Label.Trim());
-            await setup.CreateSignedInAsync(account);
-            CreatedAccount = account;
             Finished?.Invoke(this, true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Whatever goes wrong (browser, keychain, Graph): a message in the dialog, never a crash.
-            Error = ex is Neruna.Core.Auth.OAuthException or AccountSetupException or Neruna.Providers.Graph.GraphException
+            // Whatever goes wrong (browser, keychain, the provider): a message in the dialog, never a crash.
+            Error = ex is Neruna.Core.Auth.OAuthException or AccountSetupException
                 ? ex.Message
                 : F("Anmeldung fehlgeschlagen: {0}", ex.Message);
         }
@@ -175,7 +166,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     {
         ArgumentNullException.ThrowIfNull(account);
         Editing = account;
-        Step = account.Connections.Any(c => c.ProviderId == Neruna.Core.Providers.ProviderIds.Graph) ? "microsoft" : "imap";
+        Step = setup.IsSignedIn(account) ? "microsoft" : "imap";
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;
         Aliases.Clear();

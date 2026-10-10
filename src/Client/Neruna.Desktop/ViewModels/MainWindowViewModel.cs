@@ -46,7 +46,6 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly ISettingsStore _settings;
     private readonly Neruna.Core.Cloud.SettingsBackupService _backup;
     private readonly Neruna.Core.Cloud.CloudAccountSync _cloudAccounts;
-    private readonly Neruna.Providers.Graph.GraphConnectionFactory _graph;
     private readonly Neruna.Core.Auth.IBrowserLauncher _browser;
 
     // Accounts whose password the user postponed ("Später") – asked again with the next start.
@@ -80,7 +79,6 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Cloud.CloudCertificateSync cloudCertificates,
         Neruna.Core.Cloud.SettingsBackupService backup,
         Neruna.Core.Cloud.CloudAccountSync cloudAccounts,
-        Neruna.Providers.Graph.GraphConnectionFactory graph,
         Neruna.Core.Auth.IBrowserLauncher browser,
         Neruna.Core.Diagnostics.CrashReportService crashReports,
         ILogger<MainWindowViewModel> logger)
@@ -88,7 +86,6 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _crashReports = crashReports;
         // Caught on the UI thread: Neruna keeps running and offers the report now (after the dialog shown at the moment).
         CrashHandler.Caught += (_, _) => Dispatcher.UIThread.Post(async () => await OfferCrashReportsAsync());
-        _graph = graph;
         _browser = browser;
         _backup = backup;
         _cloudAccounts = cloudAccounts;
@@ -716,7 +713,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void ShowAccountSetup(Neruna.Core.Accounts.Account? editing = null)
     {
-        var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav")) { Graph = _graph, Browser = _browser };
+        var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav")) { Browser = _browser };
         if (editing is not null)
         {
             setup.LoadForEditing(editing);

@@ -38,12 +38,12 @@
           <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'IMAP/SMTP, CalDAV und CardDAV – für die meisten Anbieter und eigene Server. Die Einstellungen werden automatisch gesucht.'}" />
         </StackPanel>
       </Button>
-      <Button Classes="choice" Command="{Binding ChooseMicrosoftCommand}" IsEnabled="{x:Static vm:AccountSetupViewModel.MicrosoftAvailable}"
+      <Button Classes="choice" Command="{Binding ChooseMicrosoftCommand}" IsEnabled="{Binding MicrosoftAvailable}"
               HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
         <StackPanel Spacing="2">
           <TextBlock Text="Microsoft 365 / Outlook.com" FontWeight="SemiBold" FontSize="15" />
           <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Mail, Kalender und Kontakte mit Anmeldung bei Microsoft.'}" />
-          <TextBlock Classes="subtle" FontStyle="Italic" Text="{l:T 'Bald verfügbar'}" IsVisible="{x:Static vm:AccountSetupViewModel.MicrosoftUnavailable}" />
+          <TextBlock Classes="subtle" FontStyle="Italic" Text="{l:T 'Bald verfügbar'}" IsVisible="{Binding !MicrosoftAvailable}" />
         </StackPanel>
       </Button>
     </StackPanel>

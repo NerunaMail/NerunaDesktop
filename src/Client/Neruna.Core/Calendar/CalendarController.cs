@@ -34,7 +34,8 @@ public sealed record CalendarCandidate(CalendarInfo Calendar, bool IsSelected, b
 public sealed record CalendarDiscovery(IReadOnlyList<CalendarCandidate> Calendars, string? Details);
 
 /// <summary>A calendar connection (CalDAV server, ICS subscription …) with the account it belongs to.</summary>
-public sealed record CalendarSource(Account Account, ServiceConnection Connection);
+/// <param name="Server">The server in one line (URL, user), as the provider describes it.</param>
+public sealed record CalendarSource(Account Account, ServiceConnection Connection, string Server = "");
 
 /// <summary>
 /// The UI's single entry point for calendars, independent of whether a calendar comes from CalDAV, an ICS
@@ -75,7 +76,7 @@ public sealed class CalendarController(
 
     public async Task<IReadOnlyList<CalendarSource>> GetSourcesAsync(CancellationToken cancellationToken = default) =>
         (await accounts.GetAccountsAsync(cancellationToken))
-            .SelectMany(a => a.ConnectionsOf(ServiceKind.Calendar).Select(c => new CalendarSource(a, c)))
+            .SelectMany(a => a.ConnectionsOf(ServiceKind.Calendar).Select(c => new CalendarSource(a, c, providers.Summary(c))))
             .ToList();
 
     /// <summary>Asks the server again which calendars exist (own, shared, subscribed) and which of them are shown.</summary>

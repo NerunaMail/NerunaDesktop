@@ -6,15 +6,12 @@ using Neruna.Core.Accounts;
 using Neruna.Core.Providers;
 using Neruna.Core.Security;
 using Neruna.Desktop.Infrastructure;
-using Neruna.Providers.Dav;
-using Neruna.Providers.Ics;
-using Neruna.Providers.Imap;
 using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Account list, removal and diagnostics (where data and logs live).</summary>
-internal sealed partial class AccountsViewModel(IAccountStore accounts, ICredentialStore credentials, IFileService files, AppOptions options) : ViewModelBase
+internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountSetupService setup, ICredentialStore credentials, IFileService files, AppOptions options) : ViewModelBase
 {
     public event EventHandler? AddAccountRequested;
 
@@ -43,7 +40,7 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, ICredent
         Items.Clear();
         foreach (var account in await accounts.GetAccountsAsync())
         {
-            Items.Add(new AccountItem(account));
+            Items.Add(new AccountItem(account, setup.Summary));
         }
 
         UpdatePositions();
@@ -120,7 +117,7 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, ICredent
     private Task OpenDataFolderAsync() => files.OpenFolderAsync(options.DataDirectory);
 }
 
-internal sealed partial class AccountItem(Account account) : ObservableObject
+internal sealed partial class AccountItem(Account account, Func<ServiceConnection, string> summary) : ObservableObject
 {
     public Account Account { get; } = account;
 
@@ -136,7 +133,7 @@ internal sealed partial class AccountItem(Account account) : ObservableObject
 
     public bool HasEmail => Email is not null;
 
-    public IReadOnlyList<ConnectionLine> Connections { get; } = account.Connections.OrderBy(c => c.Kind).Select(ConnectionLine.From).ToList();
+    public IReadOnlyList<ConnectionLine> Connections { get; } = account.Connections.OrderBy(c => c.Kind).Select(c => ConnectionLine.From(c, summary(c))).ToList();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RemoveText))]
@@ -159,8 +156,10 @@ internal sealed partial class AccountItem(Account account) : ObservableObject
 
 internal sealed record ConnectionLine(string Kind, string Provider, string Detail)
 {
-    public static ConnectionLine From(ServiceConnection connection)
+    /// <param name="detail">The provider's one-line description of the server.</param>
+    public static ConnectionLine From(ServiceConnection connection, string detail)
     {
+        ArgumentNullException.ThrowIfNull(connection);
         var kind = connection.Kind switch
         {
             ServiceKind.Mail => T("E-Mail"),
@@ -168,38 +167,6 @@ internal sealed record ConnectionLine(string Kind, string Provider, string Detai
             _ => T("Kontakte"),
         };
 
-        var detail = connection.ProviderId switch
-        {
-            ProviderIds.Imap when TryImap(connection) is { } imap => $"{imap.ImapHost}:{imap.ImapPort} · SMTP {imap.SmtpHost}:{imap.SmtpPort} · {imap.Username}",
-            ProviderIds.CalDav or ProviderIds.CardDav when TryDav(connection) is { } dav => $"{dav.Url} · {dav.Username}",
-            ProviderIds.Ics => connection.Settings.GetValueOrDefault(IcsCalendarProvider.UrlSetting) ?? string.Empty,
-            _ => string.Empty,
-        };
-
         return new ConnectionLine(kind, connection.ProviderId.ToUpperInvariant(), detail);
-    }
-
-    private static ImapSettings? TryImap(ServiceConnection connection)
-    {
-        try
-        {
-            return ImapSettings.FromDictionary(connection.Settings);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentException)
-        {
-            return null;
-        }
-    }
-
-    private static DavSettings? TryDav(ServiceConnection connection)
-    {
-        try
-        {
-            return DavSettings.FromDictionary(connection.Settings);
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
     }
 }

@@ -42,4 +42,10 @@ public sealed class ImapProviderFactory(
             [new MailServerSettings(ServerProtocol.Smtp, imap.SmtpHost, imap.SmtpPort, imap.SmtpSecurity, AuthScheme.PasswordCleartext, imap.Username)],
             []);
     }
+
+    public string Summary(IReadOnlyDictionary<string, string> settings)
+    {
+        var imap = ImapSettings.FromDictionary(settings);
+        return $"{imap.ImapHost}:{imap.ImapPort} · SMTP {imap.SmtpHost}:{imap.SmtpPort} · {imap.Username}";
+    }
 }

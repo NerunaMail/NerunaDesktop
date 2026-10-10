@@ -40,6 +40,9 @@ public interface IProviderFactory<out TProvider>
     /// user; URLs), so "Konto bearbeiten" can show them protocol-neutrally. Null if this provider cannot describe them.
     /// </summary>
     MailProviderConfig? DescribeSettings(IReadOnlyDictionary<string, string> settings) => null;
+
+    /// <summary>One line for the account list, e.g. "mail.example.ch:993 · SMTP mail.example.ch:465 · anna" or a URL.</summary>
+    string Summary(IReadOnlyDictionary<string, string> settings) => string.Empty;
 }
 
 public sealed class ProviderNotFoundException(string providerId, ServiceKind kind)
@@ -80,6 +83,25 @@ public sealed class ProviderRegistry(
 
     public IContactProvider CreateContacts(ServiceConnection connection) =>
         Resolve(_contacts, connection, ServiceKind.Contacts).Create(connection);
+
+    /// <summary>The provider's one-line description of the connection; empty if it has none or is not in this build.</summary>
+    public string Summary(ServiceConnection connection)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        try
+        {
+            return connection.Kind switch
+            {
+                ServiceKind.Mail => _mail.GetValueOrDefault(connection.ProviderId)?.Summary(connection.Settings),
+                ServiceKind.Calendar => _calendar.GetValueOrDefault(connection.ProviderId)?.Summary(connection.Settings),
+                _ => _contacts.GetValueOrDefault(connection.ProviderId)?.Summary(connection.Settings),
+            } ?? string.Empty;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentException or KeyNotFoundException)
+        {
+            return string.Empty; // incomplete settings: no description rather than a broken list
+        }
+    }
 
     private static IProviderFactory<T> Resolve<T>(Dictionary<string, IProviderFactory<T>> factories, ServiceConnection connection, ServiceKind kind)
     {

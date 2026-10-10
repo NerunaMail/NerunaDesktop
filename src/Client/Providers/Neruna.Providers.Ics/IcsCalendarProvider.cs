@@ -97,6 +97,9 @@ public sealed class IcsProviderFactory(HttpClient http) : IProviderFactory<ICale
         return new IcsCalendarProvider(connection.Id, NormalizeUrl(url), name, http);
     }
 
+    public string Summary(IReadOnlyDictionary<string, string> settings) =>
+        settings?.GetValueOrDefault(IcsCalendarProvider.UrlSetting) ?? string.Empty;
+
     /// <summary>Accepts webcal:// links as published by most calendar sites.</summary>
     public static Uri NormalizeUrl(string url)
     {

@@ -291,6 +291,7 @@
  "Dieses Gerät wird von der Neruna Cloud getrennt. Für eine neue Verbindung braucht es einen neuen Verbindungscode aus dem Portal.": "Questo dispositivo verrà scollegato da Neruna Cloud. Per un nuovo collegamento serve un nuovo codice dal portale.",
  "Dieses Konto hat keinen Archivordner.": "Questo account non ha una cartella di archivio.",
  "Dieses Konto kann keine Entwürfe speichern.": "Questo account non può salvare bozze.",
+ "Dieses Konto wird nicht über eine Anmeldung im Browser verbunden.": "Questo account non è collegato tramite l'accesso nel browser.",
  "Digital signieren (S/MIME)": "Firma digitalmente (S/MIME)",
  "Digital signiert (S/MIME)": "Firmato digitalmente (S/MIME)",
  "Digital signiert von {0} · Signatur gültig{1}": "Firmato digitalmente da {0} · firma valida{1}",

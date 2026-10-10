@@ -291,6 +291,7 @@
  "Dieses Gerät wird von der Neruna Cloud getrennt. Für eine neue Verbindung braucht es einen neuen Verbindungscode aus dem Portal.": "Cet appareil sera déconnecté de Neruna Cloud. Une nouvelle connexion nécessite un nouveau code de connexion du portail.",
  "Dieses Konto hat keinen Archivordner.": "Ce compte n'a pas de dossier d'archives.",
  "Dieses Konto kann keine Entwürfe speichern.": "Ce compte ne peut pas enregistrer de brouillons.",
+ "Dieses Konto wird nicht über eine Anmeldung im Browser verbunden.": "Ce compte n'est pas connecté par une connexion dans le navigateur.",
  "Digital signieren (S/MIME)": "Signer numériquement (S/MIME)",
  "Digital signiert (S/MIME)": "Signé numériquement (S/MIME)",
  "Digital signiert von {0} · Signatur gültig{1}": "Signé numériquement par {0} · signature valide{1}",

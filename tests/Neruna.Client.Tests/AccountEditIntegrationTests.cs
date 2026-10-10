@@ -38,7 +38,7 @@ public class AccountEditIntegrationTests
             [new ImapProviderFactory(credentials, NullLoggerFactory.Instance)],
             [new CalDavProviderFactory(http, credentials, NullLoggerFactory.Instance)],
             []);
-        var setup = new AccountSetupService(registry, env.Accounts, credentials);
+        var setup = new AccountSetupService(registry, env.Accounts, credentials, []);
 
         var created = setup.BuildAccount("Anna Muster", "anna@example.com", Config());
         await setup.CreateAsync(created, "geheim", ct);

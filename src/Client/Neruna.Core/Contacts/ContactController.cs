@@ -15,7 +15,8 @@ public sealed record ContactEntry(AddressBookInfo AddressBook, string RemoteId, 
 public sealed record AddressBookCandidate(AddressBookInfo AddressBook, bool IsSelected, bool IsNew);
 
 /// <summary>A contacts connection (CardDAV …) with the account it belongs to.</summary>
-public sealed record AddressBookSource(Account Account, ServiceConnection Connection);
+/// <param name="Server">The server in one line (URL, user), as the provider describes it.</param>
+public sealed record AddressBookSource(Account Account, ServiceConnection Connection, string Server = "");
 
 /// <summary>A group member with its contact (if found) and the address that this group uses for it.</summary>
 public sealed record ResolvedMember(GroupMember Member, ContactEntry? Contact, string? Address)
@@ -63,7 +64,7 @@ public sealed class ContactController(
 
     public async Task<IReadOnlyList<AddressBookSource>> GetSourcesAsync(CancellationToken cancellationToken = default) =>
         (await accounts.GetAccountsAsync(cancellationToken))
-            .SelectMany(a => a.ConnectionsOf(ServiceKind.Contacts).Select(c => new AddressBookSource(a, c)))
+            .SelectMany(a => a.ConnectionsOf(ServiceKind.Contacts).Select(c => new AddressBookSource(a, c, providers.Summary(c))))
             .ToList();
 
     /// <summary>Asks the server again which address books exist (own, shared, global) and which of them are shown.</summary>

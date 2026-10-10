@@ -200,7 +200,7 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
 
     public string Title => Source.Account.Title;
 
-    public string Server => Source.Connection.Settings.TryGetValue(Neruna.Providers.Dav.DavSettings.UrlKey, out var url) ? url : Source.Connection.ProviderId;
+    public string Server => Source.Server.Length > 0 ? Source.Server : Source.Connection.ProviderId;
 
     public ObservableCollection<CalendarChoiceItem> Calendars { get; } = [];
 

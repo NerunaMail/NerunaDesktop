@@ -23,7 +23,7 @@ public class AccountSetupTests
             [new ImapProviderFactory(new NullCredentialStore(), NullLoggerFactory.Instance)],
             [new IcsProviderFactory(new HttpClient())],
             []);
-        var setup = new AccountSetupService(registry, null!, null!);
+        var setup = new AccountSetupService(registry, null!, null!, []);
 
         var account = setup.BuildAccount("Anna Muster", "anna.muster@example.com", AutoconfigXml.Parse(Fixture("autoconfig-example.xml")));
 

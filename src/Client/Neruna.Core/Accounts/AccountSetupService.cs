@@ -1,4 +1,5 @@
 using Neruna.Contracts.Discovery;
+using Neruna.Core.Auth;
 using Neruna.Core.Providers;
 using Neruna.Core.Security;
 using static Neruna.Core.Localization.Texts;
@@ -9,7 +10,7 @@ namespace Neruna.Core.Accounts;
 /// Turns a discovered configuration into an account. Every registered provider is asked which part of the
 /// configuration it can handle, so adding e.g. a CalDAV provider makes new accounts include calendars automatically.
 /// </summary>
-public sealed class AccountSetupService(ProviderRegistry providers, IAccountStore accounts, ICredentialStore credentials)
+public sealed class AccountSetupService(ProviderRegistry providers, IAccountStore accounts, ICredentialStore credentials, IEnumerable<IAccountSignIn> signIns)
 {
     /// <summary>
     /// An existing account as servers, for "Konto bearbeiten": what each connection's provider can describe (the first
@@ -207,8 +208,47 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
         return renamed;
     }
 
-    /// <summary>Saves an account whose connections are already signed in (OAuth): tests them, then stores it.</summary>
-    public Task CreateSignedInAsync(Account account, CancellationToken cancellationToken = default) => CreateAsync(account, null, cancellationToken);
+    /// <summary>Whether accounts of this kind can be added by signing in (the build has the app registration).</summary>
+    public bool CanSignIn(string providerId) => signIns.Any(s => s.ProviderId == providerId && s.IsAvailable);
+
+    /// <summary>Whether the account was set up by signing in (its servers belong to the provider, only names are edited).</summary>
+    public bool IsSignedIn(Account account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        return account.Connections.Any(c => signIns.Any(s => s.ProviderId == c.ProviderId));
+    }
+
+    /// <summary>
+    /// Signs in in the browser and sets up the account with the address and name the provider reports (or the
+    /// given name); the connections are tested before it is saved.
+    /// </summary>
+    /// <exception cref="AccountSetupException">Sign-in or a connection failed; nothing is saved.</exception>
+    public async Task<Account> CreateBySignInAsync(string providerId, string? displayName, string? label, string? loginHint, IBrowserLauncher browser, CancellationToken cancellationToken = default)
+    {
+        var who = await SignIn(providerId).SignInAsync(null, loginHint, browser, cancellationToken);
+        var account = new Account(Guid.NewGuid(), string.IsNullOrWhiteSpace(displayName) ? who.DisplayName : displayName.Trim(), who.EmailAddress,
+            who.Connections, string.IsNullOrWhiteSpace(label) ? null : label.Trim());
+        await CreateAsync(account, null, cancellationToken);
+        return account;
+    }
+
+    /// <summary>Signs in again (password changed, new permissions) and keeps the account; then the names.</summary>
+    /// <exception cref="AccountSetupException">The sign-in failed.</exception>
+    public async Task<Account> SignInAgainAsync(Account account, string displayName, string? label, string? loginHint, IBrowserLauncher browser, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var provider = signIns.FirstOrDefault(s => account.Connections.Any(c => c.ProviderId == s.ProviderId))
+                       ?? throw new AccountSetupException(T("Dieses Konto wird nicht über eine Anmeldung im Browser verbunden."));
+        await provider.SignInAsync(account, loginHint, browser, cancellationToken);
+        return await RenameAsync(account, displayName, label, cancellationToken);
+    }
+
+    private IAccountSignIn SignIn(string providerId) =>
+        signIns.FirstOrDefault(s => s.ProviderId == providerId && s.IsAvailable)
+        ?? throw new AccountSetupException(T("Diese Anmeldung ist in dieser Version von Neruna noch nicht eingerichtet."));
+
+    /// <summary>One line about a connection's server (host, port, user; URL), as the provider describes it.</summary>
+    public string Summary(ServiceConnection connection) => providers.Summary(connection);
 
     private async Task TestAsync(ServiceConnection connection, CancellationToken cancellationToken)
     {

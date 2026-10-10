@@ -40,7 +40,7 @@ public class CloudAccountSyncTests
             [new ImapProviderFactory(credentials, NullLoggerFactory.Instance)],
             [new CalDavProviderFactory(new HttpClient(env.Http), credentials, NullLoggerFactory.Instance)],
             []);
-        var setup = new AccountSetupService(registry, env.Accounts, credentials);
+        var setup = new AccountSetupService(registry, env.Accounts, credentials, []);
         var sync = new CloudAccountSync(cloud, env.Accounts, setup, credentials, settings, NullLogger<CloudAccountSync>.Instance);
 
         // Anna's account came with its password: set up at once, read-only servers from the organisation.
