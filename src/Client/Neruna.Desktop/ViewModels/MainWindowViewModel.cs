@@ -41,7 +41,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly ILogger<MainWindowViewModel> _logger;
     private readonly DispatcherTimer _timer;
     private readonly MailPushService _push;
-    private readonly NotificationService _notifications;
+    private readonly MailNotifier _notifier;
     private readonly ReminderScheduler _reminders;
     private readonly ISettingsStore _settings;
     private readonly Neruna.Core.Cloud.SettingsBackupService _backup;
@@ -71,7 +71,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         IHttpClientFactory http,
         UiLayout layout,
         MailPushService push,
-        NotificationService notifications,
+        MailNotifier notifier,
         ReminderScheduler reminders,
         ISettingsStore settings,
         Neruna.Core.Cloud.CloudSignatureSync cloudSignatures,
@@ -83,39 +83,13 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Diagnostics.CrashReportService crashReports,
         ILogger<MainWindowViewModel> logger)
     {
-        _crashReports = crashReports;
-        // Caught on the UI thread: Neruna keeps running and offers the report now (after the dialog shown at the moment).
-        CrashHandler.Caught += (_, _) => Dispatcher.UIThread.Post(async () => await OfferCrashReportsAsync());
-        _browser = browser;
-        _backup = backup;
-        _cloudAccounts = cloudAccounts;
-        // Accounts of the organisation arrived (connecting, or the regular cloud refresh): show them and fetch their mail.
-        settingsPage.Cloud.AccountsArrived += async (_, _) => await CloudAccountsChangedAsync(sync: true);
-        _cloudSignatures = cloudSignatures;
-        _cloudTemplates = cloudTemplates;
-        _cloudCertificates = cloudCertificates;
-        settingsPage.Attach(cloudSignatures, cloudTemplates, cloudCertificates);
-        Layout = layout;
-        _push = push;
-        _notifications = notifications;
-        _reminders = reminders;
-        _settings = settings;
         MailPage = mailPage;
         CalendarPage = calendarPage;
         ContactsPage = contactsPage;
-        ChatPage = chatPage;
         TasksPage = tasksPage;
-        tasksPage.EditorRequested += (_, editor) => ShowEditor(editor, TasksPage.ReloadAsync);
-        tasksPage.StatusMessage += (_, message) => StatusText = message;
-        tasksPage.CalendarChanged += async (_, _) => await CalendarPage.ReloadAsync();
-        calendarPage.TaskListsChanged += async (_, _) => await TasksPage.ReloadAsync();
-        calendarPage.TaskOpenRequested += async (_, occurrence) =>
-        {
-            CurrentPage = TasksPage;
-            await TasksPage.OpenAsync(occurrence.Calendar, occurrence.ObjectRemoteId);
-        };
+        ChatPage = chatPage;
         SettingsPage = settingsPage;
-        var accountsPage = settingsPage.Accounts;
+        Layout = layout;
         _mail = mail;
         _calendar = calendar;
         _contacts = contacts;
@@ -124,91 +98,60 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _discovery = discovery;
         _accounts = accounts;
         _http = http;
+        _push = push;
+        _notifier = notifier;
+        _reminders = reminders;
+        _settings = settings;
+        _cloudSignatures = cloudSignatures;
+        _cloudTemplates = cloudTemplates;
+        _cloudCertificates = cloudCertificates;
+        _backup = backup;
+        _cloudAccounts = cloudAccounts;
+        _browser = browser;
+        _crashReports = crashReports;
         _logger = logger;
+
         CurrentPage = mailPage;
         mailPage.Preferences.NavigationItems[0].IsActive = true;
+        settingsPage.Attach(cloudSignatures, cloudTemplates, cloudCertificates);
 
-        mailPage.StatusMessage += (_, message) => StatusText = message;
-        mailPage.Agenda.OpenRequested += async (_, occurrence) =>
+        // Caught on the UI thread: Neruna keeps running and offers the report now (after the dialog shown at the moment).
+        CrashHandler.Caught += (_, _) => Dispatcher.UIThread.Post(async () => await OfferCrashReportsAsync());
+
+        WireMailPage();
+        WireCalendarAndTasks();
+        WireContacts();
+        WireChat();
+        WireSettings();
+        WireBackground();
+
+        _timer = new DispatcherTimer { Interval = SyncInterval };
+        _timer.Tick += async (_, _) => await SyncAsync();
+    }
+
+    // ---- How the pages talk to each other and to the shell -----------------------------------------------------------
+
+    private void WireMailPage()
+    {
+        MailPage.StatusMessage += (_, message) => StatusText = message;
+        MailPage.Agenda.OpenRequested += async (_, occurrence) =>
         {
             CurrentPage = CalendarPage;
             await CalendarPage.OpenOccurrenceAsync(occurrence);
         };
-        mailPage.CalendarChanged += async (_, _) =>
-        {
-            await CalendarPage.ReloadAsync();
-            await MailPage.Agenda.ReloadAsync();
-            await _reminders.CheckAsync();
-        };
-        mailPage.Tree.AccountsReordered += async (_, _) => await SettingsPage.Accounts.ReloadAsync();
-        mailPage.PropertyChanged += async (_, e) =>
+        MailPage.CalendarChanged += async (_, _) => await CalendarChangedAsync();
+        MailPage.Tree.AccountsReordered += async (_, _) => await SettingsPage.Accounts.ReloadAsync();
+        MailPage.PropertyChanged += async (_, e) =>
         {
             // Opening a signed message may have collected a new certificate.
-            if (e.PropertyName == nameof(MailViewModel.ReadingPane) && mailPage.ReadingPane?.HasSecurity == true)
+            if (e.PropertyName == nameof(MailViewModel.ReadingPane) && MailPage.ReadingPane?.HasSecurity == true)
             {
                 await SettingsPage.Certificates.ReloadAsync();
             }
         };
-        calendarPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
-        calendarPage.ManageRequested += (_, _) => ShowCalendarSelection();
-        calendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
-        calendarPage.EditorRequested += (_, editor) => ShowEditor(editor, async () =>
-        {
-            await CalendarPage.ReloadAsync();
-            await MailPage.Agenda.ReloadAsync();
-            await _reminders.CheckAsync();
-        });
-        contactsPage.EditorRequested += (_, editor) => ShowEditor(editor, ContactsPage.ReloadAsync);
-        contactsPage.ManageRequested += (_, _) => ShowAddressBookSelection();
-        contactsPage.MailRequested += async (_, recipients) =>
-        {
-            CurrentPage = MailPage;
-            await MailPage.ComposeToAsync(recipients);
-        };
-        // Chat button hidden in Einstellungen → Design: no chat, offline, no status switch.
-        chatPage.IsEnabled = MailPage.Preferences.IsChatShown;
-        MailPage.Preferences.NavigationChanged += (_, _) => ChatPage.IsEnabled = MailPage.Preferences.IsChatShown;
 
-        // The unread count of the chat on its button in the rail.
-        chatPage.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(ChatViewModel.UnreadText) || e.PropertyName == nameof(ChatViewModel.HasUnread))
-            {
-                UpdateChatBadge();
-            }
-        };
-        MailPage.Preferences.NavigationItems.CollectionChanged += (_, _) =>
-        {
-            UpdateChatBadge();
-            OnCurrentPageChanged(CurrentPage);
-        };
-        chatPage.CloudSetupRequested += (_, _) =>
-        {
-            CurrentPage = SettingsPage;
-            SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
-        };
-        // Connected or disconnected: the chat follows at once, not only with the next tick.
-        settingsPage.Cloud.PropertyChanged += async (_, e) =>
-        {
-            if (e.PropertyName == nameof(CloudViewModel.Connection))
-            {
-                await ChatPage.RefreshNowAsync();
-            }
-        };
-        // Restored from a backup: every page from the store again, then the servers of the restored accounts.
-        settingsPage.Cloud.Restored += async (_, _) =>
-        {
-            ShowBackupHint = false;
-            await MailPage.Preferences.LoadAsync();
-            await SettingsPage.ReloadAsync();
-            await RefreshPagesAsync();
-            HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
-            await UpdatePushAsync();
-            await SyncAsync();
-        };
-        settingsPage.Cloud.BackedUp += (_, _) => ShowBackupHint = false;
         // Right-click on an account → "Ordner abonnieren …".
-        mailPage.Tree.FolderSubscriptionsRequested += async (_, node) =>
+        MailPage.Tree.FolderSubscriptionsRequested += async (_, node) =>
         {
             var dialog = new FolderSubscriptionsViewModel(_mail, node.Connection, node.Title);
             dialog.Finished += async (_, saved) =>
@@ -222,6 +165,101 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             Overlay = dialog;
             await dialog.LoadAsync();
         };
+    }
+
+    // An event changed (editor, invitation answered): calendar, the agenda beside the mail and the reminders follow.
+    private async Task CalendarChangedAsync()
+    {
+        await CalendarPage.ReloadAsync();
+        await MailPage.Agenda.ReloadAsync();
+        await _reminders.CheckAsync();
+    }
+
+    private void WireCalendarAndTasks()
+    {
+        CalendarPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
+        CalendarPage.ManageRequested += (_, _) => ShowCalendarSelection();
+        CalendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
+        CalendarPage.EditorRequested += (_, editor) => ShowEditor(editor, CalendarChangedAsync);
+        CalendarPage.TaskListsChanged += async (_, _) => await TasksPage.ReloadAsync();
+        CalendarPage.TaskOpenRequested += async (_, occurrence) =>
+        {
+            CurrentPage = TasksPage;
+            await TasksPage.OpenAsync(occurrence.Calendar, occurrence.ObjectRemoteId);
+        };
+
+        TasksPage.EditorRequested += (_, editor) => ShowEditor(editor, TasksPage.ReloadAsync);
+        TasksPage.StatusMessage += (_, message) => StatusText = message;
+        TasksPage.CalendarChanged += async (_, _) => await CalendarPage.ReloadAsync();
+    }
+
+    private void WireContacts()
+    {
+        ContactsPage.EditorRequested += (_, editor) => ShowEditor(editor, ContactsPage.ReloadAsync);
+        ContactsPage.ManageRequested += (_, _) => ShowAddressBookSelection();
+        ContactsPage.MailRequested += async (_, recipients) =>
+        {
+            CurrentPage = MailPage;
+            await MailPage.ComposeToAsync(recipients);
+        };
+    }
+
+    private void WireChat()
+    {
+        // Chat button hidden in Einstellungen → Design: no chat, offline, no status switch.
+        ChatPage.IsEnabled = MailPage.Preferences.IsChatShown;
+        MailPage.Preferences.NavigationChanged += (_, _) => ChatPage.IsEnabled = MailPage.Preferences.IsChatShown;
+
+        // The unread count of the chat on its button in the rail.
+        ChatPage.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ChatViewModel.UnreadText) || e.PropertyName == nameof(ChatViewModel.HasUnread))
+            {
+                UpdateChatBadge();
+            }
+        };
+        MailPage.Preferences.NavigationItems.CollectionChanged += (_, _) =>
+        {
+            UpdateChatBadge();
+            OnCurrentPageChanged(CurrentPage);
+        };
+        ChatPage.CloudSetupRequested += (_, _) =>
+        {
+            CurrentPage = SettingsPage;
+            SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        };
+    }
+
+    private void WireSettings()
+    {
+        var cloud = SettingsPage.Cloud;
+
+        // Accounts of the organisation arrived (connecting, or the regular cloud refresh): show them and fetch their mail.
+        cloud.AccountsArrived += async (_, _) => await CloudAccountsChangedAsync(sync: true);
+
+        // Connected or disconnected: the chat follows at once, not only with the next tick.
+        cloud.PropertyChanged += async (_, e) =>
+        {
+            if (e.PropertyName == nameof(CloudViewModel.Connection))
+            {
+                await ChatPage.RefreshNowAsync();
+            }
+        };
+
+        // Restored from a backup: every page from the store again, then the servers of the restored accounts.
+        cloud.Restored += async (_, _) =>
+        {
+            ShowBackupHint = false;
+            await MailPage.Preferences.LoadAsync();
+            await SettingsPage.ReloadAsync();
+            await RefreshPagesAsync();
+            HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
+            await UpdatePushAsync();
+            await SyncAsync();
+        };
+        cloud.BackedUp += (_, _) => ShowBackupHint = false;
+
+        var accountsPage = SettingsPage.Accounts;
         accountsPage.AddAccountRequested += (_, _) => ShowAccountSetup();
         accountsPage.EditRequested += (_, account) => ShowAccountSetup(account);
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
@@ -230,36 +268,26 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             await RefreshPagesAsync();
             await UpdatePushAsync();
         };
-        settingsPage.MailOptions.PushChanged += async (_, _) => await UpdatePushAsync();
-        settingsPage.MailOptions.TestNotificationRequested += (_, _) =>
+
+        SettingsPage.MailOptions.PushChanged += async (_, _) => await UpdatePushAsync();
+        SettingsPage.MailOptions.TestNotificationRequested += (_, _) =>
         {
-            try
+            if (_notifier.ShowTest() is { } error)
             {
-                _notifications.Show(new NotificationViewModel(
-                    T("Neue E-Mail · Test"), "Neruna", "So sehen Benachrichtigungen aus", T("Ein Klick holt Neruna nach vorne."),
-                    () =>
-                    {
-                        NotificationService.ActivateMainWindow();
-                        return Task.CompletedTask;
-                    }));
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Showing the test notification failed");
-                StatusText = T("Test-Benachrichtigung fehlgeschlagen: ") + ex.Message;
+                StatusText = T("Test-Benachrichtigung fehlgeschlagen: ") + error;
             }
         };
+    }
 
-        // Push runs in the background; the UI is updated on its thread.
-        push.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId));
-        push.NewMail += (_, e) => _ = Dispatcher.UIThread.InvokeAsync(() => NotifyAsync(e));
+    // Push and the full sync run in the background; the UI is updated on its thread.
+    private void WireBackground()
+    {
+        _push.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId));
+        _push.NewMail += (_, e) => _ = Dispatcher.UIThread.InvokeAsync(() => _notifier.NotifyAsync(e, IsOpenInFront, OpenMessageAsync));
 
         // During a full sync: folders and each finished folder appear at once, not only when everything is done.
-        mail.FoldersSynced += (_, _) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshAfterSyncAsync());
-        mail.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId));
-
-        _timer = new DispatcherTimer { Interval = SyncInterval };
-        _timer.Tick += async (_, _) => await SyncAsync();
+        _mail.FoldersSynced += (_, _) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshAfterSyncAsync());
+        _mail.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId));
     }
 
     public MailViewModel MailPage { get; }
@@ -418,62 +446,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    // New mail: a notification – unless the user is looking at exactly that inbox in Neruna right now.
-    private async Task NotifyAsync(NewMailEvent e)
-    {
-        try
-        {
-            await ShowNotificationsAsync(e);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogWarning(ex, "Showing the notification failed");
-        }
-    }
-
-    private async Task ShowNotificationsAsync(NewMailEvent e)
-    {
-        var account = e.Account.Title;
-        if (!await _settings.GetBoolAsync(SettingKeys.MailNotifications, fallback: true))
-        {
-            _logger.LogInformation("{Count} new mail(s) for {Account}: notifications are switched off", e.Messages.Count, account);
-            return;
-        }
-
-        var lookingAtIt = NotificationService.IsAppActive && CurrentPage == MailPage && Overlay is null
-                          && MailPage.CurrentFolder?.Folder is { } open && open.ConnectionId == e.Folder.ConnectionId && open.RemoteId == e.Folder.RemoteId;
-        if (lookingAtIt)
-        {
-            _logger.LogInformation("{Count} new mail(s) for {Account}: no notification, the inbox is open in front", e.Messages.Count, account);
-            return;
-        }
-
-        _logger.LogInformation("{Count} new mail(s) for {Account}: showing a notification", e.Messages.Count, account);
-
-        if (e.Messages.Count > MaxNotifications)
-        {
-            var newest = e.Messages[0];
-            _notifications.Show(new NotificationViewModel(
-                F("{0} neue E-Mails · {1}", e.Messages.Count, account),
-                string.Join(", ", e.Messages.Select(m => m.From?.DisplayText).Where(n => n is not null).Distinct().Take(3)),
-                newest.Subject,
-                null,
-                () => OpenMessageAsync(e.Folder, newest.RemoteId)));
-            return;
-        }
-
-        foreach (var message in e.Messages.Reverse())
-        {
-            _notifications.Show(new NotificationViewModel(
-                T("Neue E-Mail · ") + account,
-                message.From?.DisplayText ?? "(unbekannt)",
-                string.IsNullOrWhiteSpace(message.Subject) ? T("(kein Betreff)") : message.Subject,
-                message.Preview,
-                () => OpenMessageAsync(e.Folder, message.RemoteId)));
-        }
-    }
-
-    private const int MaxNotifications = 3;
+    // New mail: no notification while the user looks at exactly that folder in Neruna.
+    private bool IsOpenInFront(MailFolder folder) =>
+        NotificationService.IsAppActive && CurrentPage == MailPage && Overlay is null
+        && MailPage.CurrentFolder?.Folder is { } open && open.ConnectionId == folder.ConnectionId && open.RemoteId == folder.RemoteId;
 
     private async Task OpenMessageAsync(MailFolder folder, string remoteId)
     {

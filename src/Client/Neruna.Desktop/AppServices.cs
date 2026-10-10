@@ -118,6 +118,7 @@ internal static class AppServices
         services.AddSingleton<AgendaViewModel>();
         services.AddSingleton<UpdateService>();
         services.AddSingleton<NotificationService>();
+        services.AddSingleton<MailNotifier>();
         services.AddSingleton<ReminderScheduler>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<CertificateManager>();
