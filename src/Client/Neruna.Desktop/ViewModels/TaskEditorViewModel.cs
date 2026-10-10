@@ -91,7 +91,7 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
         {
             await _calendar.SaveTaskAsync(SelectedList!, draft, _existing);
             // New tasks go where the last one went.
-            await _settings.SetAsync(SettingKeys.TasksDefaultList, CalendarController.TaskListKey(SelectedList!));
+            await _settings.SetAsync(SettingKeys.TasksDefaultList, CalendarController.CalendarKey(SelectedList!));
         });
     }
 

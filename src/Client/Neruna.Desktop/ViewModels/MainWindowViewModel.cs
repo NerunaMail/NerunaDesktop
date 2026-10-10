@@ -32,6 +32,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly MailController _mail;
     private readonly CalendarController _calendar;
     private readonly ContactController _contacts;
+    private readonly Neruna.Core.SyncCoordinator _sync;
+    private int _syncCalls;
     private readonly AccountSetupService _setup;
     private readonly AccountDiscovery _discovery;
     private readonly IAccountStore _accounts;
@@ -63,6 +65,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         MailController mail,
         CalendarController calendar,
         ContactController contacts,
+        Neruna.Core.SyncCoordinator sync,
         AccountSetupService setup,
         AccountDiscovery discovery,
         IAccountStore accounts,
@@ -119,6 +122,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _mail = mail;
         _calendar = calendar;
         _contacts = contacts;
+        _sync = sync;
         _setup = setup;
         _discovery = discovery;
         _accounts = accounts;
@@ -621,20 +625,21 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanSync))]
     private async Task SyncAsync()
     {
+        // Timer, button, new accounts and the cloud all ask for syncs; the coordinator runs one at a time and lets
+        // waiting requests share the next run. "Synchronisiere …" stays until the last request is done.
+        _syncCalls++;
         IsSyncing = true;
         StatusText = T("Synchronisiere …");
         try
         {
-            // The three areas are independent; one failing never blocks the others.
-            // Off the UI thread: SQLite and parsing hundreds of messages, events and cards would freeze the window.
-            var reports = await Task.Run(() => Task.WhenAll(_mail.SyncAllAsync(), _calendar.SyncAllAsync(), _contacts.SyncAllAsync()));
+            var reports = await _sync.SyncAllAsync();
             await RefreshPagesAsync();
             await MailPage.Agenda.ReloadAsync();
             await _reminders.CheckAsync();
             if (await SyncCloudAsync())
             {
                 // New accounts from the organisation: fetch their folders and mail right away.
-                reports = [.. reports, .. await Task.Run(() => Task.WhenAll(_mail.SyncAllAsync(), _calendar.SyncAllAsync(), _contacts.SyncAllAsync()))];
+                reports = [.. reports, .. await _sync.SyncAllAsync()];
                 await RefreshPagesAsync();
             }
 
@@ -650,7 +655,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         }
         finally
         {
-            IsSyncing = false;
+            IsSyncing = --_syncCalls > 0;
         }
     }
 

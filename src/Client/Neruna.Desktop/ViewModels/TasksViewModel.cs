@@ -78,10 +78,10 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
                 var items = group.OrderBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase)
                     .Select(l => new TaskListItem(l, colors.GetValueOrDefault((l.ConnectionId, l.RemoteId)) ?? CalendarViewModel.Palette[0], _all.Count(t => !t.IsCompleted && Same(t.List, l)))
                     {
-                        IsVisible = !hidden.Contains(CalendarController.TaskListKey(l)),
-                        InCalendar = inCalendar.Contains(CalendarController.TaskListKey(l)),
-                        IsSolo = _soloKey == CalendarController.TaskListKey(l),
-                        IsDimmed = _soloKey is not null && _soloKey != CalendarController.TaskListKey(l),
+                        IsVisible = !hidden.Contains(CalendarController.CalendarKey(l)),
+                        InCalendar = inCalendar.Contains(CalendarController.CalendarKey(l)),
+                        IsSolo = _soloKey == CalendarController.CalendarKey(l),
+                        IsDimmed = _soloKey is not null && _soloKey != CalendarController.CalendarKey(l),
                     })
                     .ToList();
                 foreach (var item in items)
@@ -142,7 +142,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
     private void ToggleSolo(TaskListItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        var key = CalendarController.TaskListKey(item.Info);
+        var key = CalendarController.CalendarKey(item.Info);
         SetSolo(_soloKey == key ? null : key);
         Rebuild();
     }
@@ -152,7 +152,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
         _soloKey = key;
         foreach (var item in ListGroups.SelectMany(g => g.Lists))
         {
-            var itemKey = CalendarController.TaskListKey(item.Info);
+            var itemKey = CalendarController.CalendarKey(item.Info);
             item.IsSolo = key == itemKey;
             item.IsDimmed = key is not null && key != itemKey;
         }
@@ -160,7 +160,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
 
     private bool IsShown(CalendarInfo list) =>
         _soloKey is not null
-            ? CalendarController.TaskListKey(list) == _soloKey
+            ? CalendarController.CalendarKey(list) == _soloKey
             : ListGroups.SelectMany(g => g.Lists).FirstOrDefault(l => Same(l.Info, list)) is not { IsVisible: false };
 
     private static bool Same(CalendarInfo a, CalendarInfo b) => a.ConnectionId == b.ConnectionId && a.RemoteId == b.RemoteId;
@@ -258,7 +258,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
     {
         var writable = WritableLists();
         var chosen = await settings.GetAsync(SettingKeys.TasksDefaultList);
-        return writable.FirstOrDefault(l => CalendarController.TaskListKey(l) == chosen)
+        return writable.FirstOrDefault(l => CalendarController.CalendarKey(l) == chosen)
                ?? writable.FirstOrDefault(IsShown)
                ?? writable.FirstOrDefault();
     }

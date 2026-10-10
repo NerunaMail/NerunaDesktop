@@ -1,5 +1,7 @@
 using System.Net;
+using Neruna.Core;
 using Neruna.Core.Accounts;
+using Neruna.Core.Calendar;
 using Neruna.Core.Providers;
 using Neruna.Providers.Ics;
 
@@ -126,5 +128,20 @@ public class CalendarControllerTests
 
         Assert.Equal(Neruna.Core.Calendar.CalendarProviderCapabilities.None, provider.Capabilities);
         await Assert.ThrowsAsync<NotSupportedException>(() => provider.DeleteAsync(null!, null!, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Calendars_switched_off_are_remembered()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var calendar = new CalendarInfo(Guid.NewGuid(), "team", "Team", null, true);
+
+        await env.Calendar.SetCalendarVisibleAsync(calendar, false, ct);
+        Assert.NotNull(await env.Get<ISettingsStore>().GetAsync(SettingKeys.CalendarsHidden, ct)); // stored, so it outlives a restart
+        Assert.Equal([CalendarController.CalendarKey(calendar)], await env.Calendar.GetHiddenCalendarsAsync(ct));
+
+        await env.Calendar.SetCalendarVisibleAsync(calendar, true, ct);
+        Assert.Empty(await env.Calendar.GetHiddenCalendarsAsync(ct));
     }
 }

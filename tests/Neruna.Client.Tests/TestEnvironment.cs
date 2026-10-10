@@ -61,6 +61,7 @@ internal sealed class TestEnvironment : IAsyncDisposable
         services.AddSingleton<Neruna.Core.Calendar.ReminderService>();
         services.AddSingleton<Neruna.Core.Calendar.InvitationService>();
         services.AddSingleton<CalendarController>();
+        services.AddSingleton<SyncCoordinator>();
         services.AddSingleton<ContactController>();
         services.AddSingleton<AccountSetupService>();
         services.AddSingleton(TimeProvider.System);

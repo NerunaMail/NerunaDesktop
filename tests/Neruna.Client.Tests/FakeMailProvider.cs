@@ -18,6 +18,42 @@ internal sealed class FakeMailServer
 
     public int MessageDownloads { get; set; }
 
+    /// <summary>Awaited at every folder listing (= every sync of a connection): lets a test hold a sync open.</summary>
+    public Func<Task>? FolderListingGate { get; set; }
+
+    private int _listingsRunning;
+
+    public int FolderListings;
+
+    /// <summary>The most folder listings that ran at the same time.</summary>
+    public int MaxConcurrentListings;
+
+    internal async Task ListingAsync()
+    {
+        Interlocked.Increment(ref FolderListings);
+        var running = Interlocked.Increment(ref _listingsRunning);
+        InterlockedMax(ref MaxConcurrentListings, running);
+        try
+        {
+            if (FolderListingGate is { } gate)
+            {
+                await gate();
+            }
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _listingsRunning);
+        }
+    }
+
+    private static void InterlockedMax(ref int target, int value)
+    {
+        int current;
+        while (value > (current = Volatile.Read(ref target)) && Interlocked.CompareExchange(ref target, value, current) != current)
+        {
+        }
+    }
+
     /// <summary>Complete messages stored with APPEND (drafts, moved mail), by remote ID.</summary>
     public Dictionary<string, MimeMessage> Contents { get; } = [];
 
@@ -79,8 +115,14 @@ internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server)
 
     public Task TestConnectionAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-    public Task<IReadOnlyList<MailFolder>> GetFoldersAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<MailFolder>>(server.Folders.Keys
+    public async Task<IReadOnlyList<MailFolder>> GetFoldersAsync(CancellationToken cancellationToken = default)
+    {
+        await server.ListingAsync();
+        return Folders();
+    }
+
+    private IReadOnlyList<MailFolder> Folders() =>
+        [.. server.Folders.Keys
             .Select(name => new MailFolder(connectionId, name, name, null, name switch
             {
                 "INBOX" => FolderRole.Inbox,
@@ -88,8 +130,7 @@ internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server)
                 "Archive" => FolderRole.Archive,
                 "Drafts" => FolderRole.Drafts,
                 _ => FolderRole.None,
-            }))
-            .ToList());
+            }))];
 
     public Task<FolderSyncResult> SyncFolderAsync(MailFolder folder, IReadOnlyCollection<string> knownRemoteIds, CancellationToken cancellationToken = default)
     {

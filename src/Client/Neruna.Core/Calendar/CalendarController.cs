@@ -361,6 +361,20 @@ public sealed class CalendarController(
     }
 
     /// <summary>The task lists hidden under "Aufgaben" (and so also not shown in the calendar).</summary>
+    /// <summary>Calendars switched off in the calendar view – kept across restarts.</summary>
+    public async Task<IReadOnlySet<string>> GetHiddenCalendarsAsync(CancellationToken cancellationToken = default) =>
+        await GetIdsAsync(SettingKeys.CalendarsHidden, cancellationToken) ?? [];
+
+    public async Task SetCalendarVisibleAsync(CalendarInfo calendar, bool visible, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        var hidden = await GetIdsAsync(SettingKeys.CalendarsHidden, cancellationToken) ?? [];
+        if (visible ? hidden.Remove(CalendarKey(calendar)) : hidden.Add(CalendarKey(calendar)))
+        {
+            await settings.SetAsync(SettingKeys.CalendarsHidden, JsonSerializer.Serialize(hidden), cancellationToken);
+        }
+    }
+
     public async Task<IReadOnlySet<string>> GetHiddenTaskListsAsync(CancellationToken cancellationToken = default) =>
         await GetIdsAsync(SettingKeys.TasksHiddenLists, cancellationToken) ?? [];
 
@@ -368,7 +382,7 @@ public sealed class CalendarController(
     {
         ArgumentNullException.ThrowIfNull(list);
         var hidden = await GetIdsAsync(SettingKeys.TasksHiddenLists, cancellationToken) ?? [];
-        if (visible ? hidden.Remove(TaskListKey(list)) : hidden.Add(TaskListKey(list)))
+        if (visible ? hidden.Remove(CalendarKey(list)) : hidden.Add(CalendarKey(list)))
         {
             await settings.SetAsync(SettingKeys.TasksHiddenLists, JsonSerializer.Serialize(hidden), cancellationToken);
         }
@@ -385,7 +399,7 @@ public sealed class CalendarController(
         // 0.1.14 had one switch for all lists: carry it over once.
         if (await settings.GetAsync(SettingKeys.CalendarShowTasks, cancellationToken) == "true")
         {
-            var all = (await GetCalendarsAsync(cancellationToken)).Where(c => c.HasTasks).Select(TaskListKey).ToHashSet(StringComparer.Ordinal);
+            var all = (await GetCalendarsAsync(cancellationToken)).Where(c => c.HasTasks).Select(CalendarKey).ToHashSet(StringComparer.Ordinal);
             await settings.SetAsync(SettingKeys.TasksInCalendar, JsonSerializer.Serialize(all), cancellationToken);
             await settings.SetAsync(SettingKeys.CalendarShowTasks, null, cancellationToken);
             return all;
@@ -398,13 +412,13 @@ public sealed class CalendarController(
     {
         ArgumentNullException.ThrowIfNull(list);
         var lists = new HashSet<string>(await GetTaskListsInCalendarAsync(cancellationToken), StringComparer.Ordinal);
-        if (shown ? lists.Add(TaskListKey(list)) : lists.Remove(TaskListKey(list)))
+        if (shown ? lists.Add(CalendarKey(list)) : lists.Remove(CalendarKey(list)))
         {
             await settings.SetAsync(SettingKeys.TasksInCalendar, JsonSerializer.Serialize(lists), cancellationToken);
         }
     }
 
-    public static string TaskListKey(CalendarInfo list)
+    public static string CalendarKey(CalendarInfo list)
     {
         ArgumentNullException.ThrowIfNull(list);
         return $"{list.ConnectionId:N}|{list.RemoteId}";
@@ -472,10 +486,10 @@ public sealed class CalendarController(
         var inCalendar = await GetTaskListsInCalendarAsync(cancellationToken);
         if (inCalendar.Count > 0)
         {
-            var shownCalendars = calendars.Select(TaskListKey).ToHashSet(StringComparer.Ordinal);
+            var shownCalendars = calendars.Select(CalendarKey).ToHashSet(StringComparer.Ordinal);
             foreach (var task in await GetTasksAsync(cancellationToken))
             {
-                var key = TaskListKey(task.List);
+                var key = CalendarKey(task.List);
                 if (inCalendar.Contains(key) && (task.List.HasEvents ? shownCalendars.Contains(key) : includeTaskLists)
                     && !task.IsCompleted && task.Due is { } due && due < to && (task.DueHasTime ? due.AddMinutes(30) : due.AddDays(1)) > from)
                 {

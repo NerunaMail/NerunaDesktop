@@ -120,6 +120,9 @@ public static class SettingKeys
     /// </summary>
     public const string TasksInCalendar = "tasks.inCalendar";
 
+    /// <summary>Calendars switched off in the calendar (JSON list of "connectionId|remoteId").</summary>
+    public const string CalendarsHidden = "calendar.hidden";
+
     /// <summary>JSON list of task lists hidden under "Aufgaben" ("connectionId|remoteId").</summary>
     public const string TasksHiddenLists = "tasks.hidden";
 

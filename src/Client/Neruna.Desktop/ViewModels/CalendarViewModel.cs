@@ -130,7 +130,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         IsWorkWeek = await settings.GetBoolAsync(SettingKeys.CalendarWorkWeek);
         _loadingSettings = false;
         GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
-        var hidden = Calendars.Where(c => !c.IsVisible).Select(c => (c.Info.ConnectionId, c.Info.RemoteId)).ToHashSet();
+        var hidden = await calendar.GetHiddenCalendarsAsync();
 
         // The new list is built first and swapped in at once: a week load starting meanwhile must never see no calendars.
         var items = new List<CalendarListItem>();
@@ -143,10 +143,10 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
             var color = colors[(info.ConnectionId, info.RemoteId)];
             var item = new CalendarListItem(info, color)
             {
-                IsVisible = !hidden.Contains((info.ConnectionId, info.RemoteId)),
-                ShowTasks = tasksShown.Contains(CalendarController.TaskListKey(info)),
-                IsSolo = _soloKey == CalendarController.TaskListKey(info),
-                IsDimmed = _soloKey is not null && _soloKey != CalendarController.TaskListKey(info),
+                IsVisible = !hidden.Contains(CalendarController.CalendarKey(info)),
+                ShowTasks = tasksShown.Contains(CalendarController.CalendarKey(info)),
+                IsSolo = _soloKey == CalendarController.CalendarKey(info),
+                IsDimmed = _soloKey is not null && _soloKey != CalendarController.CalendarKey(info),
             };
             item.PropertyChanged += async (_, e) =>
             {
@@ -158,6 +158,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
                         SetSolo(null);
                     }
 
+                    await calendar.SetCalendarVisibleAsync(item.Info, item.IsVisible);
                     await LoadWeekAsync(dataChanged: true);
                 }
                 else if (e.PropertyName == nameof(CalendarListItem.ShowTasks))
@@ -231,7 +232,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     private async Task ToggleSoloAsync(CalendarListItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        var key = CalendarController.TaskListKey(item.Info);
+        var key = CalendarController.CalendarKey(item.Info);
         SetSolo(_soloKey == key ? null : key);
         await LoadWeekAsync(dataChanged: true);
     }
@@ -241,14 +242,14 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         _soloKey = key;
         foreach (var item in Calendars)
         {
-            var itemKey = CalendarController.TaskListKey(item.Info);
+            var itemKey = CalendarController.CalendarKey(item.Info);
             item.IsSolo = key == itemKey;
             item.IsDimmed = key is not null && key != itemKey;
         }
     }
 
     private bool IsShown(CalendarListItem item) =>
-        _soloKey is null ? item.IsVisible : CalendarController.TaskListKey(item.Info) == _soloKey;
+        _soloKey is null ? item.IsVisible : CalendarController.CalendarKey(item.Info) == _soloKey;
 
     /// <summary>Sets a calendar's color; null restores the server's color.</summary>
     public async Task SetColorAsync(CalendarListItem item, string? color)
