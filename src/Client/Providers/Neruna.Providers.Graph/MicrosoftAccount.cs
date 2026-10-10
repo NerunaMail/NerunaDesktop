@@ -18,11 +18,14 @@ public static class MicrosoftAccount
         new Uri("https://login.microsoftonline.com/common/oauth2/v2.0/authorize"),
         new Uri("https://login.microsoftonline.com/common/oauth2/v2.0/token"),
         ClientId,
-        ["offline_access", "openid", "email", "User.Read", "Mail.ReadWrite", "Mail.Send", "MailboxSettings.Read", "Calendars.ReadWrite", "Contacts.ReadWrite", TasksScope],
-        [TasksScope]);
+        ["offline_access", "openid", "email", "User.Read", "Mail.ReadWrite", "Mail.Send", "MailboxSettings.Read", "Calendars.ReadWrite", "Contacts.ReadWrite", TasksScope, MailboxSettingsScope],
+        [TasksScope, MailboxSettingsScope]);
 
     /// <summary>Microsoft To Do; added in 0.1.14 – accounts signed in before get tasks after signing in again.</summary>
     public const string TasksScope = "Tasks.ReadWrite";
+
+    /// <summary>The out-of-office reply (automatic replies) is written to the mailbox settings.</summary>
+    public const string MailboxSettingsScope = "MailboxSettings.ReadWrite";
 }
 
 /// <summary>What a Graph connection stores (no secrets: the tokens are in the keychain under <see cref="TokenId"/>).</summary>

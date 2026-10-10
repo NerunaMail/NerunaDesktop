@@ -20,6 +20,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
     /// <summary>"Bearbeiten": the shell shows the setup dialog with this account.</summary>
     public event EventHandler<Neruna.Core.Accounts.Account>? EditRequested;
 
+    /// <summary>"Abwesenheit" on an account with mail.</summary>
+    public event EventHandler<Neruna.Core.Accounts.Account>? AutoReplyRequested;
+
     /// <summary>Raised after an account was removed, so the other pages reload.</summary>
     public event EventHandler? AccountsChanged;
 
@@ -56,6 +59,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
     [RelayCommand]
     private void Edit(AccountItem item) => EditRequested?.Invoke(this, item.Account);
+
+    [RelayCommand]
+    private void AutoReply(AccountItem item) => AutoReplyRequested?.Invoke(this, item.Account);
 
     [RelayCommand]
     private async Task RemoveAsync(AccountItem item)
@@ -132,6 +138,8 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     public string? Email => Account.EmailAddress;
 
     public bool HasEmail => Email is not null;
+
+    public bool HasMail => Account.ConnectionsOf(ServiceKind.Mail).Any();
 
     public IReadOnlyList<ConnectionLine> Connections { get; } = account.Connections.OrderBy(c => c.Kind).Select(c => ConnectionLine.From(c, summary(c))).ToList();
 

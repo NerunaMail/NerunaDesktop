@@ -150,6 +150,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
 
+        MailPage.Tree.AutoReplyRequested += async (_, node) => await ShowAutoReplyAsync(node.Account, node.Connection);
+
         // Right-click on an account → "Ordner abonnieren …".
         MailPage.Tree.FolderSubscriptionsRequested += async (_, node) =>
         {
@@ -262,6 +264,13 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         var accountsPage = SettingsPage.Accounts;
         accountsPage.AddAccountRequested += (_, _) => ShowAccountSetup();
         accountsPage.EditRequested += (_, account) => ShowAccountSetup(account);
+        accountsPage.AutoReplyRequested += async (_, account) =>
+        {
+            if (account.ConnectionsOf(Neruna.Core.Accounts.ServiceKind.Mail).FirstOrDefault() is { } connection)
+            {
+                await ShowAutoReplyAsync(account, connection);
+            }
+        };
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         accountsPage.AccountsChanged += async (_, _) =>
         {
@@ -616,6 +625,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 await RefreshPagesAsync();
             }
 
+            if (DateTime.UtcNow - _autoRepliesCheckedAt > TimeSpan.FromHours(1))
+            {
+                _ = RefreshAutoRepliesAsync();
+            }
+
             var failures = reports.SelectMany(r => r.Failures).ToList();
             StatusText = failures.Count == 0
                 ? F("Synchronisiert um {0:t}", DateTime.Now)
@@ -758,6 +772,51 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 MailPage.Tree.MarkSettingUp(connection.Id, false);
             }
         }
+    }
+
+    // ---- Out of office ---------------------------------------------------------------------------------------------
+
+    private async Task ShowAutoReplyAsync(Neruna.Core.Accounts.Account account, Neruna.Core.Accounts.ServiceConnection connection)
+    {
+        var dialog = new AutoReplyViewModel(_mail, account, connection);
+        dialog.Finished += async (_, saved) =>
+        {
+            Overlay = null;
+            if (saved)
+            {
+                StatusText = T("Abwesenheitsnotiz gespeichert.");
+                await RefreshAutoRepliesAsync();
+            }
+        };
+        Overlay = dialog;
+        await dialog.LoadAsync();
+    }
+
+    private DateTime _autoRepliesCheckedAt;
+
+    /// <summary>Asks every mail account's server whether it answers automatically (at start, after a change, hourly).</summary>
+    private async Task RefreshAutoRepliesAsync()
+    {
+        _autoRepliesCheckedAt = DateTime.UtcNow;
+        var active = new List<(MailAccountNode, Neruna.Core.Mail.AutoReply)>();
+        foreach (var node in MailPage.Accounts.ToList())
+        {
+            try
+            {
+                var (reply, _) = await Task.Run(() => _mail.GetAutoReplyAsync(node.Connection));
+                if (reply.IsActive(DateTimeOffset.Now))
+                {
+                    active.Add((node, reply));
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // No ManageSieve, a missing permission, offline: no hint for this account.
+                _logger.LogDebug(ex, "Out-of-office status of {Account} unknown", node.Title);
+            }
+        }
+
+        MailPage.ShowAutoReplies(active);
     }
 
     private void ShowIcsSubscription()

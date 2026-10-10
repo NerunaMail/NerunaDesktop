@@ -235,6 +235,37 @@ public class GraphProviderTests
         Assert.Contains("Tasks.ReadWrite", http.Bodies.Last(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task The_out_of_office_reply_needs_the_mailbox_settings_permission_and_maps_both_ways()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (without, _) = await SignedInAsync("Mail.ReadWrite MailboxSettings.Read");
+        var old = new GraphMailProvider(Guid.NewGuid(), without, NullLogger<GraphMailProvider>.Instance);
+        await Assert.ThrowsAsync<AutoReplyUnavailableException>(() => old.GetAutoReplyAsync(ct));
+
+        var (graph, http) = await SignedInAsync("Mail.ReadWrite MailboxSettings.ReadWrite");
+        http.Routes["GET /v1.0/me/mailboxSettings/automaticRepliesSetting"] = """
+            {"status":"scheduled","externalAudience":"all",
+             "scheduledStartDateTime":{"dateTime":"2026-10-11T22:00:00.0000000","timeZone":"UTC"},
+             "scheduledEndDateTime":{"dateTime":"2026-10-16T22:00:00.0000000","timeZone":"UTC"},
+             "internalReplyMessage":"<html><body><div>Bin weg.<br>Gruss Anna</div></body></html>","externalReplyMessage":""}
+            """;
+        var provider = new GraphMailProvider(Guid.NewGuid(), graph, NullLogger<GraphMailProvider>.Instance);
+        var (reply, features) = await provider.GetAutoReplyAsync(ct);
+        Assert.Equal(AutoReplyFeatures.Schedule, features);
+        Assert.True(reply.IsEnabled && reply.IsScheduled);
+        Assert.Equal(new DateTimeOffset(2026, 10, 11, 22, 0, 0, TimeSpan.Zero), reply.Start);
+        Assert.Contains("Bin weg.", reply.Message, StringComparison.Ordinal);
+        Assert.Contains("Gruss Anna", reply.Message, StringComparison.Ordinal);
+
+        await provider.SetAutoReplyAsync(new AutoReply(true, "Ferien <bis> Freitag\nAnna", reply.Start, reply.End), ["anna@example.com"], ct);
+        var body = Assert.Single(http.Bodies);
+        Assert.Contains("\"status\":\"scheduled\"", body, StringComparison.Ordinal);
+        Assert.Contains("2026-10-11T22:00:00", body, StringComparison.Ordinal);
+        Assert.Contains("Ferien \\u0026lt;bis\\u0026gt; Freitag\\u003Cbr\\u003EAnna", body, StringComparison.Ordinal);
+        Assert.Contains("PATCH /v1.0/me/mailboxSettings", http.Requests);
+    }
+
     private static async Task<(GraphClient Graph, FakeGraph Http)> SignedInAsync(string? scope = null)
     {
         var env = await TestEnvironment.CreateAsync();

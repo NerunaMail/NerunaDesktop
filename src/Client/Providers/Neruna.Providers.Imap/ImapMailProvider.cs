@@ -24,13 +24,13 @@ namespace Neruna.Providers.Imap;
 /// First iteration: detects flag changes and deletions by fetching flags of all known UIDs.
 /// CONDSTORE/QRESYNC (RFC 7162) and IDLE push will replace that for large folders.
 /// </remarks>
-public sealed class ImapMailProvider(
+public sealed partial class ImapMailProvider(
     Guid connectionId,
     ImapSettings settings,
     ICredentialStore credentials,
     ILogger<ImapMailProvider> logger,
     string? protocolLogDirectory = null,
-    int maxInitialMessages = ImapMailProvider.DefaultMaxInitialMessages) : IMailProvider
+    int maxInitialMessages = ImapMailProvider.DefaultMaxInitialMessages) : IMailProvider, IAutoReplyProvider
 {
     /// <summary>On first sync only the newest messages are fetched; older ones are loaded on demand (scrolling down).</summary>
     public const int DefaultMaxInitialMessages = 2000;

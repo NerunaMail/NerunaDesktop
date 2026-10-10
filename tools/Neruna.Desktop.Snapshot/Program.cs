@@ -121,6 +121,32 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
 
+        // Out of office: the dialog, then the hint above the list while it is on.
+        vm.MailPage.Tree.AutoReplyCommand.Execute(vm.MailPage.Accounts[0]);
+        for (var i = 0; i < 50 && (vm.Overlay as AutoReplyViewModel)?.IsBusy != false; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (vm.Overlay is AutoReplyViewModel autoReply)
+        {
+            autoReply.IsEnabled = true;
+            autoReply.IsScheduled = true;
+            autoReply.FirstDay = DateTime.Today;
+            autoReply.LastDay = DateTime.Today.AddDays(11);
+            await SaveAsync(window, output, "auto-reply.png");
+            await autoReply.SaveCommand.ExecuteAsync(null);
+            for (var i = 0; i < 50 && vm.MailPage.AutoReplyNotice is null; i++)
+            {
+                await Task.Delay(100);
+            }
+
+            Console.WriteLine($"Out of office: {vm.MailPage.AutoReplyNotice}");
+            await SaveAsync(window, output, "auto-reply-notice.png");
+            vm.MailPage.ShowAutoReplies([]);
+            await services.GetRequiredService<Neruna.Core.Mail.MailController>().SetAutoReplyAsync(vm.MailPage.Accounts[0].Account, vm.MailPage.Accounts[0].Connection, Neruna.Core.Mail.AutoReply.Off);
+        }
+
         // A freshly added account: in the tree at once, "Ordner werden geladen …" until its first sync is done.
         var newAccount = vm.MailPage.Accounts[0].Connection.Id;
         vm.MailPage.Tree.MarkSettingUp(newAccount, true);

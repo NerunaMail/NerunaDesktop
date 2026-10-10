@@ -20,6 +20,9 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
     /// <summary>The user moved an account in the folder tree; other lists (settings) follow.</summary>
     public event EventHandler? AccountsReordered;
 
+    /// <summary>Raised for "Abwesenheitsnotiz …" on an account (the shell shows the dialog).</summary>
+    public event EventHandler<MailAccountNode>? AutoReplyRequested;
+
     /// <summary>Raised for "Ordner abonnieren …" on an account (the shell shows the dialog).</summary>
     public event EventHandler<MailAccountNode>? FolderSubscriptionsRequested;
 
@@ -173,6 +176,9 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
 
     [RelayCommand]
     private void SubscribeFolders(MailAccountNode node) => FolderSubscriptionsRequested?.Invoke(this, node);
+
+    [RelayCommand]
+    private void AutoReply(MailAccountNode node) => AutoReplyRequested?.Invoke(this, node);
 
     [RelayCommand]
     private async Task AddFavoriteAsync(MailFolderNode folder)

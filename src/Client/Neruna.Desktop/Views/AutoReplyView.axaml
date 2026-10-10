@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.AutoReplyView"
+             x:DataType="vm:AutoReplyViewModel">
+
+  <StackPanel>
+    <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,10"
+               Text="{l:T 'Der Mailserver beantwortet eingehende Mails automatisch – auch wenn Neruna geschlossen ist. Jeder Absender erhält die Antwort höchstens einmal pro Tag.'}" />
+
+    <ProgressBar IsIndeterminate="True" Width="120" Height="4" MinWidth="0" HorizontalAlignment="Left" IsVisible="{Binding IsBusy}" Margin="0,4,0,8" />
+    <TextBlock Classes="error" TextWrapping="Wrap" Text="{Binding Unavailable}" IsVisible="{Binding Unavailable, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,0,0,8" />
+
+    <StackPanel IsVisible="{Binding IsReady}" Spacing="6">
+      <ToggleSwitch IsChecked="{Binding IsEnabled}" OnContent="{l:T 'Automatische Antworten senden'}" OffContent="{l:T 'Automatische Antworten senden'}" />
+
+      <StackPanel Spacing="6" IsEnabled="{Binding IsEnabled}">
+        <StackPanel IsVisible="{Binding CanSchedule}" Spacing="6">
+          <CheckBox Content="{l:T 'Nur in diesem Zeitraum'}" IsChecked="{Binding IsScheduled}" />
+          <Grid ColumnDefinitions="Auto,*,16,Auto,*" IsEnabled="{Binding IsScheduled}" Margin="28,0,0,0">
+            <TextBlock Text="{l:T 'Vom'}" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding FirstDay}" HorizontalAlignment="Stretch" />
+            <TextBlock Grid.Column="3" Text="{l:T 'bis und mit'}" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <CalendarDatePicker Grid.Column="4" SelectedDate="{Binding LastDay}" HorizontalAlignment="Stretch" />
+          </Grid>
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding CanSetSubject}">
+          <TextBlock Classes="label" Text="{l:T 'Betreff'}" />
+          <TextBox Text="{Binding Subject}" PlaceholderText="{l:T 'leer lassen für den Standardbetreff des Servers'}" />
+        </StackPanel>
+
+        <TextBlock Classes="label" Text="{l:T 'Antwort'}" />
+        <TextBox Text="{Binding Message}" AcceptsReturn="True" TextWrapping="Wrap" Height="190" />
+      </StackPanel>
+    </StackPanel>
+
+    <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" Margin="0,10,0,0"
+               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,20,0,0">
+      <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
+      <Button Classes="accent" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

@@ -6,6 +6,7 @@
 # Konten (Passwort jeweils "geheim"): anna@example.com, lea@example.com, marco@example.com
 #   IMAP  <host>:3143  unverschlüsselt      SMTP <host>:3025 unverschlüsselt
 #   CalDAV/CardDAV  http://<host>:5232/     (Radicale; akzeptiert jedes Passwort, alle sehen alle Kalender per URL)
+#   ManageSieve     <host>:4190 unverschlüsselt (Dovecot; jedes Konto, Passwort "pass") – für die Abwesenheitsnotiz
 # Nur für Tests im lokalen Netz – keine Verschlüsselung, keine echte Authentifizierung beim DAV-Server.
 services:
   mail:
@@ -18,6 +19,14 @@ services:
     ports:
       - "3025:3025"
       - "3143:3143"
+
+  # ManageSieve (Abwesenheitsnotiz): Dovecot/Pigeonhole, jedes Konto mit Passwort "pass", ohne TLS
+  sieve:
+    image: dovecot/dovecot:2.3.21
+    ports:
+      - "4190:4190"
+    volumes:
+      - ./dovecot-sieve.conf:/etc/dovecot/conf.d/99-neruna.conf:ro
 
   dav:
     image: tomsquest/docker-radicale

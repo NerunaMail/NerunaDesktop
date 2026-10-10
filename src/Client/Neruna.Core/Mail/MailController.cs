@@ -44,6 +44,31 @@ public sealed class MailController(
         }
     }
 
+    /// <summary>The account's out-of-office reply as its server has it, and what the server can do.</summary>
+    /// <exception cref="AutoReplyUnavailableException">Not offered by this account's server (the message says why).</exception>
+    public async Task<(AutoReply Reply, AutoReplyFeatures Features)> GetAutoReplyAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
+    {
+        await using var provider = providers.CreateMail(connection);
+        return provider is IAutoReplyProvider replies
+            ? await replies.GetAutoReplyAsync(cancellationToken)
+            : throw new AutoReplyUnavailableException(T("Für dieses Konto kann Neruna keine Abwesenheitsnotiz einrichten."));
+    }
+
+    /// <summary>Stores the out-of-office reply on the server; mail to any of the account's addresses is answered.</summary>
+    /// <exception cref="AutoReplyUnavailableException">Not offered by this account's server (the message says why).</exception>
+    public async Task SetAutoReplyAsync(Account account, ServiceConnection connection, AutoReply reply, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        ArgumentNullException.ThrowIfNull(reply);
+        await using var provider = providers.CreateMail(connection);
+        if (provider is not IAutoReplyProvider replies)
+        {
+            throw new AutoReplyUnavailableException(T("Für dieses Konto kann Neruna keine Abwesenheitsnotiz einrichten."));
+        }
+
+        await replies.SetAutoReplyAsync(reply, [.. account.Identities.Select(i => i.Email).Distinct(StringComparer.OrdinalIgnoreCase)], cancellationToken);
+    }
+
     /// <summary>"Ordner abonnieren": every folder of the connection's server and whether it is shown.</summary>
     /// <exception cref="NotSupportedException">The provider has no subscriptions.</exception>
     public async Task<IReadOnlyList<FolderSubscription>> GetSubscriptionsAsync(ServiceConnection connection, CancellationToken cancellationToken = default)

@@ -924,6 +924,37 @@ internal sealed partial class MailViewModel(
 
     private bool CanLoadMore() => HasMore && !IsLoadingMore;
 
+    // ---- Out of office: a hint above the list while an account answers automatically --------------------------------
+
+    /// <summary>"Abwesenheitsnotiz ist eingeschaltet – …"; null when no account answers automatically.</summary>
+    [ObservableProperty]
+    public partial string? AutoReplyNotice { get; set; }
+
+    private Guid? _autoReplyConnection;
+
+    /// <summary>The accounts whose out-of-office reply is on now (from the servers).</summary>
+    public void ShowAutoReplies(IReadOnlyList<(MailAccountNode Account, AutoReply Reply)> active)
+    {
+        ArgumentNullException.ThrowIfNull(active);
+        _autoReplyConnection = active.Count > 0 ? active[0].Account.Connection.Id : null;
+        AutoReplyNotice = active switch
+        {
+            [] => null,
+            [var (account, reply)] when reply.End is { } end => F("Abwesenheitsnotiz ist eingeschaltet – {0}, bis und mit {1:d}", account.Title, end.LocalDateTime.Date.AddDays(-1)),
+            [var (account, _)] => F("Abwesenheitsnotiz ist eingeschaltet – {0}", account.Title),
+            _ => F("Abwesenheitsnotiz ist eingeschaltet – {0} Konten", active.Count),
+        };
+    }
+
+    [RelayCommand]
+    private void EditAutoReply()
+    {
+        if (Accounts.FirstOrDefault(a => a.Connection.Id == _autoReplyConnection) is { } node)
+        {
+            Tree.AutoReplyCommand.Execute(node);
+        }
+    }
+
     // ---- Search (on the server: MailSearchViewModel; here the list shows its hits) ---------------------------------
 
     private MailSearchViewModel? _search;

@@ -50,8 +50,20 @@ public sealed class DemoMailProviderFactory : IProviderFactory<IMailProvider>
     public IMailProvider Create(ServiceConnection connection) => new DemoMailProvider(connection.Id);
 }
 
-internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider
+internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAutoReplyProvider
 {
+    // The out-of-office reply lives in memory until Neruna closes.
+    private static AutoReply _autoReply = AutoReply.Off;
+
+    public Task<(AutoReply Reply, AutoReplyFeatures Features)> GetAutoReplyAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult((_autoReply, AutoReplyFeatures.Schedule | AutoReplyFeatures.Subject));
+
+    public Task SetAutoReplyAsync(AutoReply reply, IReadOnlyList<string> ownAddresses, CancellationToken cancellationToken = default)
+    {
+        _autoReply = reply;
+        return Task.CompletedTask;
+    }
+
     private static readonly (string Id, string Name, FolderRole Role)[] Folders =
     [
         ("INBOX", "Posteingang", FolderRole.Inbox),
