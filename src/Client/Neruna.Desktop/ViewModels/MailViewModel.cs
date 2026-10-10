@@ -135,11 +135,14 @@ internal sealed partial class MailViewModel(
     public async Task ReloadAsync()
     {
         var selectedFolder = CurrentFolder?.Folder;
+        // At the start: the folder open last time.
+        var lastFolder = selectedFolder is null ? await settings.GetAsync(SettingKeys.LastMailFolder) : null;
         var selectedMessage = SelectedMessage?.Summary.RemoteId;
         await Tree.LoadAsync();
         ShowAutoReplyBadges(_autoReplyBadges); // the tree was built anew
         var allFolders = Accounts.SelectMany(a => a.AllFolders()).ToList();
         var folderToSelect = allFolders.FirstOrDefault(f => selectedFolder is not null && f.Folder.ConnectionId == selectedFolder.ConnectionId && f.Folder.RemoteId == selectedFolder.RemoteId)
+                             ?? allFolders.FirstOrDefault(f => lastFolder is not null && FolderKey(f.Folder) == lastFolder)
                              ?? allFolders.FirstOrDefault(f => f.Folder.Role == FolderRole.Inbox);
 
         if (folderToSelect is null)
@@ -168,6 +171,85 @@ internal sealed partial class MailViewModel(
         if (!_refreshing && value is MessageItemViewModel message)
         {
             _ = LeaveComposeThenOpenAsync(message);
+        }
+    }
+
+    /// <summary>The list shows only unread messages (the closed envelope beside the search).</summary>
+    [ObservableProperty]
+    public partial bool ShowUnreadOnly { get; set; }
+
+    partial void OnShowUnreadOnlyChanged(bool value)
+    {
+        // Filtering keeps the open message open (no reload of the reading pane).
+        var open = SelectedEntry;
+        _refreshing = true;
+        try
+        {
+            RebuildEntries();
+            SelectedEntry = open is not null && Entries.Contains(open) ? open : null;
+        }
+        finally
+        {
+            _refreshing = false;
+        }
+    }
+
+    // ---- Folder menu: all read, empty ---------------------------------------------------------------------------
+
+    /// <summary>"Alle als gelesen markieren": on the server, also mail not loaded yet.</summary>
+    [RelayCommand]
+    private async Task MarkFolderReadAsync(MailFolderNode folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        try
+        {
+            await Task.Run(() => mail.MarkAllReadAsync(folder.Account.Connection, folder.Folder));
+            folder.UnreadCount = 0;
+            if (CurrentFolder == folder)
+            {
+                foreach (var message in _allMessages)
+                {
+                    message.IsUnread = false;
+                }
+
+                await RefreshCurrentFolderAsync();
+            }
+
+            StatusMessage?.Invoke(this, F("«{0}»: alle als gelesen markiert.", folder.Name));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(T("Als gelesen markieren fehlgeschlagen"), ex);
+        }
+    }
+
+    /// <summary>"Leeren" (trash, junk): everything deleted for good, after a question.</summary>
+    [RelayCommand]
+    private async Task EmptyFolderAsync(MailFolderNode folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        var sure = await Views.ChoiceDialog.ShowInFrontAsync(F("«{0}» leeren", folder.Name),
+            F("Alle Nachrichten in «{0}» endgültig löschen – auch die, die Neruna noch nicht geladen hat? Das lässt sich nicht rückgängig machen.", folder.Name),
+            (T("Leeren"), true, false), (T("Abbrechen"), false, true));
+        if (!sure)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() => mail.EmptyFolderAsync(folder.Account.Connection, folder.Folder));
+            folder.UnreadCount = 0;
+            if (CurrentFolder == folder)
+            {
+                await LoadFolderAsync(folder, null);
+            }
+
+            StatusMessage?.Invoke(this, F("«{0}» geleert.", folder.Name));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(F("«{0}» leeren fehlgeschlagen", folder.Name), ex);
         }
     }
 
@@ -828,9 +910,16 @@ internal sealed partial class MailViewModel(
         }
     }
 
+    private static string FolderKey(MailFolder folder) => $"{folder.ConnectionId:N}|{folder.RemoteId}";
+
     private async Task LoadFolderAsync(MailFolderNode folder, string? messageToSelect)
     {
         EndSearch();
+        if (CurrentFolder != folder)
+        {
+            _ = settings.SetAsync(SettingKeys.LastMailFolder, FolderKey(folder.Folder));
+        }
+
         CurrentFolder = folder;
         var summaries = await Task.Run(() => mail.GetMessagesAsync(folder.Folder, take: PageSize));
         _allMessages = summaries.Select(s => new MessageItemViewModel(s, folder)).ToList();
@@ -1178,6 +1267,7 @@ internal sealed partial class MailViewModel(
 
     private void RebuildEntries()
     {
+        var open = SelectedMessage; // before clearing: the list's selection goes with its items
         Entries.Clear();
         var query = SearchText.Trim();
         if (IsSearchMode && query == Search.ServerTerm)
@@ -1186,6 +1276,11 @@ internal sealed partial class MailViewModel(
         }
 
         var messages = query.Length == 0 ? _allMessages : _allMessages.Where(m => m.Matches(query)).ToList();
+        if (ShowUnreadOnly)
+        {
+            // The message being read stays, even though opening it marked it read.
+            messages = [.. messages.Where(m => m.IsUnread || m == open)];
+        }
 
         foreach (var group in messages.GroupBy(m => DateGroup.Of(m.Summary.Date)))
         {
@@ -1293,6 +1388,9 @@ internal sealed partial class FavoriteFolderNode : ObservableObject
 
 internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObject
 {
+    /// <summary>Trash and junk can be emptied.</summary>
+    public bool CanEmpty => Folder.Role is FolderRole.Trash or FolderRole.Junk;
+
     /// <summary>Also listed under "Favoriten" (the context menu offers adding or removing).</summary>
     [ObservableProperty]
     public partial bool IsFavorite { get; set; }

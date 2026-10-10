@@ -121,6 +121,13 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
 
+        // Only unread mail: the closed envelope beside the search, highlighted while it filters.
+        vm.MailPage.ShowUnreadOnly = true;
+        await Task.Delay(200);
+        await SaveAsync(window, output, "mail-unread-only.png");
+        Console.WriteLine($"Unread only: {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()} shown, all unread or open: {vm.MailPage.Entries.OfType<MessageItemViewModel>().All(m => m.IsUnread || m == vm.MailPage.SelectedMessage)}");
+        vm.MailPage.ShowUnreadOnly = false;
+
         // Out of office: the dialog, then the hint above the list while it is on.
         vm.MailPage.Tree.AutoReplyCommand.Execute(vm.MailPage.Accounts[0]);
         for (var i = 0; i < 50 && (vm.Overlay as AutoReplyViewModel)?.IsBusy != false; i++)

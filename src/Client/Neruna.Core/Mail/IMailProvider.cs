@@ -88,6 +88,15 @@ public interface IMailProvider : IAsyncDisposable
     /// </summary>
     Task WaitForChangesAsync(MailFolder folder, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Marks every message of the folder read on the server – also those Neruna has not loaded. Without an own way the
+    /// controller marks the loaded ones (<see cref="SetFlagsAsync"/>).
+    /// </summary>
+    Task MarkAllReadAsync(MailFolder folder, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    /// <summary>Deletes every message of the folder for good ("Papierkorb leeren"), also those Neruna has not loaded.</summary>
+    Task EmptyAsync(MailFolder folder, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
     /// <summary>Creates a top-level folder, e.g. "Drafts" on a server that has none.</summary>
     /// <exception cref="NotSupportedException">The provider lacks <see cref="MailProviderCapabilities.Append"/>.</exception>
     Task<MailFolder> CreateFolderAsync(string name, FolderRole role, CancellationToken cancellationToken = default);

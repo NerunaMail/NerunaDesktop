@@ -66,6 +66,9 @@ public static class SettingKeys
     /// <summary>Folder tree nodes the user collapsed (JSON list of keys); everything else is expanded.</summary>
     public const string CollapsedFolders = "mail.collapsedFolders";
 
+    /// <summary>The folder open last ("connectionId|remoteId"): opened again at the next start (this device only).</summary>
+    public const string LastMailFolder = "mail.lastFolder";
+
     /// <summary>Folders in "Favoriten" at the top of the folder tree: JSON list of "connectionId|folderRemoteId".</summary>
     public const string MailFavorites = "mail.favorites";
 

@@ -194,6 +194,53 @@ public class ImapIntegrationTests
     }
 
     [Fact]
+    public async Task A_whole_folder_is_marked_read_and_emptied_on_the_server_also_mail_not_loaded()
+    {
+        Assert.SkipWhen(Host is null, "NERUNA_TEST_IMAP_HOST not set");
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var credentials = env.Get<ICredentialStore>();
+        var registry = new ProviderRegistry([new ImapProviderFactory(credentials, NullLoggerFactory.Instance, maxInitialMessages: 2)], [], []);
+        var controller = new MailController(env.Accounts, env.MailStore, registry, NullLogger<MailController>.Instance);
+        var settings = new ImapSettings(Host!, 3143, SocketSecurity.None, Host!, 3025, SocketSecurity.None, "lea@example.com");
+        var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, ProviderIds.Imap, settings.ToDictionary());
+        await credentials.SetSecretAsync(connection.Id, "geheim", ct);
+        await env.Accounts.SaveAccountAsync(new Account(Guid.NewGuid(), "Lea", "lea@example.com", [connection]), ct);
+
+        // A fresh folder with five unread messages; Neruna only loads the newest two.
+        var name = "Leeren-" + Guid.NewGuid().ToString("N")[..8];
+        using (var imap = new MailKit.Net.Imap.ImapClient())
+        {
+            await imap.ConnectAsync(Host!, 3143, MailKit.Security.SecureSocketOptions.None, ct);
+            await imap.AuthenticateAsync("lea@example.com", "geheim", ct);
+            var folder = await imap.GetFolder(imap.PersonalNamespaces[0]).CreateAsync(name, true, ct) ?? throw new InvalidOperationException("Folder not created");
+            await folder.SubscribeAsync(ct);
+            for (var i = 0; i < 5; i++)
+            {
+                var message = new MimeMessage { Subject = $"Nr. {i}", Body = new TextPart("plain") { Text = "x" } };
+                message.From.Add(new MailboxAddress("Marco", "marco@example.com"));
+                await folder.AppendAsync(new MailKit.AppendRequest(message), ct);
+            }
+
+            await imap.DisconnectAsync(true, ct);
+        }
+
+        Assert.Empty((await controller.SyncAllAsync(ct)).Failures);
+        var mailFolder = Assert.Single(await controller.GetFoldersAsync(connection.Id, ct), f => f.Name == name);
+        Assert.Equal((5, 2), (mailFolder.UnreadCount, (await controller.GetMessagesAsync(mailFolder, cancellationToken: ct)).Count));
+
+        await controller.MarkAllReadAsync(connection, mailFolder, ct);
+        mailFolder = Assert.Single(await controller.GetFoldersAsync(connection.Id, ct), f => f.Name == name);
+        Assert.Equal(0, mailFolder.UnreadCount); // all five on the server, not just the two loaded
+        Assert.All(await controller.GetMessagesAsync(mailFolder, cancellationToken: ct), m => Assert.True(m.Flags.HasFlag(MessageFlags.Seen)));
+
+        await controller.EmptyFolderAsync(connection, mailFolder, ct);
+        mailFolder = Assert.Single(await controller.GetFoldersAsync(connection.Id, ct), f => f.Name == name);
+        Assert.Equal(0, mailFolder.TotalCount);
+        Assert.Empty(await controller.GetMessagesAsync(mailFolder, cancellationToken: ct));
+    }
+
+    [Fact]
     public async Task Only_subscribed_folders_are_shown_and_hidden_ones_leave_with_their_mail()
     {
         Assert.SkipWhen(Host is null, "NERUNA_TEST_IMAP_HOST not set");

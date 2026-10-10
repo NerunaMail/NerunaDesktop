@@ -132,6 +132,48 @@ public sealed class MailController(
         await store.UpdateFlagsAsync(folder.ConnectionId, folder.RemoteId, remoteIds, flags, add, cancellationToken);
     }
 
+    /// <summary>"Alle als gelesen markieren": on the server for the whole folder, then the folder is synced (counts).</summary>
+    public async Task MarkAllReadAsync(ServiceConnection connection, MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        var loaded = await store.GetMessageIdsAsync(folder.ConnectionId, folder.RemoteId, cancellationToken);
+        await using (var provider = providers.CreateMail(connection))
+        {
+            try
+            {
+                await provider.MarkAllReadAsync(folder, cancellationToken);
+            }
+            catch (NotSupportedException)
+            {
+                await provider.SetFlagsAsync(folder, loaded, MessageFlags.Seen, add: true, cancellationToken);
+            }
+        }
+
+        await store.UpdateFlagsAsync(folder.ConnectionId, folder.RemoteId, loaded, MessageFlags.Seen, add: true, cancellationToken);
+        await SyncFolderAsync(connection, folder, cancellationToken);
+    }
+
+    /// <summary>"Leeren" (trash, junk): every message deleted for good on the server, then the folder is synced.</summary>
+    public async Task EmptyFolderAsync(ServiceConnection connection, MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        var loaded = await store.GetMessageIdsAsync(folder.ConnectionId, folder.RemoteId, cancellationToken);
+        await using (var provider = providers.CreateMail(connection))
+        {
+            try
+            {
+                await provider.EmptyAsync(folder, cancellationToken);
+            }
+            catch (NotSupportedException)
+            {
+                await provider.DeleteAsync(folder, loaded, cancellationToken);
+            }
+        }
+
+        await store.RemoveMessagesAsync(folder.ConnectionId, folder.RemoteId, loaded, cancellationToken);
+        await SyncFolderAsync(connection, folder, cancellationToken);
+    }
+
     /// <summary>Moves messages on the server, drops them locally and refreshes the target folder.</summary>
     public async Task MoveAsync(ServiceConnection connection, MailFolder source, IReadOnlyCollection<string> remoteIds, MailFolder target, CancellationToken cancellationToken = default)
     {

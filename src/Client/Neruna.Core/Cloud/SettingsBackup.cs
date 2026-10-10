@@ -100,7 +100,7 @@ public sealed class SettingsBackupService(
     private const string DismissedKey = "vault.dismissed";
 
     // Belongs to this device, or is only how it was left on screen.
-    private static readonly string[] DeviceSettings = ["cloud.", "chat.", "vault.", "ui.layout", "mail.collapsedFolders", "mail.agendaOpen"];
+    private static readonly string[] DeviceSettings = ["cloud.", "chat.", "vault.", "ui.layout", "mail.collapsedFolders", "mail.agendaOpen", "mail.lastFolder"];
 
     public static bool IsPersonalSetting(string key) => !DeviceSettings.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal));
 

@@ -191,6 +191,22 @@ internal sealed class GraphMailProvider(Guid connectionId, GraphClient graph, IL
         }
     }
 
+    public async Task MarkAllReadAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        await SetFlagsAsync(folder, await IdsAsync(folder, "&$filter=isRead eq false", cancellationToken), MessageFlags.Seen, add: true, cancellationToken);
+    }
+
+    public async Task EmptyAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        await DeleteAsync(folder, await IdsAsync(folder, string.Empty, cancellationToken), cancellationToken);
+    }
+
+    // Every message of the folder on the server (Graph has no bulk call for these).
+    private async Task<IReadOnlyList<string>> IdsAsync(MailFolder folder, string filter, CancellationToken cancellationToken) =>
+        [.. (await graph.GetAllAsync($"me/mailFolders/{folder.RemoteId}/messages?$select=id&$top=200{filter}", cancellationToken)).Select(m => m.Str("id")).OfType<string>()];
+
     public async Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);

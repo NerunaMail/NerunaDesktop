@@ -258,6 +258,28 @@ public sealed partial class ImapMailProvider(
         }
     }
 
+    public async Task MarkAllReadAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        var imapFolder = await OpenAsync(folder.RemoteId, FolderAccess.ReadWrite, cancellationToken);
+        var unread = await imapFolder.SearchAsync(SearchQuery.NotSeen, cancellationToken);
+        if (unread.Count > 0)
+        {
+            await imapFolder.StoreAsync(unread, new StoreFlagsRequest(StoreAction.Add, ImapFlags.Seen) { Silent = true }, cancellationToken);
+        }
+    }
+
+    public async Task EmptyAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        var imapFolder = await OpenAsync(folder.RemoteId, FolderAccess.ReadWrite, cancellationToken);
+        var all = await imapFolder.SearchAsync(SearchQuery.All, cancellationToken);
+        if (all.Count > 0)
+        {
+            await DeleteAsync(folder, [.. all.Select(u => u.Id.ToString(CultureInfo.InvariantCulture))], cancellationToken);
+        }
+    }
+
     public async Task AppendAsync(MailFolder folder, MimeMessage message, CoreFlags flags, DateTimeOffset? receivedAt, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(folder);
