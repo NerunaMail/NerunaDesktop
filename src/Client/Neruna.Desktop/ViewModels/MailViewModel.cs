@@ -1363,45 +1363,24 @@ internal sealed partial class MailViewModel(
 
     private async Task ShowInvitationAsync(MessageSummary summary, Invitation invitation, Account account, ReadingPaneViewModel pane)
     {
-        InvitationBannerViewModel? banner = null;
-        banner = new InvitationBannerViewModel(
-            invitation,
-            async answer =>
+        var banner = new InvitationBannerViewModel(invitation, account, invitations, async done =>
+        {
+            CalendarChanged?.Invoke(this, EventArgs.Empty);
+            if (done.Length > 0)
             {
-                await invitations.RespondAsync(invitation, answer, account, banner!.IsInCalendar ? null : banner.SelectedCalendar);
-                CalendarChanged?.Invoke(this, EventArgs.Empty);
-                await UpdateInvitationAsync(banner!, account);
-                await TidyAnsweredInvitationAsync(summary, answer switch
-                {
-                    Participation.Accepted => T("Zugesagt – der Termin steht im Kalender."),
-                    Participation.Tentative => T("Mit Vorbehalt zugesagt – der Termin steht im Kalender."),
-                    _ => T("Abgesagt."),
-                });
-            },
-            async () =>
-            {
-                await invitations.ApplyCancelAsync(invitation);
-                CalendarChanged?.Invoke(this, EventArgs.Empty);
-                await UpdateInvitationAsync(banner!, account);
-                await TidyAnsweredInvitationAsync(summary, T("Der abgesagte Termin wurde aus dem Kalender entfernt."));
-            });
+                await TidyAnsweredInvitationAsync(summary, done);
+            }
+        });
         _invitation = (summary.RemoteId, banner);
         pane.Invitation = banner;
 
         try
         {
-            // An answer to my own invitation is recorded right away, like in office calendars.
-            if (invitation.Method == InvitationMethod.Reply && await invitations.ApplyReplyAsync(invitation))
-            {
-                CalendarChanged?.Invoke(this, EventArgs.Empty);
-            }
-
-            await UpdateInvitationAsync(banner, account);
+            await banner.LoadAsync();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Checking the invitation {Uid} failed", invitation.Uid);
-            banner.Error = T("Der Kalender konnte nicht geprüft werden: ") + ex.Message;
         }
     }
 
@@ -1423,58 +1402,6 @@ internal sealed partial class MailViewModel(
         {
             StatusMessage?.Invoke(this, done + T(" Die Einladung liegt im Papierkorb."));
         }
-    }
-
-    // Status text, collisions and which buttons make sense – from the calendar as it is now.
-    private async Task UpdateInvitationAsync(InvitationBannerViewModel banner, Account account)
-    {
-        var invitation = banner.Invitation;
-        var state = await invitations.GetStateAsync(invitation, account);
-        var mine = InvitationService.IsMine(invitation, account.EmailAddress) && invitation.Method != InvitationMethod.Reply;
-        banner.IsInCalendar = state.Item is not null;
-        if (banner.Calendars.Count == 0)
-        {
-            banner.Calendars = await invitations.TargetCalendarsAsync(account);
-            banner.SelectedCalendar = banner.Calendars.FirstOrDefault();
-        }
-        switch (invitation.Method)
-        {
-            case InvitationMethod.Reply:
-                var answer = invitation.Attendees.FirstOrDefault();
-                var who = answer?.Name ?? answer?.Email ?? T("Jemand");
-                banner.Status = answer?.Status switch
-                {
-                    Participation.Accepted => $"{who} hat zugesagt.",
-                    Participation.Tentative => F("{0} hat mit Vorbehalt zugesagt.", who),
-                    Participation.Declined => $"{who} hat abgesagt.",
-                    _ => $"{who} hat geantwortet.",
-                } + (state.Item is null ? T(" Der Termin ist nicht (mehr) in Ihrem Kalender.") : T(" Die Antwort ist in Ihrem Termin eingetragen."));
-                banner.CanRespond = false;
-                break;
-
-            case InvitationMethod.Cancel:
-                banner.Status = state.Item is null ? T("Der Termin ist nicht (mehr) in Ihrem Kalender.") : T("Der Termin steht noch in Ihrem Kalender.");
-                banner.CanRemove = state.Item is not null && state.Calendar is { IsReadOnly: false };
-                break;
-
-            default:
-                banner.Status = mine ? T("Sie sind der Organisator dieses Termins.")
-                    : state.IsOutdated ? T("Diese Einladung ist veraltet – im Kalender steht bereits eine neuere Fassung.")
-                    : state.MyAnswer switch
-                    {
-                        Participation.Accepted when state.Item is not null => T("Sie haben zugesagt."),
-                        Participation.Tentative when state.Item is not null => T("Sie haben mit Vorbehalt zugesagt."),
-                        Participation.Declined => T("Sie haben abgesagt."),
-                        _ when state.Item is not null => T("Steht in Ihrem Kalender – noch nicht beantwortet."),
-                        _ => T("Noch nicht beantwortet."),
-                    };
-                banner.CanRespond = !mine && !state.IsOutdated;
-                break;
-        }
-
-        banner.Conflicts = invitation.Method == InvitationMethod.Request && state.Conflicts.Count > 0
-            ? T("Überschneidet sich mit: ") + string.Join(", ", state.Conflicts.Take(3).Select(c => $"{c.Summary} ({c.Start:HH:mm}–{c.End:HH:mm})"))
-            : null;
     }
 
     private void RebuildEntries()
