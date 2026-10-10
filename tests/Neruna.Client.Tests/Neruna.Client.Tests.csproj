@@ -5,6 +5,7 @@
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Imap\Neruna.Providers.Imap.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Graph\Neruna.Providers.Graph.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Ics\Neruna.Providers.Ics.csproj" />
+    <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Special\Neruna.Providers.Special.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Dav\Neruna.Providers.Dav.csproj" />
   </ItemGroup>
   <ItemGroup>

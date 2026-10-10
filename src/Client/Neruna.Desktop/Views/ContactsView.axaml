@@ -181,6 +181,8 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                    <TextBlock Classes="label" Text="{l:T 'Geburtstag'}" IsVisible="{Binding HasBirthday}" />
+                    <SelectableTextBlock Text="{Binding Birthday}" IsVisible="{Binding HasBirthday}" />
                     <TextBlock Classes="label" Text="{l:T 'Notiz'}" IsVisible="{Binding HasNote}" />
                     <SelectableTextBlock Text="{Binding Note}" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
 

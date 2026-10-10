@@ -66,6 +66,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
         Organization = draft.Organization ?? string.Empty;
         Title = draft.Title ?? string.Empty;
         Note = draft.Note ?? string.Empty;
+        Birthday = draft.Birthday?.ToInput(Neruna.Core.Localization.Texts.Culture) ?? string.Empty;
 
         foreach (var email in draft.Emails.DefaultIfEmpty(new ContactField(string.Empty)))
         {
@@ -118,6 +119,10 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial string Note { get; set; }
+
+    /// <summary>Day and month, optionally the year: 15.04.1985 or 15.04.</summary>
+    [ObservableProperty]
+    public partial string Birthday { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial string? Error { get; set; }
@@ -183,6 +188,13 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
             return;
         }
 
+        var birthday = Neruna.Core.Contacts.ContactBirthday.ParseInput(Birthday);
+        if (birthday is null && !string.IsNullOrWhiteSpace(Birthday))
+        {
+            Error = T("Der Geburtstag ist ungültig – bitte als Tag.Monat.Jahr eingeben, das Jahr kann fehlen (z. B. 15.04.1985 oder 15.04.).");
+            return;
+        }
+
         var draft = new ContactDraft(
             GivenName.Trim(),
             FamilyName.Trim(),
@@ -194,6 +206,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
         {
             Photo = _photo,
             ReplacePhoto = _photoChanged,
+            Birthday = birthday,
         };
 
         if (draft.DisplayName.Length == 0)

@@ -26,6 +26,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     /// <summary>"Kalender verwalten": choose which server calendars are shown.</summary>
     public event EventHandler? ManageRequested;
 
+    /// <summary>"Spezieller Kalender": birthdays or holidays.</summary>
+    public event EventHandler? SpecialRequested;
+
     /// <summary>The shell shows the editor as an overlay and reloads the week when it reports a change.</summary>
     public event EventHandler<EventEditorViewModel>? EditorRequested;
 
@@ -233,6 +236,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
 
     [RelayCommand]
     private void Manage() => ManageRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void AddSpecial() => SpecialRequested?.Invoke(this, EventArgs.Empty);
 
     /// <param name="day">Day column that was used, or null for "next full hour today".</param>
     [RelayCommand]

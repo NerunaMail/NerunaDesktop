@@ -15,6 +15,8 @@ public static class ProviderIds
     public const string Ics = "ics";
     public const string Ews = "ews";
     public const string Graph = "graph";
+    public const string Birthdays = "birthdays";
+    public const string Holidays = "holidays";
 }
 
 /// <summary>Describes a provider and creates instances bound to one connection.</summary>

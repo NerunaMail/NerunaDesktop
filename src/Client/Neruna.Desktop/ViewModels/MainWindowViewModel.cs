@@ -138,6 +138,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         };
         calendarPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         calendarPage.ManageRequested += (_, _) => ShowCalendarSelection();
+        calendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
         calendarPage.EditorRequested += (_, editor) => ShowEditor(editor, async () =>
         {
             await CalendarPage.ReloadAsync();
@@ -716,6 +717,22 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         Overlay = subscription;
+    }
+
+    private async Task ShowSpecialCalendarAsync()
+    {
+        var special = new SpecialCalendarViewModel(_setup, await _accounts.GetAccountsAsync());
+        special.Finished += async (_, created) =>
+        {
+            Overlay = null;
+            if (created)
+            {
+                HasAccounts = true;
+                await SyncAsync();
+                CurrentPage = CalendarPage;
+            }
+        };
+        Overlay = special;
     }
 
     private void ShowCalendarSelection()

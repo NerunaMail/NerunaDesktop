@@ -357,6 +357,29 @@ internal static class Snapshots
         vm.CalendarPage.GridMinutes = 30;
         vm.CalendarPage.IsTimeGrid = false;
 
+        // Special calendars: birthdays (reminder asked) and holidays of a canton, computed by Neruna.
+        var specialAccounts = services.GetRequiredService<Neruna.Core.IAccountStore>();
+        var special = new SpecialCalendarViewModel(services.GetRequiredService<Neruna.Core.Accounts.AccountSetupService>(), await specialAccounts.GetAccountsAsync());
+        vm.Overlay = special;
+        await SaveAsync(window, output, "special-calendar-birthdays.png");
+        await special.AddCommand.ExecuteAsync(null);
+        special = new SpecialCalendarViewModel(services.GetRequiredService<Neruna.Core.Accounts.AccountSetupService>(), await specialAccounts.GetAccountsAsync());
+        special.SelectedCountry = special.Countries.First(c => c.Code == "CH");
+        special.SelectedRegion = special.Regions.First(r => r.Code == "LU");
+        vm.Overlay = special;
+        await SaveAsync(window, output, "special-calendar-holidays.png");
+        await special.AddCommand.ExecuteAsync(null);
+        vm.Overlay = null;
+        await calendarController.SyncAllAsync();
+        await vm.CalendarPage.ReloadAsync();
+        vm.CalendarPage.IsTimeGrid = true;
+        vm.CalendarPage.WeekStart = new DateTime(2026, 10, 26);
+        await vm.CalendarPage.ReloadAsync();
+        await Task.Delay(500);
+        await SaveAsync(window, output, "calendar-holidays.png");
+        vm.CalendarPage.WeekStart = DateTime.Today.AddDays(-(((int)DateTime.Today.DayOfWeek + 6) % 7));
+        vm.CalendarPage.IsTimeGrid = false;
+
         vm.NavigateCommand.Execute(Section.Contacts);
         await SaveAsync(window, output, "contacts.png");
         vm.ContactsPage.Selected = vm.ContactsPage.Items.First(i => i.IsGroup);

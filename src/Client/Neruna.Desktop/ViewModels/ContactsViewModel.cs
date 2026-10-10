@@ -256,6 +256,18 @@ internal sealed class ContactItem(ContactEntry entry, string color)
 
     public bool HasNote => !string.IsNullOrWhiteSpace(Note);
 
+    /// <summary>"15. April 1985 (40 Jahre)" or "15. April".</summary>
+    public string? Birthday => Entry.Card.Birthday is { } b
+        ? b.Year is { } year
+            ? F("{0} ({1} Jahre)", new DateTime(year, b.Month, b.Day).ToString("D", Neruna.Core.Localization.Texts.Culture), AgeOn(b, DateOnly.FromDateTime(DateTime.Today)))
+            : new DateTime(2000, b.Month, b.Day).ToString(Neruna.Core.Localization.Texts.Culture.DateTimeFormat.MonthDayPattern, Neruna.Core.Localization.Texts.Culture)
+        : null;
+
+    public bool HasBirthday => Birthday is not null;
+
+    private static int AgeOn(Neruna.Core.Contacts.ContactBirthday birthday, DateOnly today) =>
+        today.Year - birthday.Year!.Value - (today < birthday.In(today.Year) ? 1 : 0);
+
     public string Subtitle => IsGroup
         ? (Entry.Card.Members.Count == 1 ? T("Gruppe · 1 Mitglied") : F("Gruppe · {0} Mitglieder", Entry.Card.Members.Count))
         : string.Join(" · ", new[] { Entry.Card.Title, Entry.Card.Organization }.Where(s => !string.IsNullOrWhiteSpace(s)));

@@ -16,7 +16,7 @@ public sealed record ContactDraft(
     IReadOnlyList<ContactField> Phones,
     string? Note)
 {
-    private static readonly HashSet<string> ManagedProperties = ["FN", "N", "ORG", "TITLE", "EMAIL", "TEL", "NOTE", "REV", "PRODID"];
+    private static readonly HashSet<string> ManagedProperties = ["FN", "N", "ORG", "TITLE", "EMAIL", "TEL", "NOTE", "BDAY", "REV", "PRODID"];
 
     public static ContactDraft Empty { get; } = new(null, null, null, null, [], [], null);
 
@@ -28,6 +28,8 @@ public sealed record ContactDraft(
     /// removed). Otherwise the card's PHOTO lines stay exactly as they are (also linked ones Neruna cannot show).
     /// </summary>
     public bool ReplacePhoto { get; init; }
+
+    public ContactBirthday? Birthday { get; init; }
 
     public string DisplayName
     {
@@ -46,7 +48,7 @@ public sealed record ContactDraft(
     public static ContactDraft FromVCard(string vcard)
     {
         var card = VCardReader.Read(vcard);
-        return new ContactDraft(card.GivenName, card.FamilyName, card.Organization, card.Title, card.Emails, card.Phones, card.Note) { Photo = card.Photo };
+        return new ContactDraft(card.GivenName, card.FamilyName, card.Organization, card.Title, card.Emails, card.Phones, card.Note) { Photo = card.Photo, Birthday = card.Birthday };
     }
 
     /// <summary>Returns a complete vCard: <paramref name="existing"/> updated, or a new vCard 3.0.</summary>
@@ -115,6 +117,12 @@ public sealed record ContactDraft(
         if (!string.IsNullOrWhiteSpace(Note))
         {
             lines.Add("NOTE:" + VCardWriter.Escape(Note.Trim()));
+        }
+
+        if (Birthday is { } birthday)
+        {
+            // "--MMDD" (no year) is a valid date-and-or-time value in vCard 4 and widely read in vCard 3.
+            lines.Add("BDAY:" + birthday.ToVCardValue(v4));
         }
 
         if (ReplacePhoto && Photo is { } photo)

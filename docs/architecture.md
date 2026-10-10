@@ -50,6 +50,7 @@ src/
       Neruna.Providers.Imap   IMAP + SMTP (MailKit)
       Neruna.Providers.Dav    CalDAV + CardDAV (gemeinsame WebDAV-Basis, RFC 4791/6352/6578/6764)
       Neruna.Providers.Ics    ICS/webcal-Abos (read-only)
+      Neruna.Providers.Special  selbst berechnete Kalender: Geburtstage (aus allen Adressbüchern) und Feiertage (Land/Region)
       Neruna.Providers.Graph  Microsoft 365 / Outlook.com über Microsoft Graph (OAuth2, Mail+Kalender+Kontakte)
       Neruna.Providers.Demo   Beispieldaten (--demo, Screenshots)
     Neruna.Desktop        Avalonia-App (Composition Root)

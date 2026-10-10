@@ -273,8 +273,8 @@ internal sealed class DemoContactProvider(Guid connectionId) : IContactProvider
         {
             return Task.FromResult(new AddressBookSyncResult("1", IsFullResync: true,
             [
-                new ContactObject("demo-p1", null, "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:demo-p1\r\nFN:Sandra Muster\r\nN:Muster;Sandra;;;\r\nEMAIL;TYPE=INTERNET,HOME:sandra.muster@example.net\r\nTEL;TYPE=CELL:+41 79 555 44 33\r\nEND:VCARD\r\n"),
-                new ContactObject("demo-p2", null, "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:demo-p2\r\nFN:Peter Brunner\r\nN:Brunner;Peter;;;\r\nEMAIL;TYPE=INTERNET,HOME:peter.brunner@example.net\r\nEND:VCARD\r\n"),
+                new ContactObject("demo-p1", null, "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:demo-p1\r\nFN:Sandra Muster\r\nN:Muster;Sandra;;;\r\nEMAIL;TYPE=INTERNET,HOME:sandra.muster@example.net\r\nTEL;TYPE=CELL:+41 79 555 44 33\r\nBDAY:1986-10-28\r\nEND:VCARD\r\n"),
+                new ContactObject("demo-p2", null, "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:demo-p2\r\nFN:Peter Brunner\r\nN:Brunner;Peter;;;\r\nEMAIL;TYPE=INTERNET,HOME:peter.brunner@example.net\r\nBDAY:--10-30\r\nEND:VCARD\r\n"),
             ], []));
         }
 

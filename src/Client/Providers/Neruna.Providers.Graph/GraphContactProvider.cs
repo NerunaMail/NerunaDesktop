@@ -87,7 +87,11 @@ internal sealed class GraphContactProvider(Guid connectionId, GraphClient graph)
             c.Str("givenName"), c.Str("surname"), c.Str("companyName"), c.Str("jobTitle"),
             [.. c.Arr("emailAddresses").Where(e => e.Str("address") is not null).Select(e => new ContactField(e.Str("address")!))],
             phones,
-            c.Str("personalNotes") is { Length: > 0 } note ? note : null);
+            c.Str("personalNotes") is { Length: > 0 } note ? note : null)
+        {
+            // Graph: "1985-04-15T11:59:00Z" (the time is meaningless).
+            Birthday = ContactBirthday.Parse(c.Str("birthday")),
+        };
         return draft.ToVCard($"BEGIN:VCARD\r\nVERSION:3.0\r\nUID:{c.Str("id")}\r\nEND:VCARD\r\n");
     }
 
@@ -106,6 +110,8 @@ internal sealed class GraphContactProvider(Guid connectionId, GraphClient graph)
             ["companyName"] = draft.Organization,
             ["jobTitle"] = draft.Title,
             ["personalNotes"] = draft.Note,
+            // Graph needs a year; without one the birthday stays only here.
+            ["birthday"] = draft.Birthday is { Year: { } year } b ? $"{year:0000}-{b.Month:00}-{b.Day:00}T11:59:00Z" : null,
             // Graph keeps at most three addresses per contact.
             ["emailAddresses"] = draft.Emails.Take(3).Select(e => new { address = e.Value, name = draft.DisplayName }).ToList(),
             ["mobilePhone"] = mobile?.Value,

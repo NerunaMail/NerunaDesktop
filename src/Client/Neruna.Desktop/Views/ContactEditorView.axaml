@@ -95,6 +95,10 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
+    <TextBlock Classes="label" Text="{l:T 'Geburtstag'}" />
+    <TextBox Text="{Binding Birthday}" Width="200" HorizontalAlignment="Left" IsReadOnly="{Binding IsReadOnly}"
+             PlaceholderText="{l:T 'z. B. 15.04.1985 oder 15.04.'}" />
+
     <TextBlock Classes="label" Text="{l:T 'Notiz'}" />
     <TextBox Text="{Binding Note}" AcceptsReturn="True" TextWrapping="Wrap" Height="70" IsReadOnly="{Binding IsReadOnly}" />
 

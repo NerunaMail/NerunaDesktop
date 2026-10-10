@@ -52,6 +52,8 @@ public sealed record ContactCard(
 
     public ContactPhoto? Photo { get; init; }
 
+    public ContactBirthday? Birthday { get; init; }
+
     /// <summary>The UID as used in group member references ("urn:uuid:" stripped).</summary>
     public string MemberUid => NormalizeUid(Uid);
 
@@ -75,6 +77,7 @@ public static class VCardReader
         var members = new List<GroupMember>();
         var kind = ContactKind.Individual;
         ContactPhoto? photo = null;
+        ContactBirthday? birthday = null;
 
         foreach (var property in VCardProperty.Parse(vcard))
         {
@@ -108,6 +111,9 @@ public static class VCardReader
                 case "PHOTO":
                     photo ??= ReadPhoto(property);
                     break;
+                case "BDAY":
+                    birthday ??= ContactBirthday.Parse(property.Value);
+                    break;
             }
         }
 
@@ -118,6 +124,7 @@ public static class VCardReader
             Kind = kind,
             Members = members,
             Photo = photo,
+            Birthday = birthday,
         };
     }
 

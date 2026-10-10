@@ -40,6 +40,12 @@
               <TextBlock Text="{l:T 'Kalender verwalten'}" />
             </StackPanel>
           </Button>
+          <Button Classes="command" Command="{Binding AddSpecialCommand}" ToolTip.Tip="{l:T 'Geburtstage aus den Kontakten oder Feiertage hinzufügen'}">
+            <StackPanel Orientation="Horizontal">
+              <PathIcon Data="{StaticResource IconCalendar}" />
+              <TextBlock Text="{l:T 'Spezieller Kalender'}" />
+            </StackPanel>
+          </Button>
           <Button Classes="command" Command="{Binding SubscribeCommand}">
             <StackPanel Orientation="Horizontal">
               <PathIcon Data="{StaticResource IconRss}" />

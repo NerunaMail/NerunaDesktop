@@ -71,6 +71,9 @@ internal static class AppServices
         services.AddSingleton<IProviderFactory<IContactProvider>>(sp => new CardDavProviderFactory(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("dav"), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ILoggerFactory>()));
         services.AddSingleton<IProviderFactory<ICalendarProvider>, IcsProviderFactory>();
+        // Calendars Neruna computes itself: birthdays from the contacts, public holidays.
+        services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Special.BirthdayProviderFactory>();
+        services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Special.HolidayProviderFactory>();
         // Microsoft 365 / Outlook.com: one sign-in for mail, calendar and contacts (see MicrosoftAccount for the app id).
         services.AddSingleton(sp => new Neruna.Providers.Graph.GraphConnectionFactory(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>()));
         services.AddSingleton<IProviderFactory<IMailProvider>, Neruna.Providers.Graph.GraphMailProviderFactory>();
