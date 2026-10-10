@@ -7,39 +7,93 @@
              x:DataType="vm:SettingsViewModel">
   <Border Classes="pane" Padding="20,12,20,0">
     <TabControl SelectedIndex="{Binding SelectedTab}">
-      <!-- Six tabs: smaller headers so all fit on one line -->
+      <!-- Icon and name per tab, so they read as tabs; a little smaller so all fit on one line -->
       <TabControl.Styles>
         <Style Selector="TabItem">
-          <Setter Property="FontSize" Value="18" />
+          <Setter Property="FontSize" Value="16" />
           <Setter Property="Padding" Value="10,4" />
           <Setter Property="MinHeight" Value="40" />
         </Style>
       </TabControl.Styles>
-      <TabItem Header="{l:T 'Konten'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconPeople}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'Konten'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <ContentControl Content="{Binding Accounts}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="{l:T 'E-Mail'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconMail}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'E-Mail'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <ContentControl Content="{Binding MailOptions}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="{l:T 'Kalender'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconCalendar}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'Kalender'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <ContentControl Content="{Binding CalendarOptions}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="{l:T 'Signaturen'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconSignature}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'Signaturen'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <ContentControl Content="{Binding Signatures}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="{l:T 'Textvorlagen'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconTextTemplate}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'Textvorlagen'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <ContentControl Content="{Binding TextTemplates}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="{l:T 'Zertifikate (S/MIME)'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconCertificate}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'Zertifikate (S/MIME)'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <ContentControl Content="{Binding Certificates}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="{l:T 'Design'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconPalette}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'Design'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <ContentControl Content="{Binding Appearance}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="{l:T 'Cloud'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconCloud}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'Cloud'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <ContentControl Content="{Binding Cloud}" Margin="0,12,0,0" />
       </TabItem>
-      <TabItem Header="{l:T 'Info'}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="{StaticResource IconInfo}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
+            <TextBlock Text="{l:T 'Info'}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
         <views:AboutView Margin="0,12,0,0" />
       </TabItem>
     </TabControl>
