@@ -256,6 +256,13 @@ internal sealed partial class CalendarChoiceItem(CalendarCandidate candidate) : 
 
     public string Name => Candidate.Calendar.Name;
 
+    /// <summary>"Aufgaben" for a pure task list (it appears under "Aufgaben", not in the calendar).</summary>
+    public string? ContentText => Candidate.Calendar.Content switch
+    {
+        Neruna.Core.Calendar.CalendarContent.Tasks => T("Aufgaben"),
+        _ => null,
+    };
+
     public string Color => Candidate.Calendar.Color ?? "#0F6CBD";
 
     public bool IsNew => Candidate.IsNew;

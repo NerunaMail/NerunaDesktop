@@ -59,6 +59,8 @@
                         <Border Width="12" Height="12" CornerRadius="3" VerticalAlignment="Center"
                                 Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" />
                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                        <TextBlock Classes="subtle" FontSize="11" Text="{Binding ContentText}" VerticalAlignment="Center" Margin="6,0,0,0"
+                                   IsVisible="{Binding ContentText, Converter={x:Static ObjectConverters.IsNotNull}}" />
                         <Border IsVisible="{Binding IsNew}" Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="3" Padding="5,0" VerticalAlignment="Center">
                           <TextBlock Text="{l:T 'neu'}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
                         </Border>

@@ -95,6 +95,24 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         }
     }
 
+    /// <summary>"Offene Aufgaben im Kalender anzeigen" (default off: tasks stay under "Aufgaben").</summary>
+    [ObservableProperty]
+    public partial bool ShowTasks { get; set; }
+
+    partial void OnShowTasksChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = SaveShowTasksAsync(value);
+        }
+    }
+
+    private async Task SaveShowTasksAsync(bool value)
+    {
+        await settings.SetAsync(SettingKeys.CalendarShowTasks, value ? "true" : null);
+        await calendarPage.ReloadAsync();
+    }
+
     /// <summary>"Standard-Erinnerung": for new events and accepted invitations.</summary>
     public static IReadOnlyList<ReminderOption> ReminderOptions => ReminderOption.Standard;
 
@@ -115,6 +133,7 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         try
         {
             DeleteAnsweredInvitations = await settings.GetBoolAsync(SettingKeys.DeleteAnsweredInvitations, fallback: true);
+            ShowTasks = await settings.GetAsync(SettingKeys.CalendarShowTasks) == "true";
             var reminder = await settings.GetDefaultReminderAsync();
             DefaultReminder = ReminderOption.Standard.FirstOrDefault(o => o.Minutes == reminder) ?? ReminderOption.Standard.First(o => o.Minutes == EventDraft.DefaultReminderMinutes);
             TwoMonths = await settings.GetAsync(SettingKeys.CalendarNavigatorMonths) == "2";

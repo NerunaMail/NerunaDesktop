@@ -25,15 +25,22 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
     public async Task TestConnectionAsync(CancellationToken cancellationToken = default) =>
         await graph.GetAsync("me/calendars?$top=1&$select=id", cancellationToken);
 
+    /// <summary>The calendars, and – with the Tasks permission – the Microsoft To Do lists as task lists.</summary>
     public async Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default) =>
         [.. (await graph.GetAllAsync("me/calendars?$top=100&$select=id,name,hexColor,canEdit", cancellationToken))
             .Select(c => new CalendarInfo(connectionId, c.Str("id")!, c.Str("name") ?? string.Empty,
-                c.Str("hexColor") is { Length: > 0 } color ? color : null, !c.Bool("canEdit")))];
+                c.Str("hexColor") is { Length: > 0 } color ? color : null, !c.Bool("canEdit"))),
+         .. await GraphTasks.GetListsAsync(connectionId, graph, cancellationToken)];
 
     public async Task<CalendarSyncResult> SyncCalendarAsync(CalendarInfo calendar, IReadOnlyDictionary<string, string?> knownVersions, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(calendar);
         ArgumentNullException.ThrowIfNull(knownVersions);
+        if (GraphTasks.IsTaskList(calendar))
+        {
+            return await GraphTasks.SyncAsync(calendar, knownVersions, graph, cancellationToken);
+        }
+
         var listed = await graph.GetAllAsync($"me/calendars/{calendar.RemoteId}/events?$select=id,changeKey&$top=250", cancellationToken);
         var changed = new List<CalendarObject>();
         foreach (var entry in listed)
@@ -55,6 +62,11 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
     {
         ArgumentNullException.ThrowIfNull(calendar);
         ArgumentNullException.ThrowIfNull(item);
+        if (GraphTasks.IsTaskList(calendar))
+        {
+            return await GraphTasks.SaveAsync(calendar, item, graph, cancellationToken);
+        }
+
         var body = ToGraph(item.ICalendarData);
         JsonElement saved;
         if (string.IsNullOrEmpty(item.RemoteId))
@@ -78,7 +90,14 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
 
     public async Task DeleteAsync(CalendarInfo calendar, CalendarObject item, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(calendar);
         ArgumentNullException.ThrowIfNull(item);
+        if (GraphTasks.IsTaskList(calendar))
+        {
+            await GraphTasks.DeleteAsync(calendar, item, graph, cancellationToken);
+            return;
+        }
+
         await graph.SendJsonAsync(HttpMethod.Delete, $"me/events/{item.RemoteId}", null, cancellationToken);
     }
 

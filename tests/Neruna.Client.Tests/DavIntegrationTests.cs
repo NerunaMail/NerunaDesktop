@@ -91,6 +91,36 @@ public sealed class DavIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task CalDav_task_lists_are_found_and_tasks_written_completed_and_deleted()
+    {
+        Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");
+        var ct = TestContext.Current.CancellationToken;
+        await MakeCollectionAsync($"{_user}/aufgaben/", "tasks", "Aufgaben", ct);
+        await MakeCollectionAsync($"{_user}/privat/", "calendar", "Privat", ct);
+        await using var env = await CreateEnvironmentAsync(ServiceKind.Calendar, ProviderIds.CalDav);
+        Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
+
+        // A task-only list shows up, marked as tasks only; it stays out of the calendar list.
+        var calendars = await env.Calendar.GetCalendarsAsync(ct);
+        var list = calendars.Single(c => c.Name == "Aufgaben");
+        Assert.Equal(CalendarContent.Tasks, list.Content);
+        Assert.True(calendars.Single(c => c.Name == "Privat").HasEvents);
+
+        await env.Calendar.SaveTaskAsync(list, new TaskDraft("Offerte schicken", "An Marco", new DateTime(2026, 10, 20), false, TaskPriority.High, false), null, ct);
+        Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
+        var task = Assert.Single(await env.Calendar.GetTasksAsync(ct));
+        Assert.Equal(("Offerte schicken", "An Marco", TaskPriority.High, false), (task.Summary, task.Notes, task.Priority, task.IsCompleted));
+
+        await env.Calendar.SetTaskCompletedAsync(task, true, ct);
+        Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
+        Assert.True(Assert.Single(await env.Calendar.GetTasksAsync(ct)).IsCompleted);
+
+        await env.Calendar.DeleteTaskAsync(Assert.Single(await env.Calendar.GetTasksAsync(ct)), ct);
+        Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
+        Assert.Empty(await env.Calendar.GetTasksAsync(ct));
+    }
+
+    [Fact]
     public async Task CalDav_moves_event_between_calendars()
     {
         Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");
@@ -329,14 +359,15 @@ public sealed class DavIntegrationTests : IDisposable
 
     private async Task MakeCollectionAsync(string path, string type, string name, CancellationToken ct)
     {
-        var resourceType = type switch { "calendar" => "<C:calendar/>", "addressbook" => "<A:addressbook/>", _ => string.Empty };
+        var resourceType = type switch { "calendar" or "tasks" => "<C:calendar/>", "addressbook" => "<A:addressbook/>", _ => string.Empty };
+        var components = type == "tasks" ? "<C:supported-calendar-component-set><C:comp name=\"VTODO\"/></C:supported-calendar-component-set>" : string.Empty;
         var body = $"""
             <?xml version="1.0" encoding="utf-8"?>
             <D:mkcol xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:A="urn:ietf:params:xml:ns:carddav" xmlns:I="http://apple.com/ns/ical/">
               <D:set><D:prop>
                 <D:resourcetype><D:collection/>{resourceType}</D:resourcetype>
                 <D:displayname>{name}</D:displayname>
-                <I:calendar-color>#C239B3FF</I:calendar-color>
+                <I:calendar-color>#C239B3FF</I:calendar-color>{components}
               </D:prop></D:set>
             </D:mkcol>
             """;

@@ -4,6 +4,7 @@ namespace Neruna.Core.Calendar;
 /// <param name="Name">Shown name: the user's own one (set in Neruna), otherwise the server's.</param>
 /// <param name="Color">Hex color like <c>#3A87AD</c>, if the server provides one.</param>
 /// <param name="ServerName">The server's name when the user gave the calendar an own one; otherwise null.</param>
+/// <param name="Content">Events, tasks or both: task lists show under "Aufgaben", not in the calendar.</param>
 public sealed record CalendarInfo(
     Guid ConnectionId,
     string RemoteId,
@@ -11,7 +12,13 @@ public sealed record CalendarInfo(
     string? Color,
     bool IsReadOnly,
     string? SyncState = null,
-    string? ServerName = null);
+    string? ServerName = null,
+    CalendarContent Content = CalendarContent.Events)
+{
+    public bool HasEvents => Content.HasFlag(CalendarContent.Events);
+
+    public bool HasTasks => Content.HasFlag(CalendarContent.Tasks);
+}
 
 /// <summary>
 /// One calendar resource: an event or task together with its recurrence overrides, i.e. everything sharing one UID.

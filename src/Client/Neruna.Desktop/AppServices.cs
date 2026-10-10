@@ -123,6 +123,7 @@ internal static class AppServices
         services.AddSingleton<MailViewModel>();
         services.AddSingleton<CalendarViewModel>();
         services.AddSingleton<ContactsViewModel>();
+        services.AddSingleton<TasksViewModel>();
         services.AddSingleton<ChatViewModel>();
         services.AddSingleton<AccountsViewModel>();
         services.AddSingleton<CertificatesViewModel>();

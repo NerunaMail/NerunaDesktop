@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using Neruna.Core;
 using static Neruna.Core.Localization.Texts;
 
+using Neruna.Core.Calendar;
+
 namespace Neruna.Providers.Dav;
 
 /// <summary>What differs between CalDAV and CardDAV; everything else is shared.</summary>
@@ -37,7 +39,10 @@ internal sealed record DavFlavor(
         ".vcf");
 }
 
-internal sealed record DavCollection(Uri Url, string Name, string? Color, bool IsReadOnly, bool SupportsEvents);
+internal sealed record DavCollection(Uri Url, string Name, string? Color, bool IsReadOnly, CalendarContent Content)
+{
+    public bool SupportsEvents => Content.HasFlag(CalendarContent.Events);
+}
 
 internal sealed record DavItem(string RemoteId, string? ETag, string Data);
 
@@ -275,7 +280,7 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
                 r.Text(DisplayName) ?? Uri.UnescapeDataString(r.Href.Segments.Last().TrimEnd('/')),
                 ParseColor(r.Text(CalendarColor)),
                 IsReadOnly(r),
-                SupportsEvents(r)))
+                ContentOf(r)))
             .ToList();
     }
 
@@ -416,10 +421,27 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
         return !granted.Overlaps(["all", "write", "write-content", "bind"]);
     }
 
-    private static bool SupportsEvents(DavResource resource)
+    // Without supported-calendar-component-set a calendar may hold anything (RFC 4791): events and tasks.
+    private static CalendarContent ContentOf(DavResource resource)
     {
         var components = resource[SupportedComponents]?.Elements(DavNames.CalDav + "comp").Select(c => (string?)c.Attribute("name")).ToList();
-        return components is null || components.Count == 0 || components.Contains("VEVENT", StringComparer.OrdinalIgnoreCase);
+        if (components is null || components.Count == 0)
+        {
+            return CalendarContent.Events | CalendarContent.Tasks;
+        }
+
+        var content = CalendarContent.None;
+        if (components.Contains("VEVENT", StringComparer.OrdinalIgnoreCase))
+        {
+            content |= CalendarContent.Events;
+        }
+
+        if (components.Contains("VTODO", StringComparer.OrdinalIgnoreCase))
+        {
+            content |= CalendarContent.Tasks;
+        }
+
+        return content;
     }
 
     // Apple writes #RRGGBBAA; Avalonia and most UIs want #RRGGBB.

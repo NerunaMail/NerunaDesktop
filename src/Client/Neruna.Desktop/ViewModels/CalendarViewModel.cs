@@ -12,7 +12,7 @@ namespace Neruna.Desktop.ViewModels;
 /// <summary>Week view across all calendars, whatever provider they come from.</summary>
 internal sealed partial class CalendarViewModel(CalendarController calendar, InvitationService invitations, ISettingsStore settings) : ViewModelBase
 {
-    private static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
+    internal static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
     /// <summary>Colors offered when the user picks a calendar color (readable on white).</summary>
     public static IReadOnlyList<string> ColorChoices { get; } =
@@ -31,6 +31,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
 
     /// <summary>The shell shows the editor as an overlay and reloads the week when it reports a change.</summary>
     public event EventHandler<EventEditorViewModel>? EditorRequested;
+
+    /// <summary>A task shown in the calendar was opened: the shell shows it under "Aufgaben".</summary>
+    public event EventHandler<CalendarOccurrence>? TaskOpenRequested;
 
     public ObservableCollection<CalendarListItem> Calendars { get; } = [];
 
@@ -128,9 +131,10 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
 
         // The new list is built first and swapped in at once: a week load starting meanwhile must never see no calendars.
         var items = new List<CalendarListItem>();
-        var calendars = await calendar.GetCalendarsAsync();
-        var colors = await ColorsAsync(settings, calendars);
-        foreach (var info in calendars)
+        var all = await calendar.GetCalendarsAsync();
+        var colors = await ColorsAsync(settings, all);
+        // Pure task lists belong under "Aufgaben", not in the calendar list.
+        foreach (var info in all.Where(c => c.HasEvents))
         {
             var color = colors[(info.ConnectionId, info.RemoteId)];
             var item = new CalendarListItem(info, color) { IsVisible = !hidden.Contains((info.ConnectionId, info.RemoteId)) };
@@ -263,6 +267,12 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     public async Task OpenOccurrenceAsync(CalendarOccurrence occurrence)
     {
         ArgumentNullException.ThrowIfNull(occurrence);
+        if (occurrence.IsTask)
+        {
+            TaskOpenRequested?.Invoke(this, occurrence);
+            return;
+        }
+
         var stored = await calendar.GetObjectAsync(occurrence.Calendar, occurrence.ObjectRemoteId);
         if (stored is null)
         {

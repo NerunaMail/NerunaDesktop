@@ -32,6 +32,7 @@ internal sealed partial class NavigationItem(Section section, string label, stri
         new(Section.Mail, T("E-Mail"), "IconMail"),
         new(Section.Calendar, T("Kalender"), "IconCalendar"),
         new(Section.Contacts, T("Kontakte"), "IconPeople"),
+        new(Section.Tasks, T("Aufgaben"), "IconTasks"),
         new(Section.Chat, "Chat", "IconChat"),
     ];
 }

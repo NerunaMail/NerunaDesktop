@@ -173,21 +173,60 @@ public sealed class DemoCalendarProviderFactory : IProviderFactory<ICalendarProv
 
 internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvider
 {
-    public CalendarProviderCapabilities Capabilities => CalendarProviderCapabilities.None;
+    // Tasks can be ticked off and edited in the demo; they live in memory until Neruna closes.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, CalendarObject> Tasks = new(StringComparer.Ordinal);
+
+    public CalendarProviderCapabilities Capabilities => CalendarProviderCapabilities.Write;
 
     public Task TestConnectionAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<CalendarInfo>>(
         [
-            new CalendarInfo(connectionId, "personal", "Kalender", "#0F6CBD", IsReadOnly: true),
+            new CalendarInfo(connectionId, "personal", "Kalender", "#0F6CBD", IsReadOnly: true, Content: CalendarContent.Events | CalendarContent.Tasks),
             new CalendarInfo(connectionId, "team", "Team (geteilt)", "#C239B3", IsReadOnly: true),
+            new CalendarInfo(connectionId, "tasks", "Aufgaben", "#0B6A0B", IsReadOnly: false, Content: CalendarContent.Tasks),
         ]);
+
+    private static void SeedTasks()
+    {
+        if (!Tasks.IsEmpty)
+        {
+            return;
+        }
+
+        var today = DateTime.Today;
+        (string Title, DateTime? Due, bool Time, int Priority, bool Done, string? Notes)[] tasks =
+        [
+            ("Offerte an Bernasconi AG schicken", today.AddDays(-1), false, 1, false, "Version mit Wartungsvertrag"),
+            ("Rückruf Swisscom wegen Rechnung", today.AddHours(14), true, 0, false, null),
+            ("Präsentation Quartalsplanung vorbereiten", today.AddDays(3), false, 5, false, null),
+            ("Firmware der Access Points aktualisieren", today.AddDays(10), false, 0, false, "Wartungsfenster am Samstag nutzen"),
+            ("Konto für neue Mitarbeiterin einrichten", null, false, 0, false, null),
+            ("Druckerpatronen bestellen", today.AddDays(-2), false, 0, true, null),
+        ];
+        foreach (var (task, i) in tasks.Select((t, i) => (t, i)))
+        {
+            var uid = $"demo-task-{i}";
+            var due = task.Due is { } d ? task.Time ? $"DUE:{d:yyyyMMdd'T'HHmmss}\r\n" : $"DUE;VALUE=DATE:{d:yyyyMMdd}\r\n" : string.Empty;
+            var ics = $"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Neruna//Demo//DE\r\nBEGIN:VTODO\r\nUID:{uid}\r\nDTSTAMP:20260101T000000Z\r\nSUMMARY:{task.Title}\r\n{due}"
+                      + (task.Notes is null ? string.Empty : $"DESCRIPTION:{task.Notes}\r\n")
+                      + $"PRIORITY:{task.Priority}\r\nSTATUS:{(task.Done ? "COMPLETED" : "NEEDS-ACTION")}\r\n"
+                      + (task.Done ? $"COMPLETED:{today.AddDays(-1).ToUniversalTime():yyyyMMdd'T'HHmmss'Z'}\r\n" : string.Empty)
+                      + "END:VTODO\r\nEND:VCALENDAR\r\n";
+            Tasks[uid] = new CalendarObject(uid, "1", string.Create(CultureInfo.InvariantCulture, $"{ics}"));
+        }
+    }
 
     public Task<CalendarSyncResult> SyncCalendarAsync(CalendarInfo calendar, IReadOnlyDictionary<string, string?> knownVersions, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(calendar);
         var monday = DateTime.Today.AddDays(-(((int)DateTime.Today.DayOfWeek + 6) % 7));
+        if (calendar.RemoteId == "tasks")
+        {
+            SeedTasks();
+            return Task.FromResult(new CalendarSyncResult(Guid.NewGuid().ToString("N"), IsFullResync: true, [.. Tasks.Values], []));
+        }
 
         (int Day, int Hour, int Minute, int Duration, string Title, string? Location, string? Rule)[] events = calendar.RemoteId == "personal"
             ?
@@ -219,15 +258,37 @@ internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvide
             return new CalendarObject(uid, null, ics);
         }).ToList();
 
+        // A task kept in the mixed personal calendar (as some servers do).
+        if (calendar.RemoteId == "personal")
+        {
+            items.Add(new CalendarObject("demo-mixed-task", null,
+                $"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Neruna//Demo//DE\r\nBEGIN:VTODO\r\nUID:demo-mixed-task\r\nDTSTAMP:20260101T000000Z\r\nSUMMARY:Belege für die Steuererklärung sammeln\r\nDUE;VALUE=DATE:{monday.AddDays(4):yyyyMMdd}\r\nSTATUS:NEEDS-ACTION\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"));
+        }
+
         // The week moves with today, so always replace.
         return Task.FromResult(new CalendarSyncResult(monday.ToString("yyyyMMdd", CultureInfo.InvariantCulture), IsFullResync: true, items, []));
     }
 
-    public Task<CalendarObject> SaveAsync(CalendarInfo calendar, CalendarObject item, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+    public Task<CalendarObject> SaveAsync(CalendarInfo calendar, CalendarObject item, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        ArgumentNullException.ThrowIfNull(item);
+        if (calendar.RemoteId != "tasks")
+        {
+            throw new NotSupportedException();
+        }
 
-    public Task DeleteAsync(CalendarInfo calendar, CalendarObject item, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        var saved = item with { RemoteId = item.RemoteId.Length > 0 ? item.RemoteId : Guid.NewGuid().ToString("N"), ETag = Guid.NewGuid().ToString("N") };
+        Tasks[saved.RemoteId] = saved;
+        return Task.FromResult(saved);
+    }
+
+    public Task DeleteAsync(CalendarInfo calendar, CalendarObject item, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        Tasks.TryRemove(item.RemoteId, out _);
+        return Task.CompletedTask;
+    }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

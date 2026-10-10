@@ -16,6 +16,11 @@
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,14"
                Text="{l:T 'Gilt für neue Termine und angenommene Einladungen; im Termin lässt sie sich einzeln ändern. Termine aus dem Webmail oder anderen Programmen behalten ihre eigene Erinnerung.'}" />
 
+    <TextBlock Text="{l:T 'Aufgaben'}" FontSize="16" FontWeight="SemiBold" />
+    <CheckBox IsChecked="{Binding ShowTasks}" Content="{l:T 'Offene Aufgaben mit Fälligkeitsdatum auch im Kalender anzeigen'}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,14"
+               Text="{l:T 'Aus den Aufgabenlisten, die unter «Aufgaben» eingeblendet sind. Ohne Haken bleiben Aufgaben dort – auch wenn der Server sie im selben Kalender speichert wie die Termine.'}" />
+
     <TextBlock Text="{l:T 'Einladungen'}" FontSize="16" FontWeight="SemiBold" />
     <CheckBox IsChecked="{Binding DeleteAnsweredInvitations}" Content="{l:T 'Beantwortete Einladungen in den Papierkorb verschieben'}" />
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,14"

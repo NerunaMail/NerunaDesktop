@@ -24,6 +24,9 @@ internal sealed class GraphClient(HttpClient http, OAuthTokenSource tokens)
 {
     public static readonly Uri Base = new("https://graph.microsoft.com/v1.0/");
 
+    /// <summary>Whether the sign-in includes <paramref name="scope"/> (permissions added later need a new sign-in).</summary>
+    public Task<bool> GrantsAsync(string scope, CancellationToken cancellationToken) => tokens.GrantsAsync(scope, cancellationToken);
+
     public async Task<JsonElement> GetAsync(string pathOrUrl, CancellationToken cancellationToken, params (string Name, string Value)[] headers)
     {
         using var response = await SendAsync(HttpMethod.Get, pathOrUrl, null, cancellationToken, headers);

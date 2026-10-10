@@ -14,7 +14,9 @@ namespace Neruna.Core.Auth;
 /// Where and as which app to sign in (OAuth 2.0 for a public client – a desktop app has no secret, RFC 8252).
 /// The client id is not secret: security comes from the user's own sign-in, PKCE and the redirect to this computer.
 /// </summary>
-public sealed record OAuthEndpoints(Uri Authorize, Uri Token, string ClientId, IReadOnlyList<string> Scopes)
+/// <param name="AddedLater">Scopes added to <paramref name="Scopes"/> after the first release: a sign-in made before
+/// lacks them, so its refresh must not ask for them (the provider would refuse and the account would break).</param>
+public sealed record OAuthEndpoints(Uri Authorize, Uri Token, string ClientId, IReadOnlyList<string> Scopes, IReadOnlyList<string>? AddedLater = null)
 {
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ClientId);
 }
@@ -24,7 +26,14 @@ public sealed record OAuthTokens(
     [property: JsonPropertyName("access")] string AccessToken,
     [property: JsonPropertyName("refresh")] string RefreshToken,
     [property: JsonPropertyName("expires")] DateTimeOffset ExpiresAt,
-    [property: JsonPropertyName("account")] string? Account = null);
+    [property: JsonPropertyName("account")] string? Account = null,
+    [property: JsonPropertyName("scope")] string? Scope = null)
+{
+    /// <summary>Whether the provider granted <paramref name="scope"/> (also as full resource URI); unknown counts as no.</summary>
+    public bool Grants(string scope) =>
+        Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Any(s => string.Equals(s, scope, StringComparison.OrdinalIgnoreCase) || s.EndsWith("/" + scope, StringComparison.OrdinalIgnoreCase)) == true;
+}
 
 public sealed class OAuthException(string message, bool signInRequired = false, Exception? inner = null) : Exception(message, inner)
 {
@@ -122,7 +131,7 @@ public sealed class OAuthClient(HttpClient http)
     private async Task<OAuthTokens> RequestTokensAsync(OAuthEndpoints endpoints, Dictionary<string, string?> grant, OAuthTokens? previous, CancellationToken cancellationToken)
     {
         grant["client_id"] = endpoints.ClientId;
-        grant["scope"] = string.Join(' ', endpoints.Scopes);
+        grant["scope"] = string.Join(' ', ScopesFor(endpoints, previous));
         using var content = new FormUrlEncodedContent(grant.Where(g => g.Value is not null).Select(g => new KeyValuePair<string, string>(g.Key, g.Value!)));
         using var response = await http.PostAsync(endpoints.Token, content, cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken);
@@ -138,7 +147,22 @@ public sealed class OAuthClient(HttpClient http)
             body.AccessToken,
             body.RefreshToken ?? previous?.RefreshToken ?? throw new OAuthException(T("Der Anbieter hat kein dauerhaftes Anmelde-Token geliefert.")),
             DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, body.ExpiresIn)),
-            previous?.Account);
+            previous?.Account,
+            body.Scope ?? previous?.Scope ?? string.Join(' ', ScopesFor(endpoints, previous)));
+    }
+
+    // Sign-in: everything. Refresh: what was granted (a refresh may not ask for more); for sign-ins from before the
+    // grant was recorded, the scopes of that time.
+    private static IEnumerable<string> ScopesFor(OAuthEndpoints endpoints, OAuthTokens? previous)
+    {
+        if (previous is null)
+        {
+            return endpoints.Scopes;
+        }
+
+        var granted = previous.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                      ?? endpoints.Scopes.Except(endpoints.AddedLater ?? [], StringComparer.OrdinalIgnoreCase);
+        return granted.Append("offline_access").Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
     private static async Task RespondAsync(HttpListenerContext context, bool ok)
@@ -169,6 +193,7 @@ public sealed class OAuthClient(HttpClient http)
         [property: JsonPropertyName("access_token")] string? AccessToken,
         [property: JsonPropertyName("refresh_token")] string? RefreshToken,
         [property: JsonPropertyName("expires_in")] int ExpiresIn,
+        [property: JsonPropertyName("scope")] string? Scope,
         [property: JsonPropertyName("error")] string? Error,
         [property: JsonPropertyName("error_description")] string? ErrorDescription);
 }
@@ -195,6 +220,19 @@ public sealed class OAuthTokenSource(OAuthClient client, OAuthEndpoints endpoint
         }
 
         await credentials.SetSecretAsync(secretId, JsonSerializer.Serialize(tokens with { AccessToken = string.Empty, ExpiresAt = DateTimeOffset.MinValue }), cancellationToken);
+    }
+
+    /// <summary>Whether the stored sign-in includes <paramref name="scope"/> (e.g. tasks, added later).</summary>
+    public async Task<bool> GrantsAsync(string scope, CancellationToken cancellationToken = default)
+    {
+        OAuthTokens? stored;
+        lock (Current)
+        {
+            stored = Current.GetValueOrDefault(secretId);
+        }
+
+        stored ??= await credentials.GetSecretAsync(secretId, cancellationToken) is { Length: > 0 } json ? JsonSerializer.Deserialize<OAuthTokens>(json) : null;
+        return stored?.Grants(scope) == true;
     }
 
     /// <exception cref="OAuthException">Not signed in, or the sign-in expired.</exception>

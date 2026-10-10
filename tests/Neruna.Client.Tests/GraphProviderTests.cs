@@ -165,12 +165,82 @@ public class GraphProviderTests
         Assert.False(MicrosoftAccount.IsConfigured && string.IsNullOrEmpty(MicrosoftAccount.ClientId));
     }
 
-    private static async Task<(GraphClient Graph, FakeGraph Http)> SignedInAsync()
+    [Fact]
+    public async Task Microsoft_to_do_lists_need_the_tasks_permission_and_map_to_vtodo()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (withoutTasks, http) = await SignedInAsync();
+        http.Routes["GET /v1.0/me/calendars"] = """{"value":[{"id":"CAL","name":"Kalender","canEdit":true}]}""";
+        http.Routes["GET /v1.0/me/todo/lists"] = """{"value":[{"id":"L1","displayName":"Aufgaben"}]}""";
+
+        // Signed in before tasks existed: calendars only, and To Do is not even asked.
+        var calendars = await new GraphCalendarProvider(Guid.NewGuid(), withoutTasks).GetCalendarsAsync(ct);
+        Assert.Equal(["CAL"], calendars.Select(c => c.RemoteId));
+        Assert.DoesNotContain(http.Requests, r => r.Contains("todo", StringComparison.Ordinal));
+
+        var (graph, http2) = await SignedInAsync("Mail.ReadWrite Tasks.ReadWrite");
+        http2.Routes["GET /v1.0/me/calendars"] = http.Routes["GET /v1.0/me/calendars"];
+        http2.Routes["GET /v1.0/me/todo/lists"] = http.Routes["GET /v1.0/me/todo/lists"];
+        var provider = new GraphCalendarProvider(Guid.NewGuid(), graph);
+        var list = Assert.Single(await provider.GetCalendarsAsync(ct), c => c.HasTasks);
+        Assert.Equal(("todo:L1", CalendarContent.Tasks), (list.RemoteId, list.Content));
+
+        http2.Routes["GET /v1.0/me/todo/lists/L1/tasks"] = """
+            {"value":[
+              {"id":"T1","title":"Offerte schicken","status":"notStarted","importance":"high","lastModifiedDateTime":"2026-10-10T08:00:00Z",
+               "body":{"content":"An Marco","contentType":"text"},"dueDateTime":{"dateTime":"2026-10-14T00:00:00.0000000","timeZone":"UTC"}},
+              {"id":"T2","title":"Erledigt","status":"completed","importance":"normal","lastModifiedDateTime":"2026-10-09T08:00:00Z",
+               "completedDateTime":{"dateTime":"2026-10-09T07:00:00.0000000","timeZone":"UTC"}}]}
+            """;
+        var synced = await provider.SyncCalendarAsync(list, new Dictionary<string, string?> { ["T2"] = "2026-10-09T08:00:00Z", ["GONE"] = "x" }, ct);
+        var offer = TaskDraft.ToItem(list, Assert.Single(synced.AddedOrChanged))!;
+        Assert.Equal(("Offerte schicken", "An Marco", TaskPriority.High, false), (offer.Summary, offer.Notes, offer.Priority, offer.IsCompleted));
+        Assert.Equal(new DateOnly(2026, 10, 14), DateOnly.FromDateTime(offer.Due!.Value.DateTime));
+        Assert.False(offer.DueHasTime);
+        Assert.Equal(["GONE"], synced.RemovedRemoteIds);
+
+        // Done in Neruna: PATCH with status completed.
+        http2.Routes["GET /v1.0/me/todo/lists/L1/tasks/T1"] = """{"id":"T1","lastModifiedDateTime":"2026-10-10T08:00:00Z"}""";
+        http2.Routes["PATCH /v1.0/me/todo/lists/L1/tasks/T1"] = """{"id":"T1","title":"Offerte schicken","status":"completed","lastModifiedDateTime":"2026-10-10T09:00:00Z"}""";
+        var data = (TaskDraft.FromItem(offer) with { IsCompleted = true }).ToICalendar(synced.AddedOrChanged[0].ICalendarData);
+        var saved = await provider.SaveAsync(list, synced.AddedOrChanged[0] with { ICalendarData = data }, ct);
+        Assert.Contains("\"status\":\"completed\"", http2.Bodies.Last(), StringComparison.Ordinal);
+        Assert.Contains("\"importance\":\"high\"", http2.Bodies.Last(), StringComparison.Ordinal);
+        Assert.Equal("2026-10-10T09:00:00Z", saved.ETag);
+    }
+
+    [Fact]
+    public async Task A_refresh_never_asks_for_permissions_the_user_has_not_granted_yet()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var credentials = env.Get<ICredentialStore>();
+        var http = new FakeGraph();
+        var endpoints = new OAuthEndpoints(new Uri("https://login.example/authorize"), new Uri("https://login.example/token"), "client-id",
+            ["offline_access", "Mail.ReadWrite", "Tasks.ReadWrite"], ["Tasks.ReadWrite"]);
+        var tokenId = Guid.NewGuid();
+        var source = new OAuthTokenSource(new OAuthClient(new HttpClient(http)), endpoints, credentials, tokenId);
+
+        // Signed in with an older version: no grant recorded – refreshed with the scopes of that time.
+        await OAuthTokenSource.StoreAsync(credentials, tokenId, new OAuthTokens("old", "r1", DateTimeOffset.UtcNow), ct);
+        http.Routes["POST /token"] = """{"access_token":"a2","refresh_token":"r2","expires_in":3600,"scope":"Mail.ReadWrite"}""";
+        await source.GetAccessTokenAsync(ct);
+        Assert.DoesNotContain("Tasks.ReadWrite", http.Bodies.Last(), StringComparison.Ordinal);
+        Assert.False(await source.GrantsAsync("Tasks.ReadWrite", ct));
+
+        // Signed in again with tasks: the grant is kept and used for the next refresh.
+        await OAuthTokenSource.StoreAsync(credentials, tokenId, new OAuthTokens("old", "r3", DateTimeOffset.UtcNow, Scope: "https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Tasks.ReadWrite"), ct);
+        Assert.True(await source.GrantsAsync("Tasks.ReadWrite", ct));
+        await source.GetAccessTokenAsync(ct);
+        Assert.Contains("Tasks.ReadWrite", http.Bodies.Last(), StringComparison.Ordinal);
+    }
+
+    private static async Task<(GraphClient Graph, FakeGraph Http)> SignedInAsync(string? scope = null)
     {
         var env = await TestEnvironment.CreateAsync();
         var credentials = env.Get<ICredentialStore>();
         var tokenId = Guid.NewGuid();
-        await OAuthTokenSource.StoreAsync(credentials, tokenId, new OAuthTokens("access", "refresh", DateTimeOffset.UtcNow.AddHours(1)));
+        await OAuthTokenSource.StoreAsync(credentials, tokenId, new OAuthTokens("access", "refresh", DateTimeOffset.UtcNow.AddHours(1), Scope: scope));
         var http = new FakeGraph();
         return (new GraphClient(new HttpClient(http), new OAuthTokenSource(new OAuthClient(new HttpClient(http)), Endpoints, credentials, tokenId)), http);
     }

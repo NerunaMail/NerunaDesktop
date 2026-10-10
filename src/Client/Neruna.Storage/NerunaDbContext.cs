@@ -66,6 +66,8 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
         modelBuilder.Entity<CalendarEntity>(e =>
         {
             e.HasIndex(c => new { c.ConnectionId, c.RemoteId }).IsUnique();
+            // Calendars stored before tasks existed hold events.
+            e.Property(c => c.Content).HasDefaultValue(1);
             e.HasOne<ConnectionEntity>().WithMany().HasForeignKey(c => c.ConnectionId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -207,6 +209,9 @@ internal sealed class CalendarEntity
     public bool IsReadOnly { get; set; }
 
     public string? SyncState { get; set; }
+
+    /// <summary>CalendarContent flags: 1 events, 2 tasks, 3 both.</summary>
+    public int Content { get; set; } = 1;
 }
 
 internal sealed class CalendarObjectEntity

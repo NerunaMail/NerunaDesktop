@@ -19,6 +19,7 @@ internal enum Section
     Mail,
     Calendar,
     Contacts,
+    Tasks,
     Chat,
     Settings,
 }
@@ -56,6 +57,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         MailViewModel mailPage,
         CalendarViewModel calendarPage,
         ContactsViewModel contactsPage,
+        TasksViewModel tasksPage,
         ChatViewModel chatPage,
         SettingsViewModel settingsPage,
         MailController mail,
@@ -102,6 +104,14 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarPage = calendarPage;
         ContactsPage = contactsPage;
         ChatPage = chatPage;
+        TasksPage = tasksPage;
+        tasksPage.EditorRequested += (_, editor) => ShowEditor(editor, TasksPage.ReloadAsync);
+        tasksPage.StatusMessage += (_, message) => StatusText = message;
+        calendarPage.TaskOpenRequested += async (_, occurrence) =>
+        {
+            CurrentPage = TasksPage;
+            await TasksPage.OpenAsync(occurrence.Calendar, occurrence.ObjectRemoteId);
+        };
         SettingsPage = settingsPage;
         var accountsPage = settingsPage.Accounts;
         _mail = mail;
@@ -257,10 +267,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     public ChatViewModel ChatPage { get; }
 
+    public TasksViewModel TasksPage { get; }
+
     public SettingsViewModel SettingsPage { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsMail), nameof(IsCalendar), nameof(IsContacts), nameof(IsChat), nameof(IsSettings), nameof(SectionTitle))]
+    [NotifyPropertyChangedFor(nameof(IsMail), nameof(IsCalendar), nameof(IsContacts), nameof(IsTasks), nameof(IsChat), nameof(IsSettings), nameof(SectionTitle))]
     public partial ViewModelBase CurrentPage { get; set; }
 
     private void UpdateChatBadge()
@@ -282,10 +294,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     public bool IsChat => CurrentPage == ChatPage;
 
+    public bool IsTasks => CurrentPage == TasksPage;
+
     public bool IsSettings => CurrentPage == SettingsPage;
 
     /// <summary>Shown in the header bar; the window title already says "Neruna".</summary>
-    public string SectionTitle => IsCalendar ? T("Kalender") : IsContacts ? T("Kontakte") : IsChat ? "Chat" : IsSettings ? T("Einstellungen") : T("E-Mails");
+    public string SectionTitle => IsCalendar ? T("Kalender") : IsContacts ? T("Kontakte") : IsTasks ? T("Aufgaben") : IsChat ? "Chat" : IsSettings ? T("Einstellungen") : T("E-Mails");
 
     /// <summary>Modal content shown above the shell, or null.</summary>
     [ObservableProperty]
@@ -468,13 +482,14 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private Section? SectionOf(ViewModelBase page) =>
         page == MailPage ? Section.Mail : page == CalendarPage ? Section.Calendar : page == ContactsPage ? Section.Contacts
-        : page == ChatPage ? Section.Chat : page == SettingsPage ? Section.Settings : null;
+        : page == TasksPage ? Section.Tasks : page == ChatPage ? Section.Chat : page == SettingsPage ? Section.Settings : null;
 
     [RelayCommand]
     private void Navigate(Section section) => CurrentPage = section switch
     {
         Section.Calendar => CalendarPage,
         Section.Contacts => ContactsPage,
+        Section.Tasks => TasksPage,
         Section.Chat => ChatPage,
         Section.Settings => SettingsPage,
         _ => MailPage,
@@ -817,6 +832,9 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             case GroupEditorViewModel groupEditor:
                 groupEditor.Finished += OnFinished;
                 break;
+            case TaskEditorViewModel taskEditor:
+                taskEditor.Finished += OnFinished;
+                break;
         }
 
         Overlay = editor;
@@ -827,7 +845,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private async Task RefreshPagesAsync()
     {
-        _stalePages.UnionWith([MailPage, CalendarPage, ContactsPage, SettingsPage]);
+        _stalePages.UnionWith([MailPage, CalendarPage, ContactsPage, TasksPage, SettingsPage]);
         await RefreshIfStaleAsync(CurrentPage);
     }
 
@@ -850,6 +868,9 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                     break;
                 case ContactsViewModel contacts:
                     await contacts.ReloadAsync();
+                    break;
+                case TasksViewModel tasks:
+                    await tasks.ReloadAsync();
                     break;
                 case SettingsViewModel settings:
                     await settings.ReloadAsync();

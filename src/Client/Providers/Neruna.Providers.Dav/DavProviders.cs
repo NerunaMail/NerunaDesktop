@@ -103,8 +103,8 @@ internal sealed class CalDavCalendarProvider : DavProviderBase, ICalendarProvide
     {
         ArgumentNullException.ThrowIfNull(url);
         var collection = await (await ServiceAsync(cancellationToken)).GetCollectionAsync(url.IsAbsoluteUri ? url : new Uri(Settings.Url, url), cancellationToken);
-        return collection is { SupportsEvents: true }
-            ? new CalendarInfo(ConnectionId, collection.Url.AbsoluteUri, collection.Name, collection.Color, collection.IsReadOnly)
+        return collection is { Content: not CalendarContent.None }
+            ? new CalendarInfo(ConnectionId, collection.Url.AbsoluteUri, collection.Name, collection.Color, collection.IsReadOnly, Content: collection.Content)
             : null;
     }
 
@@ -129,8 +129,8 @@ internal sealed class CalDavCalendarProvider : DavProviderBase, ICalendarProvide
             ? F("Kalender-Ordner {0} · angemeldet als {1}", home.AbsoluteUri, Settings.Username)
             : F("Nur die eingetragene Adresse {0} (kein Kalender-Ordner gefunden) · angemeldet als {1}", Settings.Url.AbsoluteUri, Settings.Username);
         return collections
-            .Where(c => c.SupportsEvents)
-            .Select(c => new CalendarInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.Color, c.IsReadOnly))
+            .Where(c => c.Content != CalendarContent.None)
+            .Select(c => new CalendarInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.Color, c.IsReadOnly, Content: c.Content))
             .ToList();
     }
 

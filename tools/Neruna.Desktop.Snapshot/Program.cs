@@ -380,6 +380,24 @@ internal static class Snapshots
         vm.CalendarPage.WeekStart = DateTime.Today.AddDays(-(((int)DateTime.Today.DayOfWeek + 6) % 7));
         vm.CalendarPage.IsTimeGrid = false;
 
+        // Tasks: own section with lists per account, grouped by due date; optionally also in the calendar.
+        vm.NavigateCommand.Execute(Section.Tasks);
+        await vm.TasksPage.ReloadAsync();
+        await SaveAsync(window, output, "tasks.png");
+        var firstTask = vm.TasksPage.Groups.First().Rows.First();
+        firstTask.EditCommand.Execute(null);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "tasks-editor.png");
+        vm.Overlay = null;
+        await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.SettingKeys.CalendarShowTasks, "true");
+        vm.NavigateCommand.Execute(Section.Calendar);
+        vm.CalendarPage.IsTimeGrid = true;
+        await vm.CalendarPage.ReloadAsync();
+        await Task.Delay(400);
+        await SaveAsync(window, output, "calendar-tasks.png");
+        await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.SettingKeys.CalendarShowTasks, null);
+        vm.CalendarPage.IsTimeGrid = false;
+
         vm.NavigateCommand.Execute(Section.Contacts);
         await SaveAsync(window, output, "contacts.png");
         vm.ContactsPage.Selected = vm.ContactsPage.Items.First(i => i.IsGroup);

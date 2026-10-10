@@ -111,6 +111,15 @@ public static class SettingKeys
     /// <summary>Language of the app: "auto" (system), "de", "en", "fr" or "it"; takes effect with the next start.</summary>
     public const string UiLanguage = "ui.language";
 
+    /// <summary>Open tasks with a due date also in the calendar (default: off – tasks stay under "Aufgaben").</summary>
+    public const string CalendarShowTasks = "calendar.showTasks";
+
+    /// <summary>JSON list of task lists hidden under "Aufgaben" ("connectionId|remoteId").</summary>
+    public const string TasksHiddenLists = "tasks.hidden";
+
+    /// <summary>The task list new tasks go to ("connectionId|remoteId").</summary>
+    public const string TasksDefaultList = "tasks.defaultList";
+
     /// <summary>Crash reports to Neruna: null = ask (default), "always", "never".</summary>
     public const string CrashReports = "crash.reports";
 

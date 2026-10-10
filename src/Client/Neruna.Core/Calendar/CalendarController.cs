@@ -18,7 +18,11 @@ public sealed record CalendarOccurrence(
     DateTimeOffset Start,
     DateTimeOffset End,
     bool IsAllDay,
-    bool IsRecurring);
+    bool IsRecurring)
+{
+    /// <summary>An open task shown on its due date (setting "Aufgaben im Kalender anzeigen").</summary>
+    public bool IsTask { get; init; }
+}
 
 /// <summary>A calendar offered by the server, for choosing which ones to show (Thunderbird only offers this at setup).</summary>
 /// <param name="IsSelected">Currently synchronized.</param>
@@ -337,6 +341,83 @@ public sealed class CalendarController(
         await store.DeleteObjectAsync(calendar, remoteId, cancellationToken);
     }
 
+    /// <summary>All tasks (VTODO) of all task lists, also those in mixed calendars.</summary>
+    public async Task<IReadOnlyList<TaskItem>> GetTasksAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new List<TaskItem>();
+        foreach (var list in (await GetCalendarsAsync(cancellationToken)).Where(c => c.HasTasks))
+        {
+            foreach (var item in await store.GetObjectsAsync(list.ConnectionId, list.RemoteId, cancellationToken))
+            {
+                // Cheap text test first: mixed calendars hold mostly events.
+                if (item.ICalendarData.Contains("BEGIN:VTODO", StringComparison.OrdinalIgnoreCase) && TaskDraft.ToItem(list, item) is { } task)
+                {
+                    result.Add(task);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>The task lists hidden under "Aufgaben" (and so also not shown in the calendar).</summary>
+    public async Task<IReadOnlySet<string>> GetHiddenTaskListsAsync(CancellationToken cancellationToken = default) =>
+        await GetIdsAsync(SettingKeys.TasksHiddenLists, cancellationToken) ?? [];
+
+    public async Task SetTaskListVisibleAsync(CalendarInfo list, bool visible, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        var hidden = await GetIdsAsync(SettingKeys.TasksHiddenLists, cancellationToken) ?? [];
+        if (visible ? hidden.Remove(TaskListKey(list)) : hidden.Add(TaskListKey(list)))
+        {
+            await settings.SetAsync(SettingKeys.TasksHiddenLists, JsonSerializer.Serialize(hidden), cancellationToken);
+        }
+    }
+
+    public static string TaskListKey(CalendarInfo list)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        return $"{list.ConnectionId:N}|{list.RemoteId}";
+    }
+
+    private async Task<IReadOnlyList<TaskItem>> GetVisibleTasksAsync(CancellationToken cancellationToken)
+    {
+        var hidden = await GetHiddenTaskListsAsync(cancellationToken);
+        return [.. (await GetTasksAsync(cancellationToken)).Where(t => !hidden.Contains(TaskListKey(t.List)))];
+    }
+
+    /// <summary>Creates a task in <paramref name="target"/> or updates <paramref name="existing"/> (moving it if the list changed).</summary>
+    /// <exception cref="RemoteConflictException">Someone changed the task on the server; sync and retry.</exception>
+    public async Task<CalendarObject> SaveTaskAsync(CalendarInfo target, TaskDraft draft, TaskItem? existing = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(draft);
+        var current = existing is null ? null : await GetObjectAsync(existing.List, existing.ObjectRemoteId, cancellationToken);
+        var moving = existing is not null && (existing.List.ConnectionId != target.ConnectionId || existing.List.RemoteId != target.RemoteId);
+        var data = draft.ToICalendar(current?.ICalendarData);
+        var saved = await SaveDataAsync(target, data, moving ? null : current, cancellationToken);
+        if (moving && current is not null)
+        {
+            await DeleteEventAsync(existing!.List, current.RemoteId, cancellationToken);
+        }
+
+        return saved;
+    }
+
+    /// <exception cref="RemoteConflictException">Someone changed the task on the server; sync and retry.</exception>
+    public Task<CalendarObject> SetTaskCompletedAsync(TaskItem task, bool completed, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return SaveTaskAsync(task.List, TaskDraft.FromItem(task) with { IsCompleted = completed }, task, cancellationToken);
+    }
+
+    /// <exception cref="RemoteConflictException">Someone changed the task on the server; sync and retry.</exception>
+    public Task DeleteTaskAsync(TaskItem task, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return DeleteEventAsync(task.List, task.ObjectRemoteId, cancellationToken);
+    }
+
     private async Task<ServiceConnection> ConnectionAsync(Guid connectionId, CancellationToken cancellationToken) =>
         (await accounts.GetAccountsAsync(cancellationToken)).SelectMany(a => a.Connections).FirstOrDefault(c => c.Id == connectionId)
         ?? throw new InvalidOperationException($"Connection {connectionId} no longer exists.");
@@ -350,6 +431,19 @@ public sealed class CalendarController(
     {
         ArgumentNullException.ThrowIfNull(calendars);
         var result = new List<CalendarOccurrence>();
+
+        // Open tasks with a due date, from the task lists shown under "Aufgaben" – only when the user wants them here.
+        if (await settings.GetAsync(SettingKeys.CalendarShowTasks, cancellationToken) == "true")
+        {
+            foreach (var task in await GetVisibleTasksAsync(cancellationToken))
+            {
+                if (!task.IsCompleted && task.Due is { } due && due < to && (task.DueHasTime ? due.AddMinutes(30) : due.AddDays(1)) > from)
+                {
+                    result.Add(new CalendarOccurrence(task.List, task.ObjectRemoteId, task.Uid, "☐ " + (task.Summary.Length > 0 ? task.Summary : T("(ohne Titel)")),
+                        null, due, task.DueHasTime ? due.AddMinutes(30) : due.AddDays(1), !task.DueHasTime, task.IsRecurring) { IsTask = true });
+                }
+            }
+        }
 
         foreach (var calendar in calendars)
         {

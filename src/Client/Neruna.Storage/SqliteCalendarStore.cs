@@ -39,6 +39,7 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
             entity.Name = remote.Name;
             entity.Color = remote.Color;
             entity.IsReadOnly = remote.IsReadOnly;
+            entity.Content = (int)remote.Content;
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -136,5 +137,5 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
         await db.Calendars.Where(c => c.ConnectionId == connectionId && c.RemoteId == remoteId).Select(c => (long?)c.Id).SingleOrDefaultAsync(cancellationToken)
         ?? throw new InvalidOperationException($"Calendar '{remoteId}' is not known.");
 
-    private static CalendarInfo ToModel(CalendarEntity c) => new(c.ConnectionId, c.RemoteId, c.Name, c.Color, c.IsReadOnly, c.SyncState);
+    private static CalendarInfo ToModel(CalendarEntity c) => new(c.ConnectionId, c.RemoteId, c.Name, c.Color, c.IsReadOnly, c.SyncState, Content: c.Content == 0 ? CalendarContent.Events : (CalendarContent)c.Content);
 }
