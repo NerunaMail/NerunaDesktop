@@ -136,15 +136,25 @@ internal static class Snapshots
             autoReply.LastDay = DateTime.Today.AddDays(11);
             await SaveAsync(window, output, "auto-reply.png");
             await autoReply.SaveCommand.ExecuteAsync(null);
-            for (var i = 0; i < 50 && vm.MailPage.AutoReplyNotice is null; i++)
+            Console.WriteLine($"Out of office on: header '{vm.MailPage.AutoReplyHeader}', list: {string.Join(" | ", vm.MailPage.AutoReplyEntries.Select(e => e.Title + " " + e.Status))}");
+            await SaveAsync(window, output, "auto-reply-notice.png");
+            vm.NavigateCommand.Execute(Section.Settings);
+            vm.SettingsPage.SelectedTab = 0;
+            await Task.Delay(300);
+            await SaveAsync(window, output, "auto-reply-accounts.png");
+            vm.NavigateCommand.Execute(Section.Mail);
+
+            // Switched off again from the list at the top: the hint goes at once.
+            vm.MailPage.Tree.AutoReplyCommand.Execute(vm.MailPage.AutoReplyEntries[0].Account);
+            for (var i = 0; i < 50 && (vm.Overlay as AutoReplyViewModel)?.IsBusy != false; i++)
             {
                 await Task.Delay(100);
             }
 
-            Console.WriteLine($"Out of office: {vm.MailPage.AutoReplyNotice}");
-            await SaveAsync(window, output, "auto-reply-notice.png");
-            vm.MailPage.ShowAutoReplies([]);
-            await services.GetRequiredService<Neruna.Core.Mail.MailController>().SetAutoReplyAsync(vm.MailPage.Accounts[0].Account, vm.MailPage.Accounts[0].Connection, Neruna.Core.Mail.AutoReply.Off);
+            var off = (AutoReplyViewModel)vm.Overlay!;
+            off.IsEnabled = false;
+            await off.SaveCommand.ExecuteAsync(null);
+            Console.WriteLine($"Out of office off: header visible={vm.MailPage.HasActiveAutoReply}, settings button '{vm.SettingsPage.Accounts.Items[0].AutoReplyText}', tree badge={vm.MailPage.Accounts[0].HasAutoReply}");
         }
 
         // A freshly added account: in the tree at once, "Ordner werden geladen …" until its first sync is done.

@@ -60,6 +60,11 @@
                     </ContextMenu>
                   </TextBlock.ContextMenu>
                 </TextBlock>
+                <!-- Out-of-office reply on: under the name (beside it, a long address would push it out of sight) -->
+                <Border IsVisible="{Binding HasAutoReply}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="3" Padding="5,0" Margin="0,2,0,0"
+                        HorizontalAlignment="Left" ToolTip.Tip="{l:T 'Abwesenheitsnotiz ist eingeschaltet'}">
+                  <TextBlock Text="{l:T 'Abwesenheitsnotiz aktiv'}" FontSize="11" />
+                </Border>
                 <!-- Just added: visible at once, the folders follow -->
                 <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsSettingUp}" Margin="0,2,0,0">
                   <ProgressBar IsIndeterminate="True" Width="40" Height="3" MinWidth="0" VerticalAlignment="Center" />
@@ -122,13 +127,6 @@
       <Border Classes="pane" Grid.Column="2">
         <Grid RowDefinitions="Auto,*,Auto">
           <StackPanel Margin="12,10,12,6" Spacing="8">
-            <!-- An account answers automatically: say so, so it is not forgotten after the holidays -->
-            <Border IsVisible="{Binding AutoReplyNotice, Converter={x:Static ObjectConverters.IsNotNull}}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,6">
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="{Binding AutoReplyNotice}" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="12" />
-                <Button Grid.Column="1" Classes="command" Content="{l:T 'Ändern'}" Command="{Binding EditAutoReplyCommand}" FontSize="12" Padding="6,2" VerticalAlignment="Center" />
-              </Grid>
-            </Border>
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Text="{Binding ListTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
               <!-- Multi-selection (Ctrl/Shift-click): actions and drag & drop apply to all selected messages -->

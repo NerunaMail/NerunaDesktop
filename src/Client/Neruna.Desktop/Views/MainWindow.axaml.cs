@@ -54,6 +54,15 @@ internal sealed partial class MainWindow : Window
         PresenceButton.Flyout?.Hide();
     }
 
+    private void OnAutoReplyPicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        AutoReplyButton.Flyout?.Hide();
+        if (sender is Control { DataContext: AutoReplyEntry entry } && DataContext is MainWindowViewModel vm)
+        {
+            vm.MailPage.Tree.AutoReplyCommand.Execute(entry.Account);
+        }
+    }
+
     // Open drafts with unsaved changes: ask first (Speichern / Nicht speichern / Abbrechen).
     protected override async void OnClosing(WindowClosingEventArgs e)
     {

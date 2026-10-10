@@ -15,6 +15,9 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Account ac
     /// <summary>Closed; true when saved.</summary>
     public event EventHandler<bool>? Finished;
 
+    /// <summary>What was stored on the server (set before <see cref="Finished"/> with true).</summary>
+    public AutoReply? Saved { get; private set; }
+
     public string Title => F("Abwesenheitsnotiz · {0}", account.Title);
 
     [ObservableProperty]
@@ -122,6 +125,7 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Account ac
         try
         {
             await Task.Run(() => mail.SetAutoReplyAsync(account, connection, reply));
+            Saved = reply;
             Finished?.Invoke(this, true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

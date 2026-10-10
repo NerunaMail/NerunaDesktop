@@ -23,6 +23,36 @@
         <!-- The active section; "Neruna" is already in the window title -->
         <TextBlock Text="{Binding SectionTitle}" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <!-- Out-of-office reply on: visible from every page, the list manages it per account -->
+          <Button x:Name="AutoReplyButton" Classes="header" IsVisible="{Binding MailPage.HasActiveAutoReply}" Padding="8,4" Margin="0,0,4,0"
+                  ToolTip.Tip="{Binding MailPage.AutoReplyNotice}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <Ellipse Width="10" Height="10" Fill="#F7A700" Stroke="White" StrokeThickness="1" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding MailPage.AutoReplyHeader}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
+              <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10" Foreground="White" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button.Flyout>
+              <Flyout Placement="BottomEdgeAlignedRight">
+                <StackPanel Width="340" Spacing="4">
+                  <TextBlock Text="{l:T 'Abwesenheitsnotiz'}" FontWeight="SemiBold" Margin="4,0,0,4" />
+                  <ItemsControl ItemsSource="{Binding MailPage.AutoReplyEntries}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:AutoReplyEntry">
+                        <Grid ColumnDefinitions="*,Auto" Margin="4,3">
+                          <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="{Binding IsActive, Converter={x:Static app:Converters.BoldIf}}" />
+                            <TextBlock Text="{Binding Status}" Classes="subtle" FontSize="12" />
+                          </StackPanel>
+                          <!-- Click only (no Command binding): the list closes on the click -->
+                          <Button Grid.Column="1" Content="{Binding Action}" FontSize="12" Padding="8,3" VerticalAlignment="Center" Click="OnAutoReplyPicked" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
           <!-- Own online status for the chat, from every page (only with a chat) -->
           <Button x:Name="PresenceButton" Classes="header" IsVisible="{Binding ChatPage.ShowPresence}" Padding="8,4" Margin="0,0,4,0"
                   ToolTip.Tip="{l:T 'Online-Status im Chat'}">

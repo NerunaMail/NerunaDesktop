@@ -930,29 +930,81 @@ internal sealed partial class MailViewModel(
     [ObservableProperty]
     public partial string? AutoReplyNotice { get; set; }
 
-    private Guid? _autoReplyConnection;
+    // The accounts that answer automatically right now, by mail connection (from the servers, or as just saved).
+    private readonly Dictionary<Guid, AutoReply> _autoReplies = [];
 
-    /// <summary>The accounts whose out-of-office reply is on now (from the servers).</summary>
-    public void ShowAutoReplies(IReadOnlyList<(MailAccountNode Account, AutoReply Reply)> active)
+    /// <summary>
+    /// Takes over what the servers said: an entry per connection asked; null where the answer is unknown (offline,
+    /// no ManageSieve) – then what Neruna knew stays.
+    /// </summary>
+    public void UpdateAutoReplies(IReadOnlyDictionary<Guid, AutoReply?> states)
     {
-        ArgumentNullException.ThrowIfNull(active);
-        _autoReplyConnection = active.Count > 0 ? active[0].Account.Connection.Id : null;
+        ArgumentNullException.ThrowIfNull(states);
+        foreach (var (connectionId, reply) in states)
+        {
+            if (reply is null)
+            {
+                continue;
+            }
+
+            if (reply.IsActive(DateTimeOffset.Now))
+            {
+                _autoReplies[connectionId] = reply;
+            }
+            else
+            {
+                _autoReplies.Remove(connectionId);
+            }
+        }
+
+        ShowAutoReplyNotice();
+    }
+
+    /// <summary>The set of accounts answering automatically changed (Einstellungen → Konten shows it too).</summary>
+    public event EventHandler? AutoRepliesChanged;
+
+    /// <summary>Mail connections whose out-of-office reply is on now.</summary>
+    public IReadOnlySet<Guid> ActiveAutoReplies => _autoReplies.Keys.ToHashSet();
+
+    /// <summary>Every mail account with its out-of-office state – the list behind the "Abwesend" button at the top.</summary>
+    public ObservableCollection<AutoReplyEntry> AutoReplyEntries { get; } = [];
+
+    /// <summary>"Abwesend" / "Abwesend · 2 Konten" at the top; null when no account answers automatically.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasActiveAutoReply))]
+    public partial string? AutoReplyHeader { get; set; }
+
+    public bool HasActiveAutoReply => AutoReplyHeader is not null;
+
+    private void ShowAutoReplyNotice()
+    {
+        AutoRepliesChanged?.Invoke(this, EventArgs.Empty);
+        var active = Accounts.Where(a => _autoReplies.ContainsKey(a.Connection.Id)).ToList();
+        foreach (var node in Accounts)
+        {
+            node.HasAutoReply = _autoReplies.ContainsKey(node.Connection.Id);
+        }
+
+        AutoReplyEntries.Clear();
+        foreach (var node in Accounts.OrderByDescending(a => a.HasAutoReply))
+        {
+            AutoReplyEntries.Add(new AutoReplyEntry(node, _autoReplies.GetValueOrDefault(node.Connection.Id)));
+        }
+
+        AutoReplyHeader = active.Count switch
+        {
+            0 => null,
+            1 => T("Abwesend"),
+            _ => F("Abwesend · {0} Konten", active.Count),
+        };
+
         AutoReplyNotice = active switch
         {
             [] => null,
-            [var (account, reply)] when reply.End is { } end => F("Abwesenheitsnotiz ist eingeschaltet – {0}, bis und mit {1:d}", account.Title, end.LocalDateTime.Date.AddDays(-1)),
-            [var (account, _)] => F("Abwesenheitsnotiz ist eingeschaltet – {0}", account.Title),
+            [var account] when _autoReplies[account.Connection.Id].End is { } end => F("Abwesenheitsnotiz ist eingeschaltet – {0}, bis und mit {1:d}", account.Title, end.LocalDateTime.Date.AddDays(-1)),
+            [var account] => F("Abwesenheitsnotiz ist eingeschaltet – {0}", account.Title),
             _ => F("Abwesenheitsnotiz ist eingeschaltet – {0} Konten", active.Count),
         };
-    }
-
-    [RelayCommand]
-    private void EditAutoReply()
-    {
-        if (Accounts.FirstOrDefault(a => a.Connection.Id == _autoReplyConnection) is { } node)
-        {
-            Tree.AutoReplyCommand.Execute(node);
-        }
     }
 
     // ---- Search (on the server: MailSearchViewModel; here the list shows its hits) ---------------------------------
@@ -1223,6 +1275,25 @@ internal sealed partial class MailViewModel(
 
 }
 
+/// <summary>A mail account in the out-of-office list at the top: its state and "Ändern".</summary>
+internal sealed class AutoReplyEntry(MailAccountNode account, AutoReply? reply)
+{
+    public MailAccountNode Account { get; } = account;
+
+    public string Title => Account.Title;
+
+    public bool IsActive => reply is not null;
+
+    public string Status => reply switch
+    {
+        null => T("aus"),
+        { End: { } end } => F("aktiv, bis und mit {0:d}", end.LocalDateTime.Date.AddDays(-1)),
+        _ => T("aktiv"),
+    };
+
+    public string Action => IsActive ? T("Ändern") : T("Einrichten");
+}
+
 internal sealed partial class MailAccountNode : ObservableObject
 {
     public MailAccountNode(Account account, ServiceConnection connection, List<MailFolderNode> folders)
@@ -1255,6 +1326,10 @@ internal sealed partial class MailAccountNode : ObservableObject
     /// <summary>Just added, first sync still running.</summary>
     [ObservableProperty]
     public partial bool IsSettingUp { get; set; }
+
+    /// <summary>The out-of-office reply is on: "Abwesend" next to the account.</summary>
+    [ObservableProperty]
+    public partial bool HasAutoReply { get; set; }
 
     public IEnumerable<MailFolderNode> AllFolders() => Folders.SelectMany(f => f.SelfAndDescendants());
 }

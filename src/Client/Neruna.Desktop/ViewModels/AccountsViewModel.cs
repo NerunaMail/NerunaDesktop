@@ -38,12 +38,26 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
     public bool HasAccounts => Items.Count > 0;
 
+    private IReadOnlySet<Guid> _autoReplies = new HashSet<Guid>();
+
+    /// <summary>The mail connections whose out-of-office reply is on: their "Abwesenheit" button says so.</summary>
+    public void ShowAutoReplies(IReadOnlySet<Guid> activeConnections)
+    {
+        _autoReplies = activeConnections;
+        foreach (var item in Items)
+        {
+            item.HasAutoReply = HasAutoReply(item.Account);
+        }
+    }
+
+    private bool HasAutoReply(Account account) => account.ConnectionsOf(ServiceKind.Mail).Any(c => _autoReplies.Contains(c.Id));
+
     public async Task ReloadAsync()
     {
         Items.Clear();
         foreach (var account in await accounts.GetAccountsAsync())
         {
-            Items.Add(new AccountItem(account, setup.Summary));
+            Items.Add(new AccountItem(account, setup.Summary) { HasAutoReply = HasAutoReply(account) });
         }
 
         UpdatePositions();
@@ -125,6 +139,13 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
 internal sealed partial class AccountItem(Account account, Func<ServiceConnection, string> summary) : ObservableObject
 {
+    /// <summary>The out-of-office reply is on: the button is highlighted and says so.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AutoReplyText))]
+    public partial bool HasAutoReply { get; set; }
+
+    public string AutoReplyText => HasAutoReply ? T("Abwesend · aktiv") : T("Abwesenheit");
+
     public Account Account { get; } = account;
 
     public string Title => Account.Title;

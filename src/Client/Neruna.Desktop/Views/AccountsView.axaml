@@ -45,7 +45,7 @@
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
                       <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" Margin="0" />
                     </Button>
-                    <Button Content="{l:T 'Abwesenheit'}" Margin="4,0,0,0" IsVisible="{Binding HasMail}" ToolTip.Tip="{l:T 'Abwesenheitsnotiz'}"
+                    <Button Content="{Binding AutoReplyText}" Classes.accent="{Binding HasAutoReply}" Margin="4,0,0,0" IsVisible="{Binding HasMail}" ToolTip.Tip="{l:T 'Abwesenheitsnotiz'}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).AutoReplyCommand}" CommandParameter="{Binding}" />
                     <Button Content="{l:T 'Bearbeiten'}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
