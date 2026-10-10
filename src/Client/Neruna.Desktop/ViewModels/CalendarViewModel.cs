@@ -145,11 +145,19 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
             {
                 IsVisible = !hidden.Contains((info.ConnectionId, info.RemoteId)),
                 ShowTasks = tasksShown.Contains(CalendarController.TaskListKey(info)),
+                IsSolo = _soloKey == CalendarController.TaskListKey(info),
+                IsDimmed = _soloKey is not null && _soloKey != CalendarController.TaskListKey(info),
             };
             item.PropertyChanged += async (_, e) =>
             {
                 if (e.PropertyName == nameof(CalendarListItem.IsVisible))
                 {
+                    // Ticking a calendar ends "only this one": the ticks are the selection again.
+                    if (_soloKey is not null)
+                    {
+                        SetSolo(null);
+                    }
+
                     await LoadWeekAsync(dataChanged: true);
                 }
                 else if (e.PropertyName == nameof(CalendarListItem.ShowTasks))
@@ -214,6 +222,33 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         WeekStart = StartOfWeek(date);
         return LoadWeekAsync();
     }
+
+    // "Nur diesen Kalender anzeigen": a temporary filter on top of the ticks, which stay as they are – one more click
+    // brings back exactly the calendars ticked before.
+    private string? _soloKey;
+
+    [RelayCommand]
+    private async Task ToggleSoloAsync(CalendarListItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var key = CalendarController.TaskListKey(item.Info);
+        SetSolo(_soloKey == key ? null : key);
+        await LoadWeekAsync(dataChanged: true);
+    }
+
+    private void SetSolo(string? key)
+    {
+        _soloKey = key;
+        foreach (var item in Calendars)
+        {
+            var itemKey = CalendarController.TaskListKey(item.Info);
+            item.IsSolo = key == itemKey;
+            item.IsDimmed = key is not null && key != itemKey;
+        }
+    }
+
+    private bool IsShown(CalendarListItem item) =>
+        _soloKey is null ? item.IsVisible : CalendarController.TaskListKey(item.Info) == _soloKey;
 
     /// <summary>Sets a calendar's color; null restores the server's color.</summary>
     public async Task SetColorAsync(CalendarListItem item, string? color)
@@ -311,12 +346,12 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
 
     private async Task LoadWeekAsync(bool dataChanged = false)
     {
-        var visible = Calendars.Where(c => c.IsVisible).ToList();
+        var visible = Calendars.Where(IsShown).ToList();
         var colors = visible.ToDictionary(c => (c.Info.ConnectionId, c.Info.RemoteId), c => c.Color);
         var from = new DateTimeOffset(WeekStart);
         var shown = visible.Select(c => c.Info).ToList();
         var version = ++_weekVersion;
-        var occurrences = await Task.Run(() => calendar.GetOccurrencesAsync(shown, from, from.AddDays(7)));
+        var occurrences = await Task.Run(() => calendar.GetOccurrencesAsync(shown, from, from.AddDays(7), includeTaskLists: _soloKey is null));
         if (version != _weekVersion)
         {
             return; // A newer load (other week, calendars changed) is under way; an older result must not overwrite it.
@@ -392,8 +427,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var version = ++_busyVersion;
         var from = StartOfWeek(fromMonth);
         var to = toMonth.AddDays(7);
-        var visible = Calendars.Where(c => c.IsVisible).Select(c => c.Info).ToList();
-        var occurrences = visible.Count == 0 ? [] : await Task.Run(() => calendar.GetOccurrencesAsync(visible, new DateTimeOffset(from), new DateTimeOffset(to)));
+        var visible = Calendars.Where(IsShown).Select(c => c.Info).ToList();
+        var occurrences = visible.Count == 0 ? [] : await Task.Run(() => calendar.GetOccurrencesAsync(visible, new DateTimeOffset(from), new DateTimeOffset(to), includeTaskLists: _soloKey is null));
 
         var busy = await Task.Run(() =>
         {
@@ -453,6 +488,17 @@ internal sealed partial class CalendarListItem(CalendarInfo info, string color) 
     /// <summary>"Aufgaben im Kalender anzeigen" for this calendar (default off).</summary>
     [ObservableProperty]
     public partial bool ShowTasks { get; set; }
+
+    /// <summary>Only this calendar is shown right now.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SoloTip))]
+    public partial bool IsSolo { get; set; }
+
+    /// <summary>Another calendar is shown alone: this one is greyed out (its tick stays).</summary>
+    [ObservableProperty]
+    public partial bool IsDimmed { get; set; }
+
+    public string SoloTip => IsSolo ? T("Wieder alle ausgewählten Kalender anzeigen") : T("Nur diesen Kalender anzeigen");
 }
 
 internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem> events)

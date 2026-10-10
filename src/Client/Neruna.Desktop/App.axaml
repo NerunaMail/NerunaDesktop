@@ -65,6 +65,7 @@
       <StreamGeometry x:Key="IconSidebar">M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 2v12h10V6H4zm12 0v12h4V6h-4zm1 2h2v1.5h-2V8zm0 3h2v1.5h-2V11z</StreamGeometry>
       <StreamGeometry x:Key="IconAccountAdd">M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-4.4 0-8 2.2-8 5v1h11.3a6 6 0 0 1-.3-1.8c0-1.5.5-2.9 1.4-4A13 13 0 0 0 10 14zm8 0v3h-3v2h3v3h2v-3h3v-2h-3v-3h-2z</StreamGeometry>
       <StreamGeometry x:Key="IconTextTemplate">M5 3h10l4 4v14H5V3zm9 1.5V8h3.5L14 4.5zM8 11h8v1.6H8V11zm0 3.2h8v1.6H8v-1.6zm0 3.2h5v1.6H8v-1.6z</StreamGeometry>
+      <StreamGeometry x:Key="IconSolo">M3 4h18v2.2l-7 7.3V20l-4 2v-8.5L3 6.2z</StreamGeometry>
       <StreamGeometry x:Key="IconAdd">M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z</StreamGeometry>
       <StreamGeometry x:Key="IconFlag">M5 3h2v18H5V3zm3 1h11l-2.5 4L19 12H8V4z</StreamGeometry>
       <StreamGeometry x:Key="IconAttach">M16.5 6v11.5a4.5 4.5 0 0 1-9 0V5a3 3 0 0 1 6 0v10.5a1.5 1.5 0 0 1-3 0V6H9v9.5a3 3 0 0 0 6 0V5a4.5 4.5 0 0 0-9 0v12.5a6 6 0 0 0 12 0V6h-1.5z</StreamGeometry>
@@ -151,6 +152,24 @@
       <Setter Property="Background" Value="#26FFFFFF" />
     </Style>
 
+    <!-- "Nur diese anzeigen": quiet until hovered, highlighted while it filters -->
+    <Style Selector="Button.solo">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="3" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Opacity" Value="0.3" />
+    </Style>
+    <Style Selector="Button.solo:pointerover">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.solo.on">
+      <Setter Property="Opacity" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Button.solo.on PathIcon">
+      <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
     <Style Selector="Button.command">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Padding" Value="10,6" />

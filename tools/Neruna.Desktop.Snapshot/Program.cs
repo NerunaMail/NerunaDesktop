@@ -384,6 +384,11 @@ internal static class Snapshots
         vm.NavigateCommand.Execute(Section.Tasks);
         await vm.TasksPage.ReloadAsync();
         await SaveAsync(window, output, "tasks.png");
+        var mixedList = vm.TasksPage.ListGroups.SelectMany(g => g.Lists).First(l => l.Info.RemoteId == "personal");
+        vm.TasksPage.ToggleSoloCommand.Execute(mixedList);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "tasks-solo.png");
+        vm.TasksPage.ToggleSoloCommand.Execute(mixedList);
         var firstTask = vm.TasksPage.Groups.First().Rows.First();
         firstTask.EditCommand.Execute(null);
         await Task.Delay(300);
@@ -397,6 +402,11 @@ internal static class Snapshots
         await vm.CalendarPage.ReloadAsync();
         await Task.Delay(400);
         await SaveAsync(window, output, "calendar-tasks.png");
+        var teamCalendar = vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "team");
+        await vm.CalendarPage.ToggleSoloCommand.ExecuteAsync(teamCalendar);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "calendar-solo.png");
+        await vm.CalendarPage.ToggleSoloCommand.ExecuteAsync(teamCalendar);
         demoTasks.InCalendar = false;
         vm.CalendarPage.IsTimeGrid = false;
 

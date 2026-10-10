@@ -100,5 +100,10 @@ public class TaskTests
 
         // A mixed calendar switched off in the calendar takes its tasks with it.
         Assert.Empty(await TasksInCalendarAsync());
+
+        // "Nur diesen Kalender anzeigen": pure task lists marked for the calendar step aside too.
+        await calendar.SetTaskListInCalendarAsync(info, true, ct);
+        Assert.Equal(["☐ Bericht schreiben", "☐ Rechnung prüfen"], await TasksInCalendarAsync(mixed));
+        Assert.Equal(["☐ Bericht schreiben"], (await calendar.GetOccurrencesAsync([mixed], from, to, includeTaskLists: false, ct)).Where(o => o.IsTask).Select(o => o.Summary));
     }
 }

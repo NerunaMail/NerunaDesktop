@@ -447,10 +447,21 @@ public sealed class CalendarController(
         ?? throw new InvalidOperationException($"Connection {connectionId} no longer exists.");
 
     /// <summary>All occurrences overlapping [<paramref name="from"/>, <paramref name="to"/>) across the given calendars, ordered by start.</summary>
+    public Task<IReadOnlyList<CalendarOccurrence>> GetOccurrencesAsync(
+        IEnumerable<CalendarInfo> calendars,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default) =>
+        GetOccurrencesAsync(calendars, from, to, includeTaskLists: true, cancellationToken);
+
+    /// <param name="includeTaskLists">
+    /// Also the tasks of pure task lists marked for the calendar; false when the calendar shows just one calendar.
+    /// </param>
     public async Task<IReadOnlyList<CalendarOccurrence>> GetOccurrencesAsync(
         IEnumerable<CalendarInfo> calendars,
         DateTimeOffset from,
         DateTimeOffset to,
+        bool includeTaskLists,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(calendars);
@@ -465,7 +476,7 @@ public sealed class CalendarController(
             foreach (var task in await GetTasksAsync(cancellationToken))
             {
                 var key = TaskListKey(task.List);
-                if (inCalendar.Contains(key) && (!task.List.HasEvents || shownCalendars.Contains(key))
+                if (inCalendar.Contains(key) && (task.List.HasEvents ? shownCalendars.Contains(key) : includeTaskLists)
                     && !task.IsCompleted && task.Due is { } due && due < to && (task.DueHasTime ? due.AddMinutes(30) : due.AddDays(1)) > from)
                 {
                     result.Add(new CalendarOccurrence(task.List, task.ObjectRemoteId, task.Uid, "☐ " + (task.Summary.Length > 0 ? task.Summary : T("(ohne Titel)")),

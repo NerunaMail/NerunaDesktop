@@ -19,6 +19,9 @@ internal static class Converters
     public static FuncValueConverter<string?, IBrush> ColorBrush { get; } = new(color =>
         Color.TryParse(color, out var parsed) ? new SolidColorBrush(parsed) : Brushes.Transparent);
 
+    /// <summary>Greyed out while another list is shown alone ("Nur diesen … anzeigen").</summary>
+    public static FuncValueConverter<bool, double> DimmedOpacity { get; } = new(dimmed => dimmed ? 0.45 : 1);
+
     public static FuncValueConverter<bool, FontWeight> BoldIf { get; } = new(bold => bold ? FontWeight.SemiBold : FontWeight.Normal);
 
     /// <summary>The editor joins the formatting toolbar above it; alone it gets all corners rounded.</summary>

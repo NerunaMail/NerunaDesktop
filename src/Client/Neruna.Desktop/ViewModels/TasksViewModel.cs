@@ -80,6 +80,8 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
                     {
                         IsVisible = !hidden.Contains(CalendarController.TaskListKey(l)),
                         InCalendar = inCalendar.Contains(CalendarController.TaskListKey(l)),
+                        IsSolo = _soloKey == CalendarController.TaskListKey(l),
+                        IsDimmed = _soloKey is not null && _soloKey != CalendarController.TaskListKey(l),
                     })
                     .ToList();
                 foreach (var item in items)
@@ -88,6 +90,8 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
                     {
                         if (e.PropertyName == nameof(TaskListItem.IsVisible))
                         {
+                            // Ticking a list ends "only this list": the ticks are the selection again.
+                            SetSolo(null);
                             await calendar.SetTaskListVisibleAsync(item.Info, item.IsVisible);
                             Rebuild();
                         }
@@ -130,8 +134,34 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
         CalendarChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    // "Nur diese Liste anzeigen": a temporary filter on top of the ticks, which stay as they are (and stay saved) – one
+    // more click brings back exactly the lists ticked before.
+    private string? _soloKey;
+
+    [RelayCommand]
+    private void ToggleSolo(TaskListItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var key = CalendarController.TaskListKey(item.Info);
+        SetSolo(_soloKey == key ? null : key);
+        Rebuild();
+    }
+
+    private void SetSolo(string? key)
+    {
+        _soloKey = key;
+        foreach (var item in ListGroups.SelectMany(g => g.Lists))
+        {
+            var itemKey = CalendarController.TaskListKey(item.Info);
+            item.IsSolo = key == itemKey;
+            item.IsDimmed = key is not null && key != itemKey;
+        }
+    }
+
     private bool IsShown(CalendarInfo list) =>
-        ListGroups.SelectMany(g => g.Lists).FirstOrDefault(l => Same(l.Info, list)) is not { IsVisible: false };
+        _soloKey is not null
+            ? CalendarController.TaskListKey(list) == _soloKey
+            : ListGroups.SelectMany(g => g.Lists).FirstOrDefault(l => Same(l.Info, list)) is not { IsVisible: false };
 
     private static bool Same(CalendarInfo a, CalendarInfo b) => a.ConnectionId == b.ConnectionId && a.RemoteId == b.RemoteId;
 
@@ -329,6 +359,17 @@ internal sealed partial class TaskListItem(CalendarInfo info, string color, int 
     /// <summary>"Aufgaben im Kalender anzeigen" for this list (default off).</summary>
     [ObservableProperty]
     public partial bool InCalendar { get; set; }
+
+    /// <summary>Only this list is shown right now.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SoloTip))]
+    public partial bool IsSolo { get; set; }
+
+    /// <summary>Another list is shown alone: this one is greyed out (its tick stays).</summary>
+    [ObservableProperty]
+    public partial bool IsDimmed { get; set; }
+
+    public string SoloTip => IsSolo ? T("Wieder alle ausgewählten Listen anzeigen") : T("Nur diese Liste anzeigen");
 }
 
 internal sealed class TaskGroup(string title, IReadOnlyList<TaskRow> rows, bool isWarning)

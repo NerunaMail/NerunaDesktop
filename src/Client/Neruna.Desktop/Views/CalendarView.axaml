@@ -56,7 +56,7 @@
       </Grid>
     </Border>
 
-    <Grid x:Name="Columns" Grid.Row="1" ColumnDefinitions="244,6,*">
+    <Grid x:Name="Columns" Grid.Row="1" ColumnDefinitions="264,6,*">
 
       <!-- Date navigator + calendar list -->
       <Border Classes="pane" Padding="12,10">
@@ -180,7 +180,7 @@
           <ItemsControl ItemsSource="{Binding Calendars}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CalendarListItem">
-                <Grid ColumnDefinitions="Auto,Auto,*">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto" Opacity="{Binding IsDimmed, Converter={x:Static app:Converters.DimmedOpacity}}">
                   <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Anzeigen'}" />
                   <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
                   <Button Grid.Column="1" Width="16" Height="16" MinWidth="0" Padding="0" CornerRadius="3" Background="{Binding Brush}"
@@ -224,10 +224,15 @@
                       </Flyout>
                     </Button.Flyout>
                   </Button>
-                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{l:T '(nur lesen)'}" Classes="subtle" FontSize="11" IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" />
-                  </StackPanel>
+                  <!-- Long names end in "…" before the filter icon -->
+                  <DockPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <TextBlock DockPanel.Dock="Right" Text="{l:T '(nur lesen)'}" Classes="subtle" FontSize="11" IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" Margin="6,0,0,0" />
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                  </DockPanel>
+                  <Button Grid.Column="3" Classes="solo" Classes.on="{Binding IsSolo}" ToolTip.Tip="{Binding SoloTip}" VerticalAlignment="Center" Margin="4,0,0,0"
+                          Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).ToggleSoloCommand}" CommandParameter="{Binding}">
+                    <PathIcon Data="{StaticResource IconSolo}" Width="12" Height="12" />
+                  </Button>
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
