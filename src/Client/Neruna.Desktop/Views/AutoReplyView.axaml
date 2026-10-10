@@ -2,6 +2,7 @@
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:core="using:Neruna.Core.Mail"
              x:Class="Neruna.Desktop.Views.AutoReplyView"
              x:DataType="vm:AutoReplyViewModel">
 
@@ -27,6 +28,18 @@
           </Grid>
         </StackPanel>
 
+        <TextBlock Classes="label" Text="{l:T 'Vorlage'}" />
+        <Grid ColumnDefinitions="*,8,Auto">
+          <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" HorizontalAlignment="Stretch" PlaceholderText="{l:T 'eigener Text'}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="core:AutoReplyTemplate">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Grid.Column="2" Classes="command" Content="{l:T 'Löschen'}" Command="{Binding DeleteTemplateCommand}" FontSize="12" />
+        </Grid>
+
         <StackPanel IsVisible="{Binding CanSetSubject}">
           <TextBlock Classes="label" Text="{l:T 'Betreff'}" />
           <TextBox Text="{Binding Subject}" PlaceholderText="{l:T 'leer lassen für den Standardbetreff des Servers'}" />
@@ -34,6 +47,12 @@
 
         <TextBlock Classes="label" Text="{l:T 'Antwort'}" />
         <TextBox Text="{Binding Message}" AcceptsReturn="True" TextWrapping="Wrap" Height="190" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Platzhalter: {{start}} und {{end}} werden beim Einschalten durch den ersten und den letzten Tag des Zeitraums ersetzt.'}" />
+        <Grid ColumnDefinitions="*,8,Auto" Margin="0,4,0,0">
+          <TextBox Text="{Binding TemplateName}" PlaceholderText="{l:T 'Name der Vorlage, z. B. Ferien'}" />
+          <Button Grid.Column="2" Content="{l:T 'Als Vorlage speichern'}" Command="{Binding SaveTemplateCommand}" />
+        </Grid>
       </StackPanel>
     </StackPanel>
 

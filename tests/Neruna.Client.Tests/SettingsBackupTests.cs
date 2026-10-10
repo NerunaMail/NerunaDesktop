@@ -6,6 +6,7 @@ using Neruna.Contracts;
 using Neruna.Contracts.Cloud;
 using Neruna.Core;
 using Neruna.Core.Accounts;
+using Neruna.Core.Calendar;
 using Neruna.Core.Cloud;
 using Neruna.Core.Mail;
 using Neruna.Core.Security;
@@ -43,6 +44,18 @@ public class SettingsBackupTests
         await office.Get<CertificateManager>().ImportAsync(TestPki.Pkcs12(TestPki.User("Firma", "info@example.com"), "x"), "x", CertificateSource.Cloud, ct);
         await office.Get<ISettingsStore>().SetAsync(SettingKeys.SmimeCipher, "aes128", ct);
         await office.Get<ISettingsStore>().SetAsync("ui.layout", "{\"width\":1600}", ct);
+
+        // What came later: out-of-office templates and text, calendars and task lists switched off or shown in the
+        // calendar, own colours and names – all personal settings, so all in the backup.
+        var officeSettings = office.Get<ISettingsStore>();
+        await AutoReplyText.SaveTemplateAsync(officeSettings, new AutoReplyTemplate("Ferien", "Bis {{end}} in den Ferien."), ct);
+        await AutoReplyText.RememberAsync(officeSettings, mail.Id, "Bei Kunden bis {{end}}.", ct);
+        var team = new CalendarInfo(mail.Id, "team", "Team", null, false, Content: CalendarContent.Events | CalendarContent.Tasks);
+        await office.Calendar.SetCalendarVisibleAsync(team, false, ct);
+        await office.Tasks.SetListVisibleAsync(team, false, ct);
+        await office.Tasks.SetListInCalendarAsync(team, true, ct);
+        await office.Calendar.SetDisplayNameAsync(team, "Team Bernasconi", ct);
+        await officeSettings.SetAsync($"calendar.color.{mail.Id:N}.team", "#C239B3", ct);
 
         // No vault yet: nothing to suggest; set up with password, then a backup with a note.
         Assert.False(await officeBackup.ShouldSuggestBackupAsync(ct));
@@ -103,6 +116,14 @@ public class SettingsBackupTests
         Assert.True(certificate.HasPrivateKey);
         Assert.Single((await laptop.Get<CertificateManager>().LoadMaterialAsync(ct)).PrivateKeys); // with its password
         Assert.Equal("aes128", await laptop.Get<ISettingsStore>().GetAsync(SettingKeys.SmimeCipher, ct));
+        var laptopSettings = laptop.Get<ISettingsStore>();
+        Assert.Equal("Bis {{end}} in den Ferien.", Assert.Single(await AutoReplyText.LoadTemplatesAsync(laptopSettings, ct)).Text);
+        Assert.Equal("Bei Kunden bis {{end}}.", await AutoReplyText.TemplateForAsync(laptopSettings, mail.Id, new AutoReply(false, "Bei Kunden bis {{end}}."), ct));
+        Assert.Contains(CalendarController.CalendarKey(team), await laptop.Calendar.GetHiddenCalendarsAsync(ct));
+        Assert.Contains(CalendarController.CalendarKey(team), await laptop.Tasks.GetHiddenListsAsync(ct));
+        Assert.Contains(CalendarController.CalendarKey(team), await laptop.Tasks.GetListsInCalendarAsync(ct));
+        Assert.Equal("#C239B3", await laptopSettings.GetAsync($"calendar.color.{mail.Id:N}.team", ct));
+        Assert.NotNull(await laptopSettings.GetAsync($"calendar.name.{mail.Id:N}.team", ct));
         Assert.Null(await laptop.Get<ISettingsStore>().GetAsync("ui.layout", ct));
         Assert.False(await laptopBackup.ShouldSuggestBackupAsync(ct));
     }

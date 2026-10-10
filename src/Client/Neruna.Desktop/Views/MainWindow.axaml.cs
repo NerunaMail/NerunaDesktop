@@ -54,12 +54,12 @@ internal sealed partial class MainWindow : Window
         PresenceButton.Flyout?.Hide();
     }
 
-    private void OnAutoReplyPicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnAutoReplyMore(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         AutoReplyButton.Flyout?.Hide();
-        if (sender is Control { DataContext: AutoReplyEntry entry } && DataContext is MainWindowViewModel vm)
+        if (sender is Control { DataContext: AutoReplyAccountViewModel row })
         {
-            vm.MailPage.Tree.AutoReplyCommand.Execute(entry.Account);
+            row.MoreOptionsCommand.Execute(null);
         }
     }
 

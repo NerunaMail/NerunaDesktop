@@ -119,6 +119,7 @@ internal static class AppServices
         services.AddSingleton<UpdateService>();
         services.AddSingleton<NotificationService>();
         services.AddSingleton<MailNotifier>();
+        services.AddSingleton<AutoRepliesViewModel>();
         services.AddSingleton<ReminderScheduler>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<CertificateManager>();

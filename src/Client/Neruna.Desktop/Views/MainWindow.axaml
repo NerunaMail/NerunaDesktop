@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Neruna.Desktop.ViewModels"
         xmlns:app="using:Neruna.Desktop"
+        xmlns:core="using:Neruna.Core.Mail"
         x:Class="Neruna.Desktop.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Neruna"
@@ -23,29 +24,55 @@
         <!-- The active section; "Neruna" is already in the window title -->
         <TextBlock Text="{Binding SectionTitle}" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-          <!-- Out-of-office reply on: visible from every page, the list manages it per account -->
-          <Button x:Name="AutoReplyButton" Classes="header" IsVisible="{Binding MailPage.HasActiveAutoReply}" Padding="8,4" Margin="0,0,4,0"
-                  ToolTip.Tip="{Binding MailPage.AutoReplyNotice}">
+          <!-- Out-of-office replies: from every page; switch and period per account, the full dialog behind "Weitere Optionen" -->
+          <Button x:Name="AutoReplyButton" Classes="header" IsVisible="{Binding AutoReplies.IsAvailable}" Padding="8,4" Margin="0,0,4,0"
+                  ToolTip.Tip="{Binding AutoReplies.Summary}">
             <StackPanel Orientation="Horizontal" Spacing="7">
-              <Ellipse Width="10" Height="10" Fill="#F7A700" Stroke="White" StrokeThickness="1" VerticalAlignment="Center" />
-              <TextBlock Text="{Binding MailPage.AutoReplyHeader}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
+              <Ellipse Width="10" Height="10" Fill="#F7A700" Stroke="White" StrokeThickness="1" VerticalAlignment="Center" IsVisible="{Binding AutoReplies.AnyActive}" />
+              <TextBlock Text="{Binding AutoReplies.HeaderText}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
               <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10" Foreground="White" VerticalAlignment="Center" />
             </StackPanel>
             <Button.Flyout>
               <Flyout Placement="BottomEdgeAlignedRight">
-                <StackPanel Width="340" Spacing="4">
-                  <TextBlock Text="{l:T 'Abwesenheitsnotiz'}" FontWeight="SemiBold" Margin="4,0,0,4" />
-                  <ItemsControl ItemsSource="{Binding MailPage.AutoReplyEntries}">
+                <StackPanel Width="380" Spacing="2">
+                  <TextBlock Text="{l:T 'Abwesenheitsnotiz'}" FontWeight="SemiBold" Margin="4,0,0,6" />
+                  <ItemsControl ItemsSource="{Binding AutoReplies.Accounts}">
                     <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:AutoReplyEntry">
-                        <Grid ColumnDefinitions="*,Auto" Margin="4,3">
-                          <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="{Binding IsActive, Converter={x:Static app:Converters.BoldIf}}" />
-                            <TextBlock Text="{Binding Status}" Classes="subtle" FontSize="12" />
+                      <DataTemplate x:DataType="vm:AutoReplyAccountViewModel">
+                        <Border Padding="4,8" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1">
+                          <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Status}" Classes="subtle" FontSize="12" />
+                              </StackPanel>
+                              <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" IsEnabled="{Binding !IsBusy}" VerticalAlignment="Center" />
+                            </Grid>
+                            <StackPanel IsVisible="{Binding CanSchedule}" Spacing="4">
+                              <CheckBox Content="{l:T 'Nur in diesem Zeitraum'}" IsChecked="{Binding IsScheduled}" FontSize="12" />
+                              <Grid ColumnDefinitions="*,8,Auto,8,*" IsEnabled="{Binding IsScheduled}">
+                                <CalendarDatePicker SelectedDate="{Binding FirstDay}" HorizontalAlignment="Stretch" />
+                                <TextBlock Grid.Column="2" Text="{l:T 'bis und mit'}" FontSize="12" VerticalAlignment="Center" />
+                                <CalendarDatePicker Grid.Column="4" SelectedDate="{Binding LastDay}" HorizontalAlignment="Stretch" />
+                              </Grid>
+                            </StackPanel>
+                            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding Templates.Count}">
+                              <TextBlock Text="{l:T 'Vorlage'}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                              <ComboBox Grid.Column="1" ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" HorizontalAlignment="Stretch"
+                                        PlaceholderText="{l:T 'eigener Text'}" FontSize="12">
+                                <ComboBox.ItemTemplate>
+                                  <DataTemplate x:DataType="core:AutoReplyTemplate">
+                                    <TextBlock Text="{Binding Name}" />
+                                  </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                              </ComboBox>
+                            </Grid>
+                            <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" FontSize="12"
+                                       IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                            <!-- Click only (no Command binding): the list closes on the click -->
+                            <Button Classes="command" Content="{l:T 'Weitere Optionen …'}" FontSize="12" Padding="0,2" HorizontalAlignment="Left" Click="OnAutoReplyMore" />
                           </StackPanel>
-                          <!-- Click only (no Command binding): the list closes on the click -->
-                          <Button Grid.Column="1" Content="{Binding Action}" FontSize="12" Padding="8,3" VerticalAlignment="Center" Click="OnAutoReplyPicked" />
-                        </Grid>
+                        </Border>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>

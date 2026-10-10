@@ -134,9 +134,13 @@ internal static class Snapshots
             autoReply.IsScheduled = true;
             autoReply.FirstDay = DateTime.Today;
             autoReply.LastDay = DateTime.Today.AddDays(11);
+            autoReply.Message = "Guten Tag\n\nIch bin vom {{start}} bis und mit {{end}} in den Ferien und lese meine E-Mails nicht.\n\nFreundliche Grüsse\nAnna Muster";
+            autoReply.TemplateName = "Ferien";
+            await autoReply.SaveTemplateCommand.ExecuteAsync(null);
             await SaveAsync(window, output, "auto-reply.png");
             await autoReply.SaveCommand.ExecuteAsync(null);
-            Console.WriteLine($"Out of office on: header '{vm.MailPage.AutoReplyHeader}', list: {string.Join(" | ", vm.MailPage.AutoReplyEntries.Select(e => e.Title + " " + e.Status))}");
+            Console.WriteLine($"Out of office sent: {autoReply.Saved?.Message.Split('\n')[2]} | templates: {string.Join(", ", vm.AutoReplies.Templates.Select(t => t.Name))}, in use: {vm.AutoReplies.Accounts.FirstOrDefault()?.SelectedTemplate?.Name}");
+            Console.WriteLine($"Out of office on: header '{vm.AutoReplies.HeaderText}', list: {string.Join(" | ", vm.AutoReplies.Accounts.Select(e => e.Title + " " + e.Status))}");
             await SaveAsync(window, output, "auto-reply-notice.png");
             vm.NavigateCommand.Execute(Section.Settings);
             vm.SettingsPage.SelectedTab = 0;
@@ -145,7 +149,7 @@ internal static class Snapshots
             vm.NavigateCommand.Execute(Section.Mail);
 
             // Switched off again from the list at the top: the hint goes at once.
-            vm.MailPage.Tree.AutoReplyCommand.Execute(vm.MailPage.AutoReplyEntries[0].Account);
+            vm.MailPage.Tree.AutoReplyCommand.Execute(vm.MailPage.Accounts[0]);
             for (var i = 0; i < 50 && (vm.Overlay as AutoReplyViewModel)?.IsBusy != false; i++)
             {
                 await Task.Delay(100);
@@ -154,7 +158,7 @@ internal static class Snapshots
             var off = (AutoReplyViewModel)vm.Overlay!;
             off.IsEnabled = false;
             await off.SaveCommand.ExecuteAsync(null);
-            Console.WriteLine($"Out of office off: header visible={vm.MailPage.HasActiveAutoReply}, settings button '{vm.SettingsPage.Accounts.Items[0].AutoReplyText}', tree badge={vm.MailPage.Accounts[0].HasAutoReply}");
+            Console.WriteLine($"Out of office off: header '{vm.AutoReplies.HeaderText}' active={vm.AutoReplies.AnyActive}, settings button '{vm.SettingsPage.Accounts.Items[0].AutoReplyText}', tree badge={vm.MailPage.Accounts[0].HasAutoReply}");
         }
 
         // A freshly added account: in the tree at once, "Ordner werden geladen …" until its first sync is done.

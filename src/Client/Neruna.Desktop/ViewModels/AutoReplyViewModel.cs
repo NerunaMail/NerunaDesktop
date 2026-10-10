@@ -10,13 +10,15 @@ namespace Neruna.Desktop.ViewModels;
 /// "Abwesenheitsnotiz" of one mail account: on/off, the text, optionally a period and a subject – as far as the server
 /// supports them. Stored on the server, which answers while Neruna is closed.
 /// </summary>
-internal sealed partial class AutoReplyViewModel(MailController mail, Account account, ServiceConnection connection) : ViewModelBase
+internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Core.ISettingsStore settings, Account account, ServiceConnection connection) : ViewModelBase
 {
     /// <summary>Closed; true when saved.</summary>
     public event EventHandler<bool>? Finished;
 
     /// <summary>What was stored on the server (set before <see cref="Finished"/> with true).</summary>
     public AutoReply? Saved { get; private set; }
+
+    public AutoReplyFeatures Features => (CanSchedule ? AutoReplyFeatures.Schedule : AutoReplyFeatures.None) | (CanSetSubject ? AutoReplyFeatures.Subject : AutoReplyFeatures.None);
 
     public string Title => F("Abwesenheitsnotiz · {0}", account.Title);
 
@@ -62,6 +64,81 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Account ac
     [ObservableProperty]
     public partial string Subject { get; set; } = string.Empty;
 
+    // ---- Named texts ("Ferien", "Bei Kunden"): for all accounts --------------------------------------------------
+
+    public System.Collections.ObjectModel.ObservableCollection<AutoReplyTemplate> Templates { get; } = [];
+
+    /// <summary>Choosing one puts its text (and subject) into the fields.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DeleteTemplateCommand))]
+    public partial AutoReplyTemplate? SelectedTemplate { get; set; }
+
+    /// <summary>Name for "Als Vorlage speichern" (an existing name is replaced).</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveTemplateCommand))]
+    public partial string TemplateName { get; set; } = string.Empty;
+
+    private bool _choosing;
+
+    partial void OnSelectedTemplateChanged(AutoReplyTemplate? value)
+    {
+        if (_choosing || value is null)
+        {
+            return;
+        }
+
+        Message = value.Text;
+        Subject = value.Subject ?? string.Empty;
+        TemplateName = value.Name;
+    }
+
+    private async Task LoadTemplatesAsync(string? select)
+    {
+        _choosing = true;
+        try
+        {
+            Templates.Clear();
+            foreach (var template in await AutoReplyText.LoadTemplatesAsync(settings))
+            {
+                Templates.Add(template);
+            }
+
+            SelectedTemplate = Templates.FirstOrDefault(t => select is not null ? t.Name == select : t.Text.Trim() == Message.Trim());
+            TemplateName = SelectedTemplate?.Name ?? TemplateName;
+        }
+        finally
+        {
+            _choosing = false;
+        }
+    }
+
+    private bool CanSaveTemplate() => TemplateName.Trim().Length > 0;
+
+    [RelayCommand(CanExecute = nameof(CanSaveTemplate))]
+    private async Task SaveTemplateAsync()
+    {
+        if (Message.Trim().Length == 0)
+        {
+            Error = T("Bitte einen Text für die automatische Antwort eingeben.");
+            return;
+        }
+
+        var name = TemplateName.Trim();
+        await AutoReplyText.SaveTemplateAsync(settings, new AutoReplyTemplate(name, Message.Trim(), CanSetSubject && Subject.Trim().Length > 0 ? Subject.Trim() : null));
+        await LoadTemplatesAsync(name);
+        Error = null;
+    }
+
+    private bool CanDeleteTemplate() => SelectedTemplate is not null;
+
+    [RelayCommand(CanExecute = nameof(CanDeleteTemplate))]
+    private async Task DeleteTemplateAsync()
+    {
+        await AutoReplyText.DeleteTemplateAsync(settings, SelectedTemplate!.Name);
+        TemplateName = string.Empty;
+        await LoadTemplatesAsync(null);
+    }
+
     public async Task LoadAsync()
     {
         IsBusy = true;
@@ -71,9 +148,11 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Account ac
             CanSchedule = features.HasFlag(AutoReplyFeatures.Schedule);
             CanSetSubject = features.HasFlag(AutoReplyFeatures.Subject);
             IsEnabled = reply.IsEnabled;
-            Message = reply.Message.Length > 0 ? reply.Message : DefaultMessage();
+            var template = await AutoReplyText.TemplateForAsync(settings, connection.Id, reply);
+            Message = template.Length > 0 ? template : AutoReplyText.Default(account.DisplayName);
             Subject = reply.Subject ?? string.Empty;
             IsScheduled = reply.IsScheduled && CanSchedule;
+            await LoadTemplatesAsync(null);
             if (reply.IsScheduled)
             {
                 FirstDay = reply.Start!.Value.LocalDateTime.Date;
@@ -120,11 +199,22 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Account ac
             end = new DateTimeOffset(last.Date.AddDays(1), TimeZoneInfo.Local.GetUtcOffset(last.Date.AddDays(1)));
         }
 
-        var reply = new AutoReply(IsEnabled, Message.Trim(), start, end, CanSetSubject && Subject.Trim().Length > 0 ? Subject.Trim() : null);
+        AutoReply reply;
+        try
+        {
+            reply = new AutoReply(IsEnabled, AutoReplyText.ForServer(Message, IsEnabled, start, end), start, end, CanSetSubject && Subject.Trim().Length > 0 ? Subject.Trim() : null);
+        }
+        catch (ArgumentException ex)
+        {
+            Error = ex.Message; // {{start}}/{{end}} without a period
+            return;
+        }
+
         IsBusy = true;
         try
         {
             await Task.Run(() => mail.SetAutoReplyAsync(account, connection, reply));
+            await AutoReplyText.RememberAsync(settings, connection.Id, Message.Trim());
             Saved = reply;
             Finished?.Invoke(this, true);
         }
@@ -140,7 +230,4 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Account ac
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, false);
-
-    private string DefaultMessage() =>
-        F("Guten Tag\n\nIch bin zurzeit nicht im Büro und lese meine E-Mails nicht regelmässig. Ihre Nachricht wird nach meiner Rückkehr bearbeitet.\n\nFreundliche Grüsse\n{0}", account.DisplayName);
 }

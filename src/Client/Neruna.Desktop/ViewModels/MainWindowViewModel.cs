@@ -72,6 +72,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         UiLayout layout,
         MailPushService push,
         MailNotifier notifier,
+        AutoRepliesViewModel autoReplies,
         ReminderScheduler reminders,
         ISettingsStore settings,
         Neruna.Core.Cloud.CloudSignatureSync cloudSignatures,
@@ -100,6 +101,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _http = http;
         _push = push;
         _notifier = notifier;
+        AutoReplies = autoReplies;
         _reminders = reminders;
         _settings = settings;
         _cloudSignatures = cloudSignatures;
@@ -151,7 +153,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         };
 
         MailPage.Tree.AutoReplyRequested += async (_, node) => await ShowAutoReplyAsync(node.Account, node.Connection);
-        MailPage.AutoRepliesChanged += (_, _) => SettingsPage.Accounts.ShowAutoReplies(MailPage.ActiveAutoReplies);
+        AutoReplies.Changed += (_, _) =>
+        {
+            MailPage.ShowAutoReplyBadges(AutoReplies.ActiveConnections);
+            SettingsPage.Accounts.ShowAutoReplies(AutoReplies.ActiveConnections);
+        };
+        AutoReplies.EditRequested += async (_, row) => await ShowAutoReplyAsync(row.Account, row.Connection);
 
         // Right-click on an account → "Ordner abonnieren …".
         MailPage.Tree.FolderSubscriptionsRequested += async (_, node) =>
@@ -301,6 +308,9 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     }
 
     public MailViewModel MailPage { get; }
+
+    /// <summary>The out-of-office replies behind the button at the top.</summary>
+    public AutoRepliesViewModel AutoReplies { get; }
 
     public CalendarViewModel CalendarPage { get; }
 
@@ -779,15 +789,16 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private async Task ShowAutoReplyAsync(Neruna.Core.Accounts.Account account, Neruna.Core.Accounts.ServiceConnection connection)
     {
-        var dialog = new AutoReplyViewModel(_mail, account, connection);
-        dialog.Finished += (_, saved) =>
+        var dialog = new AutoReplyViewModel(_mail, _settings, account, connection);
+        dialog.Finished += async (_, saved) =>
         {
             Overlay = null;
+            await AutoReplies.ReloadTemplatesAsync(); // templates may have been added or deleted
             if (saved && dialog.Saved is { } reply)
             {
                 // What was just stored counts at once – no second trip to the server (and no wait for other accounts).
                 StatusText = T("Abwesenheitsnotiz gespeichert.");
-                MailPage.UpdateAutoReplies(new Dictionary<Guid, Neruna.Core.Mail.AutoReply?> { [connection.Id] = reply });
+                AutoReplies.Apply(account, connection, reply, dialog.Features, dialog.Message.Trim());
             }
         };
         Overlay = dialog;
@@ -796,33 +807,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private DateTime _autoRepliesCheckedAt;
 
-    /// <summary>
-    /// Asks every mail account's server whether it answers automatically (at start, then hourly) – all at once, so a
-    /// server without ManageSieve does not hold up the others. Unknown answers keep what Neruna knew.
-    /// </summary>
     private async Task RefreshAutoRepliesAsync()
     {
         _autoRepliesCheckedAt = DateTime.UtcNow;
-        var nodes = MailPage.Accounts.ToList();
-        var answers = await Task.WhenAll(nodes.Select(node => Task.Run(async () =>
-        {
-            try
-            {
-                return (node.Connection.Id, (Neruna.Core.Mail.AutoReply?)(await _mail.GetAutoReplyAsync(node.Connection)).Reply);
-            }
-            catch (Neruna.Core.Mail.AutoReplyUnavailableException ex)
-            {
-                // No ManageSieve, a missing permission: this account has none in Neruna.
-                _logger.LogInformation("Out-of-office status of {Account} not available: {Reason}", node.Title, ex.Message);
-                return (node.Connection.Id, (Neruna.Core.Mail.AutoReply?)null);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Out-of-office status of {Account} could not be read", node.Title);
-                return (node.Connection.Id, (Neruna.Core.Mail.AutoReply?)null);
-            }
-        })));
-        MailPage.UpdateAutoReplies(answers.ToDictionary(a => a.Item1, a => a.Item2));
+        await AutoReplies.RefreshAsync([.. MailPage.Accounts.Select(a => (a.Account, a.Connection))]);
     }
 
     private void ShowIcsSubscription()
