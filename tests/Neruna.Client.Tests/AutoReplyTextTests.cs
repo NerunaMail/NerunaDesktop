@@ -7,7 +7,8 @@ namespace Neruna.Client.Tests;
 /// <summary>Placeholders in the out-of-office text and the template Neruna keeps for them.</summary>
 public class AutoReplyTextTests
 {
-    private static readonly DateTimeOffset Monday = new(2026, 10, 12, 0, 0, 0, TimeSpan.FromHours(2));
+    // Days are the user's local days: midnight in the time zone the tests run in (CI runs in UTC).
+    private static readonly DateTimeOffset Monday = new(new DateTime(2026, 10, 12), TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 10, 12)));
     private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-CH");
 
     [Fact]
