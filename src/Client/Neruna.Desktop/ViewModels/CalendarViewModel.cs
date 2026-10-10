@@ -32,6 +32,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     /// <summary>The shell shows the editor as an overlay and reloads the week when it reports a change.</summary>
     public event EventHandler<EventEditorViewModel>? EditorRequested;
 
+    /// <summary>"Aufgaben im Kalender anzeigen" was changed here: the tasks page shows the same switch.</summary>
+    public event EventHandler? TaskListsChanged;
+
     /// <summary>A task shown in the calendar was opened: the shell shows it under "Aufgaben".</summary>
     public event EventHandler<CalendarOccurrence>? TaskOpenRequested;
 
@@ -133,16 +136,27 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var items = new List<CalendarListItem>();
         var all = await calendar.GetCalendarsAsync();
         var colors = await ColorsAsync(settings, all);
+        var tasksShown = await calendar.GetTaskListsInCalendarAsync();
         // Pure task lists belong under "Aufgaben", not in the calendar list.
         foreach (var info in all.Where(c => c.HasEvents))
         {
             var color = colors[(info.ConnectionId, info.RemoteId)];
-            var item = new CalendarListItem(info, color) { IsVisible = !hidden.Contains((info.ConnectionId, info.RemoteId)) };
+            var item = new CalendarListItem(info, color)
+            {
+                IsVisible = !hidden.Contains((info.ConnectionId, info.RemoteId)),
+                ShowTasks = tasksShown.Contains(CalendarController.TaskListKey(info)),
+            };
             item.PropertyChanged += async (_, e) =>
             {
                 if (e.PropertyName == nameof(CalendarListItem.IsVisible))
                 {
                     await LoadWeekAsync(dataChanged: true);
+                }
+                else if (e.PropertyName == nameof(CalendarListItem.ShowTasks))
+                {
+                    await calendar.SetTaskListInCalendarAsync(item.Info, item.ShowTasks);
+                    await LoadWeekAsync(dataChanged: true);
+                    TaskListsChanged?.Invoke(this, EventArgs.Empty);
                 }
             };
             items.Add(item);
@@ -233,7 +247,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         return result;
     }
 
-    private static string ColorKey(CalendarInfo info) => $"calendar.color.{info.ConnectionId:N}.{info.RemoteId}";
+    internal static string ColorKey(CalendarInfo info) => $"calendar.color.{info.ConnectionId:N}.{info.RemoteId}";
 
     [RelayCommand]
     private void Subscribe() => SubscribeRequested?.Invoke(this, EventArgs.Empty);
@@ -432,6 +446,13 @@ internal sealed partial class CalendarListItem(CalendarInfo info, string color) 
 
     [ObservableProperty]
     public partial bool IsVisible { get; set; } = true;
+
+    /// <summary>The server keeps tasks in this calendar too: they can be shown here or only under "Aufgaben".</summary>
+    public bool HasTasks => Info.HasTasks;
+
+    /// <summary>"Aufgaben im Kalender anzeigen" for this calendar (default off).</summary>
+    [ObservableProperty]
+    public partial bool ShowTasks { get; set; }
 }
 
 internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem> events)

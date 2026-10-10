@@ -111,8 +111,14 @@ public static class SettingKeys
     /// <summary>Language of the app: "auto" (system), "de", "en", "fr" or "it"; takes effect with the next start.</summary>
     public const string UiLanguage = "ui.language";
 
-    /// <summary>Open tasks with a due date also in the calendar (default: off – tasks stay under "Aufgaben").</summary>
+    /// <summary>Until 0.1.14: one switch for all lists; now only read once to fill <see cref="TasksInCalendar"/>.</summary>
     public const string CalendarShowTasks = "calendar.showTasks";
+
+    /// <summary>
+    /// JSON list of task lists ("connectionId|remoteId") whose open tasks with a due date also appear in the calendar
+    /// (default: none – tasks stay under "Aufgaben"). Independent of which lists are shown under "Aufgaben".
+    /// </summary>
+    public const string TasksInCalendar = "tasks.inCalendar";
 
     /// <summary>JSON list of task lists hidden under "Aufgaben" ("connectionId|remoteId").</summary>
     public const string TasksHiddenLists = "tasks.hidden";

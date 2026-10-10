@@ -213,6 +213,13 @@
                             <Button Content="{l:T 'Übernehmen'}" FontSize="12" Classes="accent" Click="OnRename" />
                             <Button Content="{l:T 'Originalname'}" FontSize="12" Click="OnRename" Tag="reset" IsVisible="{Binding IsRenamed}" />
                           </StackPanel>
+
+                          <!-- Same setting as in the colour menu under "Aufgaben" -->
+                          <StackPanel Spacing="8" IsVisible="{Binding HasTasks}">
+                            <CheckBox Content="{l:T 'Aufgaben im Kalender anzeigen'}" IsChecked="{Binding ShowTasks}" FontSize="12" Margin="0,6,0,0" />
+                            <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap"
+                                       Text="{l:T 'Offene Aufgaben mit Fälligkeitsdatum erscheinen dann auch im Kalender.'}" />
+                          </StackPanel>
                         </StackPanel>
                       </Flyout>
                     </Button.Flyout>

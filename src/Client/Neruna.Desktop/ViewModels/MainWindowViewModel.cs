@@ -107,6 +107,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         TasksPage = tasksPage;
         tasksPage.EditorRequested += (_, editor) => ShowEditor(editor, TasksPage.ReloadAsync);
         tasksPage.StatusMessage += (_, message) => StatusText = message;
+        tasksPage.CalendarChanged += async (_, _) => await CalendarPage.ReloadAsync();
+        calendarPage.TaskListsChanged += async (_, _) => await TasksPage.ReloadAsync();
         calendarPage.TaskOpenRequested += async (_, occurrence) =>
         {
             CurrentPage = TasksPage;

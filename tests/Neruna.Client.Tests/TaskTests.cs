@@ -55,34 +55,50 @@ public class TaskTests
     }
 
     [Fact]
-    public async Task Tasks_of_mixed_calendars_stay_out_of_the_calendar_unless_wanted_and_hidden_lists_stay_hidden()
+    public async Task Each_list_decides_on_its_own_whether_its_tasks_appear_in_the_calendar()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var env = await TestEnvironment.CreateAsync();
         var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Calendar, ProviderIds.CalDav, new Dictionary<string, string> { ["url"] = "https://dav.example/" });
         await env.Accounts.SaveAccountAsync(new Account(Guid.NewGuid(), "Anna", "anna@example.com", [connection]), ct);
         var store = env.Get<ICalendarStore>();
-        var mixed = (await store.MergeCalendarsAsync(connection.Id, [new CalendarInfo(connection.Id, "mixed", "Privat", null, false, Content: CalendarContent.Events | CalendarContent.Tasks)], ct)).Single();
+        var merged = await store.MergeCalendarsAsync(connection.Id,
+        [
+            new CalendarInfo(connection.Id, "mixed", "Privat", null, false, Content: CalendarContent.Events | CalendarContent.Tasks),
+            new CalendarInfo(connection.Id, "info", "info@", null, false, Content: CalendarContent.Tasks),
+        ], ct);
+        var mixed = merged.Single(c => c.RemoteId == "mixed");
+        var info = merged.Single(c => c.RemoteId == "info");
         Assert.Equal(CalendarContent.Events | CalendarContent.Tasks, mixed.Content);
         var evt = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:e1\r\nDTSTAMP:20261001T080000Z\r\nDTSTART;VALUE=DATE:20261015\r\nDTEND;VALUE=DATE:20261016\r\nSUMMARY:Termin\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
         await store.ApplySyncResultAsync(mixed, new CalendarSyncResult("s", true, [new CalendarObject("e1", null, evt), new CalendarObject("t1", null, ForeignTodo)], []), ct);
+        await store.ApplySyncResultAsync(info, new CalendarSyncResult("s", true, [new CalendarObject("t2", null, ForeignTodo.Replace("task-1@other", "task-2@other", StringComparison.Ordinal).Replace("Bericht schreiben", "Rechnung prüfen", StringComparison.Ordinal))], []), ct);
 
         var calendar = env.Calendar;
-        var task = Assert.Single(await calendar.GetTasksAsync(ct));
-        Assert.Equal("Bericht schreiben", task.Summary);
-
+        Assert.Equal(2, (await calendar.GetTasksAsync(ct)).Count);
         var from = new DateTimeOffset(2026, 10, 12, 0, 0, 0, TimeSpan.FromHours(2));
         var to = from.AddDays(7);
+        async Task<string[]> TasksInCalendarAsync(params CalendarInfo[] calendars) =>
+            [.. (await calendar.GetOccurrencesAsync(calendars, from, to, ct)).Where(o => o.IsTask).Select(o => o.Summary).Order(StringComparer.Ordinal)];
+
+        // Default: tasks stay under "Aufgaben".
         Assert.Equal(["Termin"], (await calendar.GetOccurrencesAsync([mixed], from, to, ct)).Select(o => o.Summary));
 
+        // The one switch of 0.1.14 is carried over to every list once.
         await env.Get<ISettingsStore>().SetAsync(SettingKeys.CalendarShowTasks, "true", ct);
-        var shown = await calendar.GetOccurrencesAsync([mixed], from, to, ct);
-        Assert.Equal(2, shown.Count);
-        Assert.True(Assert.Single(shown, o => o.IsTask).IsAllDay);
+        Assert.Equal(["☐ Bericht schreiben", "☐ Rechnung prüfen"], await TasksInCalendarAsync(mixed));
+        Assert.True((await calendar.GetOccurrencesAsync([mixed], from, to, ct)).Single(o => o.Summary == "☐ Bericht schreiben").IsAllDay);
+        Assert.Null(await env.Get<ISettingsStore>().GetAsync(SettingKeys.CalendarShowTasks, ct));
 
-        // Hidden under "Aufgaben": not in the calendar either.
+        // info@ only under "Aufgaben", not in the calendar.
+        await calendar.SetTaskListInCalendarAsync(info, false, ct);
+        Assert.Equal(["☐ Bericht schreiben"], await TasksInCalendarAsync(mixed));
+
+        // Independent of "Aufgaben": hidden there, still in the calendar if wanted there.
         await calendar.SetTaskListVisibleAsync(mixed, false, ct);
-        Assert.Contains(CalendarController.TaskListKey(mixed), await calendar.GetHiddenTaskListsAsync(ct));
-        Assert.DoesNotContain(await calendar.GetOccurrencesAsync([mixed], from, to, ct), o => o.IsTask);
+        Assert.Equal(["☐ Bericht schreiben"], await TasksInCalendarAsync(mixed));
+
+        // A mixed calendar switched off in the calendar takes its tasks with it.
+        Assert.Empty(await TasksInCalendarAsync());
     }
 }

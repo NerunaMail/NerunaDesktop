@@ -374,16 +374,40 @@ public sealed class CalendarController(
         }
     }
 
+    /// <summary>The task lists whose tasks also appear in the calendar.</summary>
+    public async Task<IReadOnlySet<string>> GetTaskListsInCalendarAsync(CancellationToken cancellationToken = default)
+    {
+        if (await GetIdsAsync(SettingKeys.TasksInCalendar, cancellationToken) is { } chosen)
+        {
+            return chosen;
+        }
+
+        // 0.1.14 had one switch for all lists: carry it over once.
+        if (await settings.GetAsync(SettingKeys.CalendarShowTasks, cancellationToken) == "true")
+        {
+            var all = (await GetCalendarsAsync(cancellationToken)).Where(c => c.HasTasks).Select(TaskListKey).ToHashSet(StringComparer.Ordinal);
+            await settings.SetAsync(SettingKeys.TasksInCalendar, JsonSerializer.Serialize(all), cancellationToken);
+            await settings.SetAsync(SettingKeys.CalendarShowTasks, null, cancellationToken);
+            return all;
+        }
+
+        return new HashSet<string>(StringComparer.Ordinal);
+    }
+
+    public async Task SetTaskListInCalendarAsync(CalendarInfo list, bool shown, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        var lists = new HashSet<string>(await GetTaskListsInCalendarAsync(cancellationToken), StringComparer.Ordinal);
+        if (shown ? lists.Add(TaskListKey(list)) : lists.Remove(TaskListKey(list)))
+        {
+            await settings.SetAsync(SettingKeys.TasksInCalendar, JsonSerializer.Serialize(lists), cancellationToken);
+        }
+    }
+
     public static string TaskListKey(CalendarInfo list)
     {
         ArgumentNullException.ThrowIfNull(list);
         return $"{list.ConnectionId:N}|{list.RemoteId}";
-    }
-
-    private async Task<IReadOnlyList<TaskItem>> GetVisibleTasksAsync(CancellationToken cancellationToken)
-    {
-        var hidden = await GetHiddenTaskListsAsync(cancellationToken);
-        return [.. (await GetTasksAsync(cancellationToken)).Where(t => !hidden.Contains(TaskListKey(t.List)))];
     }
 
     /// <summary>Creates a task in <paramref name="target"/> or updates <paramref name="existing"/> (moving it if the list changed).</summary>
@@ -432,12 +456,17 @@ public sealed class CalendarController(
         ArgumentNullException.ThrowIfNull(calendars);
         var result = new List<CalendarOccurrence>();
 
-        // Open tasks with a due date, from the task lists shown under "Aufgaben" – only when the user wants them here.
-        if (await settings.GetAsync(SettingKeys.CalendarShowTasks, cancellationToken) == "true")
+        // Open tasks with a due date, only from the lists the user wants here. A calendar that also holds events and is
+        // switched off in the calendar takes its tasks with it.
+        var inCalendar = await GetTaskListsInCalendarAsync(cancellationToken);
+        if (inCalendar.Count > 0)
         {
-            foreach (var task in await GetVisibleTasksAsync(cancellationToken))
+            var shownCalendars = calendars.Select(TaskListKey).ToHashSet(StringComparer.Ordinal);
+            foreach (var task in await GetTasksAsync(cancellationToken))
             {
-                if (!task.IsCompleted && task.Due is { } due && due < to && (task.DueHasTime ? due.AddMinutes(30) : due.AddDays(1)) > from)
+                var key = TaskListKey(task.List);
+                if (inCalendar.Contains(key) && (!task.List.HasEvents || shownCalendars.Contains(key))
+                    && !task.IsCompleted && task.Due is { } due && due < to && (task.DueHasTime ? due.AddMinutes(30) : due.AddDays(1)) > from)
                 {
                     result.Add(new CalendarOccurrence(task.List, task.ObjectRemoteId, task.Uid, "☐ " + (task.Summary.Length > 0 ? task.Summary : T("(ohne Titel)")),
                         null, due, task.DueHasTime ? due.AddMinutes(30) : due.AddDays(1), !task.DueHasTime, task.IsRecurring) { IsTask = true });

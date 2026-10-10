@@ -31,6 +31,9 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
 
     public event EventHandler<string>? StatusMessage;
 
+    /// <summary>A list's colour or "Aufgaben im Kalender anzeigen" was changed here: the calendar shows both.</summary>
+    public event EventHandler? CalendarChanged;
+
     public ObservableCollection<TaskListGroup> ListGroups { get; } = [];
 
     public ObservableCollection<TaskGroup> Groups { get; } = [];
@@ -64,6 +67,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
         {
             var lists = (await calendar.GetCalendarsAsync()).Where(c => c.HasTasks).ToList();
             var hidden = await calendar.GetHiddenTaskListsAsync();
+            var inCalendar = await calendar.GetTaskListsInCalendarAsync();
             var colors = await CalendarViewModel.ColorsAsync(settings, await calendar.GetCalendarsAsync());
             var accounts = (await calendar.GetSourcesAsync()).ToDictionary(s => s.Connection.Id, s => s.Account.Title);
             _all = await Task.Run(() => calendar.GetTasksAsync());
@@ -75,6 +79,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
                     .Select(l => new TaskListItem(l, colors.GetValueOrDefault((l.ConnectionId, l.RemoteId)) ?? CalendarViewModel.Palette[0], _all.Count(t => !t.IsCompleted && Same(t.List, l)))
                     {
                         IsVisible = !hidden.Contains(CalendarController.TaskListKey(l)),
+                        InCalendar = inCalendar.Contains(CalendarController.TaskListKey(l)),
                     })
                     .ToList();
                 foreach (var item in items)
@@ -85,6 +90,11 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
                         {
                             await calendar.SetTaskListVisibleAsync(item.Info, item.IsVisible);
                             Rebuild();
+                        }
+                        else if (e.PropertyName == nameof(TaskListItem.InCalendar))
+                        {
+                            await calendar.SetTaskListInCalendarAsync(item.Info, item.InCalendar);
+                            CalendarChanged?.Invoke(this, EventArgs.Empty);
                         }
                     };
                 }
@@ -100,6 +110,24 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
             logger.LogError(ex, "Tasks could not be loaded");
             StatusMessage?.Invoke(this, T("Aufgaben konnten nicht geladen werden"));
         }
+    }
+
+    /// <summary>Gives a list an own display name (null: the server's again) – the same name as in the calendar.</summary>
+    public async Task RenameAsync(TaskListItem item, string? name)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        await calendar.SetDisplayNameAsync(item.Info, name);
+        await ReloadAsync();
+        CalendarChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Sets a list's colour (null: the server's again) – the same colour as in the calendar.</summary>
+    public async Task SetColorAsync(TaskListItem item, string? color)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        await settings.SetAsync(CalendarViewModel.ColorKey(item.Info), color);
+        await ReloadAsync();
+        CalendarChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private bool IsShown(CalendarInfo list) =>
@@ -281,6 +309,14 @@ internal sealed partial class TaskListItem(CalendarInfo info, string color, int 
 
     public string Name => Info.Name;
 
+    /// <summary>The name being edited in the colour/name flyout.</summary>
+    [ObservableProperty]
+    public partial string EditName { get; set; } = info.Name;
+
+    public string? ServerNameText => Info.ServerName is { } server ? T("Auf dem Server: ") + server : null;
+
+    public bool IsRenamed => Info.ServerName is not null;
+
     /// <summary>"Kalender + Aufgaben" for mixed CalDAV calendars.</summary>
     public string? Kind => Info.HasEvents ? T("mit Terminen") : null;
 
@@ -289,6 +325,10 @@ internal sealed partial class TaskListItem(CalendarInfo info, string color, int 
 
     [ObservableProperty]
     public partial int OpenCount { get; set; } = openCount;
+
+    /// <summary>"Aufgaben im Kalender anzeigen" for this list (default off).</summary>
+    [ObservableProperty]
+    public partial bool InCalendar { get; set; }
 }
 
 internal sealed class TaskGroup(string title, IReadOnlyList<TaskRow> rows, bool isWarning)

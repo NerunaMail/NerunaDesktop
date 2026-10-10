@@ -389,13 +389,15 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "tasks-editor.png");
         vm.Overlay = null;
-        await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.SettingKeys.CalendarShowTasks, "true");
+        var demoTasks = vm.TasksPage.ListGroups.SelectMany(g => g.Lists).First(l => l.Info.RemoteId == "tasks");
+        demoTasks.InCalendar = true;
+        await Task.Delay(300);
         vm.NavigateCommand.Execute(Section.Calendar);
         vm.CalendarPage.IsTimeGrid = true;
         await vm.CalendarPage.ReloadAsync();
         await Task.Delay(400);
         await SaveAsync(window, output, "calendar-tasks.png");
-        await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.SettingKeys.CalendarShowTasks, null);
+        demoTasks.InCalendar = false;
         vm.CalendarPage.IsTimeGrid = false;
 
         vm.NavigateCommand.Execute(Section.Contacts);
