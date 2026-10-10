@@ -56,10 +56,12 @@ internal sealed partial class MainWindow : Window
 
     private void OnAutoReplyMore(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        // Which account – before the list closes: closing detaches it, and with it the row it belonged to.
+        var row = (sender as Control)?.DataContext as AutoReplyAccountViewModel;
         AutoReplyButton.Flyout?.Hide();
-        if (sender is Control { DataContext: AutoReplyAccountViewModel row })
+        if (row is not null)
         {
-            row.MoreOptionsCommand.Execute(null);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => row.MoreOptionsCommand.Execute(null));
         }
     }
 

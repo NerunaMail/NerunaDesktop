@@ -28,6 +28,8 @@
           <Button x:Name="AutoReplyButton" Classes="header" IsVisible="{Binding AutoReplies.IsAvailable}" Padding="8,4" Margin="0,0,4,0"
                   ToolTip.Tip="{Binding AutoReplies.Summary}">
             <StackPanel Orientation="Horizontal" Spacing="7">
+              <!-- Mail: the out-of-office reply (the chat status beside it has a speech bubble) -->
+              <PathIcon Data="{StaticResource IconMail}" Width="14" Height="14" Foreground="White" VerticalAlignment="Center" />
               <Ellipse Width="10" Height="10" Fill="#F7A700" Stroke="White" StrokeThickness="1" VerticalAlignment="Center" IsVisible="{Binding AutoReplies.AnyActive}" />
               <TextBlock Text="{Binding AutoReplies.HeaderText}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
               <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10" Foreground="White" VerticalAlignment="Center" />
@@ -44,11 +46,11 @@
                             <Grid ColumnDefinitions="*,Auto">
                               <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding Status}" Classes="subtle" FontSize="12" />
+                                <TextBlock Text="{Binding Status}" Classes="subtle" Classes.error="{Binding IsUnreachable}" FontSize="12" TextWrapping="Wrap" />
                               </StackPanel>
-                              <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" IsEnabled="{Binding !IsBusy}" VerticalAlignment="Center" />
+                              <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" IsEnabled="{Binding CanChange}" VerticalAlignment="Center" />
                             </Grid>
-                            <StackPanel IsVisible="{Binding CanSchedule}" Spacing="4">
+                            <StackPanel IsVisible="{Binding CanSchedule}" IsEnabled="{Binding CanChange}" Spacing="4">
                               <CheckBox Content="{l:T 'Nur in diesem Zeitraum'}" IsChecked="{Binding IsScheduled}" FontSize="12" />
                               <Grid ColumnDefinitions="*,8,Auto,8,*" IsEnabled="{Binding IsScheduled}">
                                 <CalendarDatePicker SelectedDate="{Binding FirstDay}" HorizontalAlignment="Stretch" />
@@ -84,6 +86,8 @@
           <Button x:Name="PresenceButton" Classes="header" IsVisible="{Binding ChatPage.ShowPresence}" Padding="8,4" Margin="0,0,4,0"
                   ToolTip.Tip="{l:T 'Online-Status im Chat'}">
             <StackPanel Orientation="Horizontal" Spacing="7">
+              <!-- Chat: own online status (beside the mail's out-of-office reply) -->
+              <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="White" VerticalAlignment="Center" />
               <Ellipse Width="10" Height="10" Fill="{Binding ChatPage.PresenceBrush}" Stroke="White" StrokeThickness="1" VerticalAlignment="Center" />
               <TextBlock Text="{Binding ChatPage.PresenceLabel}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
               <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10" Foreground="White" VerticalAlignment="Center" />

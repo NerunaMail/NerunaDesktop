@@ -64,58 +64,119 @@ internal sealed partial class AutoRepliesViewModel(MailController mail, ISetting
     /// <summary>Mail connections whose reply is on now.</summary>
     public IReadOnlySet<Guid> ActiveConnections => Accounts.Where(a => a.IsActive).Select(a => a.Connection.Id).ToHashSet();
 
+    // What the servers last said, per mail connection – so the button is there right at the start, and an account whose
+    // server cannot be reached (offline, away from the office) stays in the list. This device only (not in the backup).
+    private const string CacheKey = "autoreply.cache";
+
+    private sealed record Cached(
+        [property: System.Text.Json.Serialization.JsonPropertyName("enabled")] bool Enabled,
+        [property: System.Text.Json.Serialization.JsonPropertyName("start")] DateTimeOffset? Start,
+        [property: System.Text.Json.Serialization.JsonPropertyName("end")] DateTimeOffset? End,
+        [property: System.Text.Json.Serialization.JsonPropertyName("subject")] string? Subject,
+        [property: System.Text.Json.Serialization.JsonPropertyName("features")] AutoReplyFeatures Features,
+        [property: System.Text.Json.Serialization.JsonPropertyName("checked")] DateTimeOffset Checked);
+
+    private Dictionary<Guid, Cached> _cache = [];
+
+    /// <summary>At the start: the accounts known to support it, as last seen – no server asked yet.</summary>
+    public async Task LoadKnownAsync(IReadOnlyList<(Account Account, ServiceConnection Connection)> mailAccounts)
+    {
+        ArgumentNullException.ThrowIfNull(mailAccounts);
+        await ReloadTemplatesAsync();
+        try
+        {
+            _cache = System.Text.Json.JsonSerializer.Deserialize<Dictionary<Guid, Cached>>(await settings.GetAsync(CacheKey) ?? "{}") ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            _cache = [];
+        }
+
+        Accounts.Clear();
+        foreach (var (account, connection) in mailAccounts)
+        {
+            if (_cache.TryGetValue(connection.Id, out var known))
+            {
+                var row = new AutoReplyAccountViewModel(this, mail, settings, account, connection);
+                row.Show(new AutoReply(known.Enabled, string.Empty, known.Start, known.End, known.Subject), known.Features,
+                    await AutoReplyText.TemplateForAsync(settings, connection.Id, AutoReply.Off));
+                row.ShowChecked(known.Checked, reachable: null);
+                Accounts.Add(row);
+            }
+        }
+
+        OnChanged();
+    }
+
     /// <summary>
-    /// Asks every account's server (at start, then hourly) – all at once, so a server without ManageSieve does not
-    /// hold up the others. An account whose server cannot do it leaves the list; an unknown answer keeps the row.
+    /// Asks every account's server (at start, then hourly) – all at once, each row updated as soon as its answer is
+    /// there. No support (or a missing permission): the account leaves the list. Not reachable: it stays, with a hint,
+    /// and keeps what was known.
     /// </summary>
     public async Task RefreshAsync(IReadOnlyList<(Account Account, ServiceConnection Connection)> mailAccounts)
     {
         ArgumentNullException.ThrowIfNull(mailAccounts);
         await ReloadTemplatesAsync();
-        var answers = await Task.WhenAll(mailAccounts.Select(a => Task.Run(async () =>
+        var wanted = mailAccounts.Select(a => a.Connection.Id).ToHashSet();
+        foreach (var gone in Accounts.Where(r => !wanted.Contains(r.Connection.Id)).ToList())
         {
-            try
-            {
-                var (reply, features) = await mail.GetAutoReplyAsync(a.Connection);
-                var template = await AutoReplyText.TemplateForAsync(settings, a.Connection.Id, reply);
-                return (a.Account, a.Connection, State: (Reply: reply, Features: features, Template: template), Supported: (bool?)true);
-            }
-            catch (AutoReplyUnavailableException ex)
-            {
-                logger.LogInformation("Out-of-office reply of {Account} not available: {Reason}", a.Account.Title, ex.Message);
-                return (a.Account, a.Connection, State: default((AutoReply, AutoReplyFeatures, string)), Supported: (bool?)false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogWarning(ex, "Out-of-office status of {Account} could not be read", a.Account.Title);
-                return (a.Account, a.Connection, State: default((AutoReply, AutoReplyFeatures, string)), Supported: (bool?)null);
-            }
-        })));
-
-        var rows = new List<AutoReplyAccountViewModel>();
-        foreach (var (account, connection, state, supported) in answers)
-        {
-            var existing = Accounts.FirstOrDefault(r => r.Connection.Id == connection.Id);
-            switch (supported)
-            {
-                case true:
-                    var row = existing ?? new AutoReplyAccountViewModel(this, mail, settings, account, connection);
-                    row.Show(state.Item1, state.Item2, state.Item3);
-                    rows.Add(row);
-                    break;
-                case null when existing is not null:
-                    rows.Add(existing);
-                    break;
-            }
+            Accounts.Remove(gone);
         }
 
-        Accounts.Clear();
-        foreach (var row in rows)
+        await Task.WhenAll(mailAccounts.Select(a => CheckAsync(a.Account, a.Connection)));
+        await SaveCacheAsync();
+        OnChanged();
+    }
+
+    private async Task CheckAsync(Account account, ServiceConnection connection)
+    {
+        var row = Accounts.FirstOrDefault(r => r.Connection.Id == connection.Id);
+        try
         {
-            Accounts.Add(row);
+            var (reply, features) = await Task.Run(() => mail.GetAutoReplyAsync(connection));
+            var template = await AutoReplyText.TemplateForAsync(settings, connection.Id, reply);
+            if (row is null)
+            {
+                row = new AutoReplyAccountViewModel(this, mail, settings, account, connection);
+                Accounts.Add(row);
+            }
+
+            if (!row.IsBusy)
+            {
+                row.Show(reply, features, template);
+            }
+
+            row.ShowChecked(DateTimeOffset.Now, reachable: true);
+            _cache[connection.Id] = new Cached(reply.IsEnabled, reply.Start, reply.End, reply.Subject, features, DateTimeOffset.Now);
+        }
+        catch (AutoReplyUnavailableException ex) when (ex.InnerException is not (System.Net.Sockets.SocketException or IOException or OperationCanceledException or System.Security.Authentication.AuthenticationException))
+        {
+            // The server answered: it cannot do it (no "vacation", a permission missing).
+            logger.LogInformation("Out-of-office reply of {Account} not available: {Reason}", account.Title, ex.Message);
+            if (row is not null)
+            {
+                Accounts.Remove(row);
+            }
+
+            _cache.Remove(connection.Id);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || ex is TaskCanceledException)
+        {
+            // Offline, away from the office, ManageSieve blocked: keep what was known and say so.
+            logger.LogWarning(ex, "Out-of-office status of {Account} could not be read", account.Title);
+            row?.ShowChecked(_cache.TryGetValue(connection.Id, out var known) ? known.Checked : null, reachable: false);
         }
 
         OnChanged();
+    }
+
+    private Task SaveCacheAsync() => settings.SetAsync(CacheKey, System.Text.Json.JsonSerializer.Serialize(_cache));
+
+    /// <summary>A switch in the list changed what the server has: remembered for the next start.</summary>
+    internal void Remember(AutoReplyAccountViewModel row)
+    {
+        _cache[row.Connection.Id] = new Cached(row.Reply.IsEnabled, row.Reply.Start, row.Reply.End, row.Reply.Subject, row.Features, DateTimeOffset.Now);
+        _ = SaveCacheAsync();
     }
 
     /// <summary>Saved in the full dialog: counts at once (no second trip to the server); a new account joins the list.</summary>
@@ -131,6 +192,8 @@ internal sealed partial class AutoRepliesViewModel(MailController mail, ISetting
         }
 
         row.Show(reply, features, template);
+        row.ShowChecked(DateTimeOffset.Now, reachable: true);
+        Remember(row);
         OnChanged();
     }
 
@@ -168,6 +231,26 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
     public string Template { get; private set; } = string.Empty;
 
     public bool IsActive => Reply.IsActive(DateTimeOffset.Now);
+
+    /// <summary>False when the server could not be asked last time (offline, ManageSieve not reachable); null before the first check.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanChange), nameof(Status), nameof(IsUnreachable))]
+    public partial bool? IsReachable { get; set; }
+
+    public bool IsUnreachable => IsReachable == false;
+
+    private DateTimeOffset? _checked;
+
+    /// <summary>Switch and period only while the server answers.</summary>
+    public bool CanChange => IsReachable != false && !IsBusy;
+
+    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanChange));
+
+    public void ShowChecked(DateTimeOffset? checkedAt, bool? reachable)
+    {
+        _checked = checkedAt ?? _checked;
+        IsReachable = reachable;
+    }
 
     [ObservableProperty]
     public partial bool IsEnabled { get; set; }
@@ -229,7 +312,11 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
     // A subject chosen with a template; otherwise the one the server has.
     private string? _subject;
 
-    public string Status => Reply switch
+    public string Status => IsReachable == false
+        ? F("Server nicht erreichbar – zuletzt bekannt: {0}", KnownStatus) + (_checked is { } at ? F(" ({0:g})", at.LocalDateTime) : string.Empty)
+        : KnownStatus;
+
+    private string KnownStatus => Reply switch
     {
         { IsEnabled: false } => T("aus"),
         { End: { } end } when end <= DateTimeOffset.Now => T("abgelaufen"),
@@ -325,8 +412,10 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
             await Task.Run(() => mail.SetAutoReplyAsync(Account, Connection, reply));
             await AutoReplyText.RememberAsync(settings, Connection.Id, Template);
             Reply = reply;
+            IsReachable = true;
             OnPropertyChanged(nameof(IsActive));
             OnPropertyChanged(nameof(Status));
+            owner.Remember(this);
             owner.OnChanged();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -148,6 +148,27 @@ internal static class Snapshots
             await autoReply.SaveCommand.ExecuteAsync(null);
             Console.WriteLine($"Out of office sent: {autoReply.Saved?.Message.Split('\n')[2]} | templates: {string.Join(", ", vm.AutoReplies.Templates.Select(t => t.Name))}, in use: {vm.AutoReplies.Accounts.FirstOrDefault()?.SelectedTemplate?.Name}");
             Console.WriteLine($"Out of office on: header '{vm.AutoReplies.HeaderText}', list: {string.Join(" | ", vm.AutoReplies.Accounts.Select(e => e.Title + " " + e.Status))}");
+            // "Weitere Optionen …" in the list at the top opens the full dialog (a real click on the opened list).
+            var autoReplyButton = window.FindControl<Button>("AutoReplyButton")!;
+            var flyout = (Flyout)autoReplyButton.Flyout!;
+            flyout.ShowAt(autoReplyButton);
+            await Task.Delay(300);
+            Dispatcher.UIThread.RunJobs();
+            var more = Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants((Control)flyout.Content!).OfType<Button>().First(b => Equals(b.Content, Neruna.Core.Localization.Texts.T("Weitere Optionen …")));
+            more.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            for (var i = 0; i < 30 && vm.Overlay is not AutoReplyViewModel; i++)
+            {
+                await Task.Delay(100);
+                Dispatcher.UIThread.RunJobs();
+            }
+
+            Console.WriteLine($"Weitere Optionen opens the dialog: {vm.Overlay is AutoReplyViewModel}");
+            vm.Overlay = null;
+
+            var row0 = vm.AutoReplies.Accounts[0];
+            row0.ShowChecked(DateTimeOffset.Now.AddHours(-2), reachable: false);
+            Console.WriteLine($"Out of office unreachable: '{row0.Status}', can change={row0.CanChange}, still listed={vm.AutoReplies.IsAvailable}");
+            row0.ShowChecked(DateTimeOffset.Now, reachable: true);
             await SaveAsync(window, output, "auto-reply-notice.png");
             vm.NavigateCommand.Execute(Section.Settings);
             vm.SettingsPage.SelectedTab = 0;

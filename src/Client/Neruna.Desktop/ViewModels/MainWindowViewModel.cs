@@ -285,6 +285,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         {
             await RefreshPagesAsync();
             await UpdatePushAsync();
+            _ = RefreshAutoRepliesAsync();
         };
 
         SettingsPage.MailOptions.PushChanged += async (_, _) => await UpdatePushAsync();
@@ -442,6 +443,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _servicesStarted = true;
         _timer.Start();
         SettingsPage.Updates.Start();
+
+        // Out of office: what was known shows at once; the servers are asked alongside the first sync, not after it.
+        await AutoReplies.LoadKnownAsync([.. MailPage.Accounts.Select(a => (a.Account, a.Connection))]);
+        _ = RefreshAutoRepliesAsync();
         await SyncAsync();
         await UpdatePushAsync();
         _reminders.Start(OpenReminderAsync);
@@ -784,6 +789,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 MailPage.Tree.MarkSettingUp(connection.Id, false);
             }
         }
+
+        _ = RefreshAutoRepliesAsync(); // the new account may support an out-of-office reply
     }
 
     // ---- Out of office ---------------------------------------------------------------------------------------------
