@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Text.Json;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -187,23 +186,13 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     {
         if (book.IsVisible ? _hidden.Remove(Key(book.Info)) : _hidden.Add(Key(book.Info)))
         {
-            await settings.SetAsync(SettingKeys.HiddenAddressBooks, JsonSerializer.Serialize(_hidden));
+            await settings.SetListAsync(SettingKeys.HiddenAddressBooks, _hidden);
         }
 
         Filter();
     }
 
-    private async Task<HashSet<string>> LoadHiddenAsync()
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<HashSet<string>>(await settings.GetAsync(SettingKeys.HiddenAddressBooks) ?? "[]") ?? [];
-        }
-        catch (JsonException)
-        {
-            return [];
-        }
-    }
+    private Task<HashSet<string>> LoadHiddenAsync() => settings.GetSetAsync(SettingKeys.HiddenAddressBooks);
 
     private static bool Matches(ContactCard card, string query) =>
         query.Length == 0

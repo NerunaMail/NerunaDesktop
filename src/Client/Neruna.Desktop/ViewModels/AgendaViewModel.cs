@@ -144,24 +144,14 @@ internal sealed partial class AgendaViewModel : ViewModelBase
         }
     }
 
-    private static string Key(CalendarInfo info) => $"{info.ConnectionId:N}|{info.RemoteId}";
+    private static string Key(CalendarInfo info) => CalendarController.CalendarKey(info);
 
-    private async Task<HashSet<string>> HiddenAsync()
-    {
-        try
-        {
-            return System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(await _settings.GetAsync(SettingKeys.MailAgendaHidden) ?? "[]") ?? [];
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return [];
-        }
-    }
+    private Task<HashSet<string>> HiddenAsync() => _settings.GetSetAsync(SettingKeys.MailAgendaHidden);
 
     private async Task SaveChoiceAsync()
     {
         var hidden = Calendars.Where(c => !c.IsShown).Select(c => Key(c.Info)).ToList();
-        await _settings.SetAsync(SettingKeys.MailAgendaHidden, System.Text.Json.JsonSerializer.Serialize(hidden));
+        await _settings.SetListAsync(SettingKeys.MailAgendaHidden, hidden);
         await ReloadAsync();
     }
 

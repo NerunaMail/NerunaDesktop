@@ -147,6 +147,45 @@ public enum MarkAsReadMode
 
 public static class SettingsStoreExtensions
 {
+    /// <summary>A list of strings stored as JSON; null when never set or unreadable.</summary>
+    public static async Task<List<string>?> GetListAsync(this ISettingsStore store, string key, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        if (await store.GetAsync(key, cancellationToken) is not { Length: > 0 } json)
+        {
+            return null;
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    public static Task SetListAsync(this ISettingsStore store, string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        return store.SetAsync(key, System.Text.Json.JsonSerializer.Serialize(values), cancellationToken);
+    }
+
+    /// <summary>A set of strings stored as JSON (empty when never set).</summary>
+    public static async Task<HashSet<string>> GetSetAsync(this ISettingsStore store, string key, CancellationToken cancellationToken = default) =>
+        (await store.GetListAsync(key, cancellationToken))?.ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>Adds <paramref name="item"/> to the stored set or removes it; writes only when that changes something.</summary>
+    public static async Task SetMembershipAsync(this ISettingsStore store, string key, string item, bool member, CancellationToken cancellationToken = default)
+    {
+        var set = await store.GetSetAsync(key, cancellationToken);
+        if (member ? set.Add(item) : set.Remove(item))
+        {
+            await store.SetListAsync(key, set, cancellationToken);
+        }
+    }
+
     public static async Task<bool> GetBoolAsync(this ISettingsStore store, string key, bool fallback = false, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(store);

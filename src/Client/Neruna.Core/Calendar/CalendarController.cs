@@ -164,22 +164,8 @@ public sealed class CalendarController(
         await SyncConnectionAsync(connection, cancellationToken);
     }
 
-    private async Task<HashSet<string>?> GetIdsAsync(string key, CancellationToken cancellationToken)
-    {
-        if (await settings.GetAsync(key, cancellationToken) is not { Length: > 0 } json)
-        {
-            return null;
-        }
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<string>>(json)?.ToHashSet(StringComparer.Ordinal);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
+    private async Task<HashSet<string>?> GetIdsAsync(string key, CancellationToken cancellationToken) =>
+        (await settings.GetListAsync(key, cancellationToken))?.ToHashSet(StringComparer.Ordinal);
 
     private static string SelectedKey(Guid connectionId) => $"calendars.selected.{connectionId:N}";
 
@@ -365,28 +351,14 @@ public sealed class CalendarController(
     public async Task<IReadOnlySet<string>> GetHiddenCalendarsAsync(CancellationToken cancellationToken = default) =>
         await GetIdsAsync(SettingKeys.CalendarsHidden, cancellationToken) ?? [];
 
-    public async Task SetCalendarVisibleAsync(CalendarInfo calendar, bool visible, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(calendar);
-        var hidden = await GetIdsAsync(SettingKeys.CalendarsHidden, cancellationToken) ?? [];
-        if (visible ? hidden.Remove(CalendarKey(calendar)) : hidden.Add(CalendarKey(calendar)))
-        {
-            await settings.SetAsync(SettingKeys.CalendarsHidden, JsonSerializer.Serialize(hidden), cancellationToken);
-        }
-    }
+    public Task SetCalendarVisibleAsync(CalendarInfo calendar, bool visible, CancellationToken cancellationToken = default) =>
+        settings.SetMembershipAsync(SettingKeys.CalendarsHidden, CalendarKey(calendar), !visible, cancellationToken);
 
     public async Task<IReadOnlySet<string>> GetHiddenTaskListsAsync(CancellationToken cancellationToken = default) =>
         await GetIdsAsync(SettingKeys.TasksHiddenLists, cancellationToken) ?? [];
 
-    public async Task SetTaskListVisibleAsync(CalendarInfo list, bool visible, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(list);
-        var hidden = await GetIdsAsync(SettingKeys.TasksHiddenLists, cancellationToken) ?? [];
-        if (visible ? hidden.Remove(CalendarKey(list)) : hidden.Add(CalendarKey(list)))
-        {
-            await settings.SetAsync(SettingKeys.TasksHiddenLists, JsonSerializer.Serialize(hidden), cancellationToken);
-        }
-    }
+    public Task SetTaskListVisibleAsync(CalendarInfo list, bool visible, CancellationToken cancellationToken = default) =>
+        settings.SetMembershipAsync(SettingKeys.TasksHiddenLists, CalendarKey(list), !visible, cancellationToken);
 
     /// <summary>The task lists whose tasks also appear in the calendar.</summary>
     public async Task<IReadOnlySet<string>> GetTaskListsInCalendarAsync(CancellationToken cancellationToken = default)
@@ -410,12 +382,8 @@ public sealed class CalendarController(
 
     public async Task SetTaskListInCalendarAsync(CalendarInfo list, bool shown, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(list);
-        var lists = new HashSet<string>(await GetTaskListsInCalendarAsync(cancellationToken), StringComparer.Ordinal);
-        if (shown ? lists.Add(CalendarKey(list)) : lists.Remove(CalendarKey(list)))
-        {
-            await settings.SetAsync(SettingKeys.TasksInCalendar, JsonSerializer.Serialize(lists), cancellationToken);
-        }
+        await GetTaskListsInCalendarAsync(cancellationToken); // carries the switch of 0.1.14 over first
+        await settings.SetMembershipAsync(SettingKeys.TasksInCalendar, CalendarKey(list), shown, cancellationToken);
     }
 
     public static string CalendarKey(CalendarInfo list)

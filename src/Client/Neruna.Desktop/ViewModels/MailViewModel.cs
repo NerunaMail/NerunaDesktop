@@ -129,17 +129,7 @@ internal sealed partial class MailViewModel(
     // Folder tree: what the user collapsed stays collapsed after a restart (new folders start expanded).
     private HashSet<string>? _collapsed;
 
-    private async Task<HashSet<string>> LoadCollapsedAsync()
-    {
-        try
-        {
-            return System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(await settings.GetAsync(SettingKeys.CollapsedFolders) ?? "[]") ?? [];
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return [];
-        }
-    }
+    private Task<HashSet<string>> LoadCollapsedAsync() => settings.GetSetAsync(SettingKeys.CollapsedFolders);
 
     private void TrackExpansion(ObservableObject node, string key)
     {
@@ -164,7 +154,7 @@ internal sealed partial class MailViewModel(
             var expanded = node is MailAccountNode a ? a.IsExpanded : ((MailFolderNode)node).IsExpanded;
             if (expanded ? collapsed.Remove(key) : collapsed.Add(key))
             {
-                _ = settings.SetAsync(SettingKeys.CollapsedFolders, System.Text.Json.JsonSerializer.Serialize(collapsed));
+                _ = settings.SetListAsync(SettingKeys.CollapsedFolders, collapsed);
             }
         };
     }
@@ -401,21 +391,11 @@ internal sealed partial class MailViewModel(
 
     private async Task SaveFavoritesAsync()
     {
-        await settings.SetAsync(SettingKeys.MailFavorites, System.Text.Json.JsonSerializer.Serialize(_favoriteKeys));
+        await settings.SetListAsync(SettingKeys.MailFavorites, _favoriteKeys ?? []);
         RebuildFavorites();
     }
 
-    private async Task<List<string>> LoadFavoritesAsync()
-    {
-        try
-        {
-            return System.Text.Json.JsonSerializer.Deserialize<List<string>>(await settings.GetAsync(SettingKeys.MailFavorites) ?? "[]") ?? [];
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return [];
-        }
-    }
+    private async Task<List<string>> LoadFavoritesAsync() => await settings.GetListAsync(SettingKeys.MailFavorites) ?? [];
 
     // Favourites whose folder is gone (hidden, account removed) are skipped but kept: they come back with the folder.
     private void RebuildFavorites()
@@ -1434,14 +1414,7 @@ internal sealed partial class MailViewModel(
     {
         if (_remoteContentAllowed is null)
         {
-            try
-            {
-                _remoteContentAllowed = System.Text.Json.JsonSerializer.Deserialize<List<string>>(await settings.GetAsync(SettingKeys.RemoteContentAllowed) ?? "[]") ?? [];
-            }
-            catch (System.Text.Json.JsonException)
-            {
-                _remoteContentAllowed = [];
-            }
+            _remoteContentAllowed = await settings.GetListAsync(SettingKeys.RemoteContentAllowed) ?? [];
         }
 
         return _remoteContentAllowed;
@@ -1465,7 +1438,7 @@ internal sealed partial class MailViewModel(
             allowed.RemoveRange(0, allowed.Count - RememberedRemoteContentLimit);
         }
 
-        await settings.SetAsync(SettingKeys.RemoteContentAllowed, System.Text.Json.JsonSerializer.Serialize(allowed));
+        await settings.SetListAsync(SettingKeys.RemoteContentAllowed, allowed);
     }
 
     private void ShowOpened(MessageSummary summary, bool allowRemoteContent)

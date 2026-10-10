@@ -90,22 +90,8 @@ public sealed class ContactController(
         await SyncConnectionAsync(connection, cancellationToken);
     }
 
-    private async Task<HashSet<string>?> GetIdsAsync(string key, CancellationToken cancellationToken)
-    {
-        if (await settings.GetAsync(key, cancellationToken) is not { Length: > 0 } json)
-        {
-            return null;
-        }
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<string>>(json)?.ToHashSet(StringComparer.Ordinal);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
+    private async Task<HashSet<string>?> GetIdsAsync(string key, CancellationToken cancellationToken) =>
+        (await settings.GetListAsync(key, cancellationToken))?.ToHashSet(StringComparer.Ordinal);
 
     private static string SelectedKey(Guid connectionId) => $"addressbooks.selected.{connectionId:N}";
 
