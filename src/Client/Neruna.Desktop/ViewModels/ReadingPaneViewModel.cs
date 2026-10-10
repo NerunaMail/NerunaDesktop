@@ -190,12 +190,25 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             }
             else if (AllowsRemoteContent && _http is not null && Uri.TryCreate(source, UriKind.Absolute, out var url) && url.Scheme is "https" or "http")
             {
-                using var response = await _http.GetAsync(url);
-                if (response.IsSuccessStatusCode)
+                // A picture in a mail, not a download: at most 10 MB and 20 seconds, the rest of the mail stays usable.
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+                if (response.IsSuccessStatusCode && response.Content.Headers.ContentLength is null or <= MaxRemoteImageBytes)
                 {
-                    await using var stream = await response.Content.ReadAsStreamAsync();
+                    await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
                     using var buffer = new MemoryStream();
-                    await stream.CopyToAsync(buffer);
+                    var chunk = new byte[81920];
+                    int read;
+                    while ((read = await stream.ReadAsync(chunk, timeout.Token)) > 0)
+                    {
+                        if (buffer.Length + read > MaxRemoteImageBytes)
+                        {
+                            throw new InvalidOperationException("Remote image too large");
+                        }
+
+                        buffer.Write(chunk, 0, read);
+                    }
+
                     buffer.Position = 0;
                     bitmap = new Bitmap(buffer);
                 }
@@ -209,6 +222,8 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         _images[source] = bitmap;
         return bitmap;
     }
+
+    private const long MaxRemoteImageBytes = 10 * 1024 * 1024;
 
     [RelayCommand]
     private void LoadRemoteContent() => _loadRemoteContent?.Invoke();

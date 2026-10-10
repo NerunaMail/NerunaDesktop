@@ -20,7 +20,8 @@ internal static class SingleInstance
     {
         try
         {
-            using var pipe = new NamedPipeClientStream(".", PipeName(options), PipeDirection.Out);
+            // CurrentUserOnly: hand links and files only to a Neruna of this user, never to a pipe another user opened.
+            using var pipe = new NamedPipeClientStream(".", PipeName(options), PipeDirection.Out, PipeOptions.CurrentUserOnly);
             pipe.Connect(300);
             using var writer = new StreamWriter(pipe, new UTF8Encoding(false));
             writer.WriteLine(JsonSerializer.Serialize(args));

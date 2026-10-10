@@ -90,14 +90,28 @@ public sealed class OAuthClient(HttpClient http)
         // The browser comes back here once the user signed in (or cancelled); give up after 5 minutes.
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(5));
+        // Only the answer of the sign-in counts (code or error on "/"); anything else on the port – a favicon request,
+        // another program – is turned away and does not end the sign-in.
         HttpListenerContext context;
-        try
+        while (true)
         {
-            context = await listener.GetContextAsync().WaitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new OAuthException(T("Die Anmeldung wurde nicht abgeschlossen."));
+            try
+            {
+                context = await listener.GetContextAsync().WaitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new OAuthException(T("Die Anmeldung wurde nicht abgeschlossen."));
+            }
+
+            var incoming = context.Request.QueryString;
+            if (context.Request.Url?.AbsolutePath == "/" && (incoming["code"] is not null || incoming["error"] is not null))
+            {
+                break;
+            }
+
+            context.Response.StatusCode = 404;
+            context.Response.Close();
         }
 
         var result = context.Request.QueryString;
