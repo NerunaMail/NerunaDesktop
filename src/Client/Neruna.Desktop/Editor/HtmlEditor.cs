@@ -32,6 +32,9 @@ internal interface IHtmlEditor
     /// <summary>The user changed the text (typing, pasting, formatting) – not raised when content is loaded.</summary>
     event EventHandler? ContentChanged;
 
+    /// <summary>A picture was pasted (as data: URL); it is inserted after the size check (<see cref="FormattingViewModel.InsertImageDataAsync"/>).</summary>
+    event EventHandler<string>? ImagePasted;
+
     /// <summary>Raised once it is clear whether formatting is available (true) or the plain-text fallback is used (false).</summary>
     event EventHandler<bool>? ModeChanged;
 
@@ -124,6 +127,8 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     public event EventHandler? SaveRequested;
 
     public event EventHandler? ContentChanged;
+
+    public event EventHandler<string>? ImagePasted;
 
     public event EventHandler<bool>? ModeChanged;
 
@@ -371,6 +376,9 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 break;
             case "changed":
                 ContentChanged?.Invoke(this, EventArgs.Empty);
+                break;
+            case "image" when message.TryGetProperty("data", out var data) && data.GetString() is { } dataUrl:
+                ImagePasted?.Invoke(this, dataUrl);
                 break;
             case "state":
                 StateChanged?.Invoke(this, new EditorState(

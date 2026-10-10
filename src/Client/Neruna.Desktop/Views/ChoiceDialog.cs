@@ -13,6 +13,17 @@ internal static class ChoiceDialog
     /// <summary>The dialog on screen, if any (the snapshot tool photographs it).</summary>
     public static Window? Open { get; private set; }
 
+    /// <summary>Over the window in front (a compose or message window, or the main window).</summary>
+    /// <returns>The chosen result; the last choice (cancel) also when there is no window.</returns>
+    public static Task<T> ShowInFrontAsync<T>(string title, string message, params (string Text, T Result, bool IsDefault)[] choices)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
+        return (lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow) is { } owner
+            ? ShowAsync(owner, title, message, choices)
+            : Task.FromResult(choices[^1].Result);
+    }
+
     /// <param name="choices">Button text, result, and whether it is the highlighted default (Enter).</param>
     /// <returns>The chosen result; the last choice (cancel) if the dialog is closed otherwise.</returns>
     public static async Task<T> ShowAsync<T>(Window owner, string title, string message, params (string Text, T Result, bool IsDefault)[] choices)

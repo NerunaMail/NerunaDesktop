@@ -27,6 +27,12 @@
   html.dark { filter: invert(1) hue-rotate(180deg); }
   html.dark, html.dark body { background: #d6d6d6; }
   html.dark img, html.dark video, html.dark [style*="background-image"] { filter: invert(1) hue-rotate(180deg); }
+  /* The picture being resized: a frame and a grip at its corner. They live outside #editor – never part of the mail. */
+  #neruna-image-frame { position: absolute; display: none; pointer-events: none; border: 1px solid #0f6cbd; box-sizing: border-box; }
+  #neruna-image-grip { position: absolute; display: none; width: 12px; height: 12px; background: #0f6cbd; border: 2px solid #ffffff;
+                       box-sizing: border-box; cursor: nwse-resize; touch-action: none; }
+  #neruna-image-size { position: absolute; display: none; padding: 1px 5px; background: #0f6cbd; color: #ffffff;
+                       font: 11px sans-serif; border-radius: 3px; pointer-events: none; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -179,7 +185,11 @@
       if (items[i].kind === "file" && /^image\//.test(items[i].type)) {
         e.preventDefault();
         var reader = new FileReader();
-        reader.onload = function () { exec("insertHTML", '<img src="' + reader.result + '">'); };
+        reader.onload = function () {
+          // Neruna checks the size first (a screenshot of a 4K screen would make every mail huge).
+          if (typeof window.invokeCSharpAction === "function") post({ type: "image", data: reader.result });
+          else exec("insertHTML", '<img src="' + reader.result + '">');
+        };
         reader.readAsDataURL(items[i].getAsFile());
         return;
       }
@@ -300,6 +310,71 @@
     if (a) e.preventDefault();
   });
 
+  // ---- Resizing pictures: click one, drag the grip at its corner; the proportions always stay ----------------------
+  var imageFrame = document.createElement("div");
+  imageFrame.id = "neruna-image-frame";
+  var imageGrip = document.createElement("div");
+  imageGrip.id = "neruna-image-grip";
+  var imageSize = document.createElement("div");
+  imageSize.id = "neruna-image-size";
+  document.body.appendChild(imageFrame);
+  document.body.appendChild(imageGrip);
+  document.body.appendChild(imageSize);
+  var selectedImage = null;
+
+  function placeImageFrame() {
+    if (!selectedImage || !editor.contains(selectedImage)) {
+      selectedImage = null;
+      imageFrame.style.display = imageGrip.style.display = imageSize.style.display = "none";
+      return;
+    }
+    var r = selectedImage.getBoundingClientRect();
+    var x = r.left + window.scrollX, y = r.top + window.scrollY;
+    imageFrame.style.left = x + "px"; imageFrame.style.top = y + "px";
+    imageFrame.style.width = r.width + "px"; imageFrame.style.height = r.height + "px";
+    imageGrip.style.left = (x + r.width - 7) + "px"; imageGrip.style.top = (y + r.height - 7) + "px";
+    imageSize.textContent = Math.round(r.width) + " × " + Math.round(r.height) + " px";
+    imageSize.style.left = x + "px"; imageSize.style.top = (y + r.height + 4) + "px";
+    imageFrame.style.display = imageGrip.style.display = imageSize.style.display = "block";
+  }
+
+  function setImageWidth(img, width) {
+    var ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : img.offsetHeight / Math.max(1, img.offsetWidth);
+    var maxWidth = Math.max(16, editor.clientWidth - 36);
+    var w = Math.max(16, Math.min(Math.round(width), maxWidth));
+    var h = Math.max(1, Math.round(w * ratio));
+    // Attributes for mail programs that ignore CSS, the style for the others; both always in proportion.
+    img.setAttribute("width", w);
+    img.setAttribute("height", h);
+    img.style.width = w + "px";
+    img.style.height = h + "px";
+  }
+
+  editor.addEventListener("click", function (e) {
+    selectedImage = e.target && e.target.tagName === "IMG" ? e.target : null;
+    placeImageFrame();
+  });
+  editor.addEventListener("input", placeImageFrame);
+  window.addEventListener("resize", placeImageFrame);
+  window.addEventListener("scroll", placeImageFrame);
+
+  imageGrip.addEventListener("pointerdown", function (e) {
+    if (!selectedImage) return;
+    e.preventDefault();
+    var img = selectedImage, startX = e.clientX, startWidth = img.getBoundingClientRect().width;
+    imageGrip.setPointerCapture(e.pointerId);
+    function move(ev) { setImageWidth(img, startWidth + ev.clientX - startX); placeImageFrame(); }
+    function up() {
+      imageGrip.removeEventListener("pointermove", move);
+      imageGrip.removeEventListener("pointerup", up);
+      imageGrip.removeEventListener("pointercancel", up);
+      post({ type: "changed" });
+    }
+    imageGrip.addEventListener("pointermove", move);
+    imageGrip.addEventListener("pointerup", up);
+    imageGrip.addEventListener("pointercancel", up);
+  });
+
   window.neruna = {
     /** Loads content and the default font of the user (used for new text and the whole mail). */
     setDark: function (dark) { document.documentElement.classList.toggle("dark", !!dark); },
@@ -308,6 +383,8 @@
       editor.style.fontSize = sizePt ? sizePt + "pt" : "";
       editor.setAttribute("data-placeholder", placeholder || "");
       editor.innerHTML = html || "";
+      selectedImage = null;
+      placeImageFrame();
       document.execCommand("defaultParagraphSeparator", false, "div");
       var range = document.createRange();
       range.setStart(editor, 0);

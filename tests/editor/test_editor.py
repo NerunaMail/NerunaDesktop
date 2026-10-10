@@ -229,3 +229,32 @@ def test_focus_without_caret_starts_above_signature_and_quote(page):
     text = page.evaluate("document.getElementById('editor').innerText")
     assert text.lstrip().startswith("Danke!"), text
     assert text.index("Danke!") < text.index("Anna") < text.index("Original")
+
+
+def test_a_picture_is_resized_by_its_grip_and_keeps_its_proportions(page):
+    # A 400 × 200 picture, inserted like a logo.
+    url = page.evaluate("""() => { const c = document.createElement('canvas'); c.width = 400; c.height = 200;
+                         const g = c.getContext('2d'); g.fillStyle = '#0f6cbd'; g.fillRect(0, 0, 400, 200); return c.toDataURL('image/png'); }""")
+    page.evaluate(f"neruna.insertImage({url!r})")
+    page.wait_for_function("document.querySelector('#editor img') && document.querySelector('#editor img').complete")
+    img = page.locator("#editor img")
+    img.click()
+    grip = page.locator("#neruna-image-grip")
+    assert grip.is_visible()
+    box = grip.bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x - 100, y + 300, steps=5)  # vertical movement does not matter: proportions stay
+    page.mouse.up()
+    size = page.evaluate("() => { const i = document.querySelector('#editor img'); return [i.getAttribute('width'), i.getAttribute('height')]; }")
+    assert size == ["300", "150"]
+    assert page.locator("#neruna-image-size").inner_text() == "300 × 150 px"
+    html = page.evaluate("neruna.getBodyHtml()")
+    assert 'width="300"' in html and 'height="150"' in html
+    assert "neruna-image" not in html  # frame and grip are never part of the mail
+    assert page.evaluate("window.__nerunaMessages.some(m => m.type === 'changed')")
+
+    # Clicking into the text hides the grip.
+    page.locator("#editor").click(position={"x": 5, "y": 5})
+    assert not grip.is_visible()

@@ -77,19 +77,11 @@ internal sealed class FileService : IFileService
     }
 
     // Asked over the window in front (a message window, or the main window).
-    private static async Task<bool> ConfirmRiskyAsync(string name)
-    {
-        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
-        if ((lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow) is not { } owner)
-        {
-            return false;
-        }
-
-        return await Views.ChoiceDialog.ShowAsync(owner, T("Programm im Anhang"),
+    private static Task<bool> ConfirmRiskyAsync(string name) =>
+        Views.ChoiceDialog.ShowInFrontAsync(T("Programm im Anhang"),
             F("«{0}» ist ein Programm, ein Skript oder eine Verknüpfung. Damit übernehmen Angreifer Computer – öffnen Sie es nur, wenn Sie den Absender kennen und genau diesen Anhang erwartet haben.", name),
             (T("Trotzdem öffnen"), true, false),
             (T("Abbrechen"), false, true));
-    }
 
     public async Task OpenFolderAsync(string path)
     {

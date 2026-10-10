@@ -276,6 +276,13 @@ internal static class Snapshots
 
         await question;
 
+        // A 4K bitmap as logo: recognised as too large, shrunk to a PNG of 300 pixels.
+        var bmp = FourKBitmap();
+        var bmpInfo = Neruna.Desktop.Editor.InsertedImages.Inspect(bmp)!;
+        var shrunk = Neruna.Desktop.Editor.InsertedImages.ShrinkToPng(bmp, Neruna.Desktop.Editor.InsertedImages.SuggestedWidth);
+        var shrunkInfo = Neruna.Desktop.Editor.InsertedImages.Inspect(shrunk)!;
+        Console.WriteLine($"4K BMP: {bmpInfo.Width}x{bmpInfo.Height} {bmpInfo.MimeType} {bmpInfo.Bytes / 1024} KB large={bmpInfo.IsLarge} keep={bmpInfo.CanKeep} → {shrunkInfo.Width}x{shrunkInfo.Height} {shrunkInfo.MimeType} {shrunkInfo.Bytes} bytes");
+
         // An invitation in a mail: the bar with Annehmen / Vorläufig / Ablehnen.
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.Subject.StartsWith("Einladung:", StringComparison.Ordinal));
         for (var i = 0; i < 50 && vm.MailPage.ReadingPane?.Invitation?.Status is null; i++)
@@ -869,5 +876,34 @@ internal static class Snapshots
         var path = Path.Combine(output, name);
         frame.Save(path, PngBitmapEncoderOptions.Default);
         Console.WriteLine(path);
+    }
+
+    // A 3840 × 2160 24-bit BMP with a colour gradient (Skia reads BMP but does not write it).
+    private static byte[] FourKBitmap()
+    {
+        const int width = 3840, height = 2160, row = width * 3;
+        var data = new byte[54 + row * height];
+        void Int(int at, int value) => BitConverter.GetBytes(value).CopyTo(data, at);
+        data[0] = (byte)'B';
+        data[1] = (byte)'M';
+        Int(2, data.Length);
+        Int(10, 54);
+        Int(14, 40);
+        Int(18, width);
+        Int(22, height);
+        data[26] = 1;
+        data[28] = 24;
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var at = 54 + y * row + x * 3;
+                data[at] = (byte)(x * 255 / width);
+                data[at + 1] = (byte)(y * 255 / height);
+                data[at + 2] = 160;
+            }
+        }
+
+        return data;
     }
 }

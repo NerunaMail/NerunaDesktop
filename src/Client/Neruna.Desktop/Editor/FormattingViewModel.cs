@@ -29,12 +29,6 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
         "#008000", "#800080", "#800000", "#808000", "#808080", "#C0C0C0", "#000000",
     ];
 
-    private const long MaxImageBytes = 2 * 1024 * 1024;
-    private static readonly Dictionary<string, string> ImageTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        [".png"] = "image/png", [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".gif"] = "image/gif", [".webp"] = "image/webp",
-    };
-
     private IHtmlEditor? _editor;
     private bool _applyingState;
 
@@ -97,6 +91,19 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
         ArgumentNullException.ThrowIfNull(editor);
         _editor = editor;
         editor.StateChanged += (_, state) => ApplyState(state);
+        editor.ImagePasted += async (_, dataUrl) =>
+        {
+            // "data:image/png;base64,…" from the clipboard: the same checks as a picture from a file.
+            var comma = dataUrl.IndexOf(',', StringComparison.Ordinal);
+            try
+            {
+                await InsertImageDataAsync(Convert.FromBase64String(dataUrl[(comma + 1)..]), T("Bild aus der Zwischenablage"));
+            }
+            catch (FormatException)
+            {
+                Problem?.Invoke(this, T("Das Bild aus der Zwischenablage konnte nicht gelesen werden."));
+            }
+        };
         editor.ModeChanged += (_, rich) => IsRichText = rich;
         IsRichText = !editor.IsPlainText;
         ApplyState(new EditorState(false, false, false, false, false, false, font, sizePt, "#000000"));
@@ -143,21 +150,67 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
     {
         foreach (var path in await files.PickFilesAsync(T("Bild einfügen")))
         {
-            if (!ImageTypes.TryGetValue(Path.GetExtension(path), out var mimeType))
+            var name = Path.GetFileName(path);
+            if (new FileInfo(path).Length > MaxReadBytes)
             {
-                Problem?.Invoke(this, F("«{0}» ist kein unterstütztes Bild (PNG, JPG, GIF, WebP).", Path.GetFileName(path)));
+                Problem?.Invoke(this, F("«{0}» ist zu gross für ein Bild in einer Mail.", name));
                 continue;
             }
 
-            if (new FileInfo(path).Length > MaxImageBytes)
-            {
-                Problem?.Invoke(this, F("«{0}» ist grösser als 2 MB – bitte verkleinern.", Path.GetFileName(path)));
-                continue;
-            }
-
-            var data = await File.ReadAllBytesAsync(path);
-            await RunAsync($"neruna.insertImage({Js($"data:{mimeType};base64,{Convert.ToBase64String(data)}")})");
+            await InsertImageDataAsync(await File.ReadAllBytesAsync(path), name);
         }
+    }
+
+    // Even a 4K bitmap is far below this; anything larger is no picture for a mail.
+    private const long MaxReadBytes = 64 * 1024 * 1024;
+
+    /// <summary>
+    /// Inserts a picture from a file or the clipboard. A large one (wider than a mail, heavy, or a format like BMP)
+    /// is offered shrunk to a sensible width as PNG; kept as it is only where that is reasonable.
+    /// </summary>
+    public async Task InsertImageDataAsync(byte[] data, string name)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        if (await Task.Run(() => InsertedImages.Inspect(data)) is not { } info)
+        {
+            Problem?.Invoke(this, F("«{0}» ist kein unterstütztes Bild (PNG, JPG, GIF, WebP, BMP).", name));
+            return;
+        }
+
+        var mimeType = info.MimeType;
+        if (info.IsLarge)
+        {
+            var choices = new List<(string, ImageChoice, bool)> { (F("Auf {0} Pixel verkleinern (PNG)", InsertedImages.SuggestedWidth), ImageChoice.Shrink, true) };
+            if (info.CanKeep)
+            {
+                choices.Add((T("Original verwenden"), ImageChoice.Keep, false));
+            }
+
+            choices.Add((T("Abbrechen"), ImageChoice.Cancel, false));
+            var choice = await Views.ChoiceDialog.ShowInFrontAsync(T("Grosses Bild"),
+                F("«{0}» ist {1} × {2} Pixel und {3} gross. Für eine Signatur oder Mail genügen {4} Pixel Breite – jede Mail würde sonst unnötig gross.",
+                    name, info.Width, info.Height, InsertedImages.SizeText(info.Bytes), InsertedImages.SuggestedWidth),
+                [.. choices]);
+            if (choice == ImageChoice.Cancel)
+            {
+                return;
+            }
+
+            if (choice == ImageChoice.Shrink)
+            {
+                data = await Task.Run(() => InsertedImages.ShrinkToPng(data, InsertedImages.SuggestedWidth));
+                mimeType = "image/png";
+            }
+        }
+
+        await RunAsync($"neruna.insertImage({Js($"data:{mimeType};base64,{Convert.ToBase64String(data)}")})");
+    }
+
+    private enum ImageChoice
+    {
+        Shrink,
+        Keep,
+        Cancel,
     }
 
     partial void OnSelectedFontChanged(FontChoice? value)
