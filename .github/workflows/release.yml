@@ -1,4 +1,5 @@
-# Release: a tag like v0.1.2 builds the Windows installer with Velopack and publishes it as a GitHub release.
+# Release: a tag like v0.1.2 builds the installers with Velopack and publishes them as one GitHub release – Windows
+# (Setup.exe), Linux (AppImage) and macOS (Apple silicon and Intel). One job after the other, each adding its files.
 # The installed app checks these releases for updates (Infrastructure/UpdateService.cs) and downloads only the
 # changes (delta packages, made from the previous release). Built on Linux – the same way scripts/publish.sh does;
 # vpk then defaults to the "linux" channel, so download/upload name the "win" channel that "[win] pack" creates.
@@ -7,6 +8,8 @@ name: Release
 on:
   push:
     tags: ['v*']
+    # A dry run: builds and packs every platform, publishes nothing (to try changes to this workflow).
+    branches: [packaging-test]
 
 permissions:
   contents: write
@@ -27,7 +30,8 @@ jobs:
           global-json-file: global.json
 
       - name: Version from the tag
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.0.0-test" >> "$GITHUB_ENV"; fi
 
       - name: Tests
         run: dotnet test
@@ -49,6 +53,97 @@ jobs:
             --packTitle Neruna --packAuthors Neruna --icon src/Client/Neruna.Desktop/Assets/app.ico --outputDir releases
 
       - name: Publish
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           vpk upload github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
             --channel win --outputDir releases --publish --pre --releaseName "Neruna $VERSION" --tag "v$VERSION"
+
+  # Linux: an AppImage with the same automatic updates (channel "linux"). Built like the Windows one, on Linux.
+  linux:
+    needs: windows
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      AVALONIA_TELEMETRY_OPTOUT: 1
+      VPK_VERSION: 1.2.161
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Version from the tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.0.0-test" >> "$GITHUB_ENV"; fi
+
+      - name: Build
+        run: |
+          dotnet publish src/Client/Neruna.Desktop -c Release -r linux-x64 --self-contained true \
+            -p:PublishReadyToRun=true -p:DebugType=none -p:Version="$VERSION" -o publish
+          cp LICENSE publish/LICENSE.txt
+          cp THIRD-PARTY-NOTICES.md publish/THIRD-PARTY-NOTICES.md
+
+      - name: Package
+        run: |
+          sudo apt-get install -y squashfs-tools
+          dotnet tool install -g vpk --version "$VPK_VERSION"
+          vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+            --channel linux --pre --outputDir releases || echo "No previous release."
+          vpk pack --packId Neruna --packVersion "$VERSION" --packDir publish --mainExe neruna --packTitle Neruna \
+            --packAuthors Neruna --icon packaging/neruna.png --categories "Office;Email" --channel linux --outputDir releases
+
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          vpk upload github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+            --channel linux --outputDir releases --merge --publish --pre --releaseName "Neruna $VERSION" --tag "v$VERSION"
+
+  # macOS: an app bundle and installer per processor (channels "osx-arm64", "osx-x64"); packing needs a Mac. Not signed
+  # with a Developer ID yet: macOS asks once (right-click → Öffnen).
+  macos:
+    needs: linux
+    runs-on: macos-14
+    strategy:
+      max-parallel: 1
+      matrix:
+        rid: [osx-arm64, osx-x64]
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      AVALONIA_TELEMETRY_OPTOUT: 1
+      VPK_VERSION: 1.2.161
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Version from the tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.0.0-test" >> "$GITHUB_ENV"; fi
+
+      - name: Build
+        run: |
+          dotnet publish src/Client/Neruna.Desktop -c Release -r ${{ matrix.rid }} --self-contained true \
+            -p:PublishReadyToRun=true -p:DebugType=none -p:Version="$VERSION" -o publish
+          cp LICENSE publish/LICENSE.txt
+          cp THIRD-PARTY-NOTICES.md publish/THIRD-PARTY-NOTICES.md
+          sed "s/__VERSION__/$VERSION/g" packaging/Info.plist > Info.plist
+
+      - name: Package
+        run: |
+          dotnet tool install -g vpk --version "$VPK_VERSION"
+          vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+            --channel ${{ matrix.rid }} --pre --outputDir releases || echo "No previous release."
+          vpk pack --packId Neruna --packVersion "$VERSION" --packDir publish --mainExe neruna --packTitle Neruna \
+            --packAuthors Neruna --icon packaging/neruna.icns --bundleId org.neruna.desktop --plist Info.plist \
+            --channel ${{ matrix.rid }} --outputDir releases
+
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          vpk upload github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+            --channel ${{ matrix.rid }} --outputDir releases --merge --publish --pre --releaseName "Neruna $VERSION" --tag "v$VERSION"
