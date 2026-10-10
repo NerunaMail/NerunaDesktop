@@ -161,8 +161,9 @@ public sealed class BirthdayCalendarProvider(Guid connectionId, IContactStore co
                         continue;
                     }
 
+                    // The age first: in a narrow day column the end of the title is cut off.
                     var summary = birthday.Year is { } y && year > y
-                        ? F("Geburtstag: {0} ({1})", card.DisplayName, year - y)
+                        ? F("{1}. Geburtstag: {0}", card.DisplayName, year - y)
                         : F("Geburtstag: {0}", card.DisplayName);
                     result.Add(AllDay($"neruna-birthday-{key}-{year}", birthday.In(year), summary, null, "BIRTHDAY", alarm));
                 }
