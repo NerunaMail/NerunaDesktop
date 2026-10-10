@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
+             xmlns:views="using:Neruna.Desktop.Views"
              x:Class="Neruna.Desktop.Views.TasksView"
              x:DataType="vm:TasksViewModel">
 
@@ -53,36 +54,7 @@
                                     BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="{l:T 'Farbe und Name ändern'}">
                               <Button.Flyout>
                                 <Flyout Placement="RightEdgeAlignedTop">
-                                  <StackPanel Spacing="8" Width="220">
-                                    <TextBlock Text="{l:T 'Kalenderfarbe'}" FontWeight="SemiBold" FontSize="12" />
-                                    <ItemsControl ItemsSource="{x:Static vm:CalendarViewModel.ColorChoices}">
-                                      <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                          <WrapPanel />
-                                        </ItemsPanelTemplate>
-                                      </ItemsControl.ItemsPanel>
-                                      <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="x:String">
-                                          <Button Width="20" Height="20" MinWidth="0" Padding="0" Margin="1" CornerRadius="3" BorderThickness="0"
-                                                  Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" Click="OnColorPicked" Tag="{Binding}" />
-                                        </DataTemplate>
-                                      </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                    <Button Content="{l:T 'Farbe vom Server'}" FontSize="12" Click="OnColorPicked" Tag="{x:Null}" />
-
-                                    <!-- Own display name: stored in Neruna, the server keeps its name (same as in the calendar) -->
-                                    <TextBlock Text="{l:T 'Anzeigename'}" FontWeight="SemiBold" FontSize="12" Margin="0,6,0,0" />
-                                    <TextBox Text="{Binding EditName}" KeyDown="OnRenameKey" />
-                                    <TextBlock Text="{Binding ServerNameText}" Classes="subtle" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding IsRenamed}" />
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                      <Button Content="{l:T 'Übernehmen'}" FontSize="12" Classes="accent" Click="OnRename" />
-                                      <Button Content="{l:T 'Originalname'}" FontSize="12" Click="OnRename" Tag="reset" IsVisible="{Binding IsRenamed}" />
-                                    </StackPanel>
-
-                                    <CheckBox Content="{l:T 'Aufgaben im Kalender anzeigen'}" IsChecked="{Binding InCalendar}" FontSize="12" Margin="0,6,0,0" />
-                                    <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap"
-                                               Text="{l:T 'Offene Aufgaben mit Fälligkeitsdatum erscheinen dann auch im Kalender.'}" />
-                                  </StackPanel>
+                                  <views:CollectionAppearanceEditor />
                                 </Flyout>
                               </Button.Flyout>
                             </Button>
@@ -90,7 +62,7 @@
                               <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                               <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock Classes="subtle" FontSize="11" Text="{Binding Kind}" IsVisible="{Binding Kind, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                                <TextBlock Classes="subtle" FontSize="11" Text="{l:T 'im Kalender'}" IsVisible="{Binding InCalendar}" />
+                                <TextBlock Classes="subtle" FontSize="11" Text="{l:T 'im Kalender'}" IsVisible="{Binding ShowTasks}" />
                               </StackPanel>
                             </StackPanel>
                             <TextBlock Grid.Column="3" Classes="subtle" FontSize="12" Text="{Binding OpenCount}" VerticalAlignment="Center" Margin="6,0,0,0" />

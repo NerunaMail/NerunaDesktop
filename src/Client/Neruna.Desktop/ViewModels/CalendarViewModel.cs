@@ -10,7 +10,7 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Week view across all calendars, whatever provider they come from.</summary>
-internal sealed partial class CalendarViewModel(CalendarController calendar, InvitationService invitations, ISettingsStore settings) : ViewModelBase
+internal sealed partial class CalendarViewModel(CalendarController calendar, InvitationService invitations, ISettingsStore settings) : ViewModelBase, ICollectionListHost
 {
     internal static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
@@ -145,17 +145,16 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
             {
                 IsVisible = !hidden.Contains(CalendarController.CalendarKey(info)),
                 ShowTasks = tasksShown.Contains(CalendarController.CalendarKey(info)),
-                IsSolo = _soloKey == CalendarController.CalendarKey(info),
-                IsDimmed = _soloKey is not null && _soloKey != CalendarController.CalendarKey(info),
             };
+            _solo.Apply(item);
             item.PropertyChanged += async (_, e) =>
             {
                 if (e.PropertyName == nameof(CalendarListItem.IsVisible))
                 {
                     // Ticking a calendar ends "only this one": the ticks are the selection again.
-                    if (_soloKey is not null)
+                    if (_solo.IsActive)
                     {
-                        SetSolo(null);
+                        _solo.Set(null, Calendars);
                     }
 
                     await calendar.SetCalendarVisibleAsync(item.Info, item.IsVisible);
@@ -224,35 +223,19 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         return LoadWeekAsync();
     }
 
-    // "Nur diesen Kalender anzeigen": a temporary filter on top of the ticks, which stay as they are – one more click
-    // brings back exactly the calendars ticked before.
-    private string? _soloKey;
+    private readonly SoloFilter _solo = new();
 
     [RelayCommand]
-    private async Task ToggleSoloAsync(CalendarListItem item)
+    private Task ToggleSoloAsync(CalendarListItem item)
     {
-        ArgumentNullException.ThrowIfNull(item);
-        var key = CalendarController.CalendarKey(item.Info);
-        SetSolo(_soloKey == key ? null : key);
-        await LoadWeekAsync(dataChanged: true);
+        _solo.Toggle(item, Calendars);
+        return LoadWeekAsync(dataChanged: true);
     }
 
-    private void SetSolo(string? key)
-    {
-        _soloKey = key;
-        foreach (var item in Calendars)
-        {
-            var itemKey = CalendarController.CalendarKey(item.Info);
-            item.IsSolo = key == itemKey;
-            item.IsDimmed = key is not null && key != itemKey;
-        }
-    }
-
-    private bool IsShown(CalendarListItem item) =>
-        _soloKey is null ? item.IsVisible : CalendarController.CalendarKey(item.Info) == _soloKey;
+    private bool IsShown(CalendarListItem item) => _solo.Shows(item.Info, item.IsVisible);
 
     /// <summary>Sets a calendar's color; null restores the server's color.</summary>
-    public async Task SetColorAsync(CalendarListItem item, string? color)
+    public async Task SetColorAsync(CollectionListItem item, string? color)
     {
         ArgumentNullException.ThrowIfNull(item);
         await settings.SetAsync(ColorKey(item.Info), color);
@@ -260,7 +243,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     }
 
     /// <summary>Gives a calendar an own display name (null: the server's again).</summary>
-    public async Task RenameAsync(CalendarListItem item, string? name)
+    public async Task RenameAsync(CollectionListItem item, string? name)
     {
         ArgumentNullException.ThrowIfNull(item);
         await calendar.SetDisplayNameAsync(item.Info, name);
@@ -352,7 +335,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var from = new DateTimeOffset(WeekStart);
         var shown = visible.Select(c => c.Info).ToList();
         var version = ++_weekVersion;
-        var occurrences = await Task.Run(() => calendar.GetOccurrencesAsync(shown, from, from.AddDays(7), includeTaskLists: _soloKey is null));
+        var occurrences = await Task.Run(() => calendar.GetOccurrencesAsync(shown, from, from.AddDays(7), includeTaskLists: !_solo.IsActive));
         if (version != _weekVersion)
         {
             return; // A newer load (other week, calendars changed) is under way; an older result must not overwrite it.
@@ -429,7 +412,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
         var from = StartOfWeek(fromMonth);
         var to = toMonth.AddDays(7);
         var visible = Calendars.Where(IsShown).Select(c => c.Info).ToList();
-        var occurrences = visible.Count == 0 ? [] : await Task.Run(() => calendar.GetOccurrencesAsync(visible, new DateTimeOffset(from), new DateTimeOffset(to), includeTaskLists: _soloKey is null));
+        var occurrences = visible.Count == 0 ? [] : await Task.Run(() => calendar.GetOccurrencesAsync(visible, new DateTimeOffset(from), new DateTimeOffset(to), includeTaskLists: !_solo.IsActive));
 
         var busy = await Task.Run(() =>
         {
@@ -461,45 +444,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Inv
     private static DateTime StartOfWeek(DateTime date) => date.Date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
 }
 
-internal sealed partial class CalendarListItem(CalendarInfo info, string color) : ObservableObject
+internal sealed class CalendarListItem(CalendarInfo info, string color) : CollectionListItem(info, color)
 {
-    public CalendarInfo Info { get; } = info;
-
-    public string Color { get; } = color;
-
-    public IBrush Brush { get; } = Avalonia.Media.Brush.Parse(color);
-
-    public string Name => Info.Name;
-
-    /// <summary>The name being edited in the colour/name flyout.</summary>
-    [ObservableProperty]
-    public partial string EditName { get; set; } = info.Name;
-
-    /// <summary>"Auf dem Server: Personal" when the calendar has an own name.</summary>
-    public string? ServerNameText => Info.ServerName is { } server ? T("Auf dem Server: ") + server : null;
-
-    public bool IsRenamed => Info.ServerName is not null;
-
-    [ObservableProperty]
-    public partial bool IsVisible { get; set; } = true;
-
-    /// <summary>The server keeps tasks in this calendar too: they can be shown here or only under "Aufgaben".</summary>
-    public bool HasTasks => Info.HasTasks;
-
-    /// <summary>"Aufgaben im Kalender anzeigen" for this calendar (default off).</summary>
-    [ObservableProperty]
-    public partial bool ShowTasks { get; set; }
-
-    /// <summary>Only this calendar is shown right now.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SoloTip))]
-    public partial bool IsSolo { get; set; }
-
-    /// <summary>Another calendar is shown alone: this one is greyed out (its tick stays).</summary>
-    [ObservableProperty]
-    public partial bool IsDimmed { get; set; }
-
-    public string SoloTip => IsSolo ? T("Wieder alle ausgewählten Kalender anzeigen") : T("Nur diesen Kalender anzeigen");
+    public override string SoloTip => IsSolo ? T("Wieder alle ausgewählten Kalender anzeigen") : T("Nur diesen Kalender anzeigen");
 }
 
 internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem> events)

@@ -22,7 +22,7 @@ internal enum TaskFilter
 /// "Aufgaben": the tasks (VTODO) of all task lists – CalDAV calendars that hold tasks and Microsoft To Do. Each list can
 /// be shown or hidden on its own (hidden lists are also left out of the calendar); grouped by due date.
 /// </summary>
-internal sealed partial class TasksViewModel(CalendarController calendar, ISettingsStore settings, ILogger<TasksViewModel> logger) : ViewModelBase
+internal sealed partial class TasksViewModel(CalendarController calendar, ISettingsStore settings, ILogger<TasksViewModel> logger) : ViewModelBase, ICollectionListHost
 {
     private IReadOnlyList<TaskItem> _all = [];
 
@@ -79,25 +79,24 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
                     .Select(l => new TaskListItem(l, colors.GetValueOrDefault((l.ConnectionId, l.RemoteId)) ?? CalendarViewModel.Palette[0], _all.Count(t => !t.IsCompleted && Same(t.List, l)))
                     {
                         IsVisible = !hidden.Contains(CalendarController.CalendarKey(l)),
-                        InCalendar = inCalendar.Contains(CalendarController.CalendarKey(l)),
-                        IsSolo = _soloKey == CalendarController.CalendarKey(l),
-                        IsDimmed = _soloKey is not null && _soloKey != CalendarController.CalendarKey(l),
+                        ShowTasks = inCalendar.Contains(CalendarController.CalendarKey(l)),
                     })
                     .ToList();
                 foreach (var item in items)
                 {
+                    _solo.Apply(item);
                     item.PropertyChanged += async (_, e) =>
                     {
                         if (e.PropertyName == nameof(TaskListItem.IsVisible))
                         {
                             // Ticking a list ends "only this list": the ticks are the selection again.
-                            SetSolo(null);
+                            _solo.Set(null, AllLists);
                             await calendar.SetTaskListVisibleAsync(item.Info, item.IsVisible);
                             Rebuild();
                         }
-                        else if (e.PropertyName == nameof(TaskListItem.InCalendar))
+                        else if (e.PropertyName == nameof(TaskListItem.ShowTasks))
                         {
-                            await calendar.SetTaskListInCalendarAsync(item.Info, item.InCalendar);
+                            await calendar.SetTaskListInCalendarAsync(item.Info, item.ShowTasks);
                             CalendarChanged?.Invoke(this, EventArgs.Empty);
                         }
                     };
@@ -117,7 +116,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
     }
 
     /// <summary>Gives a list an own display name (null: the server's again) – the same name as in the calendar.</summary>
-    public async Task RenameAsync(TaskListItem item, string? name)
+    public async Task RenameAsync(CollectionListItem item, string? name)
     {
         ArgumentNullException.ThrowIfNull(item);
         await calendar.SetDisplayNameAsync(item.Info, name);
@@ -126,7 +125,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
     }
 
     /// <summary>Sets a list's colour (null: the server's again) – the same colour as in the calendar.</summary>
-    public async Task SetColorAsync(TaskListItem item, string? color)
+    public async Task SetColorAsync(CollectionListItem item, string? color)
     {
         ArgumentNullException.ThrowIfNull(item);
         await settings.SetAsync(CalendarViewModel.ColorKey(item.Info), color);
@@ -134,34 +133,19 @@ internal sealed partial class TasksViewModel(CalendarController calendar, ISetti
         CalendarChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    // "Nur diese Liste anzeigen": a temporary filter on top of the ticks, which stay as they are (and stay saved) – one
-    // more click brings back exactly the lists ticked before.
-    private string? _soloKey;
+    private readonly SoloFilter _solo = new();
+
+    private IEnumerable<TaskListItem> AllLists => ListGroups.SelectMany(g => g.Lists);
 
     [RelayCommand]
     private void ToggleSolo(TaskListItem item)
     {
-        ArgumentNullException.ThrowIfNull(item);
-        var key = CalendarController.CalendarKey(item.Info);
-        SetSolo(_soloKey == key ? null : key);
+        _solo.Toggle(item, AllLists);
         Rebuild();
     }
 
-    private void SetSolo(string? key)
-    {
-        _soloKey = key;
-        foreach (var item in ListGroups.SelectMany(g => g.Lists))
-        {
-            var itemKey = CalendarController.CalendarKey(item.Info);
-            item.IsSolo = key == itemKey;
-            item.IsDimmed = key is not null && key != itemKey;
-        }
-    }
-
     private bool IsShown(CalendarInfo list) =>
-        _soloKey is not null
-            ? CalendarController.CalendarKey(list) == _soloKey
-            : ListGroups.SelectMany(g => g.Lists).FirstOrDefault(l => Same(l.Info, list)) is not { IsVisible: false };
+        _solo.Shows(list, AllLists.FirstOrDefault(l => Same(l.Info, list)) is not { IsVisible: false });
 
     private static bool Same(CalendarInfo a, CalendarInfo b) => a.ConnectionId == b.ConnectionId && a.RemoteId == b.RemoteId;
 
@@ -329,47 +313,15 @@ internal sealed class TaskListGroup(string account, IReadOnlyList<TaskListItem> 
     public IReadOnlyList<TaskListItem> Lists { get; } = lists;
 }
 
-internal sealed partial class TaskListItem(CalendarInfo info, string color, int openCount) : ObservableObject
+internal sealed partial class TaskListItem(CalendarInfo info, string color, int openCount) : CollectionListItem(info, color)
 {
-    public CalendarInfo Info { get; } = info;
-
-    public string Color { get; } = color;
-
-    public IBrush Brush { get; } = Avalonia.Media.Brush.Parse(color);
-
-    public string Name => Info.Name;
-
-    /// <summary>The name being edited in the colour/name flyout.</summary>
-    [ObservableProperty]
-    public partial string EditName { get; set; } = info.Name;
-
-    public string? ServerNameText => Info.ServerName is { } server ? T("Auf dem Server: ") + server : null;
-
-    public bool IsRenamed => Info.ServerName is not null;
-
-    /// <summary>"Kalender + Aufgaben" for mixed CalDAV calendars.</summary>
+    /// <summary>"mit Terminen" for mixed CalDAV calendars.</summary>
     public string? Kind => Info.HasEvents ? T("mit Terminen") : null;
-
-    [ObservableProperty]
-    public partial bool IsVisible { get; set; } = true;
 
     [ObservableProperty]
     public partial int OpenCount { get; set; } = openCount;
 
-    /// <summary>"Aufgaben im Kalender anzeigen" for this list (default off).</summary>
-    [ObservableProperty]
-    public partial bool InCalendar { get; set; }
-
-    /// <summary>Only this list is shown right now.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SoloTip))]
-    public partial bool IsSolo { get; set; }
-
-    /// <summary>Another list is shown alone: this one is greyed out (its tick stays).</summary>
-    [ObservableProperty]
-    public partial bool IsDimmed { get; set; }
-
-    public string SoloTip => IsSolo ? T("Wieder alle ausgewählten Listen anzeigen") : T("Nur diese Liste anzeigen");
+    public override string SoloTip => IsSolo ? T("Wieder alle ausgewählten Listen anzeigen") : T("Nur diese Liste anzeigen");
 }
 
 internal sealed class TaskGroup(string title, IReadOnlyList<TaskRow> rows, bool isWarning)

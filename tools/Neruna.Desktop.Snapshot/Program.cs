@@ -402,19 +402,32 @@ internal static class Snapshots
         await SaveAsync(window, output, "tasks-editor.png");
         vm.Overlay = null;
         var demoTasks = vm.TasksPage.ListGroups.SelectMany(g => g.Lists).First(l => l.Info.RemoteId == "tasks");
-        demoTasks.InCalendar = true;
+        demoTasks.ShowTasks = true;
         await Task.Delay(300);
         vm.NavigateCommand.Execute(Section.Calendar);
         vm.CalendarPage.IsTimeGrid = true;
         await vm.CalendarPage.ReloadAsync();
         await Task.Delay(400);
         await SaveAsync(window, output, "calendar-tasks.png");
+
+        // The colour/name menu (a popup in the app), on its own: the same control in the calendar and under "Aufgaben".
+        var menuItem = vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "personal");
+        var menu = new Window
+        {
+            Width = 260,
+            Height = 440,
+            Content = new Border { Padding = new Avalonia.Thickness(16), Child = new Neruna.Desktop.Views.CollectionAppearanceEditor { DataContext = menuItem } },
+        };
+        menu.Bind(Window.BackgroundProperty, menu.GetResourceObservable("PaneBackgroundBrush"));
+        menu.Show();
+        await SaveAsync(menu, output, "collection-menu.png");
+        menu.Close();
         var teamCalendar = vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "team");
         await vm.CalendarPage.ToggleSoloCommand.ExecuteAsync(teamCalendar);
         await Task.Delay(300);
         await SaveAsync(window, output, "calendar-solo.png");
         await vm.CalendarPage.ToggleSoloCommand.ExecuteAsync(teamCalendar);
-        demoTasks.InCalendar = false;
+        demoTasks.ShowTasks = false;
         vm.CalendarPage.IsTimeGrid = false;
 
         vm.NavigateCommand.Execute(Section.Contacts);
