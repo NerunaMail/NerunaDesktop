@@ -720,7 +720,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void ShowAccountSetup(Neruna.Core.Accounts.Account? editing = null)
     {
-        var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav")) { Browser = _browser };
+        var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav"))
+        {
+            Browser = _browser,
+            AskRedirect = (title, message) => Views.ChoiceDialog.ShowInFrontAsync(title, message, (T("Erlauben"), true, false), (T("Nicht verwenden"), false, true)),
+        };
         if (editing is not null)
         {
             setup.LoadForEditing(editing);

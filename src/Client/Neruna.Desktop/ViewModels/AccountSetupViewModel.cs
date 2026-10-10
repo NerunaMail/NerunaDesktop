@@ -287,14 +287,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             // Many SOGo/Nextcloud setups publish DAV only via /.well-known, not in autoconfig.
             BusyText = T("Suche Kalender- und Kontaktdienst …");
             string[] hosts = [domain, ImapHost.Trim()];
-            if (CalDavUrl.Length == 0 && await DavProbe.FindAsync(davProbeClient, hosts, "caldav") is { } caldav)
+            var caldav = CalDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "caldav") : null;
+            var carddav = CardDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "carddav") : null;
+            if (await AllowedAsync(caldav, carddav) is { } allowed)
             {
-                CalDavUrl = caldav.AbsoluteUri;
-            }
-
-            if (CardDavUrl.Length == 0 && await DavProbe.FindAsync(davProbeClient, hosts, "carddav") is { } carddav)
-            {
-                CardDavUrl = carddav.AbsoluteUri;
+                CalDavUrl = allowed.Contains(caldav) ? caldav!.Url.AbsoluteUri : CalDavUrl;
+                CardDavUrl = allowed.Contains(carddav) ? carddav!.Url.AbsoluteUri : CardDavUrl;
             }
 
             ShowServerSettings = true;
@@ -309,6 +307,35 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             BusyText = null;
         }
     }
+
+    /// <summary>
+    /// The found services that may be used. One that a server redirected to another host would get the password there:
+    /// the user decides, once for both (unless it is the mail server itself, which has the password anyway).
+    /// </summary>
+    private async Task<HashSet<DavProbeResult?>?> AllowedAsync(DavProbeResult? caldav, DavProbeResult? carddav)
+    {
+        var found = new HashSet<DavProbeResult?> { caldav, carddav };
+        found.Remove(null);
+        var elsewhere = found.Where(f => f!.IsElsewhere && !f.Url.Host.Equals(ImapHost.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+        if (elsewhere.Count == 0)
+        {
+            return found;
+        }
+
+        var targets = string.Join("\n", elsewhere.Select(f => f!.Url.AbsoluteUri).Distinct(StringComparer.Ordinal));
+        var allow = await (AskRedirect?.Invoke(T("Weiterleitung erlauben?"),
+            F("{0} leitet Kalender bzw. Kontakte an einen anderen Server weiter:\n\n{1}\n\nNeruna meldet sich dort mit Ihrem Benutzernamen und Passwort an. Erlauben Sie das nur, wenn Sie diesen Server kennen.", elsewhere[0]!.ProbedHost, targets))
+            ?? Task.FromResult(false));
+        if (!allow)
+        {
+            found.ExceptWith(elsewhere);
+        }
+
+        return found;
+    }
+
+    /// <summary>Set by the shell: asks a yes/no question (title, message); without it, redirects elsewhere are not used.</summary>
+    public Func<string, string, Task<bool>>? AskRedirect { get; init; }
 
     private bool CanDiscover() => !IsBusy && Email.Contains('@', StringComparison.Ordinal);
 
