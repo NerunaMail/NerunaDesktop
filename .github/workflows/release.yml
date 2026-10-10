@@ -145,7 +145,7 @@ jobs:
               --channel ${{ matrix.rid }} --pre --outputDir releases || echo "No previous release."
           fi
           vpk pack --packId Neruna --packVersion "$VERSION" --packDir publish --mainExe neruna --packTitle Neruna \
-            --packAuthors Neruna --icon packaging/neruna.icns --bundleId org.neruna.desktop --plist Info.plist \
+            --packAuthors Neruna --icon packaging/neruna.icns --plist Info.plist \
             --channel ${{ matrix.rid }} --outputDir releases
 
       - name: Publish
