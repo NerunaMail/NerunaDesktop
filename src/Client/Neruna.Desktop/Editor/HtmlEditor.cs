@@ -64,7 +64,19 @@ internal interface IHtmlEditor
     void SetShortcuts(IReadOnlyDictionary<string, (string Html, string Text)> shortcuts);
 
     void FocusEditor();
+
+    /// <summary>For the AI: the own text (above signature and quote), the quoted message and the marked text.</summary>
+    Task<EditorTexts> GetTextsAsync();
+
+    /// <summary>Replaces the marked text (<paramref name="selectionOnly"/>) or the own text; Ctrl+Z undoes it.</summary>
+    /// <returns>False when there was nothing marked to replace.</returns>
+    Task<bool> ReplaceTextAsync(string html, string text, bool selectionOnly);
 }
+
+/// <param name="Own">What the user wrote: everything above the signature and the quoted message.</param>
+/// <param name="Quote">The quoted message of a reply or forward (empty for a new mail).</param>
+/// <param name="Selection">The marked text, or empty.</param>
+internal sealed record EditorTexts(string Own, string Quote, string Selection);
 
 /// <summary>
 /// HTML mail editor: <c>editor.html</c> (contenteditable) in the system WebView – WebView2 on Windows,
@@ -74,6 +86,7 @@ internal interface IHtmlEditor
 internal sealed class HtmlEditor : UserControl, IHtmlEditor
 {
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(12);
+    private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
     private static readonly Lazy<string> EditorPage = new(() =>
     {
         using var stream = typeof(HtmlEditor).Assembly.GetManifestResourceStream("Neruna.Desktop.Editor.editor.html")
@@ -263,6 +276,52 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         }
 
         await RunAsync($"neruna.insertHtml({FormattingViewModel.Js(html)})");
+    }
+
+    public async Task<EditorTexts> GetTextsAsync()
+    {
+        if (_fallback is not null)
+        {
+            return new EditorTexts(_fallback.Text ?? string.Empty, string.Empty, _fallback.SelectedText ?? string.Empty);
+        }
+
+        if (!IsRich || _web is null)
+        {
+            return new EditorTexts(string.Empty, string.Empty, string.Empty);
+        }
+
+        var json = Unwrap(await _web.InvokeScript("neruna.texts()"));
+        return json is null ? new EditorTexts(string.Empty, string.Empty, string.Empty)
+            : JsonSerializer.Deserialize<EditorTexts>(json, WebJson) ?? new EditorTexts(string.Empty, string.Empty, string.Empty);
+    }
+
+    public async Task<bool> ReplaceTextAsync(string html, string text, bool selectionOnly)
+    {
+        if (_fallback is not null)
+        {
+            // The plain-text box: the marked part, or the whole text.
+            var current = _fallback.Text ?? string.Empty;
+            if (selectionOnly)
+            {
+                var start = Math.Min(_fallback.SelectionStart, _fallback.SelectionEnd);
+                var length = Math.Abs(_fallback.SelectionEnd - _fallback.SelectionStart);
+                if (length == 0)
+                {
+                    return false;
+                }
+
+                _fallback.Text = current[..start] + text + current[(start + length)..];
+            }
+            else
+            {
+                _fallback.Text = text;
+            }
+
+            return true;
+        }
+
+        return IsRich && _web is not null
+               && Unwrap(await _web.InvokeScript($"neruna.replaceText({FormattingViewModel.Js(html)}, {(selectionOnly ? "true" : "false")})")) == "ok";
     }
 
     public async Task RunAsync(string script)

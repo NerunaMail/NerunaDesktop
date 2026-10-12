@@ -27,7 +27,7 @@
     </Style>
   </UserControl.Styles>
 
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
 
     <!-- Actions -->
     <Grid Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
@@ -75,6 +75,10 @@
             </MenuFlyout>
           </ctl:ToolButton.Flyout>
         </ctl:ToolButton>
+        <!-- KI: the bar above the text ("Schreiben", "Verbessern" …), only with a connected AI -->
+        <ctl:ToolToggleButton Icon="{StaticResource IconAi}" Label="{l:T 'KI'}" Hint="{l:T 'Mit KI schreiben oder überarbeiten'}"
+                              IsChecked="{Binding Ai.IsOpen, FallbackValue=False}" IsVisible="{Binding Ai.Available, FallbackValue=False}"
+                              ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <ctl:ToolButton Icon="{StaticResource IconEdit}" Label="{l:T 'Speichern'}" Hint="{l:T 'Als Entwurf speichern (Ctrl+S) – geschieht auch automatisch'}"
                         Command="{Binding SaveDraftCommand}" HotKey="Ctrl+S" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{Binding DiscardLabel}" Hint="{l:T 'Nachricht verwerfen (auch den gespeicherten Entwurf)'}"
@@ -139,16 +143,43 @@
     </ItemsControl>
 
     <!-- Formatting toolbar (hidden without WebView) -->
-    <views:FormattingToolbar Grid.Row="7" Grid.ColumnSpan="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
+    <!-- The AI bar: instructions, "Schreiben", and rewriting the marked (or the own) text -->
+    <Border Grid.Row="7" Grid.ColumnSpan="2" IsVisible="{Binding Ai.IsOpen, FallbackValue=False}" Background="{DynamicResource InfoBackgroundBrush}"
+            CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+      <StackPanel Spacing="8" DataContext="{Binding Ai}" x:DataType="vm:ComposeAiViewModel">
+        <TextBox Text="{Binding Instruction}" PlaceholderText="{Binding Placeholder}" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="90" />
+        <WrapPanel ItemSpacing="6" LineSpacing="6">
+          <Button Classes="accent" Command="{Binding WriteCommand}" ToolTip.Tip="{l:T 'Den Text der Mail nach Ihren Angaben schreiben (bei einer Antwort auf die zitierte Mail)'}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconAi}" Width="14" Height="14" />
+              <TextBlock Text="{l:T 'Schreiben'}" />
+            </StackPanel>
+          </Button>
+          <Button Content="{l:T 'Überarbeiten'}" Command="{Binding RewriteCommand}" CommandParameter="Custom" ToolTip.Tip="{l:T 'Den Text so ändern, wie oben beschrieben'}" />
+          <Border Width="1" Background="{DynamicResource DividerBrush}" Margin="4,4" />
+          <Button Content="{l:T 'Verbessern'}" Command="{Binding RewriteCommand}" CommandParameter="Improve" ToolTip.Tip="{l:T 'Rechtschreibung und Formulierung verbessern'}" />
+          <Button Content="{l:T 'Kürzer'}" Command="{Binding RewriteCommand}" CommandParameter="Shorter" />
+          <Button Content="{l:T 'Formeller'}" Command="{Binding RewriteCommand}" CommandParameter="Formal" />
+          <Button Content="{l:T 'Freundlicher'}" Command="{Binding RewriteCommand}" CommandParameter="Friendly" />
+          <ProgressBar IsIndeterminate="True" Width="60" MinWidth="0" VerticalAlignment="Center" IsVisible="{Binding IsBusy}" />
+          <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" IsVisible="{Binding IsBusy}" />
+        </WrapPanel>
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Überarbeiten wirkt auf den markierten Text, sonst auf Ihren ganzen Text über Signatur und Zitat.'}" />
+        <TextBlock Text="{Binding Notice}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <TextBlock Text="{Binding Error}" Classes="error" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
+    </Border>
+    <views:FormattingToolbar Grid.Row="8" Grid.ColumnSpan="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
 
     <!-- Editor: a page in the app theme (dark: shown inverted; the mail is sent as written) -->
-    <Border Grid.Row="8" Grid.ColumnSpan="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
+    <Border Grid.Row="9" Grid.ColumnSpan="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
       <ed:HtmlEditor x:Name="Editor" />
     </Border>
 
-    <TextBlock Grid.Row="7" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Margin="0,0,0,6" TextWrapping="Wrap" IsVisible="{Binding Formatting.IsPlainTextFallback}"
+    <TextBlock Grid.Row="8" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Margin="0,0,0,6" TextWrapping="Wrap" IsVisible="{Binding Formatting.IsPlainTextFallback}"
                Text="{l:T 'Formatierung nicht verfügbar (keine WebView-Laufzeit gefunden) – die Nachricht wird als reiner Text gesendet.'}" />
 
-    <TextBlock Grid.Row="9" Grid.ColumnSpan="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
+    <TextBlock Grid.Row="10" Grid.ColumnSpan="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
   </Grid>
 </UserControl>

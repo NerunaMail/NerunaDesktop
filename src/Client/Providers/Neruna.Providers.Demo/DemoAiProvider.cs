@@ -5,8 +5,8 @@ using Neruna.Core.Auth;
 namespace Neruna.Providers.Demo;
 
 /// <summary>
-/// AI for the demo (only with <c>--demo</c>): connects without an account and writes a fixed sample summary, piece by
-/// piece like a real provider – to show and try the AI functions without a subscription or key.
+/// AI for the demo (only with <c>--demo</c>): connects without an account and writes a fixed sample (summary, reply or
+/// rewritten text), piece by piece like a real provider – to show and try the AI functions without a subscription or key.
 /// </summary>
 public sealed class DemoAiProvider : IAiProvider
 {
@@ -31,9 +31,15 @@ public sealed class DemoAiProvider : IAiProvider
 
     public async IAsyncEnumerable<string> StreamAsync(AiAuthMethod method, string model, AiRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        const string sample = "Marco Bernasconi schickt die Offerte für die Erneuerung des Netzwerks im vierten Quartal. "
-                              + "Sie umfasst neue Switches, WLAN in allen Etagen und die Umstellung an einem Wochenende.\n\n"
-                              + "• Offerte prüfen und bis Freitag bestätigen\n• Termin für die Umstellung vorschlagen";
+        ArgumentNullException.ThrowIfNull(request);
+        var sample = request.Instructions.StartsWith("You write the body", StringComparison.Ordinal)
+            ? "Hallo Marco\n\nVielen Dank für die Offerte. Wir sind einverstanden und bestätigen sie hiermit. "
+              + "Für die Umstellung schlagen wir das Wochenende vom 7. und 8. November vor.\n\nFreundliche Grüsse"
+            : request.Instructions.StartsWith("You rewrite", StringComparison.Ordinal)
+                ? "Vielen Dank für Ihre Offerte. Wir prüfen sie und melden uns bis Freitag."
+                : "Marco Bernasconi schickt die Offerte für die Erneuerung des Netzwerks im vierten Quartal. "
+                  + "Sie umfasst neue Switches, WLAN in allen Etagen und die Umstellung an einem Wochenende.\n\n"
+                  + "• Offerte prüfen und bis Freitag bestätigen\n• Termin für die Umstellung vorschlagen";
         foreach (var word in sample.Split(' '))
         {
             await Task.Delay(15, cancellationToken);

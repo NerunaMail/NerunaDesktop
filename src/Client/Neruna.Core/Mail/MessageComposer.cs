@@ -227,6 +227,9 @@ public static partial class MessageComposer
         return html;
     }
 
+    /// <summary>Marks where the quoted message starts (the reply header): own text ends there (e.g. for the AI).</summary>
+    public const string QuoteElementId = "neruna-quote";
+
     /// <summary>
     /// Reply header (Von/Gesendet/An/Betreff) above the original, which keeps its formatting; embedded images of the original
     /// are inlined as data URIs so the editor can show them (they become cid: attachments again on send).
@@ -238,7 +241,7 @@ public static partial class MessageComposer
 
         var header = new StringBuilder()
             .Append("<div><br></div><div><br></div>")
-            .Append("<div style=\"border:none;border-top:solid #E1E1E1 1pt;padding:3pt 0 0 0;font-family:Calibri,Arial,sans-serif;font-size:11pt\">")
+            .Append(CultureInfo.InvariantCulture, $"<div id=\"{QuoteElementId}\" style=\"border:none;border-top:solid #E1E1E1 1pt;padding:3pt 0 0 0;font-family:Calibri,Arial,sans-serif;font-size:11pt\">")
             .Append(CultureInfo.InvariantCulture, $"<b>{T("Von:")}</b> {Encode(Format(original.From.Mailboxes))}<br>")
             .Append(CultureInfo.InvariantCulture, $"<b>{T("Gesendet:")}</b> {Encode(original.Date.LocalDateTime.ToString("f", culture))}<br>")
             .Append(CultureInfo.InvariantCulture, $"<b>{T("An:")}</b> {Encode(Format(original.To.Mailboxes))}<br>");
@@ -249,7 +252,8 @@ public static partial class MessageComposer
 
         header.Append(CultureInfo.InvariantCulture, $"<b>{T("Betreff:")}</b> {Encode(original.Subject ?? string.Empty)}</div><div><br></div>");
         // A quoted Neruna mail must not carry our signature marker, or choosing a signature would replace the quoted one.
-        var quoted = BodyOf(html).Replace($"id=\"{SignatureBlock.ElementId}\"", string.Empty, StringComparison.Ordinal);
+        var quoted = BodyOf(html).Replace($"id=\"{SignatureBlock.ElementId}\"", string.Empty, StringComparison.Ordinal)
+            .Replace($"id=\"{QuoteElementId}\"", string.Empty, StringComparison.Ordinal);
         return header + "<div>" + StylesOf(html) + quoted + "</div>";
     }
 

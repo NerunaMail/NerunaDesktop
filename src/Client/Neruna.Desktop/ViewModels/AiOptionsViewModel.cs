@@ -87,13 +87,48 @@ internal sealed partial class AiOptionsViewModel : ViewModelBase
         using var cancel = new CancellationTokenSource();
         _cancelSignIn = cancel.Cancel;
         IsSigningIn = true;
-        await RunAsync(() => _ai.SignInAsync(provider.Id, cancel.Token));
+        // The address shows too: the default browser may not be the one with the AI account – it can be copied.
+        await RunAsync(() => _ai.SignInAsync(provider.Id, new ShowingLauncher(this), cancel.Token));
         IsSigningIn = false;
+        SignInUrl = null;
         _cancelSignIn = null;
     }
 
     [RelayCommand]
     private void CancelSignIn() => _cancelSignIn?.Invoke();
+
+    /// <summary>The sign-in page opened in the browser, while the sign-in waits (to copy it into another browser).</summary>
+    [ObservableProperty]
+    public partial string? SignInUrl { get; set; }
+
+    /// <summary>"URL im Browser öffnen": the sign-in page again in the default browser.</summary>
+    [RelayCommand]
+    private void OpenSignInUrl()
+    {
+        if (SignInUrl is { } url && Browser is { } browser)
+        {
+            _ = browser.OpenAsync(new Uri(url));
+        }
+    }
+
+    // Shows the address, then opens it as usual; a browser that cannot be started is no error – the address is there.
+    private sealed class ShowingLauncher(AiOptionsViewModel owner) : IBrowserLauncher
+    {
+        public async Task OpenAsync(Uri uri, CancellationToken cancellationToken = default)
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => owner.SignInUrl = uri.AbsoluteUri);
+            try
+            {
+                if (owner.Browser is { } browser)
+                {
+                    await browser.OpenAsync(uri, cancellationToken);
+                }
+            }
+            catch (OAuthException)
+            {
+            }
+        }
+    }
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private async Task ConnectApiKeyAsync()

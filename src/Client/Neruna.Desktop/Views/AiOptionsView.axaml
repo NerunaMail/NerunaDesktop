@@ -32,6 +32,17 @@
               <Button Classes="accent" Content="{Binding SignInText}" Command="{Binding SignInCommand}" />
               <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelSignInCommand}" IsVisible="{Binding IsSigningIn}" />
             </StackPanel>
+            <!-- While waiting: the page's address, for another browser than the default one -->
+            <StackPanel Spacing="6" IsVisible="{Binding SignInUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Margin="0,4,0,0">
+              <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                         Text="{l:T 'Die Anmeldung wartet. Falls sie im falschen Browser geöffnet wurde: diese Adresse in den Browser kopieren, in dem Sie angemeldet sind.'}" />
+              <TextBox Text="{Binding SignInUrl}" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="90" FontSize="11"
+                       FontFamily="Consolas, Cascadia Mono, monospace" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="{l:T 'Kopieren'}" Click="OnCopySignInUrl" />
+                <Button Content="{l:T 'URL im Browser öffnen'}" Command="{Binding OpenSignInUrlCommand}" />
+              </StackPanel>
+            </StackPanel>
           </StackPanel>
         </Border>
 

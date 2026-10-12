@@ -50,10 +50,11 @@ public sealed class AiController(IEnumerable<IAiProvider> providers, ISettingsSt
     }
 
     /// <summary>Sign in with the provider's subscription (browser); replaces another connection.</summary>
-    public async Task SignInAsync(string providerId, CancellationToken cancellationToken = default)
+    /// <param name="via">Opens the sign-in page instead of the default browser launcher (e.g. one that also shows the address).</param>
+    public async Task SignInAsync(string providerId, IBrowserLauncher? via = null, CancellationToken cancellationToken = default)
     {
         var provider = Provider(providerId) ?? throw new ArgumentException("Unknown AI provider.", nameof(providerId));
-        var account = await provider.SignInAsync(browser, cancellationToken);
+        var account = await provider.SignInAsync(via ?? browser, cancellationToken);
         await ConnectAsync(provider, AiAuthMethod.SignIn, account, cancellationToken);
     }
 
@@ -109,6 +110,13 @@ public sealed class AiController(IEnumerable<IAiProvider> providers, ISettingsSt
     /// <summary>A short summary of a message, in the language of the user interface.</summary>
     public IAsyncEnumerable<string> SummarizeAsync(string? subject, string? from, string text, CancellationToken cancellationToken = default) =>
         StreamAsync(AiTasks.Summarize(subject, from, text), cancellationToken);
+
+    /// <summary>The text of a new mail or a reply (see <see cref="AiTasks.Draft"/>).</summary>
+    public IAsyncEnumerable<string> DraftAsync(string? instructions, string? subject, string? to, string? from, string ownText, string quote, CancellationToken cancellationToken = default) =>
+        StreamAsync(AiTasks.Draft(instructions, subject, to, from, ownText, quote), cancellationToken);
+
+    public IAsyncEnumerable<string> RewriteAsync(string text, AiRewrite how, string? instructions = null, CancellationToken cancellationToken = default) =>
+        StreamAsync(AiTasks.Rewrite(text, how, instructions), cancellationToken);
 
     private (IAiProvider Provider, AiConnection Connection) Current() =>
         Connection is { } connection && Provider(connection.ProviderId) is { } provider

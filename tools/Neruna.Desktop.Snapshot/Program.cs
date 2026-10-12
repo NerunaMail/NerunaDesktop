@@ -631,6 +631,20 @@ internal static class Snapshots
         await Task.Delay(200);
         Console.WriteLine($"AI summary: {vm.MailPage.ReadingPane?.Summary?.Text.Length} characters, error={vm.MailPage.ReadingPane?.Summary?.Error}");
         await SaveAsync(window, output, "mail-ai-summary.png");
+        // Antworten with AI: the bar above the text (instructions, "Schreiben", rewriting).
+        await vm.MailPage.ReplyCommand.ExecuteAsync(null);
+        await Task.Delay(1500);
+        if (vm.MailPage.Compose?.Ai is { } composeAi)
+        {
+            composeAi.IsOpen = true;
+            composeAi.Instruction = "zusagen, Umstellung am 7./8. November vorschlagen";
+            await Task.Delay(300);
+            await SaveAsync(window, output, "compose-ai.png");
+            // Writing into the text needs the real editor (a WebView), which the snapshot tool does not have; see tests/editor.
+            await vm.MailPage.Compose.DiscardCommand.ExecuteAsync(null);
+            await Task.Delay(300);
+        }
+
         await aiController.DisconnectAsync();
         vm.NavigateCommand.Execute(Section.Settings);
 

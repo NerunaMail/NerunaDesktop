@@ -258,3 +258,37 @@ def test_a_picture_is_resized_by_its_grip_and_keeps_its_proportions(page):
     # Clicking into the text hides the grip.
     page.locator("#editor").click(position={"x": 5, "y": 5})
     assert not grip.is_visible()
+
+
+REPLY = ('<div><br></div><div id="neruna-signature"><div>Anna Muster</div></div>'
+         '<div><br></div><div><br></div><div id="neruna-quote"><b>Von:</b> Marco</div><div><div>Bitte bis Freitag bestätigen.</div></div>')
+
+
+def test_ai_reads_own_text_quote_and_selection(page):
+    page.evaluate("html => neruna.setContent(html, 'Arial', 11, '')", '<div>Hallo Marco</div><div>Gern bestätige ich.</div>' + REPLY)
+    texts = page.evaluate("JSON.parse(neruna.texts())")
+    assert texts["own"] == "Hallo Marco\nGern bestätige ich."
+    assert "Bitte bis Freitag" in texts["quote"] and "Anna Muster" not in texts["own"]
+    assert texts["selection"] == ""
+    page.evaluate("""() => { const t = document.querySelector('#editor div').firstChild; const r = document.createRange();
+                     r.setStart(t, 6); r.setEnd(t, 11); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }""")
+    assert page.evaluate("JSON.parse(neruna.texts())")["selection"] == "Marco"
+
+
+def test_ai_replaces_own_text_but_keeps_signature_and_quote_and_can_be_undone(page):
+    page.evaluate("html => neruna.setContent(html, 'Arial', 11, '')", '<div>alter Text</div>' + REPLY)
+    assert page.evaluate("neruna.replaceText('<div>Neuer Text</div><div><br></div>', false)") == "ok"
+    html = page.evaluate("neruna.getBodyHtml()")
+    assert "Neuer Text" in html and "alter Text" not in html
+    assert html.index("Neuer Text") < html.index("Anna Muster") < html.index("Bitte bis Freitag")
+    page.evaluate("document.execCommand('undo')")
+    assert "alter Text" in page.evaluate("neruna.getBodyHtml()")
+
+
+def test_ai_replaces_only_the_selection(page):
+    page.evaluate("html => neruna.setContent(html, 'Arial', 11, '')", '<div>Hallo Marco, danke.</div>')
+    assert page.evaluate("neruna.replaceText('Lea', true)") == "none"  # nothing marked
+    page.evaluate("""() => { const t = document.querySelector('#editor div').firstChild; const r = document.createRange();
+                     r.setStart(t, 6); r.setEnd(t, 11); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }""")
+    assert page.evaluate("neruna.replaceText('Lea', true)") == "ok"
+    assert "Hallo Lea, danke." in page.evaluate("document.getElementById('editor').textContent")

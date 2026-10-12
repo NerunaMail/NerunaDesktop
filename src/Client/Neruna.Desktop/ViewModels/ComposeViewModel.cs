@@ -114,6 +114,12 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         _autosave.Start();
     }
 
+    /// <summary>The AI bar ("Schreiben", "Verbessern" …); null without AI (tests).</summary>
+    public ComposeAiViewModel? Ai { get; set; }
+
+    /// <summary>The editor once attached (the AI reads and replaces text through it).</summary>
+    internal IHtmlEditor? Editor => _editor;
+
     /// <summary>The address books, for completing An/Cc and the contact picker (none in tests).</summary>
     public RecipientDirectory? Recipients { get; init; }
 

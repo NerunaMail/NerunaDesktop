@@ -503,6 +503,7 @@ internal sealed partial class MailViewModel(
             Preferences = preferences,
             TextTemplates = textTemplates,
         };
+        compose.Ai = new ComposeAiViewModel(ai, compose);
         compose.Closed += async (_, sent) =>
         {
             if (Compose == compose)

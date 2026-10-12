@@ -375,7 +375,65 @@
     imageGrip.addEventListener("pointercancel", up);
   });
 
+  // AI: the user's own text runs from the start up to the signature or the quoted message, whichever comes first.
+  function ownRange() {
+    var range = document.createRange();
+    range.setStart(editor, 0);
+    var marker = editor.querySelector("#neruna-signature, #neruna-quote");
+    if (marker) {
+      var node = marker;
+      while (node.parentNode && node.parentNode !== editor) node = node.parentNode;
+      range.setEndBefore(node);
+    } else {
+      range.setEnd(editor, editor.childNodes.length);
+    }
+    return range;
+  }
+
+  /** Plain text of a fragment: a line break for every <br> and block end. */
+  function textOf(fragment) {
+    var holder = document.createElement("div");
+    holder.appendChild(fragment);
+    Array.prototype.slice.call(holder.querySelectorAll("br")).forEach(function (br) { br.parentNode.replaceChild(document.createTextNode("\n"), br); });
+    Array.prototype.slice.call(holder.querySelectorAll("div, p, li, tr, h1, h2, h3, blockquote")).forEach(function (b) { b.appendChild(document.createTextNode("\n")); });
+    return holder.textContent.replace(/​/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  /** The marked text (also after the focus moved to the app's buttons), or null. */
+  function selectedRange() {
+    var selection = window.getSelection();
+    var range = selection && selection.rangeCount > 0 && editor.contains(selection.getRangeAt(0).commonAncestorContainer) ? selection.getRangeAt(0) : lastRange;
+    return range && !range.collapsed && editor.contains(range.commonAncestorContainer) ? range : null;
+  }
+
   window.neruna = {
+    /** For the AI: own text, the quoted message and the marked text, as plain text (JSON). */
+    texts: function () {
+      var selected = selectedRange();
+      var quote = editor.querySelector("#neruna-quote");
+      var quoted = "";
+      if (quote) {
+        while (quote.parentNode && quote.parentNode !== editor) quote = quote.parentNode;
+        var range = document.createRange();
+        range.setStartBefore(quote);
+        range.setEnd(editor, editor.childNodes.length);
+        quoted = textOf(range.cloneContents());
+      }
+      return JSON.stringify({ own: textOf(ownRange().cloneContents()), quote: quoted, selection: selected ? textOf(selected.cloneContents()) : "" });
+    },
+    /** Replaces the marked text or the own text with html – as an edit, so Ctrl+Z brings the previous text back. */
+    replaceText: function (html, selectionOnly) {
+      var range = selectionOnly ? selectedRange() : ownRange();
+      if (!range) return "none";
+      editor.focus();
+      var selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      insertWithTables(html);
+      scheduleState();
+      post({ type: "changed" });
+      return "ok";
+    },
     /** Loads content and the default font of the user (used for new text and the whole mail). */
     setDark: function (dark) { document.documentElement.classList.toggle("dark", !!dark); },
     setContent: function (html, font, sizePt, placeholder) {
