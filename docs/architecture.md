@@ -487,6 +487,9 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   verschlüsselt und signiert – die Servereinstellungen sind mitsigniert, damit niemand Passwörter umleiten kann.
 - Server stammen aus einem Serverprofil (Portal → Serverprofile); ändert sich das Profil, signiert «Freigeben und
   zustellen» die betroffenen Konten mit demselben Schlüssel neu (Umschläge der Geräte bleiben gültig).
+- Gemeinsame Serverprofile (ohne Mandant, gehören einem Login) stehen in allen Organisationen dieses Logins zur Wahl.
+  Nach einer Änderung signiert eine Portalseite die betroffenen Konten aller Organisationen neu – eine Passphrase für
+  alle, die sie teilen. Der Server kann das nicht selbst: ohne Signatur übernimmt die App keine geänderten Server.
 - Eine Gerätefreigabe stellt Zertifikate und Konten zusammen zu (`DeliversToDevices`).
 - Client (`CloudAccountSync`): richtet ein, aktualisiert (Konto- und Verbindungs-IDs bleiben, Bezeichnung gehört dem
   Benutzer), entfernt nicht mehr zugeordnete. Ohne Passwort fragt er den Benutzer; dieses Passwort liegt nur lokal
