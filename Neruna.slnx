@@ -11,6 +11,7 @@
     <Project Path="src/Client/Providers/Neruna.Providers.Ics/Neruna.Providers.Ics.csproj" />
     <Project Path="src/Client/Providers/Neruna.Providers.Special/Neruna.Providers.Special.csproj" />
     <Project Path="src/Client/Providers/Neruna.Providers.Imap/Neruna.Providers.Imap.csproj" />
+    <Project Path="src/Client/Providers/Neruna.Providers.OpenAi/Neruna.Providers.OpenAi.csproj" />
   </Folder>
   <Folder Name="/Shared/">
     <Project Path="src/Shared/Neruna.Contracts/Neruna.Contracts.csproj" />

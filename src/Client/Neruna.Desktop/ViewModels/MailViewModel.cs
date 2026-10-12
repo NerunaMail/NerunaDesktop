@@ -29,8 +29,43 @@ internal sealed partial class MailViewModel(
     RecipientDirectory recipients,
     TextTemplateService textTemplates,
     AgendaViewModel agenda,
+    Neruna.Core.Ai.AiController ai,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost
 {
+    /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
+    public bool AiAvailable => ai.IsConnected;
+
+    /// <summary>At start: whether AI is connected; the toolbar follows later changes.</summary>
+    public async Task LoadAiAsync()
+    {
+        ai.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            OnPropertyChanged(nameof(AiAvailable));
+            SummarizeCommand.NotifyCanExecuteChanged();
+        });
+        await ai.LoadAsync();
+    }
+
+    /// <summary>"Zusammenfassen": the open message, summarised by the connected AI above it.</summary>
+    [RelayCommand(CanExecute = nameof(CanSummarize))]
+    private async Task SummarizeAsync()
+    {
+        if (ReadingPane is not { Message: not null } pane)
+        {
+            return;
+        }
+
+        pane.Summary?.Cancel();
+        var summary = new AiSummaryViewModel(() => pane.Summary = null);
+        pane.Summary = summary;
+        await summary.RunAsync(ai.SummarizeAsync(pane.Subject, pane.From, pane.PlainText));
+    }
+
+    private bool CanSummarize() => ai.IsConnected && ReadingPane is { Message: not null, HasBody: true };
+
+    // A summary still being written belongs to its message: it stops when another one opens.
+    partial void OnReadingPaneChanged(ReadingPaneViewModel? oldValue, ReadingPaneViewModel? newValue) => oldValue?.Summary?.Cancel();
+
     /// <summary>Drafts with changes not yet stored – in the reading pane or in their own windows.</summary>
     public IReadOnlyList<ComposeViewModel> UnsavedDrafts =>
         [.. new[] { Compose }.Concat(windows.OpenComposes).OfType<ComposeViewModel>().Distinct().Where(c => !c.IsFinished && c.IsDirty)];
@@ -106,7 +141,7 @@ internal sealed partial class MailViewModel(
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RightPane))]
-    [NotifyCanExecuteChangedFor(nameof(ReplyCommand), nameof(ReplyAllCommand), nameof(ForwardCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ReplyCommand), nameof(ReplyAllCommand), nameof(ForwardCommand), nameof(SummarizeCommand))]
     public partial ReadingPaneViewModel? ReadingPane { get; set; }
 
     [ObservableProperty]

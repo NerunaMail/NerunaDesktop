@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:ai="using:Neruna.Core.Ai"
+             x:Class="Neruna.Desktop.Views.AiOptionsView"
+             x:DataType="vm:AiOptionsViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,20">
+      <TextBlock Text="{l:T 'KI-Funktionen'}" FontSize="18" FontWeight="SemiBold" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap"
+                 Text="{l:T 'Verbinden Sie einen KI-Anbieter, um Mails zusammenfassen zu lassen. Weitere Funktionen folgen.'}" />
+
+      <!-- Not connected: provider, then sign-in with the subscription or an API key -->
+      <StackPanel Spacing="10" IsVisible="{Binding IsNotConnected}" Margin="0,8,0,0">
+        <StackPanel Spacing="6" IsVisible="{Binding HasProviderChoice}">
+          <TextBlock Text="{l:T 'Anbieter'}" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}" MinWidth="240">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="ai:IAiProvider">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+
+        <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14" IsVisible="{Binding CanSignIn}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{l:T 'Mit Ihrem Abo'}" FontWeight="SemiBold" />
+            <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{Binding SignInHelp}" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Classes="accent" Content="{Binding SignInText}" Command="{Binding SignInCommand}" />
+              <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelSignInCommand}" IsVisible="{Binding IsSigningIn}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,14" IsVisible="{Binding CanUseApiKey}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{l:T 'Mit einem API-Schlüssel'}" FontWeight="SemiBold" />
+            <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Abgerechnet über das Konto, zu dem der Schlüssel gehört. Der Schlüssel bleibt im Schlüsselbund dieses Geräts.'}" />
+            <TextBox Text="{Binding ApiKey}" PasswordChar="•" PlaceholderText="sk-…" FontFamily="Consolas, Cascadia Mono, monospace" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Content="{l:T 'Mit API-Schlüssel verbinden'}" Command="{Binding ConnectApiKeyCommand}" />
+              <Button Content="{l:T 'Schlüssel erstellen …'}" Command="{Binding OpenApiKeyHelpCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+
+      <!-- Connected: who, which model -->
+      <Border IsVisible="{Binding IsConnected}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14" Margin="0,8,0,0">
+        <StackPanel Spacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="{StaticResource IconAi}" Width="16" Height="16" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding ConnectedText}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Text="{l:T 'Modell'}" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}" MinWidth="240">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="ai:AiModel">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Content="{l:T 'Trennen'}" Command="{Binding DisconnectCommand}" />
+        </StackPanel>
+      </Border>
+
+      <ProgressBar IsIndeterminate="True" Width="80" HorizontalAlignment="Left" IsVisible="{Binding IsBusy}" />
+      <TextBlock Text="{Binding Error}" Foreground="#C42B1C" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding PrivacyText}" Margin="0,6,0,0" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

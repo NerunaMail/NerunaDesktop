@@ -19,6 +19,37 @@ namespace Neruna.Core.Auth;
 public sealed record OAuthEndpoints(Uri Authorize, Uri Token, string ClientId, IReadOnlyList<string> Scopes, IReadOnlyList<string>? AddedLater = null)
 {
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ClientId);
+
+    /// <summary>Loopback host of the redirect: "localhost", or "127.0.0.1" where a provider requires it.</summary>
+    public string RedirectHost { get; init; } = "localhost";
+
+    /// <summary>Path of the redirect, e.g. "/auth/callback".</summary>
+    public string RedirectPath { get; init; } = "/";
+
+    /// <summary>Ask the provider to let the user pick an account (<c>prompt=select_account</c>).</summary>
+    public bool SelectAccount { get; init; } = true;
+
+    /// <summary>The API the tokens are for (resource indicator, RFC 8707), sent with every request.</summary>
+    public string? Resource { get; init; }
+
+    /// <summary>Further parameters of the authorization request (e.g. an id for this installation).</summary>
+    public IReadOnlyDictionary<string, string>? AuthorizeParameters { get; init; }
+
+    /// <summary>
+    /// The provider registers the app on its first sign-in and returns a client id of its own with the code
+    /// (<see cref="OAuthTokens.ClientId"/>), used from then on; these parameters go along only then (e.g. the app name).
+    /// Null: <see cref="ClientId"/> is already the issued one.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? RegistrationParameters { get; init; }
+
+    /// <summary>The callback may carry an issued client id (dynamic registration, see <see cref="RegistrationParameters"/>).</summary>
+    public bool IssuesClientId { get; init; }
+
+    /// <summary>OpenID Connect: a nonce goes along and is checked in the returned ID token, with audience, issuer and expiry.</summary>
+    public string? Issuer { get; init; }
+
+    /// <summary>Whether token requests name the scopes (some providers keep the grant and refuse them on refresh).</summary>
+    public bool ScopeOnTokenRequests { get; init; } = true;
 }
 
 /// <summary>What the sign-in yields; kept only in the system keychain (never in the database or logs).</summary>
@@ -27,7 +58,8 @@ public sealed record OAuthTokens(
     [property: JsonPropertyName("refresh")] string RefreshToken,
     [property: JsonPropertyName("expires")] DateTimeOffset ExpiresAt,
     [property: JsonPropertyName("account")] string? Account = null,
-    [property: JsonPropertyName("scope")] string? Scope = null)
+    [property: JsonPropertyName("scope")] string? Scope = null,
+    [property: JsonPropertyName("client")] string? ClientId = null)
 {
     /// <summary>Whether the provider granted <paramref name="scope"/> (also as full resource URI); unknown counts as no.</summary>
     public bool Grants(string scope) =>
@@ -48,8 +80,9 @@ public interface IBrowserLauncher
 }
 
 /// <summary>
-/// The sign-in itself: authorization code with PKCE in the system browser, redirect to a short-lived listener on
-/// <c>http://localhost:{port}/</c>, then code for tokens. Refreshing uses the refresh token.
+/// The sign-in itself: authorization code with PKCE in the system browser, redirect to a short-lived listener on this
+/// computer (<c>http://localhost:{port}/</c> or as the provider requires), then code for tokens. Refreshing uses the
+/// refresh token.
 /// </summary>
 public sealed class OAuthClient(HttpClient http)
 {
@@ -66,12 +99,9 @@ public sealed class OAuthClient(HttpClient http)
         var verifier = Base64Url(RandomNumberGenerator.GetBytes(32));
         var challenge = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
         var state = Base64Url(RandomNumberGenerator.GetBytes(16));
-        var port = FreePort();
-        var redirect = $"http://localhost:{port}/";
-
-        using var listener = new HttpListener();
-        listener.Prefixes.Add(redirect);
-        listener.Start();
+        var nonce = endpoints.Issuer is null ? null : Base64Url(RandomNumberGenerator.GetBytes(16));
+        using var listener = LoopbackListener.Start(endpoints.RedirectHost);
+        var redirect = $"http://{endpoints.RedirectHost}:{listener.Port}{endpoints.RedirectPath}";
 
         var query = new Dictionary<string, string?>
         {
@@ -82,70 +112,100 @@ public sealed class OAuthClient(HttpClient http)
             ["code_challenge"] = challenge,
             ["code_challenge_method"] = "S256",
             ["state"] = state,
-            ["prompt"] = "select_account",
+            ["nonce"] = nonce,
+            ["resource"] = endpoints.Resource,
+            ["prompt"] = endpoints.SelectAccount ? "select_account" : null,
             ["login_hint"] = loginHint,
         };
+        foreach (var (key, value) in (endpoints.AuthorizeParameters ?? new Dictionary<string, string>()).Concat(endpoints.RegistrationParameters ?? new Dictionary<string, string>()))
+        {
+            query[key] = value;
+        }
+
         await browser.OpenAsync(new Uri(endpoints.Authorize + "?" + Form(query)), cancellationToken);
 
         // The browser comes back here once the user signed in (or cancelled); give up after 5 minutes.
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(5));
-        // Only the answer of the sign-in counts (code or error on "/"); anything else on the port – a favicon request,
-        // another program – is turned away and does not end the sign-in.
-        HttpListenerContext context;
+        // Only the answer of the sign-in counts (code or error on the redirect path); anything else on the port – a
+        // favicon request, another program – is turned away and does not end the sign-in.
+        LoopbackListener.Request request;
         while (true)
         {
             try
             {
-                context = await listener.GetContextAsync().WaitAsync(timeout.Token);
+                request = await listener.NextAsync(timeout.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 throw new OAuthException(T("Die Anmeldung wurde nicht abgeschlossen."));
             }
 
-            var incoming = context.Request.QueryString;
-            if (context.Request.Url?.AbsolutePath == "/" && (incoming["code"] is not null || incoming["error"] is not null))
+            if (request.Path == endpoints.RedirectPath && (request.Query["code"] is not null || request.Query["error"] is not null))
             {
                 break;
             }
 
-            context.Response.StatusCode = 404;
-            context.Response.Close();
+            await request.RespondAsync(404);
+            request.Dispose();
         }
 
-        var result = context.Request.QueryString;
-        var ok = result["code"] is { Length: > 0 } && result["state"] == state;
-        await RespondAsync(context, ok);
-        if (!ok)
+        using (request)
         {
-            throw new OAuthException(result["error_description"] ?? result["error"] ?? T("Die Anmeldung wurde abgebrochen."));
-        }
+            var result = request.Query;
+            var ok = result["code"] is { Length: > 0 } && result["state"] == state;
+            // A registering sign-in gets the app's own client id back; a later one must not get another.
+            var clientId = endpoints.ClientId;
+            if (ok && endpoints.IssuesClientId)
+            {
+                var issued = result["client_id"];
+                if (endpoints.RegistrationParameters is not null)
+                {
+                    ok = !string.IsNullOrEmpty(issued);
+                    clientId = issued ?? clientId;
+                }
+                else if (issued is not null && issued != endpoints.ClientId)
+                {
+                    ok = false;
+                }
+            }
 
-        return await RequestTokensAsync(endpoints, new Dictionary<string, string?>
-        {
-            ["grant_type"] = "authorization_code",
-            ["code"] = result["code"],
-            ["redirect_uri"] = redirect,
-            ["code_verifier"] = verifier,
-        }, null, cancellationToken);
+            await RespondAsync(request, ok);
+            if (!ok)
+            {
+                throw new OAuthException(result["error_description"] ?? result["error"] ?? T("Die Anmeldung wurde abgebrochen."));
+            }
+
+            return await RequestTokensAsync(endpoints, clientId, new Dictionary<string, string?>
+            {
+                ["grant_type"] = "authorization_code",
+                ["code"] = result["code"],
+                ["redirect_uri"] = redirect,
+                ["code_verifier"] = verifier,
+            }, null, nonce, cancellationToken);
+        }
     }
 
     /// <exception cref="OAuthException">With <see cref="OAuthException.SignInRequired"/> when the user has to sign in again.</exception>
     public Task<OAuthTokens> RefreshAsync(OAuthEndpoints endpoints, OAuthTokens tokens, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tokens);
-        return RequestTokensAsync(endpoints, new Dictionary<string, string?>
+        return RequestTokensAsync(endpoints, tokens.ClientId ?? endpoints.ClientId, new Dictionary<string, string?>
         {
             ["grant_type"] = "refresh_token",
             ["refresh_token"] = tokens.RefreshToken,
-        }, tokens, cancellationToken);
+        }, tokens, null, cancellationToken);
     }
 
-    private async Task<OAuthTokens> RequestTokensAsync(OAuthEndpoints endpoints, Dictionary<string, string?> grant, OAuthTokens? previous, CancellationToken cancellationToken)
+    private async Task<OAuthTokens> RequestTokensAsync(OAuthEndpoints endpoints, string clientId, Dictionary<string, string?> grant, OAuthTokens? previous, string? nonce, CancellationToken cancellationToken)
     {
-        grant["client_id"] = endpoints.ClientId;
-        grant["scope"] = string.Join(' ', ScopesFor(endpoints, previous));
+        grant["client_id"] = clientId;
+        grant["resource"] = endpoints.Resource;
+        if (endpoints.ScopeOnTokenRequests)
+        {
+            grant["scope"] = string.Join(' ', ScopesFor(endpoints, previous));
+        }
+
         using var content = new FormUrlEncodedContent(grant.Where(g => g.Value is not null).Select(g => new KeyValuePair<string, string>(g.Key, g.Value!)));
         using var response = await http.PostAsync(endpoints.Token, content, cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken);
@@ -157,12 +217,50 @@ public sealed class OAuthClient(HttpClient http)
                 invalidGrant);
         }
 
+        var account = previous?.Account;
+        if (endpoints.Issuer is not null && body.IdToken is not null)
+        {
+            account = CheckIdToken(body.IdToken, endpoints.Issuer, clientId, nonce) ?? account;
+        }
+
         return new OAuthTokens(
             body.AccessToken,
             body.RefreshToken ?? previous?.RefreshToken ?? throw new OAuthException(T("Der Anbieter hat kein dauerhaftes Anmelde-Token geliefert.")),
             DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, body.ExpiresIn)),
-            previous?.Account,
-            body.Scope ?? previous?.Scope ?? string.Join(' ', ScopesFor(endpoints, previous)));
+            account,
+            body.Scope ?? previous?.Scope ?? string.Join(' ', ScopesFor(endpoints, previous)),
+            endpoints.IssuesClientId ? clientId : previous?.ClientId);
+    }
+
+    /// <summary>
+    /// The ID token came straight from the token endpoint over TLS (OpenID Connect Core 3.1.3.7: its signature need not
+    /// be checked then); issuer, audience, expiry and – at sign-in – the nonce must match.
+    /// </summary>
+    /// <returns>The signed-in address, if the token has one.</returns>
+    private static string? CheckIdToken(string idToken, string issuer, string clientId, string? nonce)
+    {
+        JsonElement claims;
+        try
+        {
+            var payload = idToken.Split('.')[1].Replace('-', '+').Replace('_', '/');
+            claims = JsonDocument.Parse(Convert.FromBase64String(payload.PadRight(payload.Length + ((4 - (payload.Length % 4)) % 4), '='))).RootElement;
+        }
+        catch (Exception ex) when (ex is FormatException or JsonException or IndexOutOfRangeException)
+        {
+            throw new OAuthException(T("Die Anmeldung lieferte eine ungültige Antwort."), inner: ex);
+        }
+
+        string? Claim(string name) => claims.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        var audience = claims.TryGetProperty("aud", out var aud)
+            ? aud.ValueKind == JsonValueKind.Array ? aud.EnumerateArray().Select(a => a.GetString()).ToList() : [aud.GetString()]
+            : [];
+        var expired = claims.TryGetProperty("exp", out var exp) && exp.TryGetInt64(out var seconds) && DateTimeOffset.FromUnixTimeSeconds(seconds) < DateTimeOffset.UtcNow.AddMinutes(-5);
+        if (Claim("iss") != issuer || !audience.Contains(clientId) || expired || (nonce is not null && Claim("nonce") != nonce))
+        {
+            throw new OAuthException(T("Die Anmeldung lieferte eine ungültige Antwort."));
+        }
+
+        return Claim("email");
     }
 
     // Sign-in: everything. Refresh: what was granted (a refresh may not ask for more); for sign-ins from before the
@@ -179,23 +277,10 @@ public sealed class OAuthClient(HttpClient http)
         return granted.Append("offline_access").Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
-    private static async Task RespondAsync(HttpListenerContext context, bool ok)
+    private static Task RespondAsync(LoopbackListener.Request request, bool ok)
     {
         var text = ok ? T("Angemeldet – Sie können dieses Fenster schliessen und zu Neruna zurückkehren.") : T("Die Anmeldung wurde abgebrochen.");
-        var page = Encoding.UTF8.GetBytes($"<!doctype html><meta charset=\"utf-8\"><title>Neruna</title><body style=\"font-family:sans-serif;padding:3em\"><h2>Neruna</h2><p>{WebUtility.HtmlEncode(text)}</p></body>");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        context.Response.ContentLength64 = page.Length;
-        await context.Response.OutputStream.WriteAsync(page);
-        context.Response.Close();
-    }
-
-    private static int FreePort()
-    {
-        using var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-        return port;
+        return request.RespondAsync(200, $"<!doctype html><meta charset=\"utf-8\"><title>Neruna</title><body style=\"font-family:sans-serif;padding:3em\"><h2>Neruna</h2><p>{WebUtility.HtmlEncode(text)}</p></body>");
     }
 
     private static string Form(IReadOnlyDictionary<string, string?> values) =>
@@ -208,6 +293,7 @@ public sealed class OAuthClient(HttpClient http)
         [property: JsonPropertyName("refresh_token")] string? RefreshToken,
         [property: JsonPropertyName("expires_in")] int ExpiresIn,
         [property: JsonPropertyName("scope")] string? Scope,
+        [property: JsonPropertyName("id_token")] string? IdToken,
         [property: JsonPropertyName("error")] string? Error,
         [property: JsonPropertyName("error_description")] string? ErrorDescription);
 }

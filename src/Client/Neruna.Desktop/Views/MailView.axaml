@@ -285,6 +285,8 @@
               <ctl:ToolButton Icon="{StaticResource IconFlag}" Label="{l:T 'Kennzeichnen'}" Command="{Binding ToggleFlagCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
               <ctl:ToolButton Icon="{StaticResource IconMail}" Label="{l:T 'Gelesen'}" Shortcut="Ctrl+Q" Command="{Binding ToggleReadCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}"
                               ToolTip.Tip="{l:T 'Als gelesen / ungelesen markieren (Ctrl+Q)'}" />
+              <ctl:ToolButton Icon="{StaticResource IconAi}" Label="{l:T 'Zusammenfassen'}" Command="{Binding SummarizeCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}"
+                              IsVisible="{Binding AiAvailable}" ToolTip.Tip="{l:T 'Mit KI zusammenfassen'}" />
             </WrapPanel>
           </Border>
           <Panel>

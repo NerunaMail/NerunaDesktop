@@ -11,7 +11,7 @@
   <Panel>
     <TextBlock IsVisible="{Binding IsInfo}" Text="{Binding InfoText}" Classes="subtle"
                HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24" />
-    <Grid IsVisible="{Binding IsMessage}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*">
+    <Grid IsVisible="{Binding IsMessage}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
       <SelectableTextBlock Text="{Binding Subject}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="24,20,24,0" />
       <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="24,16,24,8">
         <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentTextBrush}" VerticalAlignment="Top">
@@ -110,8 +110,26 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <TextBlock Grid.Row="6" Text="{l:T 'Wird geladen …'}" Classes="subtle" Margin="24,8" IsVisible="{Binding IsLoading}" />
-      <views:MessageBodyView Grid.Row="6" IsVisible="{Binding HasBody}" />
+      <!-- AI summary ("Zusammenfassen"): written while it arrives -->
+      <Border Grid.Row="6" IsVisible="{Binding Summary, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="24,0,24,10"
+              Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="14,10">
+        <StackPanel Spacing="6" DataContext="{Binding Summary}" x:DataType="vm:AiSummaryViewModel">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <PathIcon Data="{StaticResource IconAi}" Width="15" Height="15" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBlock Grid.Column="1" Text="{l:T 'Zusammenfassung'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Content="✕" Command="{Binding CloseCommand}" Padding="6,0" Background="Transparent" BorderThickness="0"
+                    ToolTip.Tip="{l:T 'Schliessen'}" VerticalAlignment="Center" />
+          </Grid>
+          <ScrollViewer MaxHeight="260">
+            <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+          </ScrollViewer>
+          <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="80" HorizontalAlignment="Left" />
+          <TextBlock Text="{Binding Error}" Foreground="#C42B1C" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Classes="subtle" FontSize="11" Text="{l:T 'Von KI erstellt – kann Fehler enthalten.'}" />
+        </StackPanel>
+      </Border>
+      <TextBlock Grid.Row="7" Text="{l:T 'Wird geladen …'}" Classes="subtle" Margin="24,8" IsVisible="{Binding IsLoading}" />
+      <views:MessageBodyView Grid.Row="7" IsVisible="{Binding HasBody}" />
     </Grid>
   </Panel>
 </UserControl>

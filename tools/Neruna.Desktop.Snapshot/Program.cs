@@ -613,6 +613,27 @@ internal static class Snapshots
         vm.SettingsPage.Cloud.DeviceName = "Anna – Notebook";
         await SaveAsync(window, output, "settings-cloud.png");
 
+        // Einstellungen → KI: not connected (sign-in with the subscription or an API key), then connected (demo AI).
+        vm.SettingsPage.SelectedTab = 8;
+        vm.SettingsPage.Ai.SelectedProvider = vm.SettingsPage.Ai.Providers.First(p => p.Id == "openai");
+        await Task.Delay(200);
+        await SaveAsync(window, output, "settings-ai.png");
+        var aiController = services.GetRequiredService<Neruna.Core.Ai.AiController>();
+        await aiController.SignInAsync("demo");
+        await Task.Delay(300);
+        await SaveAsync(window, output, "settings-ai-connected.png");
+
+        // Mail: "Zusammenfassen" with the connected AI, above the message.
+        vm.NavigateCommand.Execute(Section.Mail);
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+        await Task.Delay(400);
+        await vm.MailPage.SummarizeCommand.ExecuteAsync(null);
+        await Task.Delay(200);
+        Console.WriteLine($"AI summary: {vm.MailPage.ReadingPane?.Summary?.Text.Length} characters, error={vm.MailPage.ReadingPane?.Summary?.Error}");
+        await SaveAsync(window, output, "mail-ai-summary.png");
+        await aiController.DisconnectAsync();
+        vm.NavigateCommand.Execute(Section.Settings);
+
         // Chat without a cloud connection: the note that it needs Neruna Cloud/Control.
         vm.NavigateCommand.Execute(Section.Chat);
         await Task.Delay(200);

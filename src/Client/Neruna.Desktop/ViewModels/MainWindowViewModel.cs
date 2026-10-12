@@ -392,6 +392,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Navigate(MailPage.Preferences.StartSection);
         await RefreshPagesAsync();
         await MailPage.Agenda.LoadStateAsync();
+        await MailPage.LoadAiAsync();
         HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
     }
 

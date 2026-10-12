@@ -81,11 +81,16 @@ internal static class AppServices
         services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Graph.GraphCalendarProviderFactory>();
         services.AddSingleton<IProviderFactory<IContactProvider>, Neruna.Providers.Graph.GraphContactProviderFactory>();
         services.AddSingleton<Neruna.Core.Auth.IBrowserLauncher, Neruna.Desktop.Infrastructure.BrowserLauncher>();
+        // AI providers (Settings → KI): one is connected at a time. Further ones (Claude, Gemini …) are added here.
+        services.AddSingleton<Neruna.Core.Ai.IAiProvider>(sp => new Neruna.Providers.OpenAi.OpenAiProvider(
+            sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ISettingsStore>()));
+        services.AddSingleton<Neruna.Core.Ai.AiController>();
         if (options.Demo)
         {
             services.AddSingleton<IProviderFactory<IMailProvider>, DemoMailProviderFactory>();
             services.AddSingleton<IProviderFactory<ICalendarProvider>, DemoCalendarProviderFactory>();
             services.AddSingleton<IProviderFactory<IContactProvider>, DemoContactProviderFactory>();
+            services.AddSingleton<Neruna.Core.Ai.IAiProvider, DemoAiProvider>();
         }
 
         services.AddSingleton<ProviderRegistry>();
@@ -138,6 +143,7 @@ internal static class AppServices
         services.AddSingleton<AppearanceViewModel>();
         services.AddSingleton<CloudViewModel>();
         services.AddSingleton<TextTemplatesViewModel>();
+        services.AddSingleton(sp => new AiOptionsViewModel(sp.GetRequiredService<Neruna.Core.Ai.AiController>()) { Browser = sp.GetRequiredService<Neruna.Core.Auth.IBrowserLauncher>() });
         services.AddSingleton<TextTemplateService>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();

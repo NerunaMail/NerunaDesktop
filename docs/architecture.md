@@ -521,6 +521,20 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 - Google später: OAuth über die bestehenden IMAP-/DAV-Provider; Mailzugriff ist bei Google ein «restricted scope»
   (Verifizierung und jährliche Sicherheitsprüfung ab 100 Nutzern). Bis dahin IMAP mit App-Passwort.
 
+## 6f. KI-Funktionen
+
+- `Neruna.Core.Ai`: `IAiProvider` (Anmeldung mit dem Abo und/oder API-Schlüssel, Modelle, Antwort als Stream) und
+  `AiController` (Einstellungen → KI, Aufgaben wie «Zusammenfassen»; Anweisungen in `AiTasks`, Antwort in der
+  UI-Sprache). Ein Anbieter ist verbunden; weitere (Claude, Gemini …) sind je ein Provider-Projekt, registriert in
+  `AppServices`. Im Demo-Modus gibt es einen Demo-Anbieter ohne Konto.
+- Anfragen gehen nur auf Auslösen und direkt vom Gerät zum Anbieter – nie über Neruna-Server. Schlüssel und Tokens
+  liegen im Schlüsselbund; die Verbindung gilt pro Gerät (`ai.*` nicht in der Einstellungssicherung).
+- OpenAI (`Neruna.Providers.OpenAi`): «Sign in with ChatGPT» im Open-Source-Ablauf – jede Installation registriert sich
+  beim ersten Anmelden selbst (`dynamic_agent_client` → eigene Client-ID, `ext_agent_host_id` pro Installation),
+  Rückleitung `http://127.0.0.1:{port}/auth/callback`, Scope `chatgpt.tokens.use.direct` für die Nutzung des Abos
+  (Plus/Pro). Alternativ API-Schlüssel. Beides über die Responses API mit `store: false`, `stream: true`; erfolgreich
+  ist eine Antwort erst mit `response.completed`.
+
 ## 7. Offene Entscheide
 
 | # | Thema | Optionen |

@@ -94,6 +94,13 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     public string Html => _content?.Html ?? string.Empty;
 
+    /// <summary>The message as text (for the AI summary).</summary>
+    public string PlainText => _content?.PlainText ?? string.Empty;
+
+    /// <summary>The AI summary shown above the message, if asked for.</summary>
+    [ObservableProperty]
+    public partial AiSummaryViewModel? Summary { get; set; }
+
     public bool HasBody => _content is not null;
 
     public IReadOnlyList<AttachmentViewModel> Attachments { get; }
