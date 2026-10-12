@@ -1,0 +1,38 @@
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+
+namespace Neruna.Core.Security;
+
+/// <summary>
+/// Which server certificates Neruna accepts for its own TLS connections (IMAP, SMTP, ManageSieve). Like browsers and
+/// other mail programs, an unknown revocation status is no reason to refuse: certificate revocation lists or OCSP are
+/// often not reachable – behind firewalls with TLS inspection, whose own certificate authority publishes none that
+/// clients can reach. Everything else still has to be right: trusted issuer, host name, validity, and a certificate
+/// known to be revoked is refused.
+/// </summary>
+public static class TlsCertificates
+{
+    private const X509ChainStatusFlags RevocationUnknown = X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation;
+
+    /// <summary>
+    /// Connection setting (value "true"): this connection accepts any server certificate – for test servers with a
+    /// self-signed one. Set by the user per account (Konto bearbeiten); never for accounts from Neruna Cloud.
+    /// </summary>
+    public const string AcceptAnyCertificateKey = "tls.acceptAnyCertificate";
+
+    public static bool AcceptsAnyCertificate(IReadOnlyDictionary<string, string> settings) =>
+        settings is not null && settings.TryGetValue(AcceptAnyCertificateKey, out var value) && value == "true";
+
+    /// <summary>The check for a connection: the usual one, or none when the user chose so for this account.</summary>
+#pragma warning disable CA5359 // Accepting any certificate is the user's explicit choice for this one account (test servers).
+    public static RemoteCertificateValidationCallback For(bool acceptAny) => acceptAny ? (_, _, _, _) => true : Validate;
+#pragma warning restore CA5359
+
+    /// <summary>For <c>ServerCertificateValidationCallback</c> / <c>RemoteCertificateValidationCallback</c>.</summary>
+    public static bool Validate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors errors) =>
+        IsAcceptable(errors, chain?.ChainStatus.Select(s => s.Status) ?? []);
+
+    internal static bool IsAcceptable(SslPolicyErrors errors, IEnumerable<X509ChainStatusFlags> chainStatus) =>
+        errors == SslPolicyErrors.None
+        || (errors == SslPolicyErrors.RemoteCertificateChainErrors && chainStatus.All(status => (status & ~RevocationUnknown) == X509ChainStatusFlags.NoError));
+}

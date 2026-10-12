@@ -462,7 +462,7 @@ public sealed partial class ImapMailProvider(
         }
 
         var password = await GetPasswordAsync(cancellationToken);
-        var imap = new ImapClient(CreateProtocolLogger("imap"));
+        var imap = new ImapClient(CreateProtocolLogger("imap")) { ServerCertificateValidationCallback = TlsCertificates.For(settings.AcceptAnyCertificate) };
         try
         {
             await imap.ConnectAsync(settings.ImapHost, settings.ImapPort, MapSecurity(settings.ImapSecurity), cancellationToken);
@@ -481,7 +481,7 @@ public sealed partial class ImapMailProvider(
     private async Task<SmtpClient> ConnectSmtpAsync(CancellationToken cancellationToken)
     {
         var password = await GetPasswordAsync(cancellationToken);
-        var smtp = new SmtpClient(CreateProtocolLogger("smtp"));
+        var smtp = new SmtpClient(CreateProtocolLogger("smtp")) { ServerCertificateValidationCallback = TlsCertificates.For(settings.AcceptAnyCertificate) };
         try
         {
             await smtp.ConnectAsync(settings.SmtpHost, settings.SmtpPort, MapSecurity(settings.SmtpSecurity), cancellationToken);

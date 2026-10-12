@@ -11,7 +11,8 @@ public sealed record ImapSettings(
     string SmtpHost,
     int SmtpPort,
     SocketSecurity SmtpSecurity,
-    string Username)
+    string Username,
+    bool AcceptAnyCertificate = false)
 {
     private const string ImapHostKey = "imap.host";
     private const string ImapPortKey = "imap.port";
@@ -30,7 +31,8 @@ public sealed record ImapSettings(
         [SmtpPortKey] = SmtpPort.ToString(CultureInfo.InvariantCulture),
         [SmtpSecurityKey] = SmtpSecurity.ToString(),
         [UsernameKey] = Username,
-    };
+    }.Concat(AcceptAnyCertificate ? [new KeyValuePair<string, string>(Neruna.Core.Security.TlsCertificates.AcceptAnyCertificateKey, "true")] : [])
+     .ToDictionary(p => p.Key, p => p.Value);
 
     public static ImapSettings FromDictionary(IReadOnlyDictionary<string, string> settings)
     {
@@ -42,7 +44,8 @@ public sealed record ImapSettings(
             Required(settings, SmtpHostKey),
             int.Parse(Required(settings, SmtpPortKey), CultureInfo.InvariantCulture),
             Enum.Parse<SocketSecurity>(Required(settings, SmtpSecurityKey)),
-            Required(settings, UsernameKey));
+            Required(settings, UsernameKey),
+            Neruna.Core.Security.TlsCertificates.AcceptsAnyCertificate(settings));
     }
 
     /// <summary>Null unless the configuration offers both an IMAP and an SMTP server.</summary>

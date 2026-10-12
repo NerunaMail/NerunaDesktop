@@ -129,6 +129,12 @@
         <TextBlock Grid.Row="2" Text="CardDAV" VerticalAlignment="Center" />
         <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CardDavUrl}" Margin="0,6,0,0" PlaceholderText="{l:T 'leer = keine Kontakte'}" />
       </Grid>
+      <!-- Test servers with a self-signed certificate; not for accounts from Neruna Cloud -->
+      <StackPanel Spacing="2" Margin="0,12,0,0" IsVisible="{Binding !IsCloud}">
+        <CheckBox IsChecked="{Binding AcceptAnyCertificate}" Content="{l:T 'Jedes Server-Zertifikat akzeptieren'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,0,0,0"
+                   Text="{l:T 'Nur für Testserver mit selbst signiertem Zertifikat: Die Verbindung ist dann verschlüsselt, aber nicht mehr gegen gefälschte Server geschützt.'}" />
+      </StackPanel>
     </StackPanel>
 
     </StackPanel>

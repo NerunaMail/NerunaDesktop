@@ -43,10 +43,11 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
     /// </summary>
     /// <param name="password">A new password for all connections, or null to keep the stored ones.</param>
     /// <exception cref="AccountSetupException">A connection could not be established; nothing is saved.</exception>
-    public async Task<Account> UpdateAsync(Account account, string displayName, string? label, string emailAddress, MailProviderConfig config, string? password, CancellationToken cancellationToken = default)
+    /// <param name="acceptAnyCertificate">Accept any server certificate (test servers); ignored for accounts from Neruna Cloud.</param>
+    public async Task<Account> UpdateAsync(Account account, string displayName, string? label, string emailAddress, MailProviderConfig config, string? password, bool acceptAnyCertificate = false, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(account);
-        var built = BuildAccount(displayName, emailAddress, config);
+        var built = BuildAccount(displayName, emailAddress, config, acceptAnyCertificate && !account.IsFromCloud);
         var editable = EditableConnections(account).ToList();
         var connections = account.Connections.Where(c => !editable.Contains(c)).ToList();
         var added = new List<ServiceConnection>();
@@ -152,12 +153,20 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
         _ => T("Verbindung"),
     };
 
-    public Account BuildAccount(string displayName, string emailAddress, MailProviderConfig config)
+    /// <param name="acceptAnyCertificate">Every connection accepts any server certificate (test servers with a self-signed one).</param>
+    public Account BuildAccount(string displayName, string emailAddress, MailProviderConfig config, bool acceptAnyCertificate = false)
     {
         var connections = new List<ServiceConnection>();
         AddConnections(connections, ServiceKind.Mail, providers.MailProviders, config, emailAddress);
         AddConnections(connections, ServiceKind.Calendar, providers.CalendarProviders, config, emailAddress);
         AddConnections(connections, ServiceKind.Contacts, providers.ContactProviders, config, emailAddress);
+        if (acceptAnyCertificate)
+        {
+            connections = [.. connections.Select(c => c with
+            {
+                Settings = new Dictionary<string, string>(c.Settings) { [Security.TlsCertificates.AcceptAnyCertificateKey] = "true" },
+            })];
+        }
 
         return new Account(Guid.NewGuid(), displayName, emailAddress, connections);
     }

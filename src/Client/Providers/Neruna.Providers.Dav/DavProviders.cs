@@ -34,6 +34,22 @@ public sealed record DavSettings(Uri Url, string Username)
         server is null ? null : new DavSettings(server.ServerUrl, DiscoveryPlaceholders.Expand(server.UsernameTemplate, emailAddress));
 }
 
+/// <summary>
+/// The HTTP client of a DAV connection: the shared one, or – when the user chose to accept any certificate for this
+/// account (test servers) – one that does so, also without following redirects itself (see DavClient).
+/// </summary>
+internal static class DavHttp
+{
+    private static readonly Lazy<HttpClient> AcceptingAny = new(() => new HttpClient(new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        SslOptions = { RemoteCertificateValidationCallback = TlsCertificates.For(acceptAny: true) },
+    }));
+
+    public static HttpClient For(HttpClient shared, IReadOnlyDictionary<string, string> settings) =>
+        TlsCertificates.AcceptsAnyCertificate(settings) ? AcceptingAny.Value : shared;
+}
+
 /// <summary>Shared plumbing: lazily creates the WebDAV client once the password is read from the credential store.</summary>
 internal abstract class DavProviderBase(
     Guid connectionId,
@@ -205,7 +221,7 @@ public sealed class CalDavProviderFactory(HttpClient http, ICredentialStore cred
     public ICalendarProvider Create(ServiceConnection connection)
     {
         ArgumentNullException.ThrowIfNull(connection);
-        return new CalDavCalendarProvider(connection.Id, DavSettings.FromDictionary(connection.Settings), http, credentials, loggerFactory.CreateLogger<CalDavCalendarProvider>());
+        return new CalDavCalendarProvider(connection.Id, DavSettings.FromDictionary(connection.Settings), DavHttp.For(http, connection.Settings), credentials, loggerFactory.CreateLogger<CalDavCalendarProvider>());
     }
 
     public IReadOnlyDictionary<string, string>? SettingsFromDiscovery(MailProviderConfig config, string emailAddress) =>
@@ -234,7 +250,7 @@ public sealed class CardDavProviderFactory(HttpClient http, ICredentialStore cre
     public IContactProvider Create(ServiceConnection connection)
     {
         ArgumentNullException.ThrowIfNull(connection);
-        return new CardDavContactProvider(connection.Id, DavSettings.FromDictionary(connection.Settings), http, credentials, loggerFactory.CreateLogger<CardDavContactProvider>());
+        return new CardDavContactProvider(connection.Id, DavSettings.FromDictionary(connection.Settings), DavHttp.For(http, connection.Settings), credentials, loggerFactory.CreateLogger<CardDavContactProvider>());
     }
 
     public IReadOnlyDictionary<string, string>? SettingsFromDiscovery(MailProviderConfig config, string emailAddress) =>

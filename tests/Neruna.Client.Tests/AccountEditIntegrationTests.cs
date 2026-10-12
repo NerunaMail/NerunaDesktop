@@ -53,15 +53,15 @@ public class AccountEditIntegrationTests
         var described = setup.Describe(created);
         Assert.Equal((Host, 3143, "anna@example.com"), (described.PreferredIncoming!.Host, described.PreferredIncoming.Port, described.PreferredIncoming.UsernameTemplate));
         Assert.Equal(new Uri(DavUrl!), described.CalDav!.ServerUrl);
-        var renamed = await setup.UpdateAsync(created, "Anna M.", "Privat", "anna@example.com", Config(), password: null, ct);
+        var renamed = await setup.UpdateAsync(created, "Anna M.", "Privat", "anna@example.com", Config(), password: null, cancellationToken: ct);
         Assert.Equal(("Privat", "Privat", "Anna M."), (renamed.Label, renamed.Title, renamed.DisplayName));
         Assert.Equal(new[] { mailId, calendarId }.Order(), renamed.Connections.Select(c => c.Id).Order());
         Assert.Equal("geheim", await credentials.GetSecretAsync(mailId, ct));
         Assert.Equal(folders, (await controller.GetFoldersAsync(mailId, ct)).Count);
 
         // A wrong password (or server): nothing changes – not the account, not the stored password.
-        await Assert.ThrowsAsync<AccountSetupException>(() => setup.UpdateAsync(renamed, "X", "Kaputt", "anna@example.com", Config(), "falsch", ct));
-        await Assert.ThrowsAsync<AccountSetupException>(() => setup.UpdateAsync(renamed, "X", "Kaputt", "anna@example.com", Config(imapPort: 1), null, ct));
+        await Assert.ThrowsAsync<AccountSetupException>(() => setup.UpdateAsync(renamed, "X", "Kaputt", "anna@example.com", Config(), "falsch", cancellationToken: ct));
+        await Assert.ThrowsAsync<AccountSetupException>(() => setup.UpdateAsync(renamed, "X", "Kaputt", "anna@example.com", Config(imapPort: 1), null, cancellationToken: ct));
         var stored = Assert.Single(await env.Accounts.GetAccountsAsync(ct));
         Assert.Equal("Privat", stored.Label);
         Assert.Equal("3143", stored.ConnectionsOf(ServiceKind.Mail).Single().Settings["imap.port"]);
@@ -69,10 +69,10 @@ public class AccountEditIntegrationTests
         Assert.Equal("geheim", await credentials.GetSecretAsync(calendarId, ct));
 
         // Calendar left empty: that connection goes (with its password); added again: a new one, same password.
-        var withoutCalendar = await setup.UpdateAsync(stored, "Anna M.", "Privat", "anna@example.com", Config(calendar: false), null, ct);
+        var withoutCalendar = await setup.UpdateAsync(stored, "Anna M.", "Privat", "anna@example.com", Config(calendar: false), null, cancellationToken: ct);
         Assert.Equal([mailId], withoutCalendar.Connections.Select(c => c.Id));
         Assert.Null(await credentials.GetSecretAsync(calendarId, ct));
-        var again = await setup.UpdateAsync(withoutCalendar, "Anna M.", null, "anna@example.com", Config(), null, ct);
+        var again = await setup.UpdateAsync(withoutCalendar, "Anna M.", null, "anna@example.com", Config(), null, cancellationToken: ct);
         var newCalendar = again.ConnectionsOf(ServiceKind.Calendar).Single();
         Assert.NotEqual(calendarId, newCalendar.Id);
         Assert.Equal("geheim", await credentials.GetSecretAsync(newCalendar.Id, ct));

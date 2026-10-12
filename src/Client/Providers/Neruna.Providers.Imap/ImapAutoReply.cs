@@ -65,7 +65,7 @@ public sealed partial class ImapMailProvider
         try
         {
             // Plain text only where IMAP itself is unencrypted (a local test server); otherwise TLS or nothing.
-            sieve = await ManageSieveClient.ConnectAsync(settings.ImapHost, SievePort, allowPlainText: settings.ImapSecurity == SocketSecurity.None, timeout.Token);
+            sieve = await ManageSieveClient.ConnectAsync(settings.ImapHost, SievePort, allowPlainText: settings.ImapSecurity == SocketSecurity.None, timeout.Token, settings.AcceptAnyCertificate);
             if (!sieve.Extensions.Contains("vacation"))
             {
                 throw new AutoReplyUnavailableException(T("Der Mailserver kann keine Abwesenheitsnotiz verschicken (Sieve ohne «vacation»)."));

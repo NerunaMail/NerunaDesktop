@@ -31,7 +31,7 @@ internal sealed class ManageSieveClient : IAsyncDisposable
     public bool IsEncrypted => _stream is SslStream;
 
     /// <param name="allowPlainText">Log in without TLS if the server offers none (only where IMAP is unencrypted too).</param>
-    public static async Task<ManageSieveClient> ConnectAsync(string host, int port, bool allowPlainText, CancellationToken cancellationToken)
+    public static async Task<ManageSieveClient> ConnectAsync(string host, int port, bool allowPlainText, CancellationToken cancellationToken, bool acceptAnyCertificate = false)
     {
         var tcp = new TcpClient();
         var client = new ManageSieveClient(tcp);
@@ -44,7 +44,12 @@ internal sealed class ManageSieveClient : IAsyncDisposable
             {
                 await client.CommandAsync("STARTTLS", cancellationToken);
                 var tls = new SslStream(client._stream, leaveInnerStreamOpen: false);
-                await tls.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = host }, cancellationToken);
+                await tls.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+                {
+                    TargetHost = host,
+                    CertificateRevocationCheckMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.Online,
+                    RemoteCertificateValidationCallback = Neruna.Core.Security.TlsCertificates.For(acceptAnyCertificate),
+                }, cancellationToken);
                 client._stream = tls;
                 await client.ReadCapabilitiesAsync(cancellationToken); // the server says them again after TLS
             }

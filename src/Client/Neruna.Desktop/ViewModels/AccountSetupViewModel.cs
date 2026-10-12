@@ -145,6 +145,13 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     /// <summary>Set up by the organisation: servers, sender and aliases are read-only here.</summary>
     public bool IsCloud => Editing?.IsFromCloud == true;
 
+    /// <summary>
+    /// "Jedes Zertifikat akzeptieren": for test servers with a self-signed certificate. Not offered for accounts from
+    /// Neruna Cloud – their servers must have proper certificates.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool AcceptAnyCertificate { get; set; }
+
     public string Title => IsEditing ? T("Konto bearbeiten") : T("Konto hinzufügen");
 
     public string SaveText => IsEditing ? T("Speichern") : T("Konto hinzufügen");
@@ -195,6 +202,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
         CalDavUrl = config.CalDav?.ServerUrl.AbsoluteUri ?? string.Empty;
         CardDavUrl = config.CardDav?.ServerUrl.AbsoluteUri ?? string.Empty;
+        AcceptAnyCertificate = account.Connections.Any(c => Neruna.Core.Security.TlsCertificates.AcceptsAnyCertificate(c.Settings));
         if (Username.Length == 0)
         {
             Username = config.DavServers.FirstOrDefault()?.UsernameTemplate ?? string.Empty;
@@ -397,7 +405,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             }
         }
 
-        var account = setup.BuildAccount(name, email, config) with { Label = label, Aliases = aliases.Count > 0 ? aliases : null };
+        var account = setup.BuildAccount(name, email, config, AcceptAnyCertificate && !IsCloud) with { Label = label, Aliases = aliases.Count > 0 ? aliases : null };
         if (account.Connections.Count == 0)
         {
             Error = T("Bitte mindestens einen IMAP-Server oder eine CalDAV-/CardDAV-Adresse angeben.");
@@ -410,7 +418,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         {
             if (Editing is { } existing)
             {
-                await setup.UpdateAsync(existing with { Aliases = account.Aliases }, name, label, email, config, Password.Length > 0 ? Password : null);
+                await setup.UpdateAsync(existing with { Aliases = account.Aliases }, name, label, email, config, Password.Length > 0 ? Password : null, acceptAnyCertificate: AcceptAnyCertificate && !IsCloud);
             }
             else
             {
