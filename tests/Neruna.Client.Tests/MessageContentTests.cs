@@ -249,4 +249,41 @@ public class MailPreviewTests
     [InlineData(null, "")]
     public void Technical_leftovers_are_removed(string? preview, string expected) =>
         Assert.Equal(expected, Neruna.Core.Mail.MailPreview.Clean(preview));
+
+    private static string HtmlOf(string html) =>
+        MessageContent.From(new MimeMessage { Body = new TextPart("html") { Text = html } }).Html;
+
+    [Fact]
+    public void Colspan_beyond_the_columns_of_the_table_is_cut_down()
+    {
+        // Newsletter: colspan="3" in a one-column table – the renderer showed nothing at all.
+        var html = HtmlOf("<table><tr><td colspan=\"3\">a</td></tr><tr><td>b</td></tr></table>"
+            + "<table><tr><td>x</td><td>y</td><td>z</td></tr><tr><td colspan=\"3\">w</td></tr></table>");
+
+        Assert.Contains("colspan=\"1\">a", html);
+        Assert.Contains("colspan=\"3\">w", html);
+    }
+
+    [Fact]
+    public void Tables_lose_max_width_and_centering_becomes_auto_margins()
+    {
+        var html = HtmlOf("<table align=\"center\" width=\"600\"><tr><td>a</td></tr></table>"
+            + "<table style=\"width: 90%; max-width: 500px; margin: auto;\"><tr><td>b</td></tr></table>");
+
+        Assert.DoesNotContain("align=", html);
+        Assert.DoesNotContain("max-width", html);
+        Assert.Equal(2, html.Split("margin-left: auto; margin-right: auto").Length - 1);
+        Assert.Contains("width: 90%", html);
+    }
+
+    [Fact]
+    public void Cells_get_the_background_of_their_row()
+    {
+        var html = HtmlOf("<table><tr style=\"background-color: #7FA8DF\"><td style=\"color: white\">Ticket</td><td bgcolor=\"#fff\">own</td></tr>"
+            + "<tr><td>plain</td></tr></table>");
+
+        Assert.Contains("<td style=\"background-color: #7FA8DF; color: white\">Ticket", html);
+        Assert.Contains("<td bgcolor=\"#fff\">own", html);
+        Assert.Contains("<td>plain", html);
+    }
 }

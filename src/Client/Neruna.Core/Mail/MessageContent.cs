@@ -239,7 +239,9 @@ public sealed partial class MessageContent
                 }
 
                 context.WriteTag(writer, false);
-                foreach (var attribute in context.Attributes)
+                var centered = false;
+                var styled = false;
+                foreach (var attribute in context.Attributes.OrderBy(a => a.Name.Equals("style", StringComparison.OrdinalIgnoreCase)))
                 {
                     var value = attribute.Value ?? string.Empty;
                     var attributeName = attribute.Name;
@@ -269,9 +271,23 @@ public sealed partial class MessageContent
                         }
                     }
 
+                    var isTable = name.Equals("table", StringComparison.OrdinalIgnoreCase);
+                    if (isTable && attributeName.Equals("align", StringComparison.OrdinalIgnoreCase) && value.Trim().Equals("center", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // The renderer centers a table wider than its space to the left, out of view; auto margins
+                        // center it as well and keep it inside (see TableStyle).
+                        centered = true;
+                        continue;
+                    }
+
                     if (attributeName.Equals("style", StringComparison.OrdinalIgnoreCase))
                     {
                         value = SanitizeCss(value, allowRemote, referencedIds, ref blockedLocal);
+                        if (isTable)
+                        {
+                            value = TableStyle(value, centered);
+                            styled = true;
+                        }
 
                         // Newsletter builders lay out <div>s as table and cells (display: table / table-cell); the
                         // renderer then shows nothing at all. As blocks the content is there (columns one below the other).
@@ -284,6 +300,11 @@ public sealed partial class MessageContent
                     writer.WriteAttribute(attributeName, value);
                 }
 
+                if (centered && !styled)
+                {
+                    writer.WriteAttribute("style", TableStyle(string.Empty, centered: true));
+                }
+
                 // Links open in the browser, never inside the mail view.
                 if (name.Equals("a", StringComparison.OrdinalIgnoreCase))
                 {
@@ -292,7 +313,7 @@ public sealed partial class MessageContent
             },
         };
 
-        var result = ExpandPreformatted(converter.Convert(html));
+        var result = CarryRowBackgrounds(LimitColspans(ExpandPreformatted(converter.Convert(html))));
 
         // CSS in <style> blocks is passed through; remote URLs there are blocked when rendering, but report them.
         if (!allowRemote && RemoteCssUrl().IsMatch(result))
@@ -307,6 +328,129 @@ public sealed partial class MessageContent
 
         blocked |= blockedLocal;
         return result;
+    }
+
+    /// <summary>
+    /// Tables as the renderer can show them: a max-width cuts off content wider than it (browsers widen the table
+    /// instead), so it goes; "margin: auto" (which the renderer reads only as margin-left/-right) and align="center"
+    /// become auto side margins.
+    /// </summary>
+    private static string TableStyle(string css, bool centered)
+    {
+        css = TableMaxWidth().Replace(css, string.Empty);
+        if (centered || MarginAuto().IsMatch(css))
+        {
+            css = MarginAuto().Replace(css, string.Empty).TrimEnd().TrimEnd(';');
+            css = (css.Length > 0 ? css + "; " : string.Empty) + "margin-left: auto; margin-right: auto";
+        }
+
+        return css;
+    }
+
+    /// <summary>
+    /// The renderer paints no background on table rows (ticket systems: white heading on a colored &lt;tr&gt;, then
+    /// invisible); the cells of such a row get the color themselves, unless they have their own.
+    /// </summary>
+    internal static string CarryRowBackgrounds(string html)
+    {
+        // Tables (IsRow false) and their open row; a <tr> without </tr> ends at the next <tr> or at </table>.
+        var open = new Stack<(bool IsRow, string? Color)>();
+        return TableStructureTag().Replace(html, tag =>
+        {
+            var name = tag.Groups["name"].Value.ToLowerInvariant();
+            var isEnd = tag.Groups["end"].Success;
+            if (name is "table" or "tr")
+            {
+                if (open.TryPeek(out var top) && top.IsRow && (name == "tr" || isEnd))
+                {
+                    open.Pop();
+                }
+
+                if (name == "table" && isEnd)
+                {
+                    open.TryPop(out _);
+                }
+                else if (!isEnd)
+                {
+                    open.Push((name == "tr", name == "tr" ? RowColor().Match(tag.Value) is { Success: true } match ? match.Groups["color"].Value : null : null));
+                }
+
+                return tag.Value;
+            }
+
+            if (isEnd || !open.TryPeek(out var row) || !row.IsRow || row.Color is not { } color || CellBackground().IsMatch(tag.Value))
+            {
+                return tag.Value;
+            }
+
+            return StyleAttribute().Match(tag.Value) is { Success: true } style
+                ? tag.Value.Insert(style.Groups[1].Index, "background-color: " + color + "; ")
+                : tag.Value.Insert(tag.Value.Length - (tag.Value.EndsWith("/>", StringComparison.Ordinal) ? 2 : 1), " style=\"background-color: " + color + "\"");
+        });
+    }
+
+    /// <summary>
+    /// Cells spanning more columns than their table has (newsletters: colspan="3" in a one-column table) make the renderer
+    /// show nothing at all. Browsers ignore the surplus; here the colspan is cut down to the columns the table really has.
+    /// </summary>
+    internal static string LimitColspans(string html)
+    {
+        var tables = new Stack<(int[] Columns, List<int>? Row)>();
+        var cells = new List<(int[] Columns, List<int> Row, int Index)>();
+        foreach (Match tag in TableStructureTag().Matches(html))
+        {
+            var name = tag.Groups["name"].Value.ToLowerInvariant();
+            var isEnd = tag.Groups["end"].Success;
+            if (name == "table")
+            {
+                if (!isEnd)
+                {
+                    tables.Push(([0], null));
+                }
+                else if (tables.Count > 0)
+                {
+                    EndRow(tables.Pop());
+                }
+            }
+            else if (tables.Count > 0 && !isEnd)
+            {
+                var table = tables.Pop();
+                if (name == "tr")
+                {
+                    EndRow(table);
+                    table = (table.Columns, []);
+                }
+                else
+                {
+                    table.Row ??= [];
+                    cells.Add((table.Columns, table.Row, tag.Index));
+                    table.Row.Add(tag.Index);
+                }
+
+                tables.Push(table);
+            }
+        }
+
+        while (tables.Count > 0)
+        {
+            EndRow(tables.Pop());
+        }
+
+        // Each cell may span the columns the other cells of its row leave free.
+        var limits = cells.ToDictionary(c => c.Index, c => Math.Max(1, c.Columns[0] - (c.Row.Count - 1)));
+        return TableStructureTag().Replace(html, tag =>
+            limits.TryGetValue(tag.Index, out var limit) && Colspan().Match(tag.Value) is { Success: true } span
+                && int.TryParse(span.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out var value) && value > limit
+                ? tag.Value[..span.Groups[1].Index] + limit.ToString(System.Globalization.CultureInfo.InvariantCulture) + tag.Value[(span.Groups[1].Index + span.Groups[1].Length)..]
+                : tag.Value);
+
+        static void EndRow((int[] Columns, List<int>? Row) table)
+        {
+            if (table.Row is { Count: > 0 } row)
+            {
+                table.Columns[0] = Math.Max(table.Columns[0], row.Count);
+            }
+        }
     }
 
     /// <summary>
@@ -385,6 +529,27 @@ public sealed partial class MessageContent
 
     [GeneratedRegex(@"<pre\b((?:\s+(?:class|id|dir|lang)=""[^""]*"")*)[^>]*>(.*?)</pre>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex PreBlock();
+
+    [GeneratedRegex(@"(?:background(?:-color)?\s*:\s*|bgcolor\s*=\s*[""']?)(?<color>#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|(?!none\b|transparent\b|inherit\b|initial\b|url\b)[a-z]+\b)", RegexOptions.IgnoreCase)]
+    private static partial Regex RowColor();
+
+    [GeneratedRegex(@"background(?:-color)?\s*:|bgcolor\s*=", RegexOptions.IgnoreCase)]
+    private static partial Regex CellBackground();
+
+    [GeneratedRegex(@"\bstyle\s*=\s*""()", RegexOptions.IgnoreCase)]
+    private static partial Regex StyleAttribute();
+
+    [GeneratedRegex(@"(?<![\w-])max-width\s*:[^;]*;?", RegexOptions.IgnoreCase)]
+    private static partial Regex TableMaxWidth();
+
+    [GeneratedRegex(@"(?<![\w-])margin\s*:\s*(?:0(?:px)?\s+)?auto(?:\s+(?:0(?:px)?\s+)?auto)?\s*(?:!important)?\s*;?", RegexOptions.IgnoreCase)]
+    private static partial Regex MarginAuto();
+
+    [GeneratedRegex(@"<(?<end>/)?(?<name>table|tr|td|th)\b[^>]*>", RegexOptions.IgnoreCase)]
+    private static partial Regex TableStructureTag();
+
+    [GeneratedRegex(@"\bcolspan\s*=\s*[""']?(\d+)", RegexOptions.IgnoreCase)]
+    private static partial Regex Colspan();
 
     [GeneratedRegex(@"<[^>]*>|[^<]+")]
     private static partial Regex TagOrText();
