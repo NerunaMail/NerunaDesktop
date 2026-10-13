@@ -23,6 +23,8 @@
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Velopack" />
+    <!-- QR code for pairing a phone (Einstellungen → Cloud) -->
+    <PackageReference Include="QRCoder" />
     <PackageReference Include="Avalonia.HtmlRenderer" />
     <PackageReference Include="Avalonia.Controls.WebView" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />

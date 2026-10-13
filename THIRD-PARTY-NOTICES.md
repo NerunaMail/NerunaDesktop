@@ -61,6 +61,7 @@ project pages and in the NuGet packages.
 | Microsoft.IO.RecyclableMemoryStream | 3.0.1 | MIT | Microsoft | https://github.com/Microsoft/Microsoft.IO.RecyclableMemoryStream |
 | MimeKit | 4.18.1 | MIT | Jeffrey Stedfast | https://www.mimekit.net/ |
 | NodaTime | 3.2.2 | Apache-2.0 | Jon Skeet | https://nodatime.org/ |
+| QRCoder | 1.8.0 | MIT | Raffael Herrmann, Shane32 and contributors | https://github.com/Shane32/QRCoder |
 | SkiaSharp | 3.119.4 | MIT | Microsoft | https://go.microsoft.com/fwlink/?linkid=868515 |
 | SkiaSharp.NativeAssets.Linux | 3.119.4 | MIT | Microsoft | https://go.microsoft.com/fwlink/?linkid=868515 |
 | SkiaSharp.NativeAssets.macOS | 3.119.4 | MIT | Microsoft | https://go.microsoft.com/fwlink/?linkid=868515 |

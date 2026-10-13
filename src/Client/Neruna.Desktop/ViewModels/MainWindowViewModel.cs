@@ -78,6 +78,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Cloud.CloudSignatureSync cloudSignatures,
         Neruna.Core.Cloud.CloudTextTemplateSync cloudTemplates,
         Neruna.Core.Cloud.CloudCertificateSync cloudCertificates,
+        Neruna.Core.Cloud.CloudPairingService cloudPairing,
         Neruna.Core.Cloud.SettingsBackupService backup,
         Neruna.Core.Cloud.CloudAccountSync cloudAccounts,
         Neruna.Core.Auth.IBrowserLauncher browser,
@@ -107,6 +108,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _cloudSignatures = cloudSignatures;
         _cloudTemplates = cloudTemplates;
         _cloudCertificates = cloudCertificates;
+        _cloudPairing = cloudPairing;
         _backup = backup;
         _cloudAccounts = cloudAccounts;
         _browser = browser;
@@ -504,6 +506,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly Neruna.Core.Cloud.CloudSignatureSync _cloudSignatures;
     private readonly Neruna.Core.Cloud.CloudTextTemplateSync _cloudTemplates;
     private readonly Neruna.Core.Cloud.CloudCertificateSync _cloudCertificates;
+    private readonly Neruna.Core.Cloud.CloudPairingService _cloudPairing;
     private DateTime _cloudSyncedAt;
 
     // The organisation's central signatures: with the sync, at most every 10 minutes; offline or unreachable is no error.
@@ -530,6 +533,17 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
 
             AskForCloudAccountPassword();
+
+            // Phones paired from this desktop get what they still miss (re-encrypted here, zero knowledge).
+            try
+            {
+                await Task.Run(() => _cloudPairing.DeliverAsync());
+            }
+            catch (Exception ex) when (ex is Neruna.Core.Cloud.CloudException or HttpRequestException or TaskCanceledException)
+            {
+                _logger.LogWarning(ex, "Paired phones not supplied");
+            }
+
             _cloudSyncedAt = DateTime.UtcNow;
         }
         catch (Exception ex) when (ex is Neruna.Core.Cloud.CloudException or HttpRequestException or TaskCanceledException)

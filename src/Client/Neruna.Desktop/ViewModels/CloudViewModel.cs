@@ -20,8 +20,93 @@ internal sealed partial class CloudViewModel(
     CloudCertificateSync certificates,
     AccountDiscovery discovery,
     SettingsBackupService backup,
-    CloudAccountSync accounts) : ViewModelBase
+    CloudAccountSync accounts,
+    CloudPairingService pairing) : ViewModelBase
 {
+    // ── Handy verbinden: QR code + PIN for the Neruna app; this desktop then re-encrypts for the phone ──
+
+    private Action? _cancelPairing;
+
+    /// <summary>The open pairing (QR code and PIN are shown), or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPairing))]
+    public partial PairingSession? PairingSession { get; set; }
+
+    public bool IsPairing => PairingSession is not null;
+
+    [ObservableProperty]
+    public partial Avalonia.Media.Imaging.Bitmap? PairingQrCode { get; set; }
+
+    [ObservableProperty]
+    public partial string? PairingText { get; set; }
+
+    [ObservableProperty]
+    public partial bool PairingFailed { get; set; }
+
+    [RelayCommand]
+    private async Task StartPairingAsync()
+    {
+        PairingText = null;
+        PairingFailed = false;
+        using var cancel = new CancellationTokenSource();
+        _cancelPairing = cancel.Cancel;
+        try
+        {
+            var session = await pairing.StartAsync(cancel.Token);
+            var png = new QRCoder.PngByteQRCode(new QRCoder.QRCodeGenerator().CreateQrCode(session.Invitation.ToString(), QRCoder.QRCodeGenerator.ECCLevel.M)).GetGraphic(8);
+            using (var stream = new MemoryStream(png))
+            {
+                PairingQrCode = new Avalonia.Media.Imaging.Bitmap(stream);
+            }
+
+            PairingSession = session;
+            PairingText = F("Gültig bis {0}. Warte auf das Handy …", session.ExpiresAt.LocalDateTime.ToString("HH:mm", System.Globalization.CultureInfo.CurrentCulture));
+            var phone = await pairing.WaitAsync(session, cancel.Token);
+            PairingSession = null;
+            PairingQrCode = null;
+            if (phone is null)
+            {
+                PairingFailed = true;
+                PairingText = T("Der Code ist abgelaufen. Bitte neu starten.");
+                return;
+            }
+
+            PairingText = F("«{0}» ist verbunden. Zertifikate und Konten werden übertragen, sobald die App ihren Schlüssel gemeldet hat.", phone.Name);
+            // The app reports its key right after connecting; deliver as soon as it is there.
+            for (var attempt = 0; attempt < 30; attempt++)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), cancel.Token);
+                var paired = (await cloud.GetPairedDevicesAsync(cancel.Token)).Devices.FirstOrDefault(d => d.Id == phone.Id);
+                if (paired?.EncryptionPublicKey is not null && paired.PairingProof is not null)
+                {
+                    await pairing.DeliverAsync(cancel.Token);
+                    PairingText = F("«{0}» ist verbunden und eingerichtet.", phone.Name);
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            PairingSession = null;
+            PairingQrCode = null;
+            PairingText = null;
+        }
+        catch (Exception ex) when (ex is CloudException or HttpRequestException)
+        {
+            PairingSession = null;
+            PairingQrCode = null;
+            PairingFailed = true;
+            PairingText = ex.Message;
+        }
+        finally
+        {
+            _cancelPairing = null;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelPairing() => _cancelPairing?.Invoke();
+
     /// <summary>Accounts of the organisation were set up, changed or removed (the shell reloads and syncs).</summary>
     public event EventHandler? AccountsArrived;
 

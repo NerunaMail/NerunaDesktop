@@ -81,6 +81,29 @@
 
       <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
+      <!-- Handy verbinden: the Neruna app scans the QR code; the PIN is typed in separately -->
+      <StackPanel Spacing="10" Margin="0,18,0,0" IsVisible="{Binding Connection, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <TextBlock Text="{l:T 'Handy verbinden'}" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Classes="subtle" TextWrapping="Wrap"
+                   Text="{l:T 'In der Neruna-App auf dem Handy «Mit Neruna Cloud verbinden» wählen, den QR-Code scannen und die PIN eingeben. Das Handy erhält danach die Zertifikate und Konten der Organisation von diesem Computer – verschlüsselt, die Cloud kann sie nicht lesen. Wie viele Handys erlaubt sind, legt ein Admin im Portal fest.'}" />
+        <Button Content="{l:T 'Handy verbinden'}" Command="{Binding StartPairingCommand}" IsVisible="{Binding !IsPairing}" HorizontalAlignment="Left" />
+        <Border IsVisible="{Binding IsPairing}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14">
+          <Grid ColumnDefinitions="Auto,*">
+            <Border Background="White" Padding="8" CornerRadius="4" VerticalAlignment="Top">
+              <Image Source="{Binding PairingQrCode}" Width="220" Height="220" RenderOptions.BitmapInterpolationMode="None" />
+            </Border>
+            <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="8">
+              <TextBlock Text="{l:T 'PIN'}" Classes="subtle" />
+              <SelectableTextBlock Text="{Binding PairingSession.Pin}" FontSize="32" FontWeight="SemiBold" FontFamily="Consolas, Cascadia Mono, monospace" />
+              <TextBlock Text="{l:T 'Die PIN nicht zusammen mit dem QR-Code fotografieren oder weitergeben.'}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+              <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelPairingCommand}" HorizontalAlignment="Left" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        <TextBlock Text="{Binding PairingText}" TextWrapping="Wrap" IsVisible="{Binding PairingText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   Classes.error="{Binding PairingFailed}" />
+      </StackPanel>
+
       <!-- Sicherung: personal settings into the vault, encrypted on this device; only by hand, with a note -->
       <StackPanel Spacing="10" Margin="0,18,0,0" IsVisible="{Binding Connection, Converter={x:Static ObjectConverters.IsNotNull}}">
         <TextBlock Text="{l:T 'Sicherung'}" FontSize="18" FontWeight="SemiBold" />

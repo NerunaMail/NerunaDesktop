@@ -133,7 +133,7 @@ public sealed record CloudCertificate(
     string? Envelope);
 
 /// <summary>Body of <c>PUT /api/v1/device/encryption-key</c>.</summary>
-public sealed record DeviceEncryptionKeyRequest(string PublicKey);
+public sealed record DeviceEncryptionKeyRequest(string PublicKey, string? PairingProof = null);
 
 /// <summary>
 /// <c>GET /api/v1/vault</c>: the config vault (null until set up) and its backups, newest first. Everything is encrypted
@@ -190,3 +190,31 @@ public sealed record CrashReportRequest(
     string? Log,
     DateTimeOffset OccurredAt,
     string? App = null);
+
+/// <summary>Response of <c>POST /api/v1/device/pairings</c>: what the desktop shows to pair a phone (QR code, PIN).</summary>
+public sealed record PairingResponse(string PairingId, string Code, string Pin, DateTimeOffset ExpiresAt);
+
+/// <summary>Response of <c>GET /api/v1/device/pairings/{id}</c>: pending, expired or connected (with the phone).</summary>
+public sealed record PairingStatusResponse(string Status, PairedDevice? Device);
+
+/// <summary>A phone paired from this desktop and what it still misses (ids of the person's certificates and accounts).</summary>
+public sealed record PairedDevice(
+    string Id,
+    string Name,
+    string? OsName,
+    string? OsVersion,
+    DateTimeOffset? ConnectedAt,
+    string? EncryptionPublicKey,
+    string? PairingProof,
+    bool Approved,
+    PairedDeviceMissing Missing);
+
+public sealed record PairedDeviceMissing(IReadOnlyList<string> Certificates, IReadOnlyList<string> Accounts);
+
+/// <summary>Response of <c>GET /api/v1/device/paired</c>.</summary>
+public sealed record PairedDevicesResponse(IReadOnlyList<PairedDevice> Devices);
+
+/// <summary>Body of <c>PUT /api/v1/device/paired/{id}/envelopes</c>: keys the desktop wrapped for its phone.</summary>
+public sealed record PairedEnvelopesRequest(IReadOnlyList<PairedEnvelope> Certificates, IReadOnlyList<PairedEnvelope> Accounts);
+
+public sealed record PairedEnvelope(string Id, string Envelope);

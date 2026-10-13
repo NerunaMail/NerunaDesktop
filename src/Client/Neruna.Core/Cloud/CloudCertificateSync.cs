@@ -44,7 +44,7 @@ public sealed class CloudCertificateSync(
         }
 
         using var deviceKey = await DeviceKeyAsync(credentials, logger, cancellationToken);
-        await cloud.SetDeviceEncryptionKeyAsync(CertificateEnvelopes.PublicKeyOf(deviceKey), cancellationToken);
+        await cloud.SetDeviceEncryptionKeyAsync(CertificateEnvelopes.PublicKeyOf(deviceKey), cancellationToken: cancellationToken);
         var response = await cloud.GetCertificatesAsync(cancellationToken);
         if (!response.Available)
         {
@@ -145,7 +145,7 @@ public sealed class CloudCertificateSync(
     }
 
     // Made once per device; the private half only in the system keychain. Shared with the accounts from the cloud.
-    internal static async Task<ECDiffieHellman> DeviceKeyAsync(ICredentialStore credentials, ILogger logger, CancellationToken cancellationToken)
+    public static async Task<ECDiffieHellman> DeviceKeyAsync(ICredentialStore credentials, ILogger logger, CancellationToken cancellationToken)
     {
         if (await credentials.GetSecretAsync(CloudController.EncryptionKeyId, cancellationToken) is { Length: > 0 } stored)
         {

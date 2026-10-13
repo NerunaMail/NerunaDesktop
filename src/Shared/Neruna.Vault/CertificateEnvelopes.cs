@@ -55,6 +55,29 @@ public static class CertificateEnvelopes
         return Open(kek, parsed, context);
     }
 
+    /// <summary>
+    /// Wraps a key for another device, as the portal does (browser module wrapKey): a desktop re-encrypting the
+    /// certificate and account keys it holds for a phone paired from it.
+    /// </summary>
+    public static string Wrap(byte[] key, string recipientPublicKey, string context)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        using var recipient = ECDiffieHellman.Create();
+        recipient.ImportSubjectPublicKeyInfo(Convert.FromBase64String(recipientPublicKey), out _);
+        using var ephemeral = CreateDeviceKey();
+        var shared = ephemeral.DeriveRawSecretAgreement(recipient.PublicKey);
+        var kek = HKDF.DeriveKey(HashAlgorithmName.SHA256, shared, 32, EnvelopeSalt, Encoding.UTF8.GetBytes(context));
+
+        var iv = RandomNumberGenerator.GetBytes(12);
+        var data = new byte[key.Length + 16];
+        using (var aes = new AesGcm(kek, 16))
+        {
+            aes.Encrypt(iv, key, data.AsSpan(0, key.Length), data.AsSpan(key.Length), Encoding.UTF8.GetBytes(context));
+        }
+
+        return JsonSerializer.Serialize(new Sealed(1, PublicKeyOf(ephemeral), Convert.ToBase64String(iv), Convert.ToBase64String(data)));
+    }
+
     /// <summary>The PKCS#12 and its password.</summary>
     public static (byte[] Pkcs12, string Password) Decrypt(string certificateId, string payload, byte[] certificateKey)
     {

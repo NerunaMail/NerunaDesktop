@@ -125,10 +125,27 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task SetPresenceAsync(string presence, CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<PresenceRequest>(HttpMethod.Put, "api/v1/presence", new PresenceRequest(presence), cancellationToken);
 
-    /// <summary>Registers this device's encryption key for certificates; true when an admin has approved it.</summary>
-    public async Task<bool> SetDeviceEncryptionKeyAsync(string publicKey, CancellationToken cancellationToken = default) =>
-        (await AuthorizedAsync<JsonElement>(HttpMethod.Put, "api/v1/device/encryption-key", new DeviceEncryptionKeyRequest(publicKey), cancellationToken))
+    /// <summary>
+    /// Registers this device's encryption key for certificates; true when it is approved (by an admin or, a phone, by
+    /// the desktop it was paired from). A paired phone sends its proof with it (see PairingInvitation).
+    /// </summary>
+    public async Task<bool> SetDeviceEncryptionKeyAsync(string publicKey, string? pairingProof = null, CancellationToken cancellationToken = default) =>
+        (await AuthorizedAsync<JsonElement>(HttpMethod.Put, "api/v1/device/encryption-key", new DeviceEncryptionKeyRequest(publicKey, pairingProof), cancellationToken))
         .TryGetProperty("approved", out var approved) && approved.GetBoolean();
+
+    /// <summary>A code + PIN for pairing a phone from this desktop (only as many phones as an admin allowed).</summary>
+    public async Task<PairingResponse> StartPairingAsync(CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PairingResponse>(HttpMethod.Post, "api/v1/device/pairings", new { }, cancellationToken);
+
+    public async Task<PairingStatusResponse> GetPairingAsync(string pairingId, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PairingStatusResponse>($"api/v1/device/pairings/{Uri.EscapeDataString(pairingId)}", cancellationToken);
+
+    /// <summary>The phones paired from this desktop, with what they still miss.</summary>
+    public async Task<PairedDevicesResponse> GetPairedDevicesAsync(CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PairedDevicesResponse>("api/v1/device/paired", cancellationToken);
+
+    public async Task<PairedDevice> DeliverToPairedDeviceAsync(string deviceId, PairedEnvelopesRequest envelopes, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PairedDevice>(HttpMethod.Put, $"api/v1/device/paired/{Uri.EscapeDataString(deviceId)}/envelopes", envelopes, cancellationToken);
 
     /// <summary>The S/MIME certificates assigned to this person, encrypted for this device.</summary>
     public async Task<CertificatesResponse> GetCertificatesAsync(CancellationToken cancellationToken = default) =>
