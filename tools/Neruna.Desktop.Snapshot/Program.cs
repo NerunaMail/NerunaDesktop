@@ -121,6 +121,36 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
 
+        // A PDF attachment in the reading pane instead of the message; a second click shows the message again.
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.HasAttachments);
+        for (var i = 0; i < 50 && vm.MailPage.ReadingPane?.Message is null; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        var pdfAttachment = vm.MailPage.ReadingPane!.Attachments.First(a => a.CanPreview);
+        await pdfAttachment.ActivateCommand.ExecuteAsync(null);
+        for (var i = 0; i < 50 && (vm.MailPage.ReadingPane.Preview?.IsBusy != false); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await SaveAsync(window, output, "mail-attachment-preview.png");
+        Console.WriteLine($"Attachment preview: {vm.MailPage.ReadingPane.Preview?.Pages.Count} page(s), {vm.MailPage.ReadingPane.Preview?.PageInfo}, problem={vm.MailPage.ReadingPane.Preview?.Problem}");
+        await pdfAttachment.ActivateCommand.ExecuteAsync(null);
+        Console.WriteLine($"Preview closed again: {vm.MailPage.ReadingPane.Preview is null && vm.MailPage.ReadingPane.ShowsBody}");
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+        await Task.Delay(300);
+
+        // The list is rebuilt (as after deleting with the Delete key): the focus stays in the list, so the next Delete works.
+        var messageList = window.GetVisualDescendants().OfType<ListBox>().First(l => l.Name == "MessageList");
+        (messageList.ContainerFromItem(messageList.SelectedItem!) as ListBoxItem)?.Focus();
+        vm.MailPage.ShowUnreadOnly = true;
+        vm.MailPage.ShowUnreadOnly = false;
+        await Task.Delay(300);
+        var focusedAfter = window.FocusManager?.GetFocusedElement() as Visual;
+        Console.WriteLine($"Focus after rebuilding the list: {focusedAfter?.GetType().Name}, in list={focusedAfter?.FindAncestorOfType<ListBox>(includeSelf: true) == messageList}");
+
         // Only unread mail: the closed envelope beside the search, highlighted while it filters.
         vm.MailPage.ShowUnreadOnly = true;
         await Task.Delay(200);

@@ -84,6 +84,8 @@ internal sealed partial class MailView : UserControl
             {
                 vm.SelectedMessages = list.SelectedItems?.OfType<MessageItemViewModel>().ToList() ?? [];
             }
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => KeepListFocus(list), Avalonia.Threading.DispatcherPriority.Background);
         };
 
         var tree = this.FindControl<TreeView>("FolderTree")!;
@@ -93,6 +95,24 @@ internal sealed partial class MailView : UserControl
     }
 
     private MailViewModel? ViewModel => DataContext as MailViewModel;
+
+    // Deleting or moving removes the focused message from the list, and the focus would end up nowhere: the next
+    // Delete would do nothing until the next message is clicked. The newly selected message takes the focus over.
+    private void KeepListFocus(ListBox list)
+    {
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual;
+        var lost = focused is null or TopLevel || !focused.IsAttachedToVisualTree();
+        if ((!lost && focused?.FindAncestorOfType<ListBox>(includeSelf: true) != list) || list.SelectedItem is not { } selected)
+        {
+            return;
+        }
+
+        list.ScrollIntoView(selected);
+        if (list.ContainerFromItem(selected) is ListBoxItem item && !item.IsFocused)
+        {
+            item.Focus(NavigationMethod.Directional);
+        }
+    }
 
     // Remember the press; the drag only starts after the pointer moved a few pixels, so a click still opens the mail.
     private void OnListPointerPressed(object? sender, PointerPressedEventArgs e)
