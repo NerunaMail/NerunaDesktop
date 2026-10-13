@@ -173,7 +173,10 @@ public sealed record MailAccountsResponse(bool Available, CloudOrganizationKey? 
 
 public sealed record CloudMailAccount(string Id, string Email, string DisplayName, string Payload, string PayloadSignature, string? Envelope);
 
-/// <summary>POST /api/v1/crash-reports – only with the user's consent, already cleaned of addresses, hosts and paths.</summary>
+/// <summary>
+/// POST /api/v1/crash-reports – only with the user's consent, already cleaned of addresses, hosts and paths.
+/// App: which Neruna sent it ("desktop", "android").
+/// </summary>
 public sealed record CrashReportRequest(
     string Fingerprint,
     string AppVersion,
@@ -185,4 +188,5 @@ public sealed record CrashReportRequest(
     string Message,
     string Stack,
     string? Log,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? App = null);

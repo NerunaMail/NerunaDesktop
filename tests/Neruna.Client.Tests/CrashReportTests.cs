@@ -124,6 +124,7 @@ public class CrashReportTests
         var body = JsonSerializer.Deserialize<CrashReportRequest>(env.Http.Sent.Last(s => s.Url == url).Body, NerunaJson.Options)!;
         Assert.Equal(pending.Report.Fingerprint, body.Fingerprint);
         Assert.Equal("Keine Verbindung für <email>", body.Message);
+        Assert.Equal("desktop", body.App);
         Assert.True(body.Fatal);
     }
 }

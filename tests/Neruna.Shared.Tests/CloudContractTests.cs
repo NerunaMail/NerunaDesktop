@@ -111,6 +111,7 @@ public class CloudContractTests
         Assert.Equal("System.ComponentModel.Win32Exception", report.ExceptionType);
         Assert.Contains("WindowsCredentialBackend", report.Stack, StringComparison.Ordinal);
         Assert.Equal("0.1.11", report.AppVersion);
+        Assert.Equal("desktop", report.App);
         Assert.NotNull(report.Log);
     }
 }

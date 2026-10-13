@@ -63,6 +63,9 @@ public static partial class CrashReportBuilder
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 
+    /// <summary>Which Neruna app reports ("desktop", "android"); the mobile apps set it at start.</summary>
+    public static string AppName { get; set; } = "desktop";
+
     /// <summary>What is sent: system details and the error, with addresses, names, hosts, paths and tokens removed.</summary>
     public static CrashReportRequest ToRequest(CrashRecord record, string language, IEnumerable<string> sensitive)
     {
@@ -80,7 +83,8 @@ public static partial class CrashReportBuilder
             Limit(Scrub(record.Message, words), 4000),
             Limit(Scrub(record.Stack, words), 60000),
             record.Log is null ? null : LimitStart(Scrub(record.Log, words), 60000),
-            record.OccurredAt);
+            record.OccurredAt,
+            AppName);
     }
 
     /// <summary>Removes what could identify a person or a company; <paramref name="sensitive"/> are the known ones.</summary>
