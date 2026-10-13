@@ -100,6 +100,32 @@ public sealed class SettingsBackupService(
     private const string DismissedKey = "vault.dismissed";
 
     // Belongs to this device, or is only how it was left on screen.
+    // The document is compressed before it is encrypted (signatures with pictures, certificates: JSON with base64
+    // shrinks a lot – hostings often take only a few MB). Backups made before are plain JSON ("{"): read as they are.
+    internal static byte[] Compress(byte[] json)
+    {
+        using var output = new MemoryStream();
+        using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.SmallestSize))
+        {
+            gzip.Write(json);
+        }
+
+        return output.ToArray();
+    }
+
+    internal static byte[] Decompress(byte[] data)
+    {
+        if (data.Length < 2 || data[0] != 0x1f || data[1] != 0x8b)
+        {
+            return data;
+        }
+
+        using var input = new System.IO.Compression.GZipStream(new MemoryStream(data), System.IO.Compression.CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        input.CopyTo(output);
+        return output.ToArray();
+    }
+
     private static readonly string[] DeviceSettings = ["cloud.", "chat.", "vault.", "ui.layout", "mail.collapsedFolders", "mail.agendaOpen", "mail.lastFolder", "autoreply.cache", "ai."];
 
     public static bool IsPersonalSetting(string key) => !DeviceSettings.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal));
@@ -162,7 +188,7 @@ public sealed class SettingsBackupService(
         var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
         using var vault = await LocalVaultAsync(info, cancellationToken) ?? throw new BackupException(T("Der Tresor ist auf diesem Gerät nicht entsperrt."));
         var content = await CollectAsync(cancellationToken);
-        var document = JsonSerializer.SerializeToUtf8Bytes(new BackupDocument(Format, clock.GetUtcNow(), content), NerunaJson.Options);
+        var document = Compress(JsonSerializer.SerializeToUtf8Bytes(new BackupDocument(Format, clock.GetUtcNow(), content), NerunaJson.Options));
         var envelope = vault.Seal(document);
         var text = string.IsNullOrWhiteSpace(note) ? null : vault.EncryptText(note.Trim());
         var created = await cloud.CreateVaultBackupAsync(new VaultBackupRequest(vault.VaultId, envelope.Version, envelope.Nonce, envelope.Ciphertext, text), cancellationToken);
@@ -180,10 +206,10 @@ public sealed class SettingsBackupService(
         BackupDocument document;
         try
         {
-            var bytes = vault.Open(new VaultEnvelope(backup.Version, backup.VaultId, [], backup.Nonce, backup.Ciphertext));
+            var bytes = Decompress(vault.Open(new VaultEnvelope(backup.Version, backup.VaultId, [], backup.Nonce, backup.Ciphertext)));
             document = JsonSerializer.Deserialize<BackupDocument>(bytes, NerunaJson.Options) ?? throw new JsonException("empty");
         }
-        catch (Exception ex) when (ex is VaultUnlockException or JsonException)
+        catch (Exception ex) when (ex is VaultUnlockException or JsonException or InvalidDataException)
         {
             throw new BackupException(T("Die Sicherung lässt sich nicht öffnen (beschädigt oder aus einem anderen Tresor)."), ex);
         }

@@ -258,4 +258,16 @@ public class SettingsBackupTests
         private static HttpResponseMessage Json(JsonNode node, HttpStatusCode status = HttpStatusCode.OK) =>
             new(status) { Content = new StringContent(node.ToJsonString(), System.Text.Encoding.UTF8, "application/json") };
     }
+
+    [Fact]
+    public void Backups_are_compressed_and_older_plain_ones_still_open()
+    {
+        var json = System.Text.Encoding.UTF8.GetBytes("{\"format\":1,\"content\":\"" + new string('a', 10_000) + "\"}");
+
+        var compressed = SettingsBackupService.Compress(json);
+
+        Assert.True(compressed.Length < json.Length / 10);
+        Assert.Equal(json, SettingsBackupService.Decompress(compressed));
+        Assert.Equal(json, SettingsBackupService.Decompress(json)); // made before 0.1.27: plain JSON
+    }
 }

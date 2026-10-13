@@ -289,7 +289,10 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
             var request = new HttpRequestMessage(method, new Uri(connection.Server, path));
             if (body is not null)
             {
+                // Buffered, so it goes with a Content-Length: a chunked body larger than the hosting's post_max_size
+                // would arrive empty, and the server could not tell why.
                 request.Content = JsonContent.Create(body, body.GetType(), options: NerunaJson.Options);
+                await request.Content.LoadIntoBufferAsync(cancellationToken);
             }
 
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
