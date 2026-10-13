@@ -11,9 +11,6 @@ namespace Neruna.Core.Cloud;
 /// <summary>A QR code for the app and the PIN shown next to it.</summary>
 public sealed record AccountTransferCode(string Code, string Pin);
 
-/// <summary>What the QR code carries: the account and the settings that belong to its connections (chosen calendars and address books, own names).</summary>
-internal sealed record TransferPayload(BackupAccount Account, IReadOnlyDictionary<string, string>? Settings);
-
 /// <summary>The transfer code cannot be used; <see cref="Exception.Message"/> is for the user.</summary>
 public sealed class AccountTransferException(string message, Exception? inner = null) : Exception(message, inner);
 
@@ -22,10 +19,10 @@ public sealed class AccountTransferException(string message, Exception? inner = 
 /// without Neruna Cloud – with it, accounts come along with the backup. Server settings and password, nothing goes over
 /// a server. Only what the app can use: mail (IMAP), calendars (CalDAV), contacts (CardDAV).
 /// </summary>
-public sealed class AccountTransferService(IAccountStore accounts, ICredentialStore credentials, ISettingsStore settings)
+public sealed class AccountTransferService(IAccountStore accounts, ICredentialStore credentials)
 {
-    // Room in one QR code (byte mode, error correction M: 2331 characters), with some to spare.
-    private const int MaxCodeLength = 2200;
+    // Empty fields are left out: every character makes the QR code denser.
+    private static readonly JsonSerializerOptions Compact = new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
 
     /// <summary>Own accounts with mail, calendars or contacts the app can use.</summary>
     public async Task<IReadOnlyList<Account>> GetTransferableAsync(CancellationToken cancellationToken = default) =>
@@ -42,25 +39,10 @@ public sealed class AccountTransferService(IAccountStore accounts, ICredentialSt
                 await credentials.GetSecretAsync(connection.Id, cancellationToken)));
         }
 
+        // Only the account and its servers: which calendars and address books to show is chosen in the app.
         var transferred = new BackupAccount(account.Id, account.DisplayName, account.EmailAddress, account.Label, connections, account.Aliases);
-
-        // Settings of these connections (which calendars and address books are shown, own calendar names).
-        var ids = connections.Select(c => c.Id.ToString("N")).ToList();
-        var related = (await settings.GetAllAsync(cancellationToken))
-            .Where(s => SettingsBackupService.IsPersonalSetting(s.Key) && ids.Any(id => s.Key.Contains(id, StringComparison.Ordinal)))
-            .ToDictionary();
-
         var pin = AccountTransfer.NewPin();
-        var code = AccountTransfer.Seal(JsonSerializer.SerializeToUtf8Bytes(new TransferPayload(transferred, related)), pin);
-        if (code.Length > MaxCodeLength)
-        {
-            // Too much for one code: without the settings, the app then shows all calendars and address books.
-            code = AccountTransfer.Seal(JsonSerializer.SerializeToUtf8Bytes(new TransferPayload(transferred, null)), pin);
-        }
-
-        return code.Length <= MaxCodeLength
-            ? new AccountTransferCode(code, pin)
-            : throw new AccountTransferException(T("Das Konto hat zu viele Einstellungen für einen QR-Code."));
+        return new AccountTransferCode(AccountTransfer.Seal(JsonSerializer.SerializeToUtf8Bytes(transferred, Compact), pin), pin);
     }
 
     /// <summary>A Neruna account code (and not, say, a pairing code).</summary>
@@ -74,18 +56,17 @@ public sealed class AccountTransferService(IAccountStore accounts, ICredentialSt
             throw new AccountTransferException(T("Das ist kein Neruna-Konto-Code. Bitte am Computer unter Einstellungen → Konten «Konto aufs Handy übertragen» wählen."));
         }
 
-        TransferPayload? payload;
+        BackupAccount? transferred;
         try
         {
             var data = await Task.Run(() => AccountTransfer.Open(code, pin), cancellationToken);
-            payload = JsonSerializer.Deserialize<TransferPayload>(data);
+            transferred = JsonSerializer.Deserialize<BackupAccount>(data);
         }
         catch (Exception ex) when (ex is CryptographicException or JsonException or ArgumentException)
         {
             throw new AccountTransferException(T("Die PIN stimmt nicht."), ex);
         }
 
-        var transferred = payload?.Account;
         if (transferred is null || transferred.Connections.Count == 0)
         {
             throw new AccountTransferException(T("Dieser QR-Code enthält kein Konto."));
@@ -108,11 +89,6 @@ public sealed class AccountTransferService(IAccountStore accounts, ICredentialSt
             {
                 await credentials.SetSecretAsync(transferredConnection.Id, secret, cancellationToken);
             }
-        }
-
-        foreach (var (key, value) in payload!.Settings ?? new Dictionary<string, string>())
-        {
-            await settings.SetAsync(key, value, cancellationToken);
         }
 
         return account;

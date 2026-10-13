@@ -87,7 +87,7 @@
           <Border IsVisible="{Binding IsTransferring}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14" HorizontalAlignment="Left">
             <Grid ColumnDefinitions="Auto,*">
               <Border Background="White" Padding="8" CornerRadius="4" VerticalAlignment="Top">
-                <Image Source="{Binding TransferQrCode}" Width="240" Height="240" RenderOptions.BitmapInterpolationMode="None" />
+                <Image Source="{Binding TransferQrCode}" Stretch="None" RenderOptions.BitmapInterpolationMode="None" />
               </Border>
               <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="8" MaxWidth="320">
                 <ComboBox ItemsSource="{Binding TransferAccounts}" SelectedItem="{Binding TransferAccount}" MinWidth="240">

@@ -59,7 +59,10 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         }
 
         var code = await transfer.CreateCodeAsync(account);
-        var png = new QRCoder.PngByteQRCode(new QRCoder.QRCodeGenerator().CreateQrCode(code.Code, QRCoder.QRCodeGenerator.ECCLevel.M)).GetGraphic(6);
+        // Error correction L (a screen does not get dirty) keeps the code coarse; whole pixels per module, about 500 pixels
+        // wide and shown unscaled, keep it sharp enough for a phone camera.
+        var data = new QRCoder.QRCodeGenerator().CreateQrCode(code.Code, QRCoder.QRCodeGenerator.ECCLevel.L);
+        var png = new QRCoder.PngByteQRCode(data).GetGraphic(Math.Max(4, 500 / data.ModuleMatrix.Count));
         using var stream = new MemoryStream(png);
         TransferQrCode = new Avalonia.Media.Imaging.Bitmap(stream);
         TransferPin = code.Pin;
