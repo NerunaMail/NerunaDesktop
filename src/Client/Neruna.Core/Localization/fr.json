@@ -1067,7 +1067,7 @@
  "Verbunden mit {0} als {1}.": "Connecté à {0} en tant que {1}.",
  "Verbunden mit {0} seit {1:d} · dieses Gerät heisst dort «{2}»": "Connecté à {0} depuis le {1:d} · cet appareil s'y appelle « {2} »",
  "Verbunden mit {0} über einen API-Schlüssel.": "Connecté à {0} avec une clé API.",
- "Verbunden mit {0}. Der Desktop überträgt jetzt Konten und Zertifikate …": "Connecté à {0}. L'ordinateur transfère maintenant les comptes et certificats …",
+ "Verbunden mit {0}. Konten und Zertifikate folgen, sobald dieses Handy freigegeben ist …": "Connecté à {0}. Les comptes et certificats suivront dès que ce téléphone sera validé …",
  "Verbunden mit {0}{1} – nutzt Ihr Abo.": "Connecté à {0}{1} – utilise votre abonnement.",
  "Verfahren für den Inhalt verschlüsselter Nachrichten": "Algorithme pour le contenu des messages chiffrés",
  "Verfassen": "Rédaction",

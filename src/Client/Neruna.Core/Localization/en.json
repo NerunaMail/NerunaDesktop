@@ -1067,7 +1067,7 @@
  "Verbunden mit {0} als {1}.": "Connected to {0} as {1}.",
  "Verbunden mit {0} seit {1:d} · dieses Gerät heisst dort «{2}»": "Connected to {0} since {1:d} · this device is called “{2}” there",
  "Verbunden mit {0} über einen API-Schlüssel.": "Connected to {0} with an API key.",
- "Verbunden mit {0}. Der Desktop überträgt jetzt Konten und Zertifikate …": "Connected to {0}. The desktop is now transferring accounts and certificates …",
+ "Verbunden mit {0}. Konten und Zertifikate folgen, sobald dieses Handy freigegeben ist …": "Connected to {0}. Accounts and certificates follow as soon as this phone is approved …",
  "Verbunden mit {0}{1} – nutzt Ihr Abo.": "Connected to {0}{1} – uses your subscription.",
  "Verfahren für den Inhalt verschlüsselter Nachrichten": "Algorithm for the content of encrypted messages",
  "Verfassen": "Compose",

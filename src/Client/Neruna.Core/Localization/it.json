@@ -1067,7 +1067,7 @@
  "Verbunden mit {0} als {1}.": "Collegato a {0} come {1}.",
  "Verbunden mit {0} seit {1:d} · dieses Gerät heisst dort «{2}»": "Collegato a {0} dal {1:d} · lì questo dispositivo si chiama «{2}»",
  "Verbunden mit {0} über einen API-Schlüssel.": "Collegato a {0} con una chiave API.",
- "Verbunden mit {0}. Der Desktop überträgt jetzt Konten und Zertifikate …": "Collegato a {0}. Il desktop sta trasferendo account e certificati …",
+ "Verbunden mit {0}. Konten und Zertifikate folgen, sobald dieses Handy freigegeben ist …": "Connesso a {0}. Account e certificati arriveranno non appena questo telefono sarà approvato …",
  "Verbunden mit {0}{1} – nutzt Ihr Abo.": "Collegato a {0}{1} – usa il tuo abbonamento.",
  "Verfahren für den Inhalt verschlüsselter Nachrichten": "Algoritmo per il contenuto dei messaggi cifrati",
  "Verfassen": "Scrittura",
