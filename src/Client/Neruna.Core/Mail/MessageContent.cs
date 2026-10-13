@@ -313,7 +313,7 @@ public sealed partial class MessageContent
             },
         };
 
-        var result = CarryRowBackgrounds(LimitColspans(ExpandPreformatted(converter.Convert(html))));
+        var result = CarryRowBackgrounds(LimitColspans(DropStrayTableContent(ExpandPreformatted(converter.Convert(html)))));
 
         // CSS in <style> blocks is passed through; remote URLs there are blocked when rendering, but report them.
         if (!allowRemote && RemoteCssUrl().IsMatch(result))
@@ -345,6 +345,63 @@ public sealed partial class MessageContent
         }
 
         return css;
+    }
+
+    /// <summary>
+    /// Elements written between the cells of a table (Outlook: empty &lt;span style="mso-bookmark:…"&gt; between the
+    /// &lt;td&gt;s of a row) – browsers move them out of the table, the renderer took them for cells and shifted the
+    /// whole table. They are dropped, as is text there (browsers would show it above the table).
+    /// </summary>
+    internal static string DropStrayTableContent(string html)
+    {
+        // Per open table: whether we are inside one of its cells right now.
+        var tables = new Stack<bool>();
+        var result = new StringBuilder(html.Length);
+        foreach (Match token in TagOrText().Matches(html))
+        {
+            var value = token.Value;
+            if (!value.StartsWith('<'))
+            {
+                if (tables.Count == 0 || tables.Peek() || string.IsNullOrWhiteSpace(value))
+                {
+                    result.Append(value);
+                }
+
+                continue;
+            }
+
+            var tag = TagName().Match(value);
+            var name = tag.Success ? tag.Groups["name"].Value.ToLowerInvariant() : string.Empty;
+            var isEnd = tag.Success && tag.Groups["end"].Success;
+            switch (name)
+            {
+                case "table" when !isEnd:
+                    tables.Push(false);
+                    break;
+                case "table":
+                    tables.TryPop(out _);
+                    break;
+                case "td" or "th" or "caption" when tables.Count > 0:
+                    tables.Pop();
+                    tables.Push(!isEnd);
+                    break;
+                case "tr" or "tbody" or "thead" or "tfoot" or "colgroup" or "col" when tables.Count > 0:
+                    tables.Pop();
+                    tables.Push(false);
+                    break;
+                default:
+                    if (tables.Count > 0 && !tables.Peek() && !value.StartsWith("<!", StringComparison.Ordinal))
+                    {
+                        continue; // between cells: dropped
+                    }
+
+                    break;
+            }
+
+            result.Append(value);
+        }
+
+        return result.ToString();
     }
 
     /// <summary>
@@ -550,6 +607,9 @@ public sealed partial class MessageContent
 
     [GeneratedRegex(@"\bcolspan\s*=\s*[""']?(\d+)", RegexOptions.IgnoreCase)]
     private static partial Regex Colspan();
+
+    [GeneratedRegex(@"^<(?<end>/)?(?<name>[a-zA-Z][a-zA-Z0-9:-]*)")]
+    private static partial Regex TagName();
 
     [GeneratedRegex(@"<[^>]*>|[^<]+")]
     private static partial Regex TagOrText();

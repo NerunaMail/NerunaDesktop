@@ -286,4 +286,16 @@ public class MailPreviewTests
         Assert.Contains("<td bgcolor=\"#fff\">own", html);
         Assert.Contains("<td>plain", html);
     }
+
+    [Fact]
+    public void Content_between_table_cells_is_dropped()
+    {
+        // Outlook: empty bookmark spans between the cells of a row – the renderer took them for cells.
+        var html = HtmlOf("<table><tr><td>a</td><span style=\"mso-bookmark:_Hlk1\"><span>x</span></span><td>b</td></tr></table>"
+            + "<table><tr><td><table><tr><td>inner</td></tr></table><span>kept</span></td></tr></table>");
+
+        Assert.Contains("<td>a</td><td>b</td>", html);
+        Assert.DoesNotContain(">x<", html);
+        Assert.Contains("<span>kept</span>", html);
+    }
 }
