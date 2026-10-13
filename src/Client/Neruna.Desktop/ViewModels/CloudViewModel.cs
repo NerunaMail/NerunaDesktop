@@ -43,8 +43,91 @@ internal sealed partial class CloudViewModel(
     [ObservableProperty]
     public partial bool PairingFailed { get; set; }
 
+    // ── Before the QR code: the computer login (like an admin prompt) – nobody connects a phone without knowing it ──
+
+    /// <summary>Linux/macOS: the password field for the computer login is shown.</summary>
+    [ObservableProperty]
+    public partial bool AskLogin { get; set; }
+
+    [ObservableProperty]
+    public partial string LoginPassword { get; set; } = string.Empty;
+
+    public string LoginLabel { get; } = F("Passwort von «{0}» auf diesem Computer", Infrastructure.UserVerification.UserName);
+
     [RelayCommand]
     private async Task StartPairingAsync()
+    {
+        PairingText = null;
+        PairingFailed = false;
+        if (!Infrastructure.UserVerification.UsesSystemDialog)
+        {
+            LoginPassword = string.Empty;
+            AskLogin = true;
+            return;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            var owner = (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)
+                ?.MainWindow?.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+            var check = await Infrastructure.UserVerification.AskWindowsAsync(owner, T("Bestätigung mit dem Computer-Login"),
+                T("Zum Verbinden eines Handys bitte mit dem Login dieses Computers bestätigen."));
+            await AfterLoginCheckAsync(check);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ConfirmLoginAsync()
+    {
+        var password = LoginPassword;
+        LoginPassword = string.Empty;
+        if (password.Length == 0)
+        {
+            return;
+        }
+
+        var check = await Infrastructure.UserVerification.CheckPasswordAsync(password);
+        if (check != Infrastructure.UserCheck.Wrong)
+        {
+            AskLogin = false;
+        }
+
+        await AfterLoginCheckAsync(check);
+    }
+
+    [RelayCommand]
+    private void CancelLogin()
+    {
+        AskLogin = false;
+        LoginPassword = string.Empty;
+        PairingText = null;
+    }
+
+    private async Task AfterLoginCheckAsync(Infrastructure.UserCheck check)
+    {
+        switch (check)
+        {
+            case Infrastructure.UserCheck.Confirmed:
+                await BeginPairingAsync();
+                break;
+            case Infrastructure.UserCheck.Cancelled:
+                break;
+            case Infrastructure.UserCheck.Wrong:
+                PairingFailed = true;
+                PairingText = T("Das Passwort stimmt nicht.");
+                break;
+            case Infrastructure.UserCheck.PasswordNeeded:
+                PairingFailed = true;
+                PairingText = T("Bitte mit dem Passwort des Windows-Kontos bestätigen (unter «Weitere Optionen») – PIN und Fingerabdruck können hier nicht geprüft werden.");
+                break;
+            default:
+                PairingFailed = true;
+                PairingText = T("Das Computer-Login kann auf diesem System nicht geprüft werden. Ein Admin kann das Handy im Portal hinzufügen.");
+                break;
+        }
+    }
+
+    private async Task BeginPairingAsync()
     {
         PairingText = null;
         PairingFailed = false;
