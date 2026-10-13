@@ -258,6 +258,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     /// <summary>S/MIME signature; only possible with an own valid certificate for the sender address.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowEncrypt))]
     public partial bool Sign { get; set; }
 
     [ObservableProperty]
@@ -268,8 +269,24 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ShowEncrypt))]
     public partial bool CanSign { get; set; }
 
-    /// <summary>Verschlüsseln: with an own certificate – or while switched on (a reply to encrypted mail), so it can be switched off.</summary>
-    public bool ShowEncrypt => CanSign || Encrypt;
+    /// <summary>
+    /// Verschlüsseln only together with Signieren: without an own certificate the copy in "Gesendet" could not be read
+    /// (shown while switched on, so it can be switched off).
+    /// </summary>
+    public bool ShowEncrypt => Sign || Encrypt;
+
+    // Signing off: encrypting goes off too; signing on again: encryption is checked again for the recipients.
+    partial void OnSignChanged(bool value)
+    {
+        if (!value && Encrypt)
+        {
+            SetEncryptAutomatically(false);
+        }
+        else if (value)
+        {
+            ScheduleEncryptionCheck();
+        }
+    }
 
     /// <summary>Tooltip of "Verschlüsseln": why it was switched on or off automatically.</summary>
     [ObservableProperty]
@@ -329,6 +346,12 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     {
         if (!_autoEncrypt || _encryptChosen || version != _recipientVersion)
         {
+            return;
+        }
+
+        if (!Sign)
+        {
+            SetEncryptAutomatically(false);
             return;
         }
 
