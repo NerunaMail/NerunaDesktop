@@ -5,6 +5,7 @@
              xmlns:cal="using:Neruna.Core.Calendar"
              xmlns:app="using:Neruna.Desktop"
              xmlns:views="using:Neruna.Desktop.Views"
+             xmlns:img="using:Avalonia.Media.Imaging"
              x:Class="Neruna.Desktop.Views.ReadingPaneView"
              x:DataType="vm:ReadingPaneViewModel">
   <!-- A message: header, security, attachments, body. Used in the mail page and in the message window. -->
@@ -96,10 +97,19 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:AttachmentViewModel">
-            <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,6,6">
+            <!-- Images and PDFs: a click shows them in the reading pane (again: back to the message) -->
+            <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,6,6"
+                    Classes.previewed="{Binding IsPreviewed}">
+              <Border.Styles>
+                <Style Selector="Border.previewed">
+                  <Setter Property="BorderBrush" Value="{DynamicResource AccentTextBrush}" />
+                  <Setter Property="Background" Value="{DynamicResource InfoBackgroundBrush}" />
+                </Style>
+              </Border.Styles>
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <PathIcon Data="{StaticResource IconAttach}" Width="14" Height="14" />
-                <Button Classes="command" Padding="0" Command="{Binding OpenCommand}" ToolTip.Tip="{l:T 'Öffnen'}">
+                <Button Classes="command" Padding="0" Command="{Binding ActivateCommand}"
+                        ToolTip.Tip="{Binding ActivateTip}">
                   <TextBlock Text="{Binding FileName}" TextDecorations="Underline" />
                 </Button>
                 <TextBlock Classes="subtle" FontSize="11" Text="{Binding SizeText}" VerticalAlignment="Center" />
@@ -129,7 +139,46 @@
         </StackPanel>
       </Border>
       <TextBlock Grid.Row="7" Text="{l:T 'Wird geladen …'}" Classes="subtle" Margin="24,8" IsVisible="{Binding IsLoading}" />
-      <views:MessageBodyView Grid.Row="7" IsVisible="{Binding HasBody}" />
+      <views:MessageBodyView Grid.Row="7" IsVisible="{Binding ShowsBody}" />
+
+      <!-- Attachment preview in place of the message text -->
+      <Grid Grid.Row="7" RowDefinitions="Auto,*" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,1" Padding="16,6">
+          <Grid ColumnDefinitions="Auto,*,Auto" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
+            <Button Classes="command" Content="{l:T '← Zur Nachricht'}" Command="{Binding CloseCommand}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="12,0" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Attachment.FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding PageInfo}" Classes="subtle" FontSize="12" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+              <Button Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Attachment.OpenCommand}" />
+              <Button Classes="command" Content="{l:T 'Speichern'}" Command="{Binding Attachment.SaveCommand}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        <ScrollViewer Grid.Row="1" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
+          <StackPanel Margin="16" Spacing="12">
+            <ItemsControl ItemsSource="{Binding Pages}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="12" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="img:Bitmap">
+                  <Border Background="White" BoxShadow="0 1 4 0 #33000000" HorizontalAlignment="Center">
+                    <Image Source="{Binding}" Stretch="Uniform" StretchDirection="DownOnly" />
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="120" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding Problem}" TextWrapping="Wrap" HorizontalAlignment="Center"
+                       IsVisible="{Binding Problem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Button Content="{l:T 'Weitere Seiten anzeigen'}" Command="{Binding MorePagesCommand}" IsVisible="{Binding HasMorePages}" HorizontalAlignment="Center" />
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
     </Grid>
   </Panel>
 </UserControl>

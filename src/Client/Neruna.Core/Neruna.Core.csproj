@@ -6,6 +6,10 @@
     <PackageReference Include="MimeKit" />
     <PackageReference Include="Ical.Net" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- PDFium (native) for the PDF attachment preview: Mail/PdfPages.cs -->
+    <PackageReference Include="bblanchon.PDFium.Win32" />
+    <PackageReference Include="bblanchon.PDFium.Linux" />
+    <PackageReference Include="bblanchon.PDFium.macOS" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\Neruna.Contracts\Neruna.Contracts.csproj" />

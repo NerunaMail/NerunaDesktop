@@ -121,6 +121,17 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
         message.Body = m.Subject.StartsWith("Einladung:", StringComparison.Ordinal)
             ? new MultipartAlternative { new TextPart("plain") { Text = m.Body }, InvitationPart() }
             : new TextPart("plain") { Text = m.Body };
+        if (m.Attachment)
+        {
+            var pdf = new MimePart("application", "pdf")
+            {
+                FileName = m.Subject + ".pdf",
+                Content = new MimeContent(new MemoryStream(DemoPdf.Create(m.Subject, m.Body.Split('\n')))),
+                ContentTransferEncoding = ContentEncoding.Base64,
+            };
+            message.Body = new Multipart("mixed") { message.Body, pdf };
+        }
+
         return Task.FromResult(message);
     }
 

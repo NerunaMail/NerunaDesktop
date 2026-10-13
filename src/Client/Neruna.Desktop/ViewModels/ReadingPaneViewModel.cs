@@ -66,6 +66,10 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         _http = http;
         _loadRemoteContent = loadRemoteContent;
         AllowsRemoteContent = allowsRemoteContent;
+        foreach (var attachment in attachments)
+        {
+            attachment.TogglePreview = TogglePreview;
+        }
     }
 
     public string Subject { get; }
@@ -102,6 +106,37 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     public partial AiSummaryViewModel? Summary { get; set; }
 
     public bool HasBody => _content is not null;
+
+    /// <summary>The message text, unless an attachment is shown in its place.</summary>
+    public bool ShowsBody => HasBody && Preview is null;
+
+    /// <summary>The image or PDF attachment shown instead of the message text.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsBody))]
+    public partial AttachmentPreviewViewModel? Preview { get; set; }
+
+    private void TogglePreview(AttachmentViewModel attachment)
+    {
+        var showing = Preview?.Attachment;
+        ClosePreview();
+        if (showing == attachment)
+        {
+            return;
+        }
+
+        attachment.IsPreviewed = true;
+        Preview = new AttachmentPreviewViewModel(attachment, ClosePreview);
+        _ = Preview.LoadAsync();
+    }
+
+    private void ClosePreview()
+    {
+        if (Preview is { } preview)
+        {
+            preview.Attachment.IsPreviewed = false;
+            Preview = null;
+        }
+    }
 
     public IReadOnlyList<AttachmentViewModel> Attachments { get; }
 
@@ -271,6 +306,40 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 internal sealed partial class AttachmentViewModel(MimeEntity entity, IFileService files) : ObservableObject
 {
     public string FileName { get; } = MessageContent.FileNameOf(entity);
+
+    public AttachmentPreviewKind PreviewKind => AttachmentPreview.KindOf(entity, FileName);
+
+    public bool CanPreview => PreviewKind != AttachmentPreviewKind.None;
+
+    public string ActivateTip => CanPreview ? T("Vorschau im Lesebereich") : T("Öffnen");
+
+    /// <summary>Shown in the reading pane right now (highlighted).</summary>
+    [ObservableProperty]
+    public partial bool IsPreviewed { get; set; }
+
+    /// <summary>Set by the reading pane: shows this attachment in place of the message, or the message again.</summary>
+    internal Action<AttachmentViewModel>? TogglePreview { get; set; }
+
+    /// <summary>A click on the name: images and PDFs in the reading pane, everything else in its program.</summary>
+    [RelayCommand]
+    private Task ActivateAsync()
+    {
+        if (CanPreview && TogglePreview is { } toggle)
+        {
+            toggle(this);
+            return Task.CompletedTask;
+        }
+
+        return OpenAsync();
+    }
+
+    /// <summary>The decoded content for the preview; null when it is larger than <see cref="AttachmentPreview.MaxBytes"/>.</summary>
+    public async Task<byte[]?> ReadAsync()
+    {
+        using var buffer = new MemoryStream();
+        await WriteToAsync(buffer);
+        return buffer.Length > AttachmentPreview.MaxBytes ? null : buffer.ToArray();
+    }
 
     public string SizeText
     {

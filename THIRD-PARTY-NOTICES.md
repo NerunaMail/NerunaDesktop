@@ -22,6 +22,9 @@ project pages and in the NuGet packages.
 | Avalonia.Themes.Fluent | 12.1.3 | MIT | Avalonia Team | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
 | Avalonia.Win32 | 12.1.3 | MIT | Avalonia Team | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
 | Avalonia.X11 | 12.1.3 | MIT | Avalonia Team | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| bblanchon.PDFium.Linux | 156.0.8076 | Apache-2.0 (PDFium: BSD-3-Clause, Apache-2.0) | Benoît Blanchon; PDFium: The PDFium Authors | https://github.com/bblanchon/pdfium-binaries |
+| bblanchon.PDFium.macOS | 156.0.8076 | Apache-2.0 (PDFium: BSD-3-Clause, Apache-2.0) | Benoît Blanchon; PDFium: The PDFium Authors | https://github.com/bblanchon/pdfium-binaries |
+| bblanchon.PDFium.Win32 | 156.0.8076 | Apache-2.0 (PDFium: BSD-3-Clause, Apache-2.0) | Benoît Blanchon; PDFium: The PDFium Authors | https://github.com/bblanchon/pdfium-binaries |
 | BouncyCastle.Cryptography | 2.7.0 | MIT | Legion of the Bouncy Castle Inc. | https://www.bouncycastle.org/stable/nuget/csharp/website |
 | CommunityToolkit.Mvvm | 8.4.2 | MIT | Microsoft | https://github.com/CommunityToolkit/dotnet |
 | HarfBuzzSharp | 8.3.1.3 | MIT | Microsoft | https://go.microsoft.com/fwlink/?linkid=868515 |
