@@ -177,30 +177,51 @@
           <TextBlock Text="{l:T 'Meine Kalender'}" FontWeight="SemiBold" Margin="0,0,0,4" />
           <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasCalendars}"
                      Text="{l:T 'Noch keine Kalender. Konto mit CalDAV hinzufügen oder einen Internet-Kalender abonnieren.'}" />
-          <ItemsControl ItemsSource="{Binding Calendars}">
+          <!-- Grouped by account: a small title per group, arrows (on hover) to move the group -->
+          <ItemsControl ItemsSource="{Binding CalendarGroups}">
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:CalendarListItem">
-                <Grid ColumnDefinitions="Auto,Auto,*,Auto" Opacity="{Binding IsDimmed, Converter={x:Static app:Converters.DimmedOpacity}}">
-                  <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Anzeigen'}" />
-                  <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
-                  <Button Grid.Column="1" Width="16" Height="16" MinWidth="0" Padding="0" CornerRadius="3" Background="{Binding Brush}"
-                          BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="{l:T 'Farbe und Name ändern'}">
-                    <Button.Flyout>
-                      <Flyout Placement="RightEdgeAlignedTop">
-                        <views:CollectionAppearanceEditor />
-                      </Flyout>
-                    </Button.Flyout>
-                  </Button>
-                  <!-- Long names end in "…" before the filter icon -->
-                  <DockPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Left">
-                    <TextBlock DockPanel.Dock="Right" Text="{l:T '(nur lesen)'}" Classes="subtle" FontSize="11" IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" Margin="6,0,0,0" />
-                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
-                  </DockPanel>
-                  <Button Grid.Column="3" Classes="solo" Classes.on="{Binding IsSolo}" ToolTip.Tip="{Binding SoloTip}" VerticalAlignment="Center" Margin="4,0,0,0"
-                          Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).ToggleSoloCommand}" CommandParameter="{Binding}">
-                    <PathIcon Data="{StaticResource IconSolo}" Width="12" Height="12" />
-                  </Button>
-                </Grid>
+              <DataTemplate x:DataType="vm:CalendarGroup">
+                <StackPanel Margin="0,4,0,6">
+                  <Grid ColumnDefinitions="*,Auto,Auto" Classes="group-head" Background="Transparent">
+                    <Grid.Styles>
+                      <Style Selector="Grid.group-head Button.move"><Setter Property="Opacity" Value="0" /></Style>
+                      <Style Selector="Grid.group-head:pointerover Button.move"><Setter Property="Opacity" Value="1" /></Style>
+                    </Grid.Styles>
+                    <TextBlock Text="{Binding Title}" Classes="subtle" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding Title}" VerticalAlignment="Center" Margin="0,0,0,2" />
+                    <Button Grid.Column="1" Classes="move" Content="↑" Command="{Binding MoveUpCommand}" Padding="4,0" MinWidth="0" FontSize="11"
+                            Background="Transparent" BorderThickness="0" ToolTip.Tip="{l:T 'Nach oben'}" />
+                    <Button Grid.Column="2" Classes="move" Content="↓" Command="{Binding MoveDownCommand}" Padding="4,0" MinWidth="0" FontSize="11"
+                            Background="Transparent" BorderThickness="0" ToolTip.Tip="{l:T 'Nach unten'}" />
+                  </Grid>
+                  <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CalendarListItem">
+                      <Grid ColumnDefinitions="Auto,Auto,*,Auto" Opacity="{Binding IsDimmed, Converter={x:Static app:Converters.DimmedOpacity}}">
+                        <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Anzeigen'}" />
+                        <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
+                        <Button Grid.Column="1" Width="16" Height="16" MinWidth="0" Padding="0" CornerRadius="3" Background="{Binding Brush}"
+                                BorderThickness="0" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="{l:T 'Farbe und Name ändern'}">
+                          <Button.Flyout>
+                            <Flyout Placement="RightEdgeAlignedTop">
+                              <views:CollectionAppearanceEditor />
+                            </Flyout>
+                          </Button.Flyout>
+                        </Button>
+                        <!-- Long names end in "…" before the filter icon -->
+                        <DockPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Left">
+                          <TextBlock DockPanel.Dock="Right" Text="{l:T '(nur lesen)'}" Classes="subtle" FontSize="11" IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" Margin="6,0,0,0" />
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                        </DockPanel>
+                        <Button Grid.Column="3" Classes="solo" Classes.on="{Binding IsSolo}" ToolTip.Tip="{Binding SoloTip}" VerticalAlignment="Center" Margin="4,0,0,0"
+                                Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).ToggleSoloCommand}" CommandParameter="{Binding}">
+                          <PathIcon Data="{StaticResource IconSolo}" Width="12" Height="12" />
+                        </Button>
+                      </Grid>
+                    </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>

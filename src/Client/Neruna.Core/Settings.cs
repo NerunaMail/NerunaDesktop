@@ -93,6 +93,9 @@ public static class SettingKeys
     /// <summary>"true": the week view shows Monday–Friday only.</summary>
     public const string CalendarWorkWeek = "calendar.workWeek";
 
+    /// <summary>Order of the account groups in "Meine Kalender" (JSON list of account ids); others follow in account order.</summary>
+    public const string CalendarGroupOrder = "calendar.groupOrder";
+
     /// <summary>Reminder for new events and accepted invitations, minutes before the start; "none" for none. Default: 15.</summary>
     public const string CalendarDefaultReminder = "calendar.defaultReminder";
 

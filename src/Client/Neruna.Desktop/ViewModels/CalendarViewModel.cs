@@ -51,6 +51,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
     public ObservableCollection<CalendarListItem> Calendars { get; } = [];
 
+    /// <summary>"Meine Kalender" grouped by account, in the order the user chose (arrows at the group title).</summary>
+    public ObservableCollection<CalendarGroup> CalendarGroups { get; } = [];
+
     public ObservableCollection<CalendarDay> Days { get; } = [];
 
     /// <summary>The date navigator: one or two months (setting "Kalender → Monatsübersicht").</summary>
@@ -187,14 +190,68 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             items.Add(item);
         }
 
+        // Grouped by the account they come from – several "Persönlich" calendars are told apart by the group title.
+        var sources = await calendar.GetSourcesAsync();
+        var accountOf = sources.ToDictionary(s => s.Connection.Id, s => s.Account);
+        var accountOrder = sources.Select(s => s.Account.Id).Distinct().ToList();
+        var chosen = ParseOrder(await settings.GetAsync(SettingKeys.CalendarGroupOrder));
+        var groups = items
+            .GroupBy(i => accountOf.TryGetValue(i.Info.ConnectionId, out var account) ? account : null)
+            .Select(g => new CalendarGroup(this, g.Key?.Id ?? Guid.Empty, g.Key?.Title ?? T("Weitere"), [.. g]))
+            .OrderBy(g => chosen.IndexOf(g.AccountId) is var at and >= 0 ? at : chosen.Count + accountOrder.IndexOf(g.AccountId))
+            .ToList();
+
+        CalendarGroups.Clear();
         Calendars.Clear();
-        foreach (var item in items)
+        foreach (var group in groups)
         {
-            Calendars.Add(item);
+            CalendarGroups.Add(group);
+            foreach (var item in group.Items)
+            {
+                Calendars.Add(item);
+            }
         }
+
+        UpdateGroupMoves();
 
         OnPropertyChanged(nameof(HasCalendars));
         await LoadWeekAsync(dataChanged: true);
+    }
+
+    private static List<Guid> ParseOrder(string? json)
+    {
+        try
+        {
+            return json is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(json) ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Moves an account group up or down in "Meine Kalender"; the order is kept.</summary>
+    internal async Task MoveGroupAsync(CalendarGroup group, int delta)
+    {
+        var index = CalendarGroups.IndexOf(group);
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= CalendarGroups.Count)
+        {
+            return;
+        }
+
+        CalendarGroups.Move(index, target);
+        UpdateGroupMoves();
+        await settings.SetAsync(SettingKeys.CalendarGroupOrder, System.Text.Json.JsonSerializer.Serialize(CalendarGroups.Select(g => g.AccountId)));
+    }
+
+    private void UpdateGroupMoves()
+    {
+        for (var i = 0; i < CalendarGroups.Count; i++)
+        {
+            CalendarGroups[i].CanMoveUp = i > 0;
+            CalendarGroups[i].CanMoveDown = i < CalendarGroups.Count - 1;
+        }
     }
 
     [RelayCommand]
@@ -463,6 +520,30 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     }
 
     private static DateTime StartOfWeek(DateTime date) => date.Date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
+}
+
+/// <summary>The calendars of one account in "Meine Kalender", under the account's name.</summary>
+internal sealed partial class CalendarGroup(CalendarViewModel owner, Guid accountId, string title, IReadOnlyList<CalendarListItem> items) : ObservableObject
+{
+    public Guid AccountId { get; } = accountId;
+
+    public string Title { get; } = title;
+
+    public IReadOnlyList<CalendarListItem> Items { get; } = items;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(MoveUpCommand))]
+    public partial bool CanMoveUp { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(MoveDownCommand))]
+    public partial bool CanMoveDown { get; set; }
+
+    [RelayCommand(CanExecute = nameof(CanMoveUp))]
+    private Task MoveUpAsync() => owner.MoveGroupAsync(this, -1);
+
+    [RelayCommand(CanExecute = nameof(CanMoveDown))]
+    private Task MoveDownAsync() => owner.MoveGroupAsync(this, +1);
 }
 
 internal sealed class CalendarListItem(CalendarInfo info, string color) : CollectionListItem(info, color)
