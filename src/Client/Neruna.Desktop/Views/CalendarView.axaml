@@ -179,8 +179,9 @@
           <TextBlock DockPanel.Dock="Top" Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasCalendars}"
                      Text="{l:T 'Noch keine Kalender. Konto mit CalDAV hinzufügen oder einen Internet-Kalender abonnieren.'}" />
           <!-- Grouped by account: a small title per group, arrows (on hover) to move the group -->
+          <!-- The scroll bar lies over the content and widens under the mouse: room on the right keeps the filter icons free -->
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding CalendarGroups}">
+          <ItemsControl ItemsSource="{Binding CalendarGroups}" Margin="0,0,16,0">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CalendarGroup">
                 <StackPanel Margin="0,4,0,6">
