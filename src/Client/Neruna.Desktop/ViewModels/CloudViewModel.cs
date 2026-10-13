@@ -81,6 +81,7 @@ internal sealed partial class CloudViewModel(
                 {
                     await pairing.DeliverAsync(cancel.Token);
                     PairingText = F("«{0}» ist verbunden und eingerichtet.", phone.Name);
+                    await LoadPairedPhonesAsync();
                     break;
                 }
             }
@@ -106,6 +107,44 @@ internal sealed partial class CloudViewModel(
 
     [RelayCommand]
     private void CancelPairing() => _cancelPairing?.Invoke();
+
+    /// <summary>The phones paired from this computer (removing one is up to an admin in the portal).</summary>
+    public ObservableCollection<PairedPhone> PairedPhones { get; } = [];
+
+    [ObservableProperty]
+    public partial string? PairingLimitsText { get; set; }
+
+    private async Task LoadPairedPhonesAsync()
+    {
+        try
+        {
+            var paired = await cloud.GetPairedDevicesAsync();
+            PairedPhones.Clear();
+            foreach (var phone in paired.Devices)
+            {
+                PairedPhones.Add(new PairedPhone(
+                    phone.Name,
+                    string.Join(" · ", new[]
+                    {
+                        string.Join(' ', new[] { phone.OsName, phone.OsVersion }.Where(p => !string.IsNullOrWhiteSpace(p))),
+                        phone.ConnectedAt is { } at ? F("verbunden am {0}", at.LocalDateTime.ToString("d", System.Globalization.CultureInfo.CurrentCulture)) : null,
+                        phone.Approved
+                            ? (phone.Missing.Certificates.Count + phone.Missing.Accounts.Count > 0 ? T("wird beim nächsten Abgleich ergänzt") : T("eingerichtet"))
+                            : T("wartet auf diesen Computer"),
+                    }.Where(p => !string.IsNullOrWhiteSpace(p)))));
+            }
+
+            PairingLimitsText = paired.Limits is not { } limits ? null
+                : limits.MobileDevicesAllowed == 0
+                    ? T("Für Sie sind keine mobilen Geräte freigegeben. Ein Admin kann sie im Portal unter Benutzer erlauben.")
+                    : F("Mobile Geräte: {0} von {1} erlaubten verbunden.", limits.MobileDevicesAllowed - limits.MobileDevicesLeft, limits.MobileDevicesAllowed)
+                      + (limits.DeviceLimit is { } max ? " " + F("Geräte insgesamt: {0} von {1}.", limits.DevicesInUse, max) : string.Empty);
+        }
+        catch (Exception ex) when (ex is CloudException or HttpRequestException)
+        {
+            PairingLimitsText = null; // older server or offline: the list just stays empty
+        }
+    }
 
     /// <summary>Accounts of the organisation were set up, changed or removed (the shell reloads and syncs).</summary>
     public event EventHandler? AccountsArrived;
@@ -570,6 +609,7 @@ internal sealed partial class CloudViewModel(
     private async Task LoadProfileAsync()
     {
         Profile = await cloud.GetProfileAsync();
+        await LoadPairedPhonesAsync();
         await signatures.SyncAsync();
         await textTemplates.SyncAsync();
         try
@@ -634,3 +674,6 @@ internal sealed record RestoreGroup(BackupChangeKind Kind, IReadOnlyList<string>
 
     public bool IsRemoval => Kind == BackupChangeKind.Removed;
 }
+
+/// <summary>A phone in the list under "Handy verbinden".</summary>
+internal sealed record PairedPhone(string Name, string Details);

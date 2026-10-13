@@ -86,6 +86,18 @@
         <TextBlock Text="{l:T 'Handy verbinden'}" FontSize="18" FontWeight="SemiBold" />
         <TextBlock Classes="subtle" TextWrapping="Wrap"
                    Text="{l:T 'In der Neruna-App auf dem Handy «Mit Neruna Cloud verbinden» wählen, den QR-Code scannen und die PIN eingeben. Das Handy erhält danach die Zertifikate und Konten der Organisation von diesem Computer – verschlüsselt, die Cloud kann sie nicht lesen. Wie viele Handys erlaubt sind, legt ein Admin im Portal fest.'}" />
+        <ItemsControl ItemsSource="{Binding PairedPhones}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PairedPhone">
+              <StackPanel Margin="0,0,0,6">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Details}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{Binding PairingLimitsText}" TextWrapping="Wrap" FontSize="12"
+                   IsVisible="{Binding PairingLimitsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <Button Content="{l:T 'Handy verbinden'}" Command="{Binding StartPairingCommand}" IsVisible="{Binding !IsPairing}" HorizontalAlignment="Left" />
         <Border IsVisible="{Binding IsPairing}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14">
           <Grid ColumnDefinitions="Auto,*">

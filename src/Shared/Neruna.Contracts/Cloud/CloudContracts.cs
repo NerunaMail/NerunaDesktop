@@ -211,8 +211,11 @@ public sealed record PairedDevice(
 
 public sealed record PairedDeviceMissing(IReadOnlyList<string> Certificates, IReadOnlyList<string> Accounts);
 
-/// <summary>Response of <c>GET /api/v1/device/paired</c>.</summary>
-public sealed record PairedDevicesResponse(IReadOnlyList<PairedDevice> Devices);
+/// <summary>Response of <c>GET /api/v1/device/paired</c>: the person's limits and the phones of this desktop.</summary>
+public sealed record PairedDevicesResponse(IReadOnlyList<PairedDevice> Devices, PairingLimits? Limits = null);
+
+/// <param name="DeviceLimit">The licence's devices per person (all kinds); null = no limit.</param>
+public sealed record PairingLimits(int MobileDevicesAllowed, int MobileDevicesLeft, int? DeviceLimit, int DevicesInUse);
 
 /// <summary>Body of <c>PUT /api/v1/device/paired/{id}/envelopes</c>: keys the desktop wrapped for its phone.</summary>
 public sealed record PairedEnvelopesRequest(IReadOnlyList<PairedEnvelope> Certificates, IReadOnlyList<PairedEnvelope> Accounts);
