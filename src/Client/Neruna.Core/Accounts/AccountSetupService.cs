@@ -259,6 +259,16 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
     /// <summary>One line about a connection's server (host, port, user; URL), as the provider describes it.</summary>
     public string Summary(ServiceConnection connection) => providers.Summary(connection);
 
+    /// <summary>
+    /// The services this installation can set up (e.g. "calendar:caldav"). Changes when an update brings a new one –
+    /// accounts described by others (the organisation) are then built again to get it.
+    /// </summary>
+    public string Capabilities => string.Join(",",
+        providers.MailProviders.Select(p => "mail:" + p.ProviderId)
+            .Concat(providers.CalendarProviders.Select(p => "calendar:" + p.ProviderId))
+            .Concat(providers.ContactProviders.Select(p => "contacts:" + p.ProviderId))
+            .Order(StringComparer.Ordinal));
+
     private async Task TestAsync(ServiceConnection connection, CancellationToken cancellationToken)
     {
         switch (connection.Kind)

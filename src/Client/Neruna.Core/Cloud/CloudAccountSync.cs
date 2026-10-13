@@ -77,7 +77,9 @@ public sealed class CloudAccountSync(
         var waiting = 0;
         foreach (var offered in response.Accounts)
         {
-            var fingerprint = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(offered.Payload)));
+            // With what this installation can set up: an update that brings calendars (the Android app) builds the
+            // accounts again, so their CalDAV/CardDAV servers are taken too.
+            var fingerprint = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(offered.Payload + "\n" + setup.Capabilities)));
             if (local.ContainsKey(offered.Id) && state.GetValueOrDefault(offered.Id) == fingerprint)
             {
                 received++;
