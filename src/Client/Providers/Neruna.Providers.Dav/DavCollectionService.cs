@@ -100,6 +100,8 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
     public async Task<IReadOnlyList<DavCollection>> DiscoverAsync(CancellationToken cancellationToken)
     {
         Home = null;
+        var answers = new List<string>();
+        var blocked = false;
         foreach (var candidate in Candidates())
         {
             Multistatus self;
@@ -110,12 +112,17 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
             catch (DavException ex)
             {
                 logger.LogDebug("DAV discovery: {Url} not usable ({Status})", candidate, (int)ex.Status);
+                answers.Add($"{candidate.AbsoluteUri} → {(int)ex.Status} {ex.Status}");
+
+                // Firewalls and proxies with web filtering often answer WebDAV requests with 403/405/501 or a web page.
+                blocked |= ex.Status is HttpStatusCode.OK or HttpStatusCode.Forbidden or HttpStatusCode.MethodNotAllowed or HttpStatusCode.NotImplemented;
                 continue;
             }
 
             var resource = self.Resources.FirstOrDefault();
             if (resource is null)
             {
+                answers.Add($"{candidate.AbsoluteUri} → 207 ({T("leer")})");
                 continue;
             }
 
@@ -155,9 +162,18 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
             {
                 return collections;
             }
+
+            answers.Add($"{candidate.AbsoluteUri} → 207 ({T("leer")})");
         }
 
-        throw new DavException(HttpStatusCode.NotFound, F("Unter {0} wurde kein {1}-Dienst gefunden.", startUrl, flavor.WellKnown.ToUpperInvariant()));
+        var message = F("Unter {0} wurde kein {1}-Dienst gefunden.", startUrl, flavor.WellKnown.ToUpperInvariant())
+            + " " + F("Antworten des Servers: {0}", string.Join("; ", answers));
+        if (blocked)
+        {
+            message += " " + T("Falls das Netzwerk eine Firewall oder einen Proxy mit Webfilter hat: WebDAV-Anfragen (PROPFIND) müssen dort erlaubt sein.");
+        }
+
+        throw new DavException(HttpStatusCode.NotFound, message);
     }
 
     public async Task<DavSyncResult> SyncAsync(Uri collection, string? state, IReadOnlyDictionary<string, string?> known, CancellationToken cancellationToken)
