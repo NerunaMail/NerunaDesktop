@@ -110,6 +110,7 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Cloud.CloudTextTemplateSync>();
         services.AddSingleton<Neruna.Core.Cloud.CloudCertificateSync>();
         services.AddSingleton<Neruna.Core.Cloud.CloudPairingService>();
+        services.AddSingleton<Neruna.Core.Cloud.AccountTransferService>();
         services.AddSingleton<Neruna.Core.Cloud.SettingsBackupService>();
         services.AddSingleton<Neruna.Core.Cloud.CloudAccountSync>();
         services.AddSingleton<Neruna.Core.Chat.ChatController>();

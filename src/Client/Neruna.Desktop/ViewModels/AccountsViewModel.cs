@@ -11,8 +11,69 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Account list, removal and diagnostics (where data and logs live).</summary>
-internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountSetupService setup, ICredentialStore credentials, IFileService files, AppOptions options) : ViewModelBase
+internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountSetupService setup, ICredentialStore credentials, IFileService files, AppOptions options,
+    Neruna.Core.Cloud.AccountTransferService transfer) : ViewModelBase
 {
+    // ── Konto aufs Handy übertragen: QR code + PIN for the Neruna app, after the computer login ──
+
+    public Infrastructure.LoginGate Login { get; } = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTransferring))]
+    public partial IReadOnlyList<Neruna.Core.Accounts.Account>? TransferAccounts { get; set; }
+
+    public bool IsTransferring => TransferAccounts is not null;
+
+    [ObservableProperty]
+    public partial Neruna.Core.Accounts.Account? TransferAccount { get; set; }
+
+    [ObservableProperty]
+    public partial Avalonia.Media.Imaging.Bitmap? TransferQrCode { get; set; }
+
+    [ObservableProperty]
+    public partial string? TransferPin { get; set; }
+
+    [RelayCommand]
+    private async Task StartTransferAsync()
+    {
+        var list = await transfer.GetTransferableAsync();
+        if (list.Count == 0 || !await Login.VerifyAsync(T("Zum Übertragen eines Kontos aufs Handy bitte mit dem Login dieses Computers bestätigen.")))
+        {
+            return;
+        }
+
+        TransferAccount = null;
+        TransferAccounts = list;
+        TransferAccount = list[0];
+    }
+
+    partial void OnTransferAccountChanged(Neruna.Core.Accounts.Account? value) => _ = ShowTransferCodeAsync(value);
+
+    private async Task ShowTransferCodeAsync(Neruna.Core.Accounts.Account? account)
+    {
+        TransferQrCode = null;
+        TransferPin = null;
+        if (account is null)
+        {
+            return;
+        }
+
+        var code = await transfer.CreateCodeAsync(account);
+        var png = new QRCoder.PngByteQRCode(new QRCoder.QRCodeGenerator().CreateQrCode(code.Code, QRCoder.QRCodeGenerator.ECCLevel.M)).GetGraphic(6);
+        using var stream = new MemoryStream(png);
+        TransferQrCode = new Avalonia.Media.Imaging.Bitmap(stream);
+        TransferPin = code.Pin;
+    }
+
+    [RelayCommand]
+    private void CloseTransfer()
+    {
+        TransferAccounts = null;
+        TransferAccount = null;
+        TransferQrCode = null;
+        TransferPin = null;
+    }
+
     public event EventHandler? AddAccountRequested;
 
     public event EventHandler? SubscribeRequested;
@@ -63,7 +124,12 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         UpdatePositions();
 
         OnPropertyChanged(nameof(HasAccounts));
+        CanTransfer = (await transfer.GetTransferableAsync()).Count > 0;
     }
+
+    /// <summary>There are own IMAP accounts the app can take over.</summary>
+    [ObservableProperty]
+    public partial bool CanTransfer { get; set; }
 
     [RelayCommand]
     private void AddAccount() => AddAccountRequested?.Invoke(this, EventArgs.Empty);

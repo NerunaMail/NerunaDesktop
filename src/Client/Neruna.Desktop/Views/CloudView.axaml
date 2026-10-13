@@ -2,6 +2,7 @@
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:views="using:Neruna.Desktop.Views"
              x:Class="Neruna.Desktop.Views.CloudView"
              x:DataType="vm:CloudViewModel">
   <ScrollViewer>
@@ -102,24 +103,11 @@
           <Button.IsVisible>
             <MultiBinding Converter="{x:Static BoolConverters.And}">
               <Binding Path="!IsPairing" />
-              <Binding Path="!AskLogin" />
+              <Binding Path="!Login.IsAsking" />
             </MultiBinding>
           </Button.IsVisible>
         </Button>
-        <!-- Linux/macOS: the computer login first (Windows shows its own security dialog) -->
-        <StackPanel Spacing="8" IsVisible="{Binding AskLogin}" MaxWidth="420" HorizontalAlignment="Left">
-          <TextBlock Text="{l:T 'Zum Verbinden eines Handys bitte mit dem Login dieses Computers bestätigen.'}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding LoginLabel}" Classes="subtle" FontSize="12" />
-          <TextBox x:Name="LoginPasswordBox" Text="{Binding LoginPassword}" PasswordChar="•">
-            <TextBox.KeyBindings>
-              <KeyBinding Gesture="Enter" Command="{Binding ConfirmLoginCommand}" />
-            </TextBox.KeyBindings>
-          </TextBox>
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="accent" Content="{l:T 'Bestätigen'}" Command="{Binding ConfirmLoginCommand}" />
-            <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelLoginCommand}" />
-          </StackPanel>
-        </StackPanel>
+        <views:LoginGateView DataContext="{Binding Login}" />
         <Border IsVisible="{Binding IsPairing}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14">
           <Grid ColumnDefinitions="Auto,*">
             <Border Background="White" Padding="8" CornerRadius="4" VerticalAlignment="Top">

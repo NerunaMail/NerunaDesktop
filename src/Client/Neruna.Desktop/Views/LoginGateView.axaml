@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:i="using:Neruna.Desktop.Infrastructure"
+             x:Class="Neruna.Desktop.Views.LoginGateView"
+             x:DataType="i:LoginGate">
+  <!-- Linux/macOS: the computer login before something sensitive (Windows shows its own security dialog) -->
+  <StackPanel Spacing="8" MaxWidth="420" HorizontalAlignment="Left">
+    <StackPanel Spacing="8" IsVisible="{Binding IsAsking}">
+      <TextBlock Text="{Binding Prompt}" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" />
+      <TextBox Text="{Binding Password}" PasswordChar="•">
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Enter" Command="{Binding ConfirmCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Classes="accent" Content="{l:T 'Bestätigen'}" Command="{Binding ConfirmCommand}" />
+        <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
+      </StackPanel>
+    </StackPanel>
+    <TextBlock Text="{Binding Error}" Classes="error" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  </StackPanel>
+</UserControl>

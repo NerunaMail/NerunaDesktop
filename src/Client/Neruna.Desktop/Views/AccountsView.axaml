@@ -2,6 +2,8 @@
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:views="using:Neruna.Desktop.Views"
+             xmlns:acc="using:Neruna.Core.Accounts"
              x:Class="Neruna.Desktop.Views.AccountsView"
              x:DataType="vm:AccountsViewModel">
 
@@ -68,6 +70,42 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        <!-- Konto aufs Handy: QR code + PIN for the Neruna app (without Neruna Cloud; with it the backup brings the accounts) -->
+        <StackPanel Spacing="10" Margin="0,18,0,0" IsVisible="{Binding CanTransfer}">
+          <TextBlock Text="{l:T 'Konto aufs Handy übertragen'}" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap"
+                     Text="{l:T 'Ein eigenes Konto samt Passwort per QR-Code in die Neruna-App übernehmen, ohne es dort neu einzutippen. Der QR-Code ist mit der PIN daneben verschlüsselt.'}" />
+          <Button Content="{l:T 'Konto aufs Handy übertragen'}" Command="{Binding StartTransferCommand}" HorizontalAlignment="Left">
+            <Button.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="!IsTransferring" />
+                <Binding Path="!Login.IsAsking" />
+              </MultiBinding>
+            </Button.IsVisible>
+          </Button>
+          <views:LoginGateView DataContext="{Binding Login}" />
+          <Border IsVisible="{Binding IsTransferring}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14" HorizontalAlignment="Left">
+            <Grid ColumnDefinitions="Auto,*">
+              <Border Background="White" Padding="8" CornerRadius="4" VerticalAlignment="Top">
+                <Image Source="{Binding TransferQrCode}" Width="240" Height="240" RenderOptions.BitmapInterpolationMode="None" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="8" MaxWidth="320">
+                <ComboBox ItemsSource="{Binding TransferAccounts}" SelectedItem="{Binding TransferAccount}" MinWidth="240">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="acc:Account">
+                      <TextBlock Text="{Binding Title}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{l:T 'PIN'}" Classes="subtle" />
+                <SelectableTextBlock Text="{Binding TransferPin}" FontSize="32" FontWeight="SemiBold" FontFamily="Consolas, Cascadia Mono, monospace" />
+                <TextBlock TextWrapping="Wrap" FontSize="12"
+                           Text="{l:T 'In der Neruna-App: Einstellungen → Konten → «Konto vom Computer übernehmen», QR-Code scannen und die PIN eingeben. Die PIN nicht zusammen mit dem QR-Code fotografieren oder weitergeben.'}" />
+                <Button Content="{l:T 'Fertig'}" Command="{Binding CloseTransferCommand}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </StackPanel>
 
         <TextBlock Text="{l:T 'Diagnose'}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
         <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
