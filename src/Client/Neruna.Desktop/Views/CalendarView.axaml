@@ -60,8 +60,9 @@
 
       <!-- Date navigator + calendar list -->
       <Border Classes="pane" Padding="12,10">
-        <StackPanel Spacing="6">
-          <ItemsControl ItemsSource="{Binding MiniMonths}">
+        <!-- Months stay; the calendar list scrolls when it is longer than the window -->
+        <DockPanel>
+          <ItemsControl DockPanel.Dock="Top" Margin="0,0,0,6" ItemsSource="{Binding MiniMonths}">
             <ItemsControl.Styles>
               <Style Selector="Button.day">
                 <Setter Property="Width" Value="26" />
@@ -173,11 +174,12 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="0,0,0,6" />
-          <TextBlock Text="{l:T 'Meine Kalender'}" FontWeight="SemiBold" Margin="0,0,0,4" />
-          <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasCalendars}"
+          <Border DockPanel.Dock="Top" Height="1" Background="{DynamicResource DividerBrush}" Margin="0,0,0,6" />
+          <TextBlock DockPanel.Dock="Top" Text="{l:T 'Meine Kalender'}" FontWeight="SemiBold" Margin="0,0,0,4" />
+          <TextBlock DockPanel.Dock="Top" Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasCalendars}"
                      Text="{l:T 'Noch keine Kalender. Konto mit CalDAV hinzufügen oder einen Internet-Kalender abonnieren.'}" />
           <!-- Grouped by account: a small title per group, arrows (on hover) to move the group -->
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding CalendarGroups}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CalendarGroup">
@@ -225,7 +227,8 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-        </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
       </Border>
 
       <!-- Week -->
