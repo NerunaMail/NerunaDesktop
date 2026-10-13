@@ -566,6 +566,7 @@
  "Kein E-Mail-Konto vorhanden.": "Nessun account e-mail.",
  "Kein KI-Anbieter verbunden – unter Einstellungen → KI verbinden.": "Nessun fornitore di IA collegato – collegane uno in Impostazioni → IA.",
  "Kein Kalender passt zur Suche.": "Nessun calendario corrisponde alla ricerca.",
+ "Kein Posteingang gefunden.": "Nessuna posta in arrivo trovata.",
  "Kein Signaturzertifikat gefunden.": "Nessun certificato di firma trovato.",
  "Kein Verschlüsselungszertifikat gefunden.": "Nessun certificato di cifratura trovato.",
  "Kein beschreibbarer Kalender vorhanden, in den der Termin eingetragen werden kann.": "Nessun calendario scrivibile in cui inserire l'appuntamento.",
@@ -624,6 +625,7 @@
  "Land": "Paese",
  "Leeren": "Svuota",
  "Leeren …": "Svuota …",
+ "Leistungstest": "Test di prestazioni",
  "Lesebereich": "Riquadro di lettura",
  "Letzte Protokollzeilen:": "Ultime righe del log:",
  "Letzte Woche": "Settimana scorsa",
@@ -917,6 +919,8 @@
  "Standardfarbe": "Colore predefinito",
  "Standardschrift für neue Nachrichten": "Carattere predefinito per i nuovi messaggi",
  "Standardsignatur pro Konto": "Firma predefinita per account",
+ "Start bis Mailliste: {0} s": "Avvio fino all'elenco: {0} s",
+ "Start fehlgeschlagen: {0}": "Avvio non riuscito: {0}",
  "Steht in Ihrem Kalender – noch nicht beantwortet.": "Nel tuo calendario – non ancora risposto.",
  "Steiermark": "Stiria",
  "Stephanstag": "Santo Stefano",
@@ -1170,6 +1174,7 @@
  "{0} ({1} Jahre)": "{0} ({1} anni)",
  "{0} Berichte": "{0} rapporti",
  "{0} Einstellungen": "{0} impostazioni",
+ "{0} Einträge erzeugt in {1} ms": "{0} voci create in {1} ms",
  "{0} Entwürfe haben ungespeicherte Änderungen: {1}. Vor dem Beenden speichern?": "{0} bozze hanno modifiche non salvate: {1}. Salvare prima di uscire?",
  "{0} Erinnerungen": "{0} promemoria",
  "{0} Minuten vorher": "{0} minuti prima",
@@ -1231,5 +1236,6 @@
  "Übernehmen fehlgeschlagen: ": "Applicazione non riuscita: ",
  "Überschneidet sich mit: ": "Si sovrappone a: ",
  "– nie in der Neruna-Datenbank und nie in den Protokolldateien.": "– mai nel database di Neruna e mai nei file di log.",
- "← Zur Nachricht": "← Torna al messaggio"
+ "← Zur Nachricht": "← Torna al messaggio",
+ "← Zurück": "← Indietro"
 }

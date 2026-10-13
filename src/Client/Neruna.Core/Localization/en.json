@@ -566,6 +566,7 @@
  "Kein E-Mail-Konto vorhanden.": "No email account.",
  "Kein KI-Anbieter verbunden – unter Einstellungen → KI verbinden.": "No AI provider connected – connect one under Settings → AI.",
  "Kein Kalender passt zur Suche.": "No calendar matches the search.",
+ "Kein Posteingang gefunden.": "No inbox found.",
  "Kein Signaturzertifikat gefunden.": "No signing certificate found.",
  "Kein Verschlüsselungszertifikat gefunden.": "No encryption certificate found.",
  "Kein beschreibbarer Kalender vorhanden, in den der Termin eingetragen werden kann.": "No writable calendar to put the event in.",
@@ -624,6 +625,7 @@
  "Land": "Country",
  "Leeren": "Empty",
  "Leeren …": "Empty …",
+ "Leistungstest": "Performance test",
  "Lesebereich": "Reading pane",
  "Letzte Protokollzeilen:": "Last log lines:",
  "Letzte Woche": "Last week",
@@ -917,6 +919,8 @@
  "Standardfarbe": "Default colour",
  "Standardschrift für neue Nachrichten": "Default font for new messages",
  "Standardsignatur pro Konto": "Default signature per account",
+ "Start bis Mailliste: {0} s": "Start to message list: {0} s",
+ "Start fehlgeschlagen: {0}": "Start failed: {0}",
  "Steht in Ihrem Kalender – noch nicht beantwortet.": "In your calendar – not answered yet.",
  "Steiermark": "Styria",
  "Stephanstag": "St Stephen's Day",
@@ -1170,6 +1174,7 @@
  "{0} ({1} Jahre)": "{0} ({1} years)",
  "{0} Berichte": "{0} reports",
  "{0} Einstellungen": "{0} settings",
+ "{0} Einträge erzeugt in {1} ms": "{0} entries created in {1} ms",
  "{0} Entwürfe haben ungespeicherte Änderungen: {1}. Vor dem Beenden speichern?": "{0} drafts have unsaved changes: {1}. Save before quitting?",
  "{0} Erinnerungen": "{0} reminders",
  "{0} Minuten vorher": "{0} minutes before",
@@ -1231,5 +1236,6 @@
  "Übernehmen fehlgeschlagen: ": "Applying failed: ",
  "Überschneidet sich mit: ": "Overlaps with: ",
  "– nie in der Neruna-Datenbank und nie in den Protokolldateien.": "– never in the Neruna database and never in the log files.",
- "← Zur Nachricht": "← Back to message"
+ "← Zur Nachricht": "← Back to message",
+ "← Zurück": "← Back"
 }

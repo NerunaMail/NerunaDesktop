@@ -566,6 +566,7 @@
  "Kein E-Mail-Konto vorhanden.": "Aucun compte e-mail.",
  "Kein KI-Anbieter verbunden – unter Einstellungen → KI verbinden.": "Aucun fournisseur d'IA connecté – connectez-en un sous Paramètres → IA.",
  "Kein Kalender passt zur Suche.": "Aucun agenda ne correspond à la recherche.",
+ "Kein Posteingang gefunden.": "Aucune boîte de réception trouvée.",
  "Kein Signaturzertifikat gefunden.": "Aucun certificat de signature trouvé.",
  "Kein Verschlüsselungszertifikat gefunden.": "Aucun certificat de chiffrement trouvé.",
  "Kein beschreibbarer Kalender vorhanden, in den der Termin eingetragen werden kann.": "Aucun agenda modifiable où inscrire le rendez-vous.",
@@ -624,6 +625,7 @@
  "Land": "Pays",
  "Leeren": "Vider",
  "Leeren …": "Vider …",
+ "Leistungstest": "Test de performance",
  "Lesebereich": "Volet de lecture",
  "Letzte Protokollzeilen:": "Dernières lignes du journal :",
  "Letzte Woche": "La semaine dernière",
@@ -917,6 +919,8 @@
  "Standardfarbe": "Couleur par défaut",
  "Standardschrift für neue Nachrichten": "Police par défaut des nouveaux messages",
  "Standardsignatur pro Konto": "Signature par défaut par compte",
+ "Start bis Mailliste: {0} s": "Démarrage jusqu'à la liste : {0} s",
+ "Start fehlgeschlagen: {0}": "Échec du démarrage : {0}",
  "Steht in Ihrem Kalender – noch nicht beantwortet.": "Dans votre agenda – pas encore répondu.",
  "Steiermark": "Styrie",
  "Stephanstag": "Saint-Étienne",
@@ -1170,6 +1174,7 @@
  "{0} ({1} Jahre)": "{0} ({1} ans)",
  "{0} Berichte": "{0} rapports",
  "{0} Einstellungen": "{0} paramètres",
+ "{0} Einträge erzeugt in {1} ms": "{0} entrées créées en {1} ms",
  "{0} Entwürfe haben ungespeicherte Änderungen: {1}. Vor dem Beenden speichern?": "{0} brouillons ont des modifications non enregistrées : {1}. Enregistrer avant de quitter ?",
  "{0} Erinnerungen": "{0} rappels",
  "{0} Minuten vorher": "{0} minutes avant",
@@ -1231,5 +1236,6 @@
  "Übernehmen fehlgeschlagen: ": "L'application a échoué : ",
  "Überschneidet sich mit: ": "Chevauche : ",
  "– nie in der Neruna-Datenbank und nie in den Protokolldateien.": "– jamais dans la base de données Neruna ni dans les fichiers journaux.",
- "← Zur Nachricht": "← Retour au message"
+ "← Zur Nachricht": "← Retour au message",
+ "← Zurück": "← Retour"
 }
