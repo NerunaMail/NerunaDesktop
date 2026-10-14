@@ -456,6 +456,16 @@ internal static class Snapshots
         await SaveAsync(window, output, "sync-status.png");
         vm.Overlay = null;
 
+        // "Einstellungen geändert" → what changed since the last backup.
+        vm.Overlay = new BackupChangesViewModel(
+        [
+            new Neruna.Core.Cloud.BackupChange("Einstellungen", "calendar.visibleTo", Neruna.Core.Cloud.BackupChangeKind.Changed),
+            new Neruna.Core.Cloud.BackupChange("Signaturen", "Privat", Neruna.Core.Cloud.BackupChangeKind.Added),
+            new Neruna.Core.Cloud.BackupChange("Konten", "anna.muster@example.com", Neruna.Core.Cloud.BackupChangeKind.Changed),
+        ], vm.BackupNowCommand, vm.BackupLaterCommand);
+        await SaveAsync(window, output, "backup-changes.png");
+        vm.Overlay = null;
+
         // The reminder window with the next events of the demo week.
         var upcoming = (await calendarController.GetOccurrencesAsync(await calendarController.GetCalendarsAsync(), DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now.AddDays(4)))
             .Where(o => !o.IsAllDay).Take(3).ToList();

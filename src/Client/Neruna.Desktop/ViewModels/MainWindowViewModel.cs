@@ -1084,6 +1084,25 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Click on the hint: what changed since the last backup.</summary>
+    [RelayCommand]
+    private async Task ShowBackupChangesAsync()
+    {
+        IReadOnlyList<Neruna.Core.Cloud.BackupChange>? changes = null;
+        try
+        {
+            changes = await _backup.GetChangesSinceBackupAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not list the changes since the last backup");
+        }
+
+        var dialog = new BackupChangesViewModel(changes, BackupNowCommand, BackupLaterCommand);
+        dialog.Finished += (_, _) => Overlay = null;
+        Overlay = dialog;
+    }
+
     [RelayCommand]
     private void BackupNow()
     {

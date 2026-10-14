@@ -182,7 +182,10 @@
         </StackPanel>
         <!-- Personal settings changed since the last backup -->
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,16,0" IsVisible="{Binding ShowBackupHint}">
-          <TextBlock FontSize="12" Text="{l:T 'Einstellungen geändert – neue Sicherung erstellen?'}" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" />
+          <!-- A link: what changed since the last backup -->
+          <Button Classes="command" Command="{Binding ShowBackupChangesCommand}" Padding="2,1" ToolTip.Tip="{l:T 'Anzeigen, was sich seit der letzten Sicherung geändert hat'}">
+            <TextBlock FontSize="12" Text="{l:T 'Einstellungen geändert – neue Sicherung erstellen?'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+          </Button>
           <Button Classes="command" Command="{Binding BackupNowCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="{l:T 'Einstellungen → Cloud → Sicherung'}">
             <TextBlock Text="{l:T 'Sichern'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
           </Button>

@@ -23,6 +23,7 @@ internal sealed class ViewLocator : IDataTemplate
         CrashReportViewModel => new CrashReportView(),
         FolderSubscriptionsViewModel => new FolderSubscriptionsView(),
         SyncStatusViewModel => new SyncStatusView(),
+        BackupChangesViewModel => new BackupChangesView(),
         AutoReplyViewModel => new AutoReplyView(),
         CalendarSelectionViewModel => new CalendarSelectionView(),
         ReadingPaneViewModel => new ReadingPaneView(),

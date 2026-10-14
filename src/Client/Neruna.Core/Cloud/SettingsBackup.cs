@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Neruna.Contracts;
 using Neruna.Contracts.Cloud;
 using Neruna.Core.Accounts;
+using Neruna.Core.Providers;
 using Neruna.Core.Mail;
 using Neruna.Core.Security;
 using Neruna.Vault;
@@ -99,6 +100,9 @@ public sealed class SettingsBackupService(
     /// <summary>Fingerprint for which the user chose "Später" – asked again after the next change.</summary>
     private const string DismissedKey = "vault.dismissed";
 
+    // Per item a fingerprint (HMAC with the vault key) as of the last backup: what changed since, shown by name.
+    private const string SavedItemsKey = "vault.savedItems";
+
     // Belongs to this device, or is only how it was left on screen.
     // The document is compressed before it is encrypted (signatures with pictures, certificates: JSON with base64
     // shrinks a lot – hostings often take only a few MB). Backups made before are plain JSON ("{"): read as they are.
@@ -192,7 +196,7 @@ public sealed class SettingsBackupService(
         var envelope = vault.Seal(document);
         var text = string.IsNullOrWhiteSpace(note) ? null : vault.EncryptText(note.Trim());
         var created = await cloud.CreateVaultBackupAsync(new VaultBackupRequest(vault.VaultId, envelope.Version, envelope.Nonce, envelope.Ciphertext, text), cancellationToken);
-        await settings.SetAsync(SavedKey, Fingerprint(vault, content), cancellationToken);
+        await RememberAsync(vault, content, cancellationToken);
         logger.LogInformation("Settings backup {Id} created ({Size} bytes)", created.Id, created.Size);
         return new BackupEntry(created.Id, created.CreatedAt, created.DeviceName, note?.Trim(), created.Size);
     }
@@ -305,7 +309,7 @@ public sealed class SettingsBackupService(
         using var vault = info is null ? null : await LocalVaultAsync(info, cancellationToken);
         if (vault is not null)
         {
-            await settings.SetAsync(SavedKey, Fingerprint(vault, await CollectAsync(cancellationToken)), cancellationToken);
+            await RememberAsync(vault, await CollectAsync(cancellationToken), cancellationToken);
         }
 
         logger.LogInformation("Settings backup {Id} restored ({Changes} changes)", plan.Backup.Id, plan.Changes.Count);
@@ -325,6 +329,7 @@ public sealed class SettingsBackupService(
     {
         await credentials.DeleteSecretAsync(VaultKeyId, cancellationToken);
         await settings.SetAsync(SavedKey, null, cancellationToken);
+        await settings.SetAsync(SavedItemsKey, null, cancellationToken);
         await settings.SetAsync(DismissedKey, null, cancellationToken);
     }
 
@@ -342,6 +347,84 @@ public sealed class SettingsBackupService(
 
         var current = Fingerprint(vault, await CollectAsync(cancellationToken));
         return current != await settings.GetAsync(SavedKey, cancellationToken) && current != await settings.GetAsync(DismissedKey, cancellationToken);
+    }
+
+    /// <summary>
+    /// What changed since the last backup, item by item (an account, a setting by its name, a signature …) – to judge
+    /// whether a new backup is worth it. Null when the last backup was made before Neruna kept this list.
+    /// </summary>
+    public async Task<IReadOnlyList<BackupChange>?> GetChangesSinceBackupAsync(CancellationToken cancellationToken = default)
+    {
+        using var vault = await StoredVaultAsync(cancellationToken);
+        if (vault is null || await settings.GetAsync(SavedItemsKey, cancellationToken) is not { } json
+            || JsonSerializer.Deserialize<Dictionary<string, string[]>>(json) is not { } saved)
+        {
+            return null;
+        }
+
+        var current = ItemPrints(vault, await CollectAsync(cancellationToken));
+        var changes = new List<BackupChange>();
+        foreach (var (key, item) in current)
+        {
+            if (!saved.TryGetValue(key, out var before))
+            {
+                changes.Add(new BackupChange(item[0], item[1], BackupChangeKind.Added));
+            }
+            else if (before[2] != item[2])
+            {
+                changes.Add(new BackupChange(item[0], item[1], BackupChangeKind.Changed));
+            }
+        }
+
+        changes.AddRange(saved.Where(s => !current.ContainsKey(s.Key)).Select(s => new BackupChange(s.Value[0], s.Value[1], BackupChangeKind.Removed)));
+        return changes;
+    }
+
+    private async Task RememberAsync(UnlockedVault vault, BackupContent content, CancellationToken cancellationToken)
+    {
+        await settings.SetAsync(SavedKey, Fingerprint(vault, content), cancellationToken);
+        await settings.SetAsync(SavedItemsKey, JsonSerializer.Serialize(ItemPrints(vault, content)), cancellationToken);
+    }
+
+    // Item key → [area, name, fingerprint]. Names are no secrets (titles, setting names); the values only as HMAC.
+    private static Dictionary<string, string[]> ItemPrints(UnlockedVault vault, BackupContent content)
+    {
+        content = Comparable(content);
+        var result = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        void Add(string key, string area, string name, object value) =>
+            result[key] = [area, name, vault.Fingerprint(JsonSerializer.SerializeToUtf8Bytes(value, NerunaJson.Options))];
+
+        foreach (var account in content.Accounts)
+        {
+            Add("account:" + account.Id, T("Konten"), account.Title, account);
+        }
+
+        foreach (var (key, value) in content.Settings)
+        {
+            Add("setting:" + key, T("Einstellungen"), key, value);
+        }
+
+        foreach (var signature in content.Signatures)
+        {
+            Add("signature:" + signature.Id, T("Signaturen"), signature.Name, signature);
+        }
+
+        foreach (var template in content.TextTemplates)
+        {
+            Add("template:" + template.Id, T("Textvorlagen"), template.Name, template);
+        }
+
+        foreach (var certificate in content.Certificates)
+        {
+            Add("certificate:" + certificate.Thumbprint, T("Zertifikate"), CertificateName(certificate), certificate);
+        }
+
+        foreach (var (id, password) in content.CloudPasswords ?? new Dictionary<string, string>())
+        {
+            Add("cloudpassword:" + id, T("Konten"), T("Passwort eines Kontos der Organisation"), password);
+        }
+
+        return result;
     }
 
     /// <summary>"Später": not again until something changes.</summary>
@@ -472,7 +555,20 @@ public sealed class SettingsBackupService(
     }
 
     private static string Fingerprint(UnlockedVault vault, BackupContent content) =>
-        vault.Fingerprint(JsonSerializer.SerializeToUtf8Bytes(content, NerunaJson.Options));
+        vault.Fingerprint(JsonSerializer.SerializeToUtf8Bytes(Comparable(content), NerunaJson.Options));
+
+    /// <summary>
+    /// The content as compared for "Einstellungen geändert": without what changes by itself – certificates collected
+    /// from signed mail, and the sign-in tokens of Microsoft accounts (renewed every hour). Both stay in the backup.
+    /// </summary>
+    private static BackupContent Comparable(BackupContent content) => content with
+    {
+        Accounts = [.. content.Accounts.Select(a => a with
+        {
+            Connections = [.. a.Connections.Select(c => c.ProviderId.StartsWith(ProviderIds.Graph, StringComparison.Ordinal) ? c with { Secret = null } : c)],
+        })],
+        Certificates = [.. content.Certificates.Where(c => c.Source != CertificateSource.CollectedFromMail)],
+    };
 
     private static List<WrappedKey> Keys(CloudVault info) =>
         info.Keys.Deserialize<List<WrappedKey>>(NerunaJson.Options) ?? [];
