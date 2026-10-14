@@ -38,4 +38,11 @@ public static class CollectionColors
 
         return result;
     }
+
+    /// <summary>The calendars with the colour they are shown in (chosen, the server's or a palette colour) in <see cref="CalendarInfo.Color"/>.</summary>
+    public static async Task<IReadOnlyList<CalendarInfo>> WithColorsAsync(ISettingsStore settings, IReadOnlyList<CalendarInfo> calendars, CancellationToken cancellationToken = default)
+    {
+        var colors = await ResolveAsync(settings, calendars, cancellationToken);
+        return [.. calendars.Select(c => c with { Color = colors[(c.ConnectionId, c.RemoteId)] })];
+    }
 }
