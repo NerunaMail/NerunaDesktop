@@ -146,6 +146,8 @@ internal static class AppServices
         services.AddSingleton<AppearanceViewModel>();
         services.AddSingleton<CloudViewModel>();
         services.AddSingleton<TextTemplatesViewModel>();
+        services.AddSingleton<Neruna.Core.Mail.QuickActionService>();
+        services.AddSingleton<QuickActionsViewModel>();
         services.AddSingleton(sp => new AiOptionsViewModel(sp.GetRequiredService<Neruna.Core.Ai.AiController>()) { Browser = sp.GetRequiredService<Neruna.Core.Auth.IBrowserLauncher>() });
         services.AddSingleton<TextTemplateService>();
         services.AddSingleton<SettingsViewModel>();

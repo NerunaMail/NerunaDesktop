@@ -31,6 +31,9 @@ public sealed record ComposeDraft(
 
     /// <summary>Blind copies (Bcc): the transport delivers them without showing the header to the others.</summary>
     public string Bcc { get; init; } = string.Empty;
+
+    /// <summary>Text above the signature (a text template from a quick action), where one would start typing.</summary>
+    public string? LeadHtml { get; init; }
 }
 
 /// <summary>Builds replies and forwards the way business users expect (AW:/WG:, header block above the original).</summary>

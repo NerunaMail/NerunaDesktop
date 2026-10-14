@@ -30,7 +30,8 @@ internal sealed partial class MailViewModel(
     TextTemplateService textTemplates,
     AgendaViewModel agenda,
     Neruna.Core.Ai.AiController ai,
-    ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost
+    QuickActionService quickActions,
+    ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
     public bool AiAvailable => ai.IsConnected;
@@ -64,7 +65,16 @@ internal sealed partial class MailViewModel(
     private bool CanSummarize() => ai.IsConnected && ReadingPane is { Message: not null, HasBody: true };
 
     // A summary still being written belongs to its message: it stops when another one opens.
-    partial void OnReadingPaneChanged(ReadingPaneViewModel? oldValue, ReadingPaneViewModel? newValue) => oldValue?.Summary?.Cancel();
+    partial void OnReadingPaneChanged(ReadingPaneViewModel? oldValue, ReadingPaneViewModel? newValue)
+    {
+        oldValue?.Summary?.Cancel();
+        if (newValue is not null)
+        {
+            newValue.AttachmentActions = this;
+        }
+
+        _ = ShowQuickActionsAsync(newValue);
+    }
 
     /// <summary>Drafts with changes not yet stored – in the reading pane or in their own windows.</summary>
     public IReadOnlyList<ComposeViewModel> UnsavedDrafts =>

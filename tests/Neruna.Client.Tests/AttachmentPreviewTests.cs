@@ -54,6 +54,38 @@ public class AttachmentPreviewTests
         Assert.Equal(PdfPreviewProblem.Unreadable, error.Problem);
     }
 
+    [Fact]
+    public void StampsWhereClickedInItsColour()
+    {
+        // Top right of the second (empty) page, in red.
+        var stamped = PdfPages.Stamp(MinimalPdf("", ""), new PdfStampMark(1, 0.75, 0.2, "Genehmigt", ["Anna Muster", "14.10.2026 15:42"], "#FF0000"));
+        var rendering = PdfPages.Render(stamped, 0, 10, 400);
+
+        Assert.Equal(2, rendering.PageCount);
+        Assert.All(rendering.Pages[0].Pixels, b => Assert.Equal(255, b)); // the first page stays as it was
+        var page = rendering.Pages[1];
+        var red = Enumerable.Range(0, page.Height).SelectMany(y => Enumerable.Range(0, page.Width).Select(x => (x, y)))
+            .Where(p => IsRed(page, p.x, p.y)).ToList();
+        Assert.NotEmpty(red);
+        Assert.InRange(red.Average(p => p.x), 0.70 * page.Width, 0.80 * page.Width);
+        Assert.InRange(red.Average(p => p.y), 0.17 * page.Height, 0.23 * page.Height);
+    }
+
+    [Fact]
+    public void StampingKeepsTheOriginal()
+    {
+        var original = MinimalPdf("0 0 100 100 re f");
+        var copy = original.ToArray();
+        _ = PdfPages.Stamp(original, new PdfStampMark(0, 0.5, 0.5, "Geprüft", [], "#0F6CBD"));
+        Assert.Equal(copy, original);
+    }
+
+    private static bool IsRed(PdfPageImage page, int x, int y)
+    {
+        var i = (y * page.Stride) + (x * 4); // BGRA
+        return page.Pixels[i + 2] > 200 && page.Pixels[i + 1] < 120 && page.Pixels[i] < 120;
+    }
+
     private static byte Pixel(PdfPageImage page, int x, int y) => page.Pixels[(y * page.Stride) + (x * 4)];
 
     private static byte[] MinimalPdf(params string[] pageContents)

@@ -115,6 +115,9 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ShowsBody))]
     public partial AttachmentPreviewViewModel? Preview { get; set; }
 
+    /// <summary>Set on the mail page: PDFs can be stamped, and answered or forwarded stamped.</summary>
+    public IAttachmentActions? AttachmentActions { get; set; }
+
     private void TogglePreview(AttachmentViewModel attachment)
     {
         var showing = Preview?.Attachment;
@@ -125,8 +128,20 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         }
 
         attachment.IsPreviewed = true;
-        Preview = new AttachmentPreviewViewModel(attachment, ClosePreview);
+        Preview = new AttachmentPreviewViewModel(attachment, ClosePreview, AttachmentActions);
         _ = Preview.LoadAsync();
+    }
+
+    /// <summary>A quick action's stamp step: the PDF in the preview, ready for the stamp; the stamped PDF or null (cancelled).</summary>
+    public async Task<byte[]?> StampAsync(AttachmentViewModel attachment, PdfStamp stamp, byte[]? content)
+    {
+        ClosePreview();
+        attachment.IsPreviewed = true;
+        var preview = new AttachmentPreviewViewModel(attachment, ClosePreview, AttachmentActions, content);
+        Preview = preview;
+        await preview.LoadAsync();
+        var stamped = await preview.StampForActionAsync(stamp);
+        return stamped;
     }
 
     private void ClosePreview()
@@ -285,6 +300,43 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 internal sealed partial class AttachmentViewModel(MimeEntity entity, IFileService files) : ObservableObject
 {
     public string FileName { get; } = MessageContent.FileNameOf(entity);
+
+    /// <summary>The part in the mail (forwarding replaces it with a stamped copy).</summary>
+    public MimeEntity Entity => entity;
+
+    /// <summary>For the conditions of quick actions.</summary>
+    public QuickActionAttachment Describe() => new(FileName, entity.ContentType?.MimeType ?? string.Empty);
+
+    /// <summary>An attachment part with other content (the stamped PDF), same name and type.</summary>
+    public MimePart WithContent(byte[] content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        return new MimePart(entity.ContentType?.MimeType ?? "application/octet-stream")
+        {
+            Content = new MimeContent(new MemoryStream(content)),
+            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+            ContentTransferEncoding = ContentEncoding.Base64,
+            FileName = FileName,
+        };
+    }
+
+    /// <summary>Saves other content (the stamped PDF) under the attachment's name, or <paramref name="suggestedName"/> in <paramref name="folder"/>.</summary>
+    public async Task<bool> SaveContentAsync(byte[] content, string? suggestedName = null, string? folder = null)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        var target = await files.SaveFileAsync(T("Anhang speichern"), suggestedName ?? FileName, folder);
+        if (target is null)
+        {
+            return false;
+        }
+
+        await using (target)
+        {
+            await target.WriteAsync(content);
+        }
+
+        return true;
+    }
 
     public AttachmentPreviewKind PreviewKind => AttachmentPreview.KindOf(entity, FileName);
 

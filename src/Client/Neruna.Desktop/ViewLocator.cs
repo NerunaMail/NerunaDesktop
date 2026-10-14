@@ -44,6 +44,7 @@ internal sealed class ViewLocator : IDataTemplate
         AppearanceViewModel => new AppearanceView(),
         CloudViewModel => new CloudView(),
         TextTemplatesViewModel => new TextTemplatesView(),
+        QuickActionsViewModel => new QuickActionsView(),
         null => null,
         _ => new TextBlock { Text = "Keine Ansicht für " + param.GetType().Name },
     };

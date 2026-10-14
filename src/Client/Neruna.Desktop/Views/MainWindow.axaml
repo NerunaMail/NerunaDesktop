@@ -22,7 +22,23 @@
     <Border Grid.Row="0" Background="{DynamicResource HeaderBackgroundBrush}">
       <Grid ColumnDefinitions="Auto,*,Auto" Margin="16,0,8,0">
         <!-- The active section; "Neruna" is already in the window title -->
-        <TextBlock Text="{Binding SectionTitle}" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <StackPanel Orientation="Horizontal" Spacing="16">
+          <TextBlock Text="{Binding SectionTitle}" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <!-- Schnellaktionen whose conditions the open mail meets, each in its own colour -->
+          <ItemsControl ItemsSource="{Binding MailPage.QuickActionButtons}" IsVisible="{Binding IsMail}" VerticalAlignment="Center">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:QuickActionButton">
+                <Button Classes="quickAction" Content="{Binding Label}" Command="{Binding Command}" CommandParameter="{Binding Action}"
+                        Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" ToolTip.Tip="{l:T 'Schnellaktion'}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
           <!-- Out-of-office replies: from every page; switch and period per account, the full dialog behind "Weitere Optionen" -->
           <Button x:Name="AutoReplyButton" Classes="header" IsVisible="{Binding AutoReplies.IsAvailable}" Padding="8,4" Margin="0,0,4,0"

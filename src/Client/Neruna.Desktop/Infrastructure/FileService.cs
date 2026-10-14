@@ -13,7 +13,11 @@ internal interface IFileService
     Task<IReadOnlyList<string>> PickFilesAsync(string title);
 
     /// <returns>A writable stream for the chosen target, or null when cancelled.</returns>
-    Task<Stream?> SaveFileAsync(string title, string suggestedName);
+    /// <param name="folder">Where the dialog starts (a quick action's folder); the system's choice when null or missing.</param>
+    Task<Stream?> SaveFileAsync(string title, string suggestedName, string? folder = null);
+
+    /// <returns>The local path of the chosen folder, or null when cancelled.</returns>
+    Task<string?> PickFolderAsync(string title);
 
     /// <summary>
     /// Writes the content to a private temp file, marks it as coming from the internet and opens it with the system's
@@ -22,6 +26,9 @@ internal interface IFileService
     Task OpenAsync(string fileName, Func<Stream, Task> writeContent);
 
     Task OpenFolderAsync(string path);
+
+    /// <summary>Sends the file to the default printer (Windows: its program's "print"; macOS and Linux: lp).</summary>
+    Task PrintAsync(string fileName, byte[] content);
 }
 
 internal sealed class FileService : IFileService
@@ -40,15 +47,27 @@ internal sealed class FileService : IFileService
         return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
     }
 
-    public async Task<Stream?> SaveFileAsync(string title, string suggestedName)
+    public async Task<Stream?> SaveFileAsync(string title, string suggestedName, string? folder = null)
     {
         if (Window is not { } window)
         {
             return null;
         }
 
-        var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = title, SuggestedFileName = suggestedName });
+        var start = !string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder) ? await window.StorageProvider.TryGetFolderFromPathAsync(folder) : null;
+        var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = title, SuggestedFileName = suggestedName, SuggestedStartLocation = start });
         return file is null ? null : await file.OpenWriteAsync();
+    }
+
+    public async Task<string?> PickFolderAsync(string title)
+    {
+        if (Window is not { } window)
+        {
+            return null;
+        }
+
+        var folders = await window.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = title });
+        return folders.Count == 0 ? null : folders[0].TryGetLocalPath();
     }
 
     public async Task OpenAsync(string fileName, Func<Stream, Task> writeContent)
@@ -89,6 +108,18 @@ internal sealed class FileService : IFileService
         {
             await window.Launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(path));
         }
+    }
+
+    public async Task PrintAsync(string fileName, byte[] content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        var path = Path.Combine(OpenedAttachments.CreateFolder(), SanitizeFileName(fileName));
+        await File.WriteAllBytesAsync(path, content);
+        OpenedAttachments.MarkAsFromInternet(path);
+        var start = OperatingSystem.IsWindows()
+            ? new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true, Verb = "print" }
+            : new System.Diagnostics.ProcessStartInfo("lp", [path]) { UseShellExecute = false };
+        using var process = System.Diagnostics.Process.Start(start);
     }
 
     internal static string SanitizeFileName(string name)

@@ -85,11 +85,14 @@ public static partial class SignatureBlock
         // The container is inserted even without a signature, so one can be chosen later in the same place.
         var existing = draft.HtmlBody ?? (draft.Body.Length > 0 ? MessageContent.PlainTextToHtml(draft.Body) : string.Empty);
         var rest = LeadingEmptyLines().Replace(existing, string.Empty);
-        var htmlBody = "<div><br></div><div><br></div>" + Element(html) + (rest.Length > 0 ? "<div><br></div>" + rest : string.Empty);
+        var lead = string.IsNullOrEmpty(draft.LeadHtml) ? "<div><br></div>" : draft.LeadHtml;
+        var htmlBody = lead + "<div><br></div>" + Element(html) + (rest.Length > 0 ? "<div><br></div>" + rest : string.Empty);
 
         var plainSignature = signature is null ? string.Empty : HtmlText.ToPlainText(html);
-        var body = plainSignature.Length == 0 ? draft.Body : "\n\n" + plainSignature + (draft.Body.Length > 0 ? "\n" + draft.Body.TrimStart('\r', '\n') : string.Empty);
-        return draft with { HtmlBody = htmlBody, Body = body };
+        var plainLead = string.IsNullOrEmpty(draft.LeadHtml) ? string.Empty : HtmlText.ToPlainText(draft.LeadHtml);
+        var body = plainSignature.Length == 0 && plainLead.Length == 0 ? draft.Body
+            : plainLead + "\n\n" + plainSignature + (draft.Body.Length > 0 ? "\n" + draft.Body.TrimStart('\r', '\n') : string.Empty);
+        return draft with { HtmlBody = htmlBody, Body = body, LeadHtml = null };
     }
 
     public static string Element(string html) => $"<div id=\"{ElementId}\">{html}</div>";

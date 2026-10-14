@@ -1,0 +1,226 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:sys="using:System"
+             x:Class="Neruna.Desktop.Views.QuickActionsView"
+             x:DataType="vm:QuickActionsViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,12,0,4" />
+    </Style>
+    <!-- Colour swatches in a row -->
+    <Style Selector="ListBox.swatches">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" Spacing="4" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ListBox.swatches ListBoxItem">
+      <Setter Property="Padding" Value="3" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer>
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MaxWidth="860" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <!-- The list of actions, and the stamps -->
+      <StackPanel Spacing="8" IsVisible="{Binding IsListing}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,0,16,0"
+                     Text="{l:T 'Eine Schnellaktion erscheint als Button in der farbigen Leiste oben, wenn die geöffnete E-Mail ihre Bedingungen erfüllt. Ein Klick führt ihre Schritte nacheinander aus – z. B. ein PDF stempeln, in einen festen Ordner speichern und mit dem gestempelten PDF antworten.'}" />
+          <Button Grid.Column="1" Classes="accent" Command="{Binding NewCommand}" VerticalAlignment="Top">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+              <TextBlock Text="{l:T 'Neue Schnellaktion'}" />
+            </StackPanel>
+          </Button>
+        </Grid>
+
+        <TextBlock Classes="subtle" Text="{l:T 'Noch keine Schnellaktion eingerichtet.'}" IsVisible="{Binding !HasActions}" Margin="0,12" />
+        <ItemsControl ItemsSource="{Binding Actions}" Margin="0,4,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:QuickActionItem">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <!-- The button as it appears in the bar -->
+                  <Border Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" CornerRadius="4" Padding="10,4" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Label}" Foreground="White" FontWeight="SemiBold" />
+                  </Border>
+                  <TextBlock Grid.Column="1" Text="{Binding Summary}" Classes="subtle" TextWrapping="Wrap" VerticalAlignment="Center" Margin="14,0" />
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button Content="{l:T 'Bearbeiten'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
+                    <Button Padding="8,6" ToolTip.Tip="{l:T 'Weitere Aktionen'}">
+                      <TextBlock Text="⋯" FontWeight="Bold" />
+                      <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                          <MenuItem Header="{l:T 'Nach oben'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="{l:T 'Nach unten'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}" />
+                          <Separator />
+                          <MenuItem Header="{l:T 'Löschen'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).DeleteCommand}" CommandParameter="{Binding}" />
+                        </MenuFlyout>
+                      </Button.Flyout>
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Stamps for PDFs (also in the PDF preview under «Stempeln») -->
+        <TextBlock Classes="section" Text="{l:T 'Stempel'}" Margin="0,20,0,0" />
+        <TextBlock Classes="subtle" TextWrapping="Wrap"
+                   Text="{l:T 'Zum Stempeln von PDFs in der Vorschau und in Schnellaktionen. Unter dem Text stehen auf Wunsch Ihr Name (Absendername des Kontos) und Datum mit Uhrzeit. Ein Stempel ist ein sichtbarer Vermerk, keine digitale Signatur.'}" />
+        <ItemsControl ItemsSource="{Binding Stamps}" Margin="0,6,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:StampEditor">
+              <Grid ColumnDefinitions="220,Auto,Auto,Auto,*" Margin="0,0,0,6">
+                <TextBox Text="{Binding Text}" />
+                <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:StampEditor.Colors}" SelectedItem="{Binding Color}" Margin="8,0,0,0" VerticalAlignment="Center">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="sys:String">
+                      <Border Width="28" Height="16" CornerRadius="3" Background="{Binding Converter={x:Static l:Converters.ColorBrush}}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <CheckBox Grid.Column="2" Content="{l:T 'Name'}" IsChecked="{Binding WithName}" Margin="14,0,0,0" />
+                <CheckBox Grid.Column="3" Content="{l:T 'Datum'}" IsChecked="{Binding WithDate}" Margin="10,0,0,0" />
+                <Button Grid.Column="4" Content="{l:T 'Entfernen'}" Command="{Binding RemoveCommand}" HorizontalAlignment="Left" Margin="10,0,0,0" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Content="{l:T 'Stempel hinzufügen'}" Command="{Binding AddStampCommand}" HorizontalAlignment="Left" />
+      </StackPanel>
+
+      <!-- Editing one action -->
+      <StackPanel Spacing="6" IsVisible="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).IsEditing}" DataContext="{Binding Editing}" x:DataType="vm:QuickActionEditor">
+        <TextBlock Classes="section" Text="{l:T 'Button'}" Margin="0,0,0,4" />
+        <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+          <TextBlock Classes="label" Text="{l:T 'Text'}" />
+          <TextBox Grid.Column="1" Text="{Binding Label}" MaxWidth="320" HorizontalAlignment="Left" Width="320" />
+          <TextBlock Grid.Row="1" Classes="label" Text="{l:T 'Farbe'}" />
+          <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="16">
+            <ListBox Classes="swatches" ItemsSource="{x:Static vm:QuickActionEditor.Colors}" SelectedItem="{Binding Color}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="sys:String">
+                  <Border Width="24" Height="24" CornerRadius="4" Background="{Binding Converter={x:Static l:Converters.ColorBrush}}" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <!-- How it will look -->
+            <Border Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="4" Padding="10,6" VerticalAlignment="Center">
+              <Border Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" BorderBrush="#66FFFFFF" BorderThickness="1" CornerRadius="4" Padding="10,3">
+                <TextBlock Text="{Binding Label}" Foreground="White" FontWeight="SemiBold" />
+              </Border>
+            </Border>
+          </StackPanel>
+        </Grid>
+
+        <TextBlock Classes="section" Text="{l:T 'Wann erscheint der Button?'}" />
+        <TextBlock Classes="subtle" FontSize="12" Text="{l:T 'Alle ausgefüllten Bedingungen müssen zutreffen; leere gelten nicht.'}" />
+        <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8" Margin="0,4,0,0">
+          <TextBlock Classes="label" Text="{l:T 'Anhang'}" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+            <ComboBox ItemsSource="{x:Static vm:QuickActionEditor.AttachmentKinds}" SelectedItem="{Binding AttachmentKind}" MinWidth="220" />
+            <TextBox Text="{Binding Extensions}" PlaceholderText="{l:T 'z. B. xml, csv'}" Width="180" IsVisible="{Binding ShowsExtensions}" />
+          </StackPanel>
+          <TextBlock Grid.Row="1" Classes="label" Text="{l:T 'Absender enthält'}" />
+          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SenderContains}" PlaceholderText="{l:T 'Name, Adresse oder z. B. @lieferant.ch'}" Width="320" HorizontalAlignment="Left" />
+          <TextBlock Grid.Row="2" Classes="label" Text="{l:T 'Betreff enthält'}" />
+          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SubjectContains}" Width="320" HorizontalAlignment="Left" />
+          <TextBlock Grid.Row="3" Classes="label" Text="{l:T 'Konto'}" />
+          <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Accounts}" SelectedItem="{Binding Account}" MinWidth="320" />
+          <TextBlock Grid.Row="4" Classes="label" Text="{l:T 'Ordner'}" IsVisible="{Binding ShowsFolders}" />
+          <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Folders}" SelectedItem="{Binding Folder}" MinWidth="320" IsVisible="{Binding ShowsFolders}" />
+        </Grid>
+
+        <TextBlock Classes="section" Text="{l:T 'Was passiert beim Klick?'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Die Schritte laufen der Reihe nach. Sie arbeiten mit den Anhängen, die die Bedingung «Anhang» erfüllen (ohne Bedingung: mit allen).'}" />
+        <TextBlock Classes="subtle" Text="{l:T 'Noch kein Schritt.'}" IsVisible="{Binding !HasSteps}" Margin="0,6" />
+        <ItemsControl ItemsSource="{Binding Steps}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:StepEditor">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,4">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                      <Button Classes="command" Content="↑" Command="{Binding MoveUpCommand}" ToolTip.Tip="{l:T 'Nach oben'}" />
+                      <Button Classes="command" Content="↓" Command="{Binding MoveDownCommand}" ToolTip.Tip="{l:T 'Nach unten'}" />
+                      <Button Classes="command" Content="✕" Command="{Binding RemoveCommand}" ToolTip.Tip="{l:T 'Schritt entfernen'}" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Text="{Binding Hint}" Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  <Grid ColumnDefinitions="140,*" IsVisible="{Binding ShowsStamp}">
+                    <TextBlock Classes="label" Text="{l:T 'Stempel'}" />
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding Stamps}" SelectedItem="{Binding Stamp}" MinWidth="220" />
+                  </Grid>
+                  <Grid ColumnDefinitions="140,*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="6" IsVisible="{Binding ShowsSave}">
+                    <TextBlock Classes="label" Text="{l:T 'Ordner'}" />
+                    <TextBox Grid.Column="1" Text="{Binding Folder}" PlaceholderText="{l:T 'Leer: der zuletzt verwendete'}" />
+                    <Button Grid.Column="2" Content="{l:T 'Auswählen …'}" Command="{Binding ChooseFolderCommand}" Margin="6,0,0,0" />
+                    <TextBlock Grid.Row="1" Classes="label" Text="{l:T 'Dateiname'}" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding FileName}" PlaceholderText="{l:T 'Leer: Name des Anhangs'}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                               Text="{l:T 'Platzhalter: {Datum}, {Absender}, {Betreff}, {Dateiname} – z. B. «{Datum}_{Absender}_{Dateiname}». Die Endung kommt automatisch dazu. Der Speichern-Dialog öffnet sich mit Ordner und Name; «Speichern» genügt.'}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+                    <TextBlock Classes="label" Text="{l:T 'An'}" IsVisible="{Binding ShowsTo}" />
+                    <TextBox Grid.Column="1" Text="{Binding To}" PlaceholderText="{l:T 'z. B. buchhaltung@firma.ch; mehrere mit «;»'}" IsVisible="{Binding ShowsTo}" />
+                    <TextBlock Grid.Row="1" Classes="label" Text="{l:T 'Betreff'}" IsVisible="{Binding ShowsSubject}" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Subject}" PlaceholderText="{l:T 'Leer: Betreff der E-Mail; Platzhalter wie beim Dateinamen'}" IsVisible="{Binding ShowsSubject}" />
+                    <TextBlock Grid.Row="2" Classes="label" Text="{l:T 'Textvorlage'}" IsVisible="{Binding ShowsTemplate}" />
+                    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Templates}" SelectedItem="{Binding Template}" MinWidth="220" IsVisible="{Binding ShowsTemplate}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="140,*" IsVisible="{Binding ShowsMoveFolder}">
+                    <TextBlock Classes="label" Text="{l:T 'Nach'}" />
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding MoveFolders}" SelectedItem="{Binding MoveFolder}" MinWidth="220" />
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button HorizontalAlignment="Left" Margin="0,4,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconAdd}" Width="12" Height="12" />
+            <TextBlock Text="{l:T 'Schritt hinzufügen'}" />
+            <PathIcon Data="{StaticResource IconChevronDown}" Width="9" Height="9" />
+          </StackPanel>
+          <Button.Flyout>
+            <MenuFlyout ItemsSource="{x:Static vm:QuickActionEditor.StepKinds}" Placement="BottomEdgeAlignedLeft">
+              <MenuFlyout.ItemContainerTheme>
+                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                  <Setter Property="Header" Value="{ReflectionBinding Title}" />
+                  <Setter Property="Command" Value="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).Editing.AddStepCommand}" />
+                  <Setter Property="CommandParameter" Value="{ReflectionBinding}" />
+                </ControlTheme>
+              </MenuFlyout.ItemContainerTheme>
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,20,0,16">
+          <Button Classes="accent" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" />
+          <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+  </ScrollViewer>
+</UserControl>

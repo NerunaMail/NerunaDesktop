@@ -41,6 +41,7 @@
         <ContentControl Content="{Binding Appearance}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=6}" />
         <ContentControl Content="{Binding Cloud}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=7}" />
         <ContentControl Content="{Binding Ai}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=8}" />
+        <ContentControl Content="{Binding QuickActions}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=11}" />
         <ContentControl Content="{Binding FileBackup}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=10}" />
         <views:AboutView IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=9}" />
       </Panel>

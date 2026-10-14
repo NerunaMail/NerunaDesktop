@@ -12,7 +12,7 @@ public sealed record PdfRendering(int PageCount, IReadOnlyList<PdfPageImage> Pag
 /// Renders PDF pages with PDFium (the PDF engine of Chromium; native library from the bblanchon.PDFium packages).
 /// Only pictures of the pages: no scripts, no forms, no links. PDFium is not thread-safe, so every call holds a lock.
 /// </summary>
-public static class PdfPages
+public static partial class PdfPages
 {
     private const int MaxHeight = 6000;
     private const uint White = 0xFFFFFFFF;
@@ -129,7 +129,7 @@ public static class PdfPages
         _initialized = true;
     }
 
-    private static class NativeMethods
+    private static partial class NativeMethods
     {
         private const string Pdfium = "pdfium";
 

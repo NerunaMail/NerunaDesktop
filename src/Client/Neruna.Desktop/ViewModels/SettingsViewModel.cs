@@ -4,8 +4,11 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions) : ViewModelBase
 {
+    /// <summary>Settings → E-Mail → Schnellaktionen (and the PDF stamps).</summary>
+    public QuickActionsViewModel QuickActions => quickActions;
+
     /// <summary>Settings → Datensicherung: the personal settings into a password-protected file and back.</summary>
     public FileBackupViewModel FileBackup => fileBackup;
 
@@ -56,6 +59,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(1, T("Allgemein"), "IconMail", IsIndented: true),
         new(3, T("Signaturen"), "IconSignature", IsIndented: true),
         new(4, T("Textvorlagen"), "IconTextTemplate", IsIndented: true),
+        new(11, T("Schnellaktionen"), "IconFlash", IsIndented: true),
         new(5, T("Zertifikate (S/MIME)"), "IconCertificate", IsIndented: true),
         new(2, T("Kalender"), "IconCalendar"),
         new(7, T("Neruna Cloud"), "IconCloud"),
@@ -104,6 +108,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         await Certificates.ReloadAsync();
         await Appearance.ReloadAsync();
         await TextTemplates.ReloadAsync();
+        await QuickActions.ReloadAsync();
         await Cloud.ReloadAsync();
     }
 }

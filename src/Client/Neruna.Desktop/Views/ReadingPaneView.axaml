@@ -5,7 +5,7 @@
              xmlns:cal="using:Neruna.Core.Calendar"
              xmlns:app="using:Neruna.Desktop"
              xmlns:views="using:Neruna.Desktop.Views"
-             xmlns:img="using:Avalonia.Media.Imaging"
+             xmlns:core="using:Neruna.Core.Mail"
              x:Class="Neruna.Desktop.Views.ReadingPaneView"
              x:DataType="vm:ReadingPaneViewModel">
   <!-- A message: header, security, attachments, body. Used in the mail page and in the message window. -->
@@ -142,21 +142,50 @@
       <views:MessageBodyView Grid.Row="7" IsVisible="{Binding ShowsBody}" />
 
       <!-- Attachment preview in place of the message text -->
-      <Grid Grid.Row="7" RowDefinitions="Auto,*" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid Grid.Row="7" RowDefinitions="Auto,Auto,*" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}">
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,1" Padding="16,6">
           <Grid ColumnDefinitions="Auto,*,Auto" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
             <Button Classes="command" Content="{l:T '← Zur Nachricht'}" Command="{Binding CloseCommand}" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="12,0" VerticalAlignment="Center">
-              <TextBlock Text="{Binding Attachment.FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-              <TextBlock Text="{Binding PageInfo}" Classes="subtle" FontSize="12" VerticalAlignment="Center" />
-            </StackPanel>
+            <DockPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+              <TextBlock DockPanel.Dock="Right" Text="{Binding PageInfo}" Classes="subtle" FontSize="12" VerticalAlignment="Center" Margin="10,0,0,0" />
+              <TextBlock Text="{Binding Attachment.FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Attachment.FileName}" />
+            </DockPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
-              <Button Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Attachment.OpenCommand}" />
-              <Button Classes="command" Content="{l:T 'Speichern'}" Command="{Binding Attachment.SaveCommand}" />
+              <!-- PDF: a stamp ("Genehmigt", name, date) into the file -->
+              <Button Classes="command" IsVisible="{Binding CanStamp}" IsEnabled="{Binding !IsStamping}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{l:T 'Stempeln'}" />
+                  <PathIcon Data="{StaticResource IconChevronDown}" Width="9" Height="9" />
+                </StackPanel>
+                <Button.Flyout>
+                  <MenuFlyout ItemsSource="{Binding Stamps}" Placement="BottomEdgeAlignedRight">
+                    <MenuFlyout.ItemContainerTheme>
+                      <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="core:PdfStamp">
+                        <Setter Property="Header" Value="{Binding Text}" />
+                        <Setter Property="Command" Value="{Binding $parent[UserControl].((vm:ReadingPaneViewModel)DataContext).Preview.StartStampCommand}" />
+                        <Setter Property="CommandParameter" Value="{Binding}" />
+                      </ControlTheme>
+                    </MenuFlyout.ItemContainerTheme>
+                  </MenuFlyout>
+                </Button.Flyout>
+              </Button>
+              <Button Classes="command" Content="{l:T 'Antworten mit PDF'}" Command="{Binding ReplyWithCommand}" IsVisible="{Binding IsStamped}" />
+              <Button Classes="command" Content="{l:T 'Weiterleiten mit PDF'}" Command="{Binding ForwardWithCommand}" IsVisible="{Binding IsStamped}" />
+              <Button Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Attachment.OpenCommand}" IsVisible="{Binding !IsStamped}" />
+              <Button Classes="command" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" />
             </StackPanel>
           </Grid>
         </Border>
-        <ScrollViewer Grid.Row="1" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
+        <!-- Placing a stamp: what to do, then keep it or not -->
+        <Border Grid.Row="1" Background="{DynamicResource InfoBackgroundBrush}" Padding="16,8" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel"
+                IsVisible="{Binding IsStamping, FallbackValue=False}">
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Text="{Binding StampHint}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Content="{Binding CancelLabel}" Command="{Binding CancelStampCommand}" Margin="8,0,0,0" />
+            <Button Grid.Column="2" Classes="accent" Content="{Binding ApplyLabel}" Command="{Binding ApplyStampCommand}" Margin="6,0,0,0" />
+          </Grid>
+        </Border>
+        <ScrollViewer Grid.Row="2" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
           <StackPanel Margin="16" Spacing="12">
             <ItemsControl ItemsSource="{Binding Pages}">
               <ItemsControl.ItemsPanel>
@@ -165,9 +194,10 @@
                 </ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="img:Bitmap">
+                <DataTemplate x:DataType="vm:PreviewPage">
                   <Border Background="White" BoxShadow="0 1 4 0 #33000000" HorizontalAlignment="Center">
-                    <Image Source="{Binding}" Stretch="Uniform" StretchDirection="DownOnly" />
+                    <Image Source="{Binding Image}" Stretch="Uniform" StretchDirection="DownOnly" PointerPressed="OnPreviewPagePressed"
+                           Cursor="{Binding $parent[ScrollViewer].((vm:AttachmentPreviewViewModel)DataContext).IsStamping, Converter={x:Static app:Converters.StampCursor}, FallbackValue={x:Null}}" />
                   </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

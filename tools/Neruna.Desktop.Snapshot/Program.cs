@@ -137,7 +137,49 @@ internal static class Snapshots
 
         await SaveAsync(window, output, "mail-attachment-preview.png");
         Console.WriteLine($"Attachment preview: {vm.MailPage.ReadingPane.Preview?.Pages.Count} page(s), {vm.MailPage.ReadingPane.Preview?.PageInfo}, problem={vm.MailPage.ReadingPane.Preview?.Problem}");
+        // Stamping the PDF: placed (shown on the page at once), then kept.
+        var stampPreview = vm.MailPage.ReadingPane.Preview!;
+        Console.WriteLine($"Can stamp: {stampPreview.CanStamp}, stamps: {string.Join(", ", stampPreview.Stamps.Select(s => s.Text))}");
+        stampPreview.StartStampCommand.Execute(stampPreview.Stamps[0]);
+        await stampPreview.PlaceAsync(stampPreview.Pages[0], 0.72, 0.16);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "mail-pdf-stamp.png");
+        stampPreview.ApplyStampCommand.Execute(null);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "mail-pdf-stamped.png");
+        Console.WriteLine($"Stamped: {stampPreview.IsStamped}, stamping: {stampPreview.IsStamping}");
+
+        // A quick action for mails with a PDF: its button in the coloured bar.
+        var quick = services.GetRequiredService<Neruna.Core.Mail.QuickActionService>();
+        var firstStamp = (await quick.GetStampsAsync())[0];
+        await quick.SaveActionsAsync(
+        [
+            new Neruna.Core.Mail.QuickAction(Guid.NewGuid(), "Offerte genehmigen", "#107C10",
+                new Neruna.Core.Mail.QuickActionCondition { Attachment = Neruna.Core.Mail.QuickActionAttachmentKind.Pdf },
+                [
+                    new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.StampPdf) { StampId = firstStamp.Id },
+                    new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.SaveAttachment) { Folder = "/home/anna/Offerten", FileName = "{Datum}_{Absender}_{Dateiname}" },
+                    new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.Reply),
+                ]),
+            new Neruna.Core.Mail.QuickAction(Guid.NewGuid(), "An Buchhaltung", "#CA5010",
+                new Neruna.Core.Mail.QuickActionCondition { Attachment = Neruna.Core.Mail.QuickActionAttachmentKind.Pdf },
+                [new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.NewMail) { To = "buchhaltung@example.com", Subject = "Rechnung {Absender}" }]),
+        ]);
         await pdfAttachment.ActivateCommand.ExecuteAsync(null);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-quick-actions.png");
+        Console.WriteLine($"Quick action buttons: {string.Join(", ", vm.MailPage.QuickActionButtons.Select(b => b.Label))}");
+        vm.NavigateCommand.Execute(Section.Settings);
+        vm.SettingsPage.SelectedTab = 11;
+        await vm.SettingsPage.QuickActions.ReloadAsync();
+        await Task.Delay(300);
+        await SaveAsync(window, output, "settings-quick-actions.png");
+        await vm.SettingsPage.QuickActions.EditCommand.ExecuteAsync(vm.SettingsPage.QuickActions.Actions[0]);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "settings-quick-action-edit.png");
+        vm.SettingsPage.QuickActions.Editing!.CancelCommand.Execute(null);
+        vm.NavigateCommand.Execute(Section.Mail);
+        await Task.Delay(200);
         Console.WriteLine($"Preview closed again: {vm.MailPage.ReadingPane.Preview is null && vm.MailPage.ReadingPane.ShowsBody}");
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
         await Task.Delay(300);
