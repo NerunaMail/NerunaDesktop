@@ -94,17 +94,53 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
     [ObservableProperty]
     public partial string? Notice { get; set; }
 
+    /// <summary>"Exportieren …": one file per action into a folder – so a changed action can be passed on alone.</summary>
     [RelayCommand]
     private async Task ExportAsync()
     {
-        if (_actions.Count == 0)
+        if (_actions.Count == 0 || await files.PickFolderAsync(T("Ordner für die Schnellaktionen")) is not { } folder)
         {
             return;
         }
 
         var (accountAddresses, templateNames) = await LookupsAsync();
-        var json = QuickActionService.Export(_actions, [.. Stamps.Select(s => s.ToStamp())], accountAddresses, templateNames);
-        var target = await files.SaveFileAsync(T("Schnellaktionen exportieren"), T("Schnellaktionen") + ".nerunaactions");
+        var stamps = Stamps.Select(s => s.ToStamp()).ToList();
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var action in _actions)
+            {
+                // Two actions with the same text: "Name (2)".
+                var name = FileService.SanitizeFileName(action.Label);
+                var unique = name;
+                for (var n = 2; !used.Add(unique); n++)
+                {
+                    unique = $"{name} ({n})";
+                }
+
+                await File.WriteAllTextAsync(Path.Combine(folder, unique + FileExtension), QuickActionService.Export([action], stamps, accountAddresses, templateNames));
+            }
+
+            Notice = _actions.Count == 1 ? F("1 Schnellaktion nach «{0}» exportiert.", folder) : F("{0} Schnellaktionen nach «{1}» exportiert – eine Datei pro Aktion.", _actions.Count, folder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Notice = F("Export fehlgeschlagen: {0}", ex.Message);
+        }
+    }
+
+    /// <summary>"⋯ → Exportieren …": this one action as a file.</summary>
+    [RelayCommand]
+    private async Task ExportOneAsync(QuickActionItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var (accountAddresses, templateNames) = await LookupsAsync();
+        var json = QuickActionService.Export([item.Action], [.. Stamps.Select(s => s.ToStamp())], accountAddresses, templateNames);
+        var target = await files.SaveFileAsync(T("Schnellaktion exportieren"), FileService.SanitizeFileName(item.Label) + FileExtension);
         if (target is null)
         {
             return;
@@ -116,8 +152,10 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
             await writer.WriteAsync(json);
         }
 
-        Notice = _actions.Count == 1 ? T("1 Schnellaktion exportiert.") : F("{0} Schnellaktionen exportiert.", _actions.Count);
+        Notice = F("Schnellaktion «{0}» exportiert.", item.Label);
     }
+
+    private const string FileExtension = ".nerunaactions";
 
     [RelayCommand]
     private async Task ImportAsync()

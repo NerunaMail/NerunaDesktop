@@ -99,6 +99,8 @@
                       <TextBlock Text="⋯" FontWeight="Bold" />
                       <Button.Flyout>
                         <MenuFlyout Placement="BottomEdgeAlignedRight">
+                          <MenuItem Header="{l:T 'Exportieren …'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).ExportOneCommand}" CommandParameter="{Binding}" />
+                          <Separator />
                           <MenuItem Header="{l:T 'Nach oben'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
                           <MenuItem Header="{l:T 'Nach unten'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}" />
                           <Separator />
