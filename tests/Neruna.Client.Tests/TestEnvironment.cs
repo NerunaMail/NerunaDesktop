@@ -104,6 +104,8 @@ internal sealed class StubHttpHandler : HttpMessageHandler
 
     public List<string> Requested { get; } = [];
 
+    public List<string> UserAgents { get; } = [];
+
     /// <summary>Method, address and body of requests that had one (POST, PUT).</summary>
     public List<(string Method, string Url, string Body)> Sent { get; } = [];
 
@@ -111,6 +113,7 @@ internal sealed class StubHttpHandler : HttpMessageHandler
     {
         var url = request.RequestUri!.AbsoluteUri;
         Requested.Add(url);
+        UserAgents.Add(request.Headers.UserAgent.ToString());
         if (request.Content is not null)
         {
             Sent.Add((request.Method.Method, url, await request.Content.ReadAsStringAsync(cancellationToken)));

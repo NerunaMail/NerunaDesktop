@@ -64,15 +64,32 @@ public sealed class AccountDiscovery(HttpClient http, ILogger<AccountDiscovery> 
 
     private async Task<DiscoveryResult> FetchNerunaAsync(Uri url, CancellationToken cancellationToken)
     {
-        var response = await http.GetFromJsonAsync<DiscoveryResponse>(url, NerunaJson.Options, cancellationToken)
+        using var response = await GetAsync(url, cancellationToken);
+        var discovery = await response.Content.ReadFromJsonAsync<DiscoveryResponse>(NerunaJson.Options, cancellationToken)
             ?? throw new InvalidDataException("Empty discovery response.");
-        return new DiscoveryResult(response.Provider, response.OrganizationName, response.OrganizationName);
+        return new DiscoveryResult(discovery.Provider, discovery.OrganizationName, discovery.OrganizationName);
     }
 
     private async Task<DiscoveryResult> FetchAutoconfigAsync(Uri url, CancellationToken cancellationToken)
     {
-        var xml = await http.GetStringAsync(url, cancellationToken);
-        return new DiscoveryResult(AutoconfigXml.Parse(xml), url.Host, null);
+        using var response = await GetAsync(url, cancellationToken);
+        return new DiscoveryResult(AutoconfigXml.Parse(await response.Content.ReadAsStringAsync(cancellationToken)), url.Host, null);
+    }
+
+    // With Neruna's user agent: the directory tells Neruna's lookups from other programs'.
+    private async Task<HttpResponseMessage> GetAsync(Uri url, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.TryAddWithoutValidation("User-Agent", Cloud.DeviceInfo.UserAgent);
+        var response = await http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var status = response.StatusCode;
+            response.Dispose();
+            throw new HttpRequestException($"HTTP {(int)status}", null, status);
+        }
+
+        return response;
     }
 
     // Each step gets its own time limit, so a server that does not answer does not hold up the next one.

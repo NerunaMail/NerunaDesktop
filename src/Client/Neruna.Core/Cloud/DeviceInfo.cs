@@ -20,6 +20,14 @@ public sealed record DeviceInfo(string Name, string AppVersion, string OsName, s
         return new DeviceInfo(string.IsNullOrWhiteSpace(name) ? Environment.MachineName : name.Trim(), app, os, version, user);
     }
 
+    /// <summary>
+    /// "Neruna/0.8.0 (Windows)" – how Neruna introduces itself where it asks a service for settings (the autoconfig
+    /// directory counts lookups per program). Only the version and the kind of system, nothing that identifies a person.
+    /// </summary>
+    public static string UserAgent { get; } =
+        $"Neruna/{(Assembly.GetEntryAssembly() ?? typeof(DeviceInfo).Assembly).GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "0"} " +
+        $"({(OperatingSystem.IsAndroid() ? "Android" : OperatingSystem.IsIOS() ? "iOS" : OperatingSystem.IsWindows() ? "Windows" : OperatingSystem.IsMacOS() ? "macOS" : OperatingSystem.IsLinux() ? "Linux" : "other")})";
+
     // "11 (Build 26100)": Windows 11 reports itself as 10.0 with a build of 22000 or higher.
     private static string WindowsVersion()
     {

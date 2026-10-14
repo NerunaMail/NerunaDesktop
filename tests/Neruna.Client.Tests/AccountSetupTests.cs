@@ -93,6 +93,7 @@ public class AccountSetupTests
         Assert.Equal(["https://autoconfig.kunde.ch/mail/config-v1.1.xml?emailaddress=anna%40kunde.ch",
             "https://kunde.ch/.well-known/autoconfig/mail/config-v1.1.xml?emailaddress=anna%40kunde.ch",
             "https://autoconfig.neruna.cloud/v1/kunde.ch"], http.Requested);
+        Assert.StartsWith("Neruna/", http.UserAgents.Last(), StringComparison.Ordinal);
 
         // The directory unreachable: Mozilla.
         http.Responses.Remove("https://autoconfig.neruna.cloud/v1/kunde.ch");
