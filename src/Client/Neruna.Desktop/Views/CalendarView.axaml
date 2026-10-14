@@ -306,7 +306,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="x:String">
                     <!-- Label centred on the hour line above it -->
-                    <Border Height="48">
+                    <Border Height="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).HourHeight}">
                       <TextBlock Text="{Binding}" FontSize="11" Classes="subtle" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-7,8,0" />
                     </Border>
                   </DataTemplate>

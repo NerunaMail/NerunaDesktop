@@ -26,6 +26,12 @@ internal sealed partial class CalendarView : UserControl
         var scroll = this.FindControl<ScrollViewer>("TimeScroll")!;
         scroll.PropertyChanged += (_, e) =>
         {
+            // Tall screens: the hours grow until the whole day fills the view (never below the normal height).
+            if (e.Property == BoundsProperty && scroll.Bounds.Height > 0 && DataContext is CalendarViewModel calendar)
+            {
+                _ = calendar.SetHourHeightAsync(Math.Max(TimedEventItem.MinHourHeight, Math.Floor(scroll.Bounds.Height / 24)));
+            }
+
             if (e.Property == BoundsProperty && !_scrolledToMorning && scroll.Bounds.Height > 0 && scroll.Extent.Height > 0)
             {
                 _scrolledToMorning = true;

@@ -227,7 +227,9 @@
                 </Border>
               </DataTemplate>
               <DataTemplate DataType="vm:MessageItemViewModel">
-                <Grid ColumnDefinitions="3,*" Classes.unread="{Binding IsUnread}">
+                <Grid ColumnDefinitions="3,*" RowDefinitions="*,Auto" Classes.unread="{Binding IsUnread}">
+                  <!-- A fine line under each message, indented like the text -->
+                  <Border Grid.Row="1" Grid.ColumnSpan="2" Height="1" Margin="13,0,10,0" Background="{DynamicResource DividerBrush}" />
                   <Border Background="{DynamicResource UnreadBarBrush}" IsVisible="{Binding IsUnread}" CornerRadius="2" Margin="0,6" />
                   <Grid Grid.Column="1" Margin="10,7,10,7" RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                     <TextBlock Classes="sender" Text="{Binding Sender}" TextTrimming="CharacterEllipsis" />

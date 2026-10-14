@@ -109,6 +109,25 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     /// <summary>One entry per slot of the day: full hours get a solid line, subdivisions a lighter one.</summary>
     public IReadOnlyList<GridLine> GridLines => GridLine.ForDay(GridMinutes);
 
+    /// <summary>The hour labels' height (follows <see cref="TimedEventItem.HourHeight"/>).</summary>
+    [ObservableProperty]
+    public partial double HourHeight { get; set; } = TimedEventItem.HourHeight;
+
+    /// <summary>The view's height changed: a new hour height, the grid and the appointments laid out again.</summary>
+    public async Task SetHourHeightAsync(double height)
+    {
+        if (Math.Abs(height - TimedEventItem.HourHeight) < 0.5 && Math.Abs(height - HourHeight) < 0.5)
+        {
+            return;
+        }
+
+        TimedEventItem.HourHeight = height;
+        HourHeight = height;
+        OnPropertyChanged(nameof(GridLines));
+        RefreshNow();
+        await LoadWeekAsync(dataChanged: false);
+    }
+
     /// <summary>Position of the "now" line in the time grid (pixels from midnight), refreshed every minute.</summary>
     [ObservableProperty]
     public partial double NowTop { get; set; } = CurrentTop();
@@ -599,7 +618,14 @@ internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string co
 /// <summary>An event placed in the time grid of one day: vertical position from its time, column from overlaps.</summary>
 internal sealed class TimedEventItem(CalendarEventItem item, double top, double height, int column, int columns)
 {
-    public const double HourHeight = 48;
+    /// <summary>The least height of an hour in the time grid.</summary>
+    public const double MinHourHeight = 48;
+
+    /// <summary>
+    /// Height of an hour: at least <see cref="MinHourHeight"/>, more on tall screens so the day fills the view
+    /// (set by the view from its height, see CalendarView).
+    /// </summary>
+    public static double HourHeight { get; set; } = MinHourHeight;
     private const double MinHeight = 22;
 
     public CalendarEventItem Item { get; } = item;
