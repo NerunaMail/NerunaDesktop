@@ -410,10 +410,14 @@ Logdateien pro Tag unter `<Datenordner>/logs`. `--protocol-log` schreibt zusätz
 
 1. Neruna-Server der Organisation (`/api/v1/discovery`), sofern der Client angemeldet ist. *(DNS-TXT `_neruna.<domain>` folgt)*
 2. Thunderbird-Autoconfig beim Provider (`autoconfig.<domain>`, `<domain>/.well-known/…`)
-3. Mozilla ISPDB (erfährt nur die Domain)
-4. CalDAV/CardDAV zusätzlich über `/.well-known` auf Mail-Domain und IMAP-Host
-5. DNS-SRV (RFC 6186/6764) *(folgt)*
-6. Raten + Verbindungstest (heute: Vorschlag `mail.<domain>`, Benutzer kann alles anpassen)
+3. Neruna-Verzeichnis `autoconfig.neruna.cloud/v1/<domain>` (erfährt nur die Domain): Mozillas ISPDB, täglich gespiegelt,
+   plus CalDAV/CardDAV/EWS und eigene Einträge; unbekannte Domains über ihren MX (ausser bei Spamfiltern/Relays).
+   Im Format: `<calendar>`/`<addressBook>` wie bei Mozilla vorgesehen, Exchange als `<incomingServer type="exchange">`
+   mit `<ewsURL>` (→ `ServerProtocol.Ews`). Vertrag: `contract/fixtures/autoconfig-directory-example.xml`.
+4. Mozilla ISPDB direkt, falls das Verzeichnis nicht erreichbar ist
+5. CalDAV/CardDAV zusätzlich über `/.well-known` auf Mail-Domain und IMAP-Host
+6. DNS-SRV (RFC 6186/6764) *(folgt)*
+7. Raten + Verbindungstest (heute: Vorschlag `mail.<domain>`, Benutzer kann alles anpassen)
 
 ### UI
 
@@ -428,6 +432,7 @@ Kontaktliste mit Detailansicht. Screenshots: `docs/screenshots/` (erzeugt mit `t
 | Mandanten, Domains, Server-Profile | ✔ Datenmodell (ULIDs), Domain-Verifikation per TXT-Token vorbereitet |
 | Discovery-API `/api/v1/discovery` | ✔ inkl. Vertragstest |
 | Thunderbird-Autoconfig (beide Pfade) | ✔ inkl. Vertragstest |
+| Autoconfig-Verzeichnis `/v1/<domain>` | ✔ ISPDB-Spiegel (täglich, Cron), Ergänzungen und eigene Einträge unter Admin → Autoconfig, MX-Suche |
 | Admin und Kundenportal | ✔ Filament 5: `/admin` (Mandanten, Lizenz, Limits, Addons, Logins), `/portal` (Firmendaten, Benutzer, Verbindungscodes, Geräte) |
 | Signaturvorlagen, Kalender-Abos, Richtlinien | offen |
 | Config-Tresor-Ablage | ✔ `/api/v1/vault`: verpackte Schlüssel + max. 20 verschlüsselte Sicherungen pro Person (Abschnitt 6) |

@@ -17,6 +17,12 @@ public sealed class AccountDiscovery(HttpClient http, ILogger<AccountDiscovery> 
 {
     private static readonly TimeSpan StepTimeout = TimeSpan.FromSeconds(8);
 
+    /// <summary>
+    /// Neruna's autoconfig directory: Mozilla's ISPDB plus CalDAV/CardDAV/EWS and providers Mozilla does not know, also
+    /// found through the domain's mail servers (MX). Learns only the domain.
+    /// </summary>
+    public Uri Directory { get; set; } = new("https://autoconfig.neruna.cloud/v1/");
+
     /// <summary>The organization's Neruna Cloud/Control server, if the client is enrolled.</summary>
     public Uri? OrganizationServer { get; set; }
 
@@ -27,7 +33,7 @@ public sealed class AccountDiscovery(HttpClient http, ILogger<AccountDiscovery> 
 
         if (OrganizationServer is { } server)
         {
-            var neruna = await TryAsync(() => FetchNerunaAsync(new Uri(server, $"api/v1/discovery?email={email}"), cancellationToken), server.Host, cancellationToken);
+            var neruna = await TryAsync(token => FetchNerunaAsync(new Uri(server, $"api/v1/discovery?email={email}"), token), server.Host, cancellationToken);
             if (neruna is not null)
             {
                 return neruna;
@@ -38,14 +44,15 @@ public sealed class AccountDiscovery(HttpClient http, ILogger<AccountDiscovery> 
         [
             $"https://autoconfig.{domain}/mail/config-v1.1.xml?emailaddress={email}",
             $"https://{domain}/.well-known/autoconfig/mail/config-v1.1.xml?emailaddress={email}",
-            // Mozilla's ISP database only learns the domain, never the full address.
+            // Neruna's directory and – if it cannot be reached – Mozilla's ISP database only learn the domain, never the address.
+            new Uri(Directory, Uri.EscapeDataString(domain)).AbsoluteUri,
             $"https://autoconfig.thunderbird.net/v1.1/{domain}",
         ];
 
         foreach (var url in autoconfigUrls)
         {
             var uri = new Uri(url);
-            var result = await TryAsync(() => FetchAutoconfigAsync(uri, cancellationToken), uri.Host, cancellationToken);
+            var result = await TryAsync(token => FetchAutoconfigAsync(uri, token), uri.Host, cancellationToken);
             if (result is not null)
             {
                 return result;
@@ -68,13 +75,14 @@ public sealed class AccountDiscovery(HttpClient http, ILogger<AccountDiscovery> 
         return new DiscoveryResult(AutoconfigXml.Parse(xml), url.Host, null);
     }
 
-    private async Task<DiscoveryResult?> TryAsync(Func<Task<DiscoveryResult>> step, string source, CancellationToken cancellationToken)
+    // Each step gets its own time limit, so a server that does not answer does not hold up the next one.
+    private async Task<DiscoveryResult?> TryAsync(Func<CancellationToken, Task<DiscoveryResult>> step, string source, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(StepTimeout);
         try
         {
-            return await step();
+            return await step(timeout.Token);
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidDataException or FormatException or System.Xml.XmlException or System.Text.Json.JsonException
                                    || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))

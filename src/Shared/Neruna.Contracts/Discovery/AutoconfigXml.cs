@@ -39,6 +39,7 @@ public static class AutoconfigXml
 
         var dav = root.Elements("calendar").Concat(root.Elements("addressBook"))
             .Select(ParseDavServer)
+            .Concat(provider.Elements("incomingServer").Select(ParseExchangeServer))
             .OfType<DavServerSettings>()
             .ToList();
 
@@ -110,6 +111,13 @@ public static class AutoconfigXml
             auth,
             element.Element("username")?.Value.Trim() ?? DiscoveryPlaceholders.EmailAddress);
     }
+
+    /// <summary>An Exchange server with its EWS address (as Thunderbird describes it; Neruna's directory adds it).</summary>
+    private static DavServerSettings? ParseExchangeServer(XElement element) =>
+        string.Equals(element.Attribute("type")?.Value, "exchange", StringComparison.OrdinalIgnoreCase)
+        && Uri.TryCreate(element.Element("ewsURL")?.Value.Trim(), UriKind.Absolute, out var url) && url.Scheme == Uri.UriSchemeHttps
+            ? new DavServerSettings(ServerProtocol.Ews, url, element.Element("username")?.Value.Trim() ?? DiscoveryPlaceholders.EmailAddress)
+            : null;
 
     private static DavServerSettings? ParseDavServer(XElement element)
     {

@@ -21,6 +21,21 @@ public class AutoconfigXmlTests
     }
 
     [Fact]
+    public void The_directorys_entries_bring_calendar_contacts_and_exchange()
+    {
+        // Served by autoconfig.neruna.cloud: Mozilla's file with Neruna's additions (also asserted by the server tests).
+        var config = AutoconfigXml.Parse(ContractFixtures.Read("autoconfig-directory-example.xml"));
+
+        Assert.Equal(("example-hosting.net", "Example Hosting"), (config.Domain, config.DisplayName));
+        Assert.Equal(new MailServerSettings(ServerProtocol.Imap, "imap.example-hosting.net", 993, SocketSecurity.SslOnConnect, AuthScheme.PasswordCleartext, "%EMAILADDRESS%"), config.PreferredIncoming);
+        Assert.Equal(new MailServerSettings(ServerProtocol.Smtp, "smtp.example-hosting.net", 465, SocketSecurity.SslOnConnect, AuthScheme.PasswordCleartext, "%EMAILADDRESS%"), config.PreferredOutgoing);
+        Assert.Equal(new Uri("https://dav.example-hosting.net/calendars/"), config.CalDav?.ServerUrl);
+        Assert.Equal(new Uri("https://dav.example-hosting.net/addressbooks/"), config.CardDav?.ServerUrl);
+        Assert.Equal(new DavServerSettings(ServerProtocol.Ews, new Uri("https://exchange.example-hosting.net/EWS/Exchange.asmx"), "%EMAILADDRESS%"), config.Ews);
+        Assert.Single(config.IncomingServers); // the exchange server is no IMAP/POP server
+    }
+
+    [Fact]
     public void Write_then_parse_round_trips()
     {
         var original = AutoconfigXml.Parse(Fixture);

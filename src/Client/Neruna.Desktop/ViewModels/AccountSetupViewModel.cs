@@ -409,7 +409,33 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         var options = new Dictionary<string, string>();
         if (IsExchange)
         {
-            if (EwsSettings.ParseServer(ExchangeServer) is not { } url)
+            // Left empty: the address from the domain's configuration or Neruna's directory, if it has one.
+            var url = EwsSettings.ParseServer(ExchangeServer);
+            if (url is null && string.IsNullOrWhiteSpace(ExchangeServer))
+            {
+                IsBusy = true;
+                BusyText = T("Suche Servereinstellungen …");
+                try
+                {
+                    if ((await discovery.DiscoverAsync(email))?.Config.Ews is { } found)
+                    {
+                        url = found.ServerUrl;
+                        ExchangeServer = url.AbsoluteUri;
+                        if (Username.Trim().Length == 0)
+                        {
+                            username = DiscoveryPlaceholders.Expand(found.UsernameTemplate, email);
+                            Username = username;
+                        }
+                    }
+                }
+                finally
+                {
+                    IsBusy = false;
+                    BusyText = null;
+                }
+            }
+
+            if (url is null)
             {
                 Error = T("Bitte den Exchange-Server angeben, z. B. mail.example.com.");
                 return;

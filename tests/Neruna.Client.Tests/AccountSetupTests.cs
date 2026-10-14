@@ -81,6 +81,26 @@ public class AccountSetupTests
     }
 
     [Fact]
+    public async Task Without_an_own_configuration_the_directory_is_asked_before_mozilla_with_the_domain_only()
+    {
+        var http = new StubHttpHandler();
+        http.Responses["https://autoconfig.neruna.cloud/v1/kunde.ch"] = (HttpStatusCode.OK, Fixture("autoconfig-directory-example.xml"));
+        var discovery = new AccountDiscovery(new HttpClient(http), NullLogger<AccountDiscovery>.Instance);
+
+        var found = await discovery.DiscoverAsync("anna@kunde.ch", TestContext.Current.CancellationToken);
+        Assert.Equal("autoconfig.neruna.cloud", found?.Source);
+        Assert.Equal("https://exchange.example-hosting.net/EWS/Exchange.asmx", found?.Config.Ews?.ServerUrl.AbsoluteUri);
+        Assert.Equal(["https://autoconfig.kunde.ch/mail/config-v1.1.xml?emailaddress=anna%40kunde.ch",
+            "https://kunde.ch/.well-known/autoconfig/mail/config-v1.1.xml?emailaddress=anna%40kunde.ch",
+            "https://autoconfig.neruna.cloud/v1/kunde.ch"], http.Requested);
+
+        // The directory unreachable: Mozilla.
+        http.Responses.Remove("https://autoconfig.neruna.cloud/v1/kunde.ch");
+        http.Responses["https://autoconfig.thunderbird.net/v1.1/kunde.ch"] = (HttpStatusCode.OK, Fixture("autoconfig-example.xml"));
+        Assert.Equal("autoconfig.thunderbird.net", (await discovery.DiscoverAsync("anna@kunde.ch", TestContext.Current.CancellationToken))?.Source);
+    }
+
+    [Fact]
     public async Task Discovery_returns_null_when_nothing_answers()
     {
         var discovery = new AccountDiscovery(new HttpClient(new StubHttpHandler()), NullLogger<AccountDiscovery>.Instance);
