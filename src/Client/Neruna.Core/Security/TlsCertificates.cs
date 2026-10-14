@@ -20,6 +20,15 @@ public static class TlsCertificates
     /// </summary>
     public const string AcceptAnyCertificateKey = "tls.acceptAnyCertificate";
 
+    /// <summary>
+    /// Connection setting: the TLS client certificate shown to the server (a reverse proxy that demands one), as a
+    /// <see cref="ClientCertificates"/> reference. Absent: none.
+    /// </summary>
+    public const string ClientCertificateKey = "tls.clientCertificate";
+
+    public static string? ClientCertificateOf(IReadOnlyDictionary<string, string> settings) =>
+        settings is not null && settings.TryGetValue(ClientCertificateKey, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
+
     public static bool AcceptsAnyCertificate(IReadOnlyDictionary<string, string> settings) =>
         settings is not null && settings.TryGetValue(AcceptAnyCertificateKey, out var value) && value == "true";
 

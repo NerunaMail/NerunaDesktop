@@ -80,6 +80,12 @@ internal static class AppServices
         services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Graph.GraphCalendarProviderFactory>();
         services.AddSingleton<IProviderFactory<IContactProvider>, Neruna.Providers.Graph.GraphContactProviderFactory>();
         services.AddSingleton<Neruna.Core.Auth.IBrowserLauncher, Neruna.Desktop.Infrastructure.BrowserLauncher>();
+        // Exchange on premises (EWS), also behind a reverse proxy with client certificates.
+        services.AddSingleton<Neruna.Core.Security.ClientCertificates>();
+        services.AddSingleton<Neruna.Providers.Ews.EwsConnectionFactory>();
+        services.AddSingleton<IProviderFactory<IMailProvider>, Neruna.Providers.Ews.EwsMailProviderFactory>();
+        services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Ews.EwsCalendarProviderFactory>();
+        services.AddSingleton<IProviderFactory<IContactProvider>, Neruna.Providers.Ews.EwsContactProviderFactory>();
         // AI providers (Settings → KI): one is connected at a time. Further ones (Claude, Gemini …) are added here.
         services.AddSingleton<Neruna.Core.Ai.IAiProvider>(sp => new Neruna.Providers.OpenAi.OpenAiProvider(
             sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ISettingsStore>()));

@@ -48,6 +48,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly Neruna.Core.Cloud.SettingsBackupService _backup;
     private readonly Neruna.Core.Cloud.CloudAccountSync _cloudAccounts;
     private readonly Neruna.Core.Auth.IBrowserLauncher _browser;
+    private readonly Neruna.Core.Security.ClientCertificates _clientCertificates;
+    private readonly Infrastructure.IFileService _files;
 
     // Accounts whose password the user postponed ("Später") – asked again with the next start.
     private readonly HashSet<string> _postponedCloudAccounts = [];
@@ -85,8 +87,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Cloud.CloudAccountSync cloudAccounts,
         Neruna.Core.Auth.IBrowserLauncher browser,
         Neruna.Core.Diagnostics.CrashReportService crashReports,
+        Neruna.Core.Security.ClientCertificates clientCertificates,
+        Infrastructure.IFileService files,
         ILogger<MainWindowViewModel> logger)
     {
+        _clientCertificates = clientCertificates;
+        _files = files;
         MailPage = mailPage;
         CalendarPage = calendarPage;
         ContactsPage = contactsPage;
@@ -774,6 +780,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav"))
         {
             Browser = _browser,
+            Certificates = _clientCertificates,
+            Files = _files,
             AskRedirect = (title, message) => Views.ChoiceDialog.ShowInFrontAsync(title, message, (T("Erlauben"), true, false), (T("Nicht verwenden"), false, true)),
         };
         if (editing is not null)

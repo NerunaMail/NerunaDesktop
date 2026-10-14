@@ -1,6 +1,6 @@
 # Neruna – Architektur
 
-Stand: 2026-10-07 · lebendes Dokument, wird mit dem Code nachgeführt.
+Stand: 2026-10-14 · lebendes Dokument, wird mit dem Code nachgeführt.
 
 ## 1. Produkte
 
@@ -51,6 +51,7 @@ src/
       Neruna.Providers.Dav    CalDAV + CardDAV (gemeinsame WebDAV-Basis, RFC 4791/6352/6578/6764)
       Neruna.Providers.Ics    ICS/webcal-Abos (read-only)
       Neruna.Providers.Special  selbst berechnete Kalender: Geburtstage (aus allen Adressbüchern) und Feiertage (Land/Region)
+      Neruna.Providers.Ews    Exchange im eigenen Netz über Exchange Web Services (Mail+Kalender+Kontakte, Client-Zertifikate)
       Neruna.Providers.Graph  Microsoft 365 / Outlook.com über Microsoft Graph (OAuth2, Mail+Kalender+Kontakte)
       Neruna.Providers.Demo   Beispieldaten (--demo, Screenshots)
     Neruna.Desktop        Avalonia-App (Composition Root)
@@ -73,8 +74,9 @@ MailController  CalendarController  ContactController      ← kennen kein Proto
      │               │                   │
 IMailProvider   ICalendarProvider   IContactProvider        ← Interfaces in Neruna.Core
  ├ imap ✔        ├ caldav ✔          ├ carddav ✔
- ├ ews (später)  ├ ics ✔             ├ ldap (später)
- └ jmap/graph …  └ ews (später)      └ neruna-global (Add-on)
+ ├ ews ✔         ├ ics ✔             ├ ews ✔
+ └ graph ✔       ├ ews ✔             ├ graph ✔
+                 └ graph ✔           └ ldap, neruna-global (später)
      │               │                   │
 IMailStore      ICalendarStore      IContactStore            ← SQLite (Neruna.Storage)
 ```
@@ -534,6 +536,43 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   Rückleitung `http://127.0.0.1:{port}/auth/callback`, Scope `chatgpt.tokens.use.direct` für die Nutzung des Abos
   (Plus/Pro). Alternativ API-Schlüssel. Beides über die Responses API mit `store: false`, `stream: true`; erfolgreich
   ist eine Antwort erst mit `response.completed`.
+
+## 6g. Exchange im eigenen Netz (EWS)
+
+- Eigene Kontoart «Microsoft Exchange (EWS)» für Exchange 2013 oder neuer (2016, 2019, SE). Eine Adresse für alles
+  (`https://<server>/EWS/Exchange.asmx`; nur der Hostname genügt). Im Konfigurationsformat ist das ein Eintrag mit
+  `ServerProtocol.Ews` unter `DavServers`; die drei EWS-Provider übernehmen ihn wie IMAP/DAV ihre Einträge, deshalb
+  funktionieren Einrichten, Prüfen und «Konto bearbeiten» unverändert. Verbindungseinstellungen: `ews.url`,
+  `username`, `ews.mailbox` (eigene Adresse, für Einladungen), `ews.auth`.
+- Eigener, kleiner SOAP-Client (XML, keine Fremdbibliothek – die EWS Managed API gibt es nicht für .NET 10/Android).
+  Anfragen als `Exchange2013`; bei «Server beschäftigt» einmal neu nach der genannten Pause.
+- Anmeldung: automatisch (Negotiate/NTLM/Basic, wie der Server anbietet; Anmeldedaten nur an den EWS-Host), Basic
+  sofort (für Reverse Proxys, die NTLM nicht durchreichen) oder nur Client-Zertifikat (der Proxy meldet bei Exchange
+  an). Unter Linux/macOS NTLM ohne GSSAPI über `System.Net.Security.UseManagedNtlm`. Ein HTTP-Client pro Verbindung,
+  solange Passwort und Einstellungen gleich bleiben (NTLM gilt pro TCP-Verbindung). Keine Weiterleitungen.
+- **Client-Zertifikate** (`Neruna.Core.Security.ClientCertificates`, Einstellung `tls.clientCertificate`): eine
+  importierte .p12/.pfx bleibt mit ihrem Passwort verschlüsselt und liegt samt Passwort im Schlüsselbund (nicht in
+  SQLite); unter Windows/macOS alternativ ein Zertifikat aus dem Zertifikatsspeicher des Benutzers
+  (`system:<Fingerabdruck>`, auch Smartcards). Das Zertifikat wird bei jeder Anfrage des Servers gezeigt, auch wenn
+  seine Liste akzeptierter Aussteller es nicht nennt. Getestet mit einem echten TLS-Server, der eines verlangt.
+- Mail: Ordner per `FindFolder` (tief, ohne versteckte und Suchordner, nur `IPF.Note`), Rollen über die bekannten
+  Ordner. Erster Abgleich: `SyncFolderItems` bis zum Ende (nur IDs, ergibt den Sync-Stand), dann die neuesten 2000
+  per `FindItem` + `GetItem`; danach nur Änderungen (neu, gelesen, gelöscht). Nachrichten als MIME, Senden mit Kopie
+  in «Gesendete Elemente» (BCC zusätzlich als Empfänger), Ablegen mit Gelesen/Entwurf-Flag und Empfangsdatum
+  (MAPI-Eigenschaften beim Erstellen), beantwortet/weitergeleitet wie Outlook (PR_LAST_VERB_EXECUTED, Symbol).
+  Suche über AQS. Kein Push (Abfrage jede Minute; Streaming-Benachrichtigungen später), keine Abwesenheitsnotiz.
+- Kalender: Termine und Serien (Muster, gelöschte Vorkommen als EXDATE, geänderte als eigene VEVENT mit
+  RECURRENCE-ID), Zeitzone des Termins (Windows-ID → IANA), Teilnehmer mit Rolle und der eigenen Antwort.
+  Geschrieben wird nur, was sich geändert hat (Serien behalten ihre Ausnahmen, Teilnehmer erfahren nur echte
+  Änderungen), mit Change-Key-Prüfung. Exchange verschickt Einladungen, Updates und Absagen selbst; eine neue eigene
+  Antwort auf eine fremde Besprechung wird `AcceptItem`/`TentativelyAcceptItem`/`DeclineItem`, Löschen einer fremden
+  Besprechung sagt ab. Der Geburtstagskalender von Exchange wird ausgelassen.
+- Kontakte: Kontaktordner (`IPF.Contact`) als vCard 3.0 mit Adressen (nur lesend), drei E-Mail-Adressen,
+  Telefonnummern in Exchanges festen Feldern; geschrieben werden nur geänderte Felder. Noch nicht: Verteilerlisten,
+  Kontaktbilder.
+- Tests ohne Exchange: Antworten wie dokumentiert (`EwsProviderTests`), Client-Zertifikat gegen echten TLS-Server
+  (`EwsClientCertificateTests`). Gegen einen echten Exchange-Server noch nicht geprüft.
+- Android: Der Provider hängt nur am Core und läuft unverändert mit; dort fehlen Kontoart und Zertifikatsauswahl in der UI.
 
 ## 7. Offene Entscheide
 

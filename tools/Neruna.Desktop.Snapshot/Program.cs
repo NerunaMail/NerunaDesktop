@@ -904,6 +904,15 @@ internal static class Snapshots
         await SaveAsync(window, output, "account-setup-kind.png");
         ((AccountSetupViewModel)vm.Overlay!).ChooseImapCommand.Execute(null);
         await SaveAsync(window, output, "account-setup.png");
+        vm.ShowAccountSetupCommand.Execute(null);
+        var exchange = (AccountSetupViewModel)vm.Overlay!;
+        await exchange.ChooseExchangeCommand.ExecuteAsync(null);
+        exchange.DisplayName = "Anna Muster";
+        exchange.Email = "anna.muster@muster-ag.ch";
+        exchange.ExchangeServer = "mail.muster-ag.ch";
+        exchange.Username = "MUSTER\\anna";
+        exchange.ExchangeAuthentication = AccountSetupViewModel.AuthenticationChoices[1];
+        await SaveAsync(window, output, "account-setup-exchange.png");
 
         window.Close();
         Directory.Delete(dataDir, recursive: true);

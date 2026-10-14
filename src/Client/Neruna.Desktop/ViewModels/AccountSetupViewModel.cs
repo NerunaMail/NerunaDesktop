@@ -4,7 +4,10 @@ using CommunityToolkit.Mvvm.Input;
 using Neruna.Contracts.Discovery;
 using Neruna.Core.Accounts;
 using Neruna.Core.Discovery;
+using Neruna.Core.Security;
+using Neruna.Desktop.Infrastructure;
 using Neruna.Providers.Dav;
+using Neruna.Providers.Ews;
 using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
@@ -17,17 +20,30 @@ namespace Neruna.Desktop.ViewModels;
 /// </summary>
 internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, AccountSetupService setup, HttpClient davProbeClient) : ViewModelBase
 {
+    /// <summary>Set by the shell: TLS client certificates (Exchange behind a reverse proxy); without it none can be chosen.</summary>
+    public ClientCertificates? Certificates { get; init; }
+
+    /// <summary>Set by the shell: picks a certificate file.</summary>
+    public IFileService? Files { get; init; }
+
     // ── Step 1 for a new account: which kind. Everything with IMAP/CalDAV/CardDAV is one choice (found automatically);
     //    only providers that need their own sign-in are listed separately. ──
 
-    /// <summary>"choose", "imap" or "microsoft".</summary>
+    /// <summary>"choose", "imap", "exchange" or "microsoft".</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsMicrosoft), nameof(CanGoBack), nameof(Subtitle))]
+    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsMailForm), nameof(IsMicrosoft), nameof(CanGoBack), nameof(Subtitle), nameof(NeedsPassword))]
+    [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
     public partial string Step { get; set; } = "choose";
 
     public bool IsChoosing => Step == "choose";
 
     public bool IsImap => Step == "imap";
+
+    /// <summary>Exchange on premises through EWS (also behind a reverse proxy with client certificate).</summary>
+    public bool IsExchange => Step == "exchange";
+
+    /// <summary>Name, address, aliases and password: the same for IMAP and Exchange.</summary>
+    public bool IsMailForm => IsImap || IsExchange;
 
     public bool IsMicrosoft => Step == "microsoft";
 
@@ -44,6 +60,14 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     private void ChooseImap() => Step = "imap";
 
     [RelayCommand]
+    private async Task ChooseExchangeAsync()
+    {
+        Step = "exchange";
+        ShowServerSettings = true;
+        await LoadCertificatesAsync(null);
+    }
+
+    [RelayCommand]
     private void ChooseMicrosoft()
     {
         if (MicrosoftAvailable)
@@ -56,6 +80,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     private void Back()
     {
         Error = null;
+        ShowServerSettings = false;
         Step = "choose";
     }
 
@@ -160,6 +185,10 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         ? T("Welche Art von Konto möchten Sie einrichten?")
         : IsMicrosoft
             ? T("Mail, Kalender und Kontakte Ihres Microsoft-Kontos – angemeldet wird im Browser.")
+            : IsExchange && !IsCloud
+            ? IsEditing
+                ? T("Namen, Passwort, Server und Zertifikat ändern. Die Verbindung wird vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten.")
+                : T("E-Mail, Kalender und Kontakte eines Exchange-Servers (2013 oder neuer) über Exchange Web Services – auch hinter einem Reverse Proxy mit Client-Zertifikat.")
             : IsCloud
         ? T("Die Verbindungen werden vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten.")
         : IsEditing
@@ -173,7 +202,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     {
         ArgumentNullException.ThrowIfNull(account);
         Editing = account;
-        Step = setup.IsSignedIn(account) ? "microsoft" : "imap";
+        var ews = account.Connections.FirstOrDefault(c => c.ProviderId == Neruna.Core.Providers.ProviderIds.Ews);
+        Step = setup.IsSignedIn(account) ? "microsoft" : ews is not null ? "exchange" : "imap";
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;
         Aliases.Clear();
@@ -203,6 +233,15 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         CalDavUrl = config.CalDav?.ServerUrl.AbsoluteUri ?? string.Empty;
         CardDavUrl = config.CardDav?.ServerUrl.AbsoluteUri ?? string.Empty;
         AcceptAnyCertificate = account.Connections.Any(c => Neruna.Core.Security.TlsCertificates.AcceptsAnyCertificate(c.Settings));
+        if (ews is not null)
+        {
+            var settings = EwsConnectionFactory.SettingsOf(ews);
+            ExchangeServer = settings.Url.AbsoluteUri;
+            Username = settings.Username;
+            ExchangeAuthentication = AuthenticationChoices.First(c => c.Value == settings.Authentication);
+            _ = LoadCertificatesAsync(TlsCertificates.ClientCertificateOf(ews.Settings));
+        }
+
         if (Username.Length == 0)
         {
             Username = config.DavServers.FirstOrDefault()?.UsernameTemplate ?? string.Empty;
@@ -366,7 +405,28 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         var username = Username.Trim().Length > 0 ? Username.Trim() : email;
         var incoming = new List<MailServerSettings>();
         var outgoing = new List<MailServerSettings>();
-        if (ImapHost.Trim().Length > 0)
+        var dav = new List<DavServerSettings>();
+        var options = new Dictionary<string, string>();
+        if (IsExchange)
+        {
+            if (EwsSettings.ParseServer(ExchangeServer) is not { } url)
+            {
+                Error = T("Bitte den Exchange-Server angeben, z. B. mail.example.com.");
+                return;
+            }
+
+            dav.Add(new DavServerSettings(ServerProtocol.Ews, url, username));
+            if (ExchangeAuthentication.Value != EwsAuthentication.Automatic)
+            {
+                options[EwsSettings.AuthenticationKey] = ExchangeAuthentication.Value.ToString();
+            }
+
+            if (SelectedCertificate?.Value is { } certificate)
+            {
+                options[TlsCertificates.ClientCertificateKey] = certificate;
+            }
+        }
+        else if (ImapHost.Trim().Length > 0)
         {
             if (!int.TryParse(ImapPort, NumberStyles.None, CultureInfo.InvariantCulture, out var imapPort)
                 || !int.TryParse(SmtpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var smtpPort))
@@ -379,8 +439,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             outgoing.Add(new MailServerSettings(ServerProtocol.Smtp, SmtpHost.Trim(), smtpPort, SmtpSecurity, AuthScheme.PasswordCleartext, username));
         }
 
-        var dav = new List<DavServerSettings>();
-        if (!TryAddDav(dav, ServerProtocol.CalDav, CalDavUrl, username) || !TryAddDav(dav, ServerProtocol.CardDav, CardDavUrl, username))
+        if (!IsExchange && (!TryAddDav(dav, ServerProtocol.CalDav, CalDavUrl, username) || !TryAddDav(dav, ServerProtocol.CardDav, CardDavUrl, username)))
         {
             Error = T("Die CalDAV-/CardDAV-Adresse muss mit https:// oder http:// beginnen.");
             return;
@@ -405,7 +464,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             }
         }
 
-        var account = setup.BuildAccount(name, email, config, AcceptAnyCertificate && !IsCloud) with { Label = label, Aliases = aliases.Count > 0 ? aliases : null };
+        var account = setup.BuildAccount(name, email, config, AcceptAnyCertificate && !IsCloud, options) with { Label = label, Aliases = aliases.Count > 0 ? aliases : null };
         if (account.Connections.Count == 0)
         {
             Error = T("Bitte mindestens einen IMAP-Server oder eine CalDAV-/CardDAV-Adresse angeben.");
@@ -418,11 +477,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         {
             if (Editing is { } existing)
             {
-                await setup.UpdateAsync(existing with { Aliases = account.Aliases }, name, label, email, config, Password.Length > 0 ? Password : null, acceptAnyCertificate: AcceptAnyCertificate && !IsCloud);
+                await setup.UpdateAsync(existing with { Aliases = account.Aliases }, name, label, email, config, Password.Length > 0 && NeedsPassword ? Password : null,
+                    acceptAnyCertificate: AcceptAnyCertificate && !IsCloud, options: options);
             }
             else
             {
-                await setup.CreateAsync(account, Password);
+                await setup.CreateAsync(account, NeedsPassword ? Password : null);
                 CreatedAccount = account;
             }
 
@@ -439,10 +499,130 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
     }
 
-    private bool CanCreate() => !IsBusy && (IsEditing || Password.Length > 0);
+    private bool CanCreate() => !IsBusy && (IsEditing || Password.Length > 0 || !NeedsPassword);
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, false);
+
+    // ── Exchange (EWS) ──
+
+    /// <summary>Here, not in XAML: a backslash there would be read as an escape.</summary>
+    public static string ExchangeUserHint => T("anna@example.com oder FIRMA\\anna – leer = E-Mail-Adresse");
+
+    /// <summary>"mail.example.com" or the full EWS address.</summary>
+    [ObservableProperty]
+    public partial string ExchangeServer { get; set; } = string.Empty;
+
+    public static IReadOnlyList<Choice<EwsAuthentication>> AuthenticationChoices { get; } =
+    [
+        new(EwsAuthentication.Automatic, T("Automatisch (Kerberos/NTLM oder Basic)")),
+        new(EwsAuthentication.Basic, T("Basic (für Reverse Proxys)")),
+        new(EwsAuthentication.CertificateOnly, T("Nur Client-Zertifikat, ohne Passwort")),
+    ];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsPassword))]
+    [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
+    public partial Choice<EwsAuthentication> ExchangeAuthentication { get; set; } = AuthenticationChoices[0];
+
+    /// <summary>False for Exchange with the client certificate alone.</summary>
+    public bool NeedsPassword => !IsExchange || ExchangeAuthentication.Value != EwsAuthentication.CertificateOnly;
+
+    /// <summary>"Kein Client-Zertifikat", the system's certificates (Windows, macOS) and the one the account uses or was imported.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<Choice<string?>> CertificateChoices { get; } = [];
+
+    [ObservableProperty]
+    public partial Choice<string?>? SelectedCertificate { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsCertificatePasswordVisible { get; set; }
+
+    [ObservableProperty]
+    public partial string CertificatePassword { get; set; } = string.Empty;
+
+    private byte[]? _pendingCertificate;
+
+    private async Task LoadCertificatesAsync(string? current)
+    {
+        CertificateChoices.Clear();
+        CertificateChoices.Add(new Choice<string?>(null, T("Kein Client-Zertifikat")));
+        foreach (var system in ClientCertificates.SystemCertificates())
+        {
+            CertificateChoices.Add(new Choice<string?>(system.Reference, system.DisplayName));
+        }
+
+        if (current is not null && CertificateChoices.All(c => c.Value != current))
+        {
+            var info = Certificates is null ? null : await Certificates.DescribeAsync(current);
+            CertificateChoices.Add(new Choice<string?>(current, info?.DisplayName ?? T("Zertifikat fehlt auf diesem Gerät – bitte neu wählen")));
+        }
+
+        SelectedCertificate = CertificateChoices.FirstOrDefault(c => c.Value == current) ?? CertificateChoices[0];
+    }
+
+    /// <summary>A .p12/.pfx file: kept in the keychain (with its password) and chosen for this account.</summary>
+    [RelayCommand]
+    private async Task ImportCertificateAsync()
+    {
+        if (Files is null || Certificates is null || (await Files.PickFilesAsync(T("Client-Zertifikat wählen (.p12, .pfx)"))).FirstOrDefault() is not { } path)
+        {
+            return;
+        }
+
+        try
+        {
+            _pendingCertificate = await File.ReadAllBytesAsync(path);
+        }
+        catch (IOException ex)
+        {
+            Error = F("«{0}» konnte nicht gelesen werden: {1}", Path.GetFileName(path), ex.Message);
+            return;
+        }
+
+        CertificatePassword = string.Empty;
+        await ImportPendingAsync(string.Empty);
+    }
+
+    [RelayCommand]
+    private Task ConfirmCertificateAsync() => ImportPendingAsync(CertificatePassword);
+
+    [RelayCommand]
+    private void CancelCertificate()
+    {
+        _pendingCertificate = null;
+        IsCertificatePasswordVisible = false;
+    }
+
+    private async Task ImportPendingAsync(string password)
+    {
+        if (_pendingCertificate is not { } data || Certificates is null)
+        {
+            return;
+        }
+
+        Error = null;
+        try
+        {
+            var info = await Certificates.ImportAsync(data, password);
+            _pendingCertificate = null;
+            IsCertificatePasswordVisible = false;
+            var choice = CertificateChoices.FirstOrDefault(c => c.Value == info.Reference) ?? new Choice<string?>(info.Reference, info.DisplayName);
+            if (!CertificateChoices.Contains(choice))
+            {
+                CertificateChoices.Add(choice);
+            }
+
+            SelectedCertificate = choice;
+        }
+        catch (CertificatePasswordException) when (password.Length == 0)
+        {
+            IsCertificatePasswordVisible = true; // protected by a password: ask for it
+        }
+        catch (Exception ex) when (ex is CertificatePasswordException or FormatException)
+        {
+            Error = ex.Message;
+        }
+    }
 
     private static bool TryAddDav(List<DavServerSettings> target, ServerProtocol protocol, string url, string username)
     {

@@ -34,12 +34,17 @@
     <ProjectReference Include="..\Neruna.Core\Neruna.Core.csproj" />
     <ProjectReference Include="..\Neruna.Storage\Neruna.Storage.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Imap\Neruna.Providers.Imap.csproj" />
+    <ProjectReference Include="..\Providers\Neruna.Providers.Ews\Neruna.Providers.Ews.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Graph\Neruna.Providers.Graph.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.OpenAi\Neruna.Providers.OpenAi.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Ics\Neruna.Providers.Ics.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Special\Neruna.Providers.Special.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Dav\Neruna.Providers.Dav.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Demo\Neruna.Providers.Demo.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- NTLM for Exchange (EWS) on Linux and macOS without GSSAPI/gss-ntlmssp: .NET's own implementation. -->
+    <RuntimeHostConfigurationOption Include="System.Net.Security.UseManagedNtlm" Value="true" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Neruna.Desktop.Snapshot" />

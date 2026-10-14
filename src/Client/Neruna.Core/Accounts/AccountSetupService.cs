@@ -44,10 +44,12 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
     /// <param name="password">A new password for all connections, or null to keep the stored ones.</param>
     /// <exception cref="AccountSetupException">A connection could not be established; nothing is saved.</exception>
     /// <param name="acceptAnyCertificate">Accept any server certificate (test servers); ignored for accounts from Neruna Cloud.</param>
-    public async Task<Account> UpdateAsync(Account account, string displayName, string? label, string emailAddress, MailProviderConfig config, string? password, bool acceptAnyCertificate = false, CancellationToken cancellationToken = default)
+    /// <param name="options">Further settings for every connection (see <see cref="BuildAccount"/>).</param>
+    public async Task<Account> UpdateAsync(Account account, string displayName, string? label, string emailAddress, MailProviderConfig config, string? password, bool acceptAnyCertificate = false,
+        IReadOnlyDictionary<string, string>? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(account);
-        var built = BuildAccount(displayName, emailAddress, config, acceptAnyCertificate && !account.IsFromCloud);
+        var built = BuildAccount(displayName, emailAddress, config, acceptAnyCertificate && !account.IsFromCloud, options);
         var editable = EditableConnections(account).ToList();
         var connections = account.Connections.Where(c => !editable.Contains(c)).ToList();
         var added = new List<ServiceConnection>();
@@ -154,18 +156,25 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
     };
 
     /// <param name="acceptAnyCertificate">Every connection accepts any server certificate (test servers with a self-signed one).</param>
-    public Account BuildAccount(string displayName, string emailAddress, MailProviderConfig config, bool acceptAnyCertificate = false)
+    /// <param name="options">
+    /// Further settings for every connection, beyond what the configuration describes – e.g. a TLS client certificate
+    /// (<see cref="Security.TlsCertificates.ClientCertificateKey"/>) or how to sign in at Exchange.
+    /// </param>
+    public Account BuildAccount(string displayName, string emailAddress, MailProviderConfig config, bool acceptAnyCertificate = false, IReadOnlyDictionary<string, string>? options = null)
     {
         var connections = new List<ServiceConnection>();
         AddConnections(connections, ServiceKind.Mail, providers.MailProviders, config, emailAddress);
         AddConnections(connections, ServiceKind.Calendar, providers.CalendarProviders, config, emailAddress);
         AddConnections(connections, ServiceKind.Contacts, providers.ContactProviders, config, emailAddress);
+        var extra = new Dictionary<string, string>(options ?? new Dictionary<string, string>());
         if (acceptAnyCertificate)
         {
-            connections = [.. connections.Select(c => c with
-            {
-                Settings = new Dictionary<string, string>(c.Settings) { [Security.TlsCertificates.AcceptAnyCertificateKey] = "true" },
-            })];
+            extra[Security.TlsCertificates.AcceptAnyCertificateKey] = "true";
+        }
+
+        if (extra.Count > 0)
+        {
+            connections = [.. connections.Select(c => c with { Settings = new Dictionary<string, string>(c.Settings.Concat(extra).GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Last().Value)) })];
         }
 
         return new Account(Guid.NewGuid(), displayName, emailAddress, connections);

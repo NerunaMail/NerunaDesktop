@@ -38,6 +38,12 @@
           <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'IMAP/SMTP, CalDAV und CardDAV – für die meisten Anbieter und eigene Server. Die Einstellungen werden automatisch gesucht.'}" />
         </StackPanel>
       </Button>
+      <Button Classes="choice" Command="{Binding ChooseExchangeCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
+        <StackPanel Spacing="2">
+          <TextBlock Text="Microsoft Exchange (EWS)" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Exchange-Server der Firma (2013 oder neuer): Mail, Kalender und Kontakte – auch hinter einem Reverse Proxy mit Client-Zertifikat.'}" />
+        </StackPanel>
+      </Button>
       <Button Classes="choice" Command="{Binding ChooseMicrosoftCommand}" IsEnabled="{Binding MicrosoftAvailable}"
               HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
         <StackPanel Spacing="2">
@@ -62,7 +68,7 @@
               Content="{l:T 'Bei Microsoft anmelden'}" />
     </StackPanel>
 
-    <StackPanel IsVisible="{Binding IsImap}">
+    <StackPanel IsVisible="{Binding IsMailForm}">
 
     <!-- Accounts of the organisation: only the label (and a password typed in here) are the user's -->
     <Border IsVisible="{Binding IsCloud}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
@@ -93,11 +99,47 @@
     </ItemsControl>
     <Button Classes="command" Content="{l:T '+ Alias hinzufügen'}" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left" Padding="0,2" IsVisible="{Binding !IsCloud}" />
 
-    <TextBlock Classes="label" Text="{l:T 'Passwort'}" />
-    <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="{Binding PasswordHint}" />
+    <TextBlock Classes="label" Text="{l:T 'Passwort'}" IsVisible="{Binding NeedsPassword}" />
+    <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="{Binding PasswordHint}" IsVisible="{Binding NeedsPassword}" />
+
+    <!-- Exchange: one address for mail, calendar and contacts; sign-in and client certificate for a reverse proxy -->
+    <StackPanel IsVisible="{Binding IsExchange}" IsEnabled="{Binding !IsCloud}" Margin="0,12,0,0" Spacing="2">
+      <TextBlock Classes="label" Text="{l:T 'Exchange-Server'}" />
+      <TextBox Text="{Binding ExchangeServer}" PlaceholderText="{l:T 'mail.example.com oder https://mail.example.com/EWS/Exchange.asmx'}" />
+      <TextBlock Classes="label" Text="{l:T 'Benutzer'}" />
+      <TextBox Text="{Binding Username}" PlaceholderText="{x:Static vm:AccountSetupViewModel.ExchangeUserHint}" />
+      <TextBlock Classes="label" Text="{l:T 'Anmeldung'}" />
+      <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:AccountSetupViewModel.AuthenticationChoices}" SelectedItem="{Binding ExchangeAuthentication}" />
+      <TextBlock Classes="label" Text="{l:T 'Client-Zertifikat'}" />
+      <Grid ColumnDefinitions="*,8,Auto">
+        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding CertificateChoices}" SelectedItem="{Binding SelectedCertificate}" />
+        <Button Grid.Column="2" Content="{l:T 'Aus Datei …'}" Command="{Binding ImportCertificateCommand}" ToolTip.Tip="{l:T 'Zertifikat mit privatem Schlüssel (.p12, .pfx) – es wird im Schlüsselbund dieses Computers gespeichert.'}" />
+      </Grid>
+      <StackPanel IsVisible="{Binding IsCertificatePasswordVisible}" Margin="0,6,0,0" Spacing="4">
+        <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Das Zertifikat ist mit einem Passwort geschützt:'}" />
+        <Grid ColumnDefinitions="*,8,Auto,8,Auto">
+          <TextBox Text="{Binding CertificatePassword}" PasswordChar="●" />
+          <Button Grid.Column="2" Classes="accent" Content="{l:T 'Übernehmen'}" Command="{Binding ConfirmCertificateCommand}" />
+          <Button Grid.Column="4" Content="{l:T 'Abbrechen'}" Command="{Binding CancelCertificateCommand}" />
+        </Grid>
+      </StackPanel>
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                 Text="{l:T 'Nur nötig, wenn ein Reverse Proxy vor Exchange ein Zertifikat verlangt.'}" />
+      <StackPanel Spacing="2" Margin="0,10,0,0">
+        <CheckBox IsChecked="{Binding AcceptAnyCertificate}" Content="{l:T 'Jedes Server-Zertifikat akzeptieren'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,0,0,0"
+                   Text="{l:T 'Nur für Testserver mit selbst signiertem Zertifikat: Die Verbindung ist dann verschlüsselt, aber nicht mehr gegen gefälschte Server geschützt.'}" />
+      </StackPanel>
+    </StackPanel>
 
     <!-- Server settings, prefilled by discovery -->
-    <StackPanel IsVisible="{Binding ShowServerSettings}" IsEnabled="{Binding !IsCloud}" Margin="0,12,0,0">
+    <StackPanel IsEnabled="{Binding !IsCloud}" Margin="0,12,0,0">
+      <StackPanel.IsVisible>
+        <MultiBinding Converter="{x:Static BoolConverters.And}">
+          <Binding Path="ShowServerSettings" />
+          <Binding Path="IsImap" />
+        </MultiBinding>
+      </StackPanel.IsVisible>
       <TextBlock Text="{Binding DiscoverySource}" Foreground="{DynamicResource AccentTextBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding DiscoverySource, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
@@ -151,7 +193,7 @@
         <Button Content="{l:T 'Zurück'}" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}" />
         <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
       </StackPanel>
-      <Panel Grid.Column="3" IsVisible="{Binding IsImap}">
+      <Panel Grid.Column="3" IsVisible="{Binding IsMailForm}">
         <Button Classes="accent" Content="{l:T 'Weiter'}" Command="{Binding DiscoverCommand}" IsVisible="{Binding !ShowServerSettings}" />
         <Button Classes="accent" Content="{Binding SaveText}" Command="{Binding CreateCommand}" IsVisible="{Binding ShowServerSettings}" />
       </Panel>

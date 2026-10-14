@@ -9,6 +9,9 @@ public enum ServerProtocol
     Smtp,
     CalDav,
     CardDav,
+
+    /// <summary>Exchange Web Services: one URL for mail, calendar and contacts (listed under <see cref="MailProviderConfig.DavServers"/>).</summary>
+    Ews,
 }
 
 public enum SocketSecurity
@@ -36,7 +39,10 @@ public sealed record MailServerSettings(
     AuthScheme Authentication,
     string UsernameTemplate);
 
-/// <summary>A CalDAV or CardDAV endpoint. Neruna only points at it, the data stays on the customer's server.</summary>
+/// <summary>
+/// An endpoint addressed by URL: CalDAV, CardDAV or Exchange Web Services. Neruna only points at it, the data stays on
+/// the customer's server.
+/// </summary>
 public sealed record DavServerSettings(
     ServerProtocol Protocol,
     Uri ServerUrl,
@@ -62,4 +68,7 @@ public sealed record MailProviderConfig(
 
     [JsonIgnore]
     public DavServerSettings? CardDav => DavServers.FirstOrDefault(s => s.Protocol == ServerProtocol.CardDav);
+
+    [JsonIgnore]
+    public DavServerSettings? Ews => DavServers.FirstOrDefault(s => s.Protocol == ServerProtocol.Ews);
 }

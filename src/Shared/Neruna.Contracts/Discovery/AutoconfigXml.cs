@@ -68,7 +68,7 @@ public static class AutoconfigXml
         provider.Add(config.OutgoingServers.Select(s => WriteMailServer("outgoingServer", s)));
 
         var root = new XElement("clientConfig", new XAttribute("version", "1.1"), provider);
-        root.Add(config.DavServers.Select(WriteDavServer));
+        root.Add(config.DavServers.Where(s => s.Protocol is ServerProtocol.CalDav or ServerProtocol.CardDav).Select(WriteDavServer));
 
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + root;
     }
