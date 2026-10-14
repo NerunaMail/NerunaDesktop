@@ -27,8 +27,7 @@ internal sealed record AppOptions(string DataDirectory, bool Demo, LogLevel LogL
     public static AppOptions FromArgs(string[] args)
     {
         var demo = args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
-        var root = Environment.GetEnvironmentVariable("NERUNA_DATA_DIR")
-                   ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create), "Neruna");
+        var root = Environment.GetEnvironmentVariable("NERUNA_DATA_DIR") ?? Neruna.Storage.DataFolder.Default();
         var protocolLog = Environment.GetEnvironmentVariable("NERUNA_PROTOCOL_LOG") is "1" or "true"
                           || args.Contains("--protocol-log", StringComparer.OrdinalIgnoreCase);
         var level = Enum.TryParse<LogLevel>(Environment.GetEnvironmentVariable("NERUNA_LOG_LEVEL"), ignoreCase: true, out var parsed)
