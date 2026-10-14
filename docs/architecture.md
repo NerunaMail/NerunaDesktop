@@ -429,10 +429,10 @@ Kontaktliste mit Detailansicht. Screenshots: `docs/screenshots/` (erzeugt mit `t
 
 | Bereich | Stand |
 |---|---|
-| Mandanten, Domains, Server-Profile | ✔ Datenmodell (ULIDs), Domain-Verifikation per TXT-Token vorbereitet |
+| Mandanten, Domains, Server-Profile | ✔ Portal → Domains: Bestätigung per TXT `_neruna-verify.<domain>`; mehrere Organisationen dürfen eine Domain eintragen, nur eine bestätigen; bestätigte mit Serverprofil liefern Discovery, Autoconfig und das Verzeichnis |
 | Discovery-API `/api/v1/discovery` | ✔ inkl. Vertragstest |
 | Thunderbird-Autoconfig (beide Pfade) | ✔ inkl. Vertragstest |
-| Autoconfig-Verzeichnis `/v1/<domain>` | ✔ ISPDB-Spiegel (täglich, Cron), Ergänzungen und eigene Einträge unter Admin → Autoconfig, MX-Suche |
+| Autoconfig-Verzeichnis `/v1/<domain>` | ✔ ISPDB-Spiegel (täglich, Cron), Ergänzungen und eigene Einträge unter Admin → Autoconfig, MX-Suche, Abfrage-Statistik pro Domain |
 | Admin und Kundenportal | ✔ Filament 5: `/admin` (Mandanten, Lizenz, Limits, Addons, Logins), `/portal` (Firmendaten, Benutzer, Verbindungscodes, Geräte) |
 | Signaturvorlagen, Kalender-Abos, Richtlinien | offen |
 | Config-Tresor-Ablage | ✔ `/api/v1/vault`: verpackte Schlüssel + max. 20 verschlüsselte Sicherungen pro Person (Abschnitt 6) |
