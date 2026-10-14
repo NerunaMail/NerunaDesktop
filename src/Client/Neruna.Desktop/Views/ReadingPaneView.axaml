@@ -6,6 +6,7 @@
              xmlns:app="using:Neruna.Desktop"
              xmlns:views="using:Neruna.Desktop.Views"
              xmlns:core="using:Neruna.Core.Mail"
+             xmlns:sys="using:System"
              x:Class="Neruna.Desktop.Views.ReadingPaneView"
              x:DataType="vm:ReadingPaneViewModel">
   <!-- A message: header, security, attachments, body. Used in the mail page and in the message window. -->
@@ -169,6 +170,8 @@
                   </MenuFlyout>
                 </Button.Flyout>
               </Button>
+              <Button Classes="command" Content="{l:T 'Text'}" Command="{Binding StartTextCommand}" IsVisible="{Binding CanStamp}" IsEnabled="{Binding !IsStamping}"
+                      ToolTip.Tip="{l:T 'Eigenen Text ins PDF schreiben'}" />
               <Button Classes="command" Content="{l:T 'Antworten mit PDF'}" Command="{Binding ReplyWithCommand}" IsVisible="{Binding IsStamped}" />
               <Button Classes="command" Content="{l:T 'Weiterleiten mit PDF'}" Command="{Binding ForwardWithCommand}" IsVisible="{Binding IsStamped}" />
               <Button Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Attachment.OpenCommand}" IsVisible="{Binding !IsStamped}" />
@@ -179,10 +182,25 @@
         <!-- Placing a stamp: what to do, then keep it or not -->
         <Border Grid.Row="1" Background="{DynamicResource InfoBackgroundBrush}" Padding="16,8" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel"
                 IsVisible="{Binding IsStamping, FallbackValue=False}">
-          <Grid ColumnDefinitions="*,Auto,Auto">
+          <Grid ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto">
             <TextBlock Text="{Binding StampHint}" TextWrapping="Wrap" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Content="{Binding CancelLabel}" Command="{Binding CancelStampCommand}" Margin="8,0,0,0" />
-            <Button Grid.Column="2" Classes="accent" Content="{Binding ApplyLabel}" Command="{Binding ApplyStampCommand}" Margin="6,0,0,0" />
+            <Button Grid.Column="1" Content="{Binding CancelLabel}" Command="{Binding CancelStampCommand}" Margin="8,0,0,0" VerticalAlignment="Top" />
+            <Button Grid.Column="2" Classes="accent" Content="{Binding ApplyLabel}" Command="{Binding ApplyStampCommand}" Margin="6,0,0,0" VerticalAlignment="Top" />
+            <!-- Own text: what, how large, which colour -->
+            <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding IsAddingText}">
+              <TextBox Text="{Binding TextContent}" AcceptsReturn="True" TextWrapping="Wrap" Width="360" MinHeight="32" MaxHeight="96"
+                       PlaceholderText="{l:T 'Text (mehrere Zeilen mit Enter)'}" />
+              <ComboBox ItemsSource="{x:Static vm:AttachmentPreviewViewModel.TextSizes}" SelectedItem="{Binding TextSize}" VerticalAlignment="Top"
+                        ToolTip.Tip="{l:T 'Schriftgrösse'}" />
+              <ComboBox ItemsSource="{x:Static vm:AttachmentPreviewViewModel.TextColors}" SelectedItem="{Binding TextColor}" VerticalAlignment="Top"
+                        ToolTip.Tip="{l:T 'Farbe'}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="sys:String">
+                    <Border Width="28" Height="16" CornerRadius="3" Background="{Binding Converter={x:Static l:Converters.ColorBrush}}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
           </Grid>
         </Border>
         <ScrollViewer Grid.Row="2" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">

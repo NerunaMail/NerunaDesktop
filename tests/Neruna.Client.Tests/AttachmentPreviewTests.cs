@@ -72,6 +72,19 @@ public class AttachmentPreviewTests
     }
 
     [Fact]
+    public void WritesOwnTextBelowAndRightOfTheClick()
+    {
+        var edited = PdfPages.AddText(MinimalPdf(""), new PdfTextMark(0, 0.1, 0.5, "Bezahlt am 14.10.\nVisum AM", "#FF0000", 14));
+        var page = PdfPages.Render(edited, 0, 1, 400).Pages[0];
+        var red = Enumerable.Range(0, page.Height).SelectMany(y => Enumerable.Range(0, page.Width).Select(x => (x, y)))
+            .Where(p => IsRed(page, p.x, p.y)).ToList();
+        Assert.NotEmpty(red);
+        Assert.InRange(red.Min(p => p.x), 0.09 * page.Width, 0.13 * page.Width);
+        Assert.InRange(red.Min(p => p.y), 0.49 * page.Height, 0.52 * page.Height);
+        Assert.True(red.Max(p => p.y) > 0.53 * page.Height); // two lines
+    }
+
+    [Fact]
     public void StampingKeepsTheOriginal()
     {
         var original = MinimalPdf("0 0 100 100 re f");

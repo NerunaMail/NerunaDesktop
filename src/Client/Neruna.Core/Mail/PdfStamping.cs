@@ -12,6 +12,9 @@ namespace Neruna.Core.Mail;
 /// <param name="Color">"#RRGGBB".</param>
 public sealed record PdfStampMark(int Page, double X, double Y, string Title, IReadOnlyList<string> Lines, string Color);
 
+/// <summary>Own text written into a PDF page; <paramref name="X"/>/<paramref name="Y"/> is its top left corner (0 – 1 of the page as shown).</summary>
+public sealed record PdfTextMark(int Page, double X, double Y, string Text, string Color, float Size);
+
 public static partial class PdfPages
 {
     private const float TitleSize = 15;
@@ -24,8 +27,21 @@ public static partial class PdfPages
     /// <exception cref="PdfPreviewException">The PDF cannot be read or written, or is protected by a password.</exception>
     public static byte[] Stamp(byte[] pdf, PdfStampMark mark)
     {
-        ArgumentNullException.ThrowIfNull(pdf);
         ArgumentNullException.ThrowIfNull(mark);
+        return Edit(pdf, mark.Page, (document, page) => DrawStamp(document, page, mark));
+    }
+
+    /// <summary>The PDF with the text on its page, as a new file.</summary>
+    /// <exception cref="PdfPreviewException">The PDF cannot be read or written, or is protected by a password.</exception>
+    public static byte[] AddText(byte[] pdf, PdfTextMark mark)
+    {
+        ArgumentNullException.ThrowIfNull(mark);
+        return Edit(pdf, mark.Page, (document, page) => DrawText(document, page, mark));
+    }
+
+    private static byte[] Edit(byte[] pdf, int pageIndex, Action<IntPtr, IntPtr> draw)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
 
         lock (Gate)
         {
@@ -42,7 +58,7 @@ public static partial class PdfPages
 
                 try
                 {
-                    var page = NativeMethods.FPDF_LoadPage(document, mark.Page);
+                    var page = NativeMethods.FPDF_LoadPage(document, pageIndex);
                     if (page == IntPtr.Zero)
                     {
                         throw new PdfPreviewException(PdfPreviewProblem.Unreadable);
@@ -50,7 +66,7 @@ public static partial class PdfPages
 
                     try
                     {
-                        DrawStamp(document, page, mark);
+                        draw(document, page);
                         if (NativeMethods.FPDFPage_GenerateContent(page) == 0)
                         {
                             throw new PdfPreviewException(PdfPreviewProblem.Unreadable);
@@ -75,21 +91,43 @@ public static partial class PdfPages
         }
     }
 
-    private static void DrawStamp(IntPtr document, IntPtr page, PdfStampMark mark)
+    // Where the user clicked, in the page's own coordinates (PDFium accounts for rotation and crop box), and the
+    // turn against the page's rotation, so what is added reads upright as the page is shown.
+    private static (double X, double Y, double Cos, double Sin) Anchor(IntPtr page, double x, double y)
     {
-        var (r, g, b) = ParseColor(mark.Color);
-
-        // Where the user clicked, in the page's own coordinates (PDFium accounts for rotation and crop box).
         var width = NativeMethods.FPDF_GetPageWidthF(page);
         var height = NativeMethods.FPDF_GetPageHeightF(page);
         const int Device = 10000;
         var deviceHeight = width > 0 ? (int)Math.Round(Device * height / width) : Device;
         _ = NativeMethods.FPDF_DeviceToPage(page, 0, 0, Device, deviceHeight, 0,
-            (int)Math.Round(Math.Clamp(mark.X, 0, 1) * Device), (int)Math.Round(Math.Clamp(mark.Y, 0, 1) * deviceHeight), out var centerX, out var centerY);
-
-        // Turned against the page's rotation, so the stamp reads upright as the page is shown.
+            (int)Math.Round(Math.Clamp(x, 0, 1) * Device), (int)Math.Round(Math.Clamp(y, 0, 1) * deviceHeight), out var pageX, out var pageY);
         var angle = NativeMethods.FPDFPage_GetRotation(page) * Math.PI / 2;
-        var (cos, sin) = (Math.Cos(angle), Math.Sin(angle));
+        return (pageX, pageY, Math.Cos(angle), Math.Sin(angle));
+    }
+
+    private static void DrawText(IntPtr document, IntPtr page, PdfTextMark mark)
+    {
+        var (r, g, b) = ParseColor(mark.Color);
+        var (left, top, cos, sin) = Anchor(page, mark.X, mark.Y);
+        var baseline = -mark.Size * 0.8;
+        foreach (var line in mark.Text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            if (line.Length > 0)
+            {
+                var (text, _) = NewText(document, "Helvetica", mark.Size, line, r, g, b);
+                NativeMethods.FPDFPageObj_Transform(text, 1, 0, 0, 1, 0, baseline);
+                NativeMethods.FPDFPageObj_Transform(text, cos, sin, -sin, cos, left, top);
+                NativeMethods.FPDFPage_InsertObject(page, text);
+            }
+
+            baseline -= mark.Size * 1.25;
+        }
+    }
+
+    private static void DrawStamp(IntPtr document, IntPtr page, PdfStampMark mark)
+    {
+        var (r, g, b) = ParseColor(mark.Color);
+        var (centerX, centerY, cos, sin) = Anchor(page, mark.X, mark.Y);
 
         var texts = new List<(IntPtr Text, float Width)>
         {

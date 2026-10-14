@@ -73,14 +73,68 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsStamping), nameof(StampHint))]
     public partial PdfStamp? ActiveStamp { get; set; }
 
-    public bool IsStamping => ActiveStamp is not null;
+    /// <summary>Own text being placed ("Text"): the bar has a field for it, size and colour.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsStamping), nameof(StampHint))]
+    public partial bool IsAddingText { get; set; }
+
+    /// <summary>A stamp or text is being placed: clicks on a page place it.</summary>
+    public bool IsStamping => ActiveStamp is not null || IsAddingText;
+
+    [ObservableProperty]
+    public partial string TextContent { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string TextColor { get; set; } = "#000000";
+
+    [ObservableProperty]
+    public partial float TextSize { get; set; } = 11;
+
+    public static IReadOnlyList<string> TextColors { get; } = ["#000000", .. QuickActionService.Colors];
+
+    public static IReadOnlyList<float> TextSizes { get; } = [8, 9, 10, 11, 12, 14, 16, 20, 24];
+
+    // Where the text was clicked: changing it, its size or colour shows it there again.
+    private (PreviewPage Page, double X, double Y)? _textAt;
+
+    partial void OnTextContentChanged(string value) => _ = RedrawTextAsync();
+
+    partial void OnTextColorChanged(string value) => _ = RedrawTextAsync();
+
+    partial void OnTextSizeChanged(float value) => _ = RedrawTextAsync();
+
+    [RelayCommand]
+    private void StartText()
+    {
+        if (!CanStamp)
+        {
+            return;
+        }
+
+        RestorePlaced();
+        ActiveStamp = null;
+        _textAt = null;
+        IsAddingText = true;
+    }
+
+    private int _textVersion;
+
+    private async Task RedrawTextAsync()
+    {
+        if (IsAddingText && _textAt is { } at)
+        {
+            await PlaceAsync(at.Page, at.X, at.Y);
+        }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StampHint))]
     [NotifyCanExecuteChangedFor(nameof(ApplyStampCommand))]
     public partial bool HasPlacedStamp { get; set; }
 
-    public string? StampHint => ActiveStamp is not { } stamp ? null
+    public string? StampHint => IsAddingText
+        ? (HasPlacedStamp ? T("Text gesetzt – ein Klick an eine andere Stelle verschiebt ihn.") : T("Klicken Sie auf die Stelle, an der der Text beginnt, und schreiben Sie ihn ins Feld."))
+        : ActiveStamp is not { } stamp ? null
         : HasPlacedStamp ? F("Stempel «{0}» gesetzt – ein Klick an eine andere Stelle verschiebt ihn.", stamp.Text)
         : F("Klicken Sie auf die Stelle, an die der Stempel «{0}» kommt.", stamp.Text);
 
@@ -116,23 +170,49 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
     /// <summary>A click on a page while stamping (position as share of the page's width and height, from top left).</summary>
     public async Task PlaceAsync(PreviewPage page, double x, double y)
     {
-        if (ActiveStamp is not { } stamp || _data is not { } data)
+        if (_data is not { } data)
         {
             return;
         }
 
-        var name = _actions is null ? null : await _actions.GetStampNameAsync();
-        var mark = new PdfStampMark(page.Index, x, y, stamp.Text, stamp.Lines(name, DateTime.Now), stamp.Color);
+        Func<byte[]> edit;
+        Func<bool> stillWanted;
+        if (IsAddingText)
+        {
+            _textAt = (page, x, y);
+            if (string.IsNullOrWhiteSpace(TextContent))
+            {
+                RestorePlaced(); // the position is kept; the text follows as it is typed
+                return;
+            }
+
+            var mark = new PdfTextMark(page.Index, x, y, TextContent, TextColor, TextSize);
+            var version = ++_textVersion;
+            edit = () => PdfPages.AddText(data, mark);
+            stillWanted = () => IsAddingText && version == _textVersion;
+        }
+        else if (ActiveStamp is { } stamp)
+        {
+            var name = _actions is null ? null : await _actions.GetStampNameAsync();
+            var mark = new PdfStampMark(page.Index, x, y, stamp.Text, stamp.Lines(name, DateTime.Now), stamp.Color);
+            edit = () => PdfPages.Stamp(data, mark);
+            stillWanted = () => ActiveStamp == stamp;
+        }
+        else
+        {
+            return;
+        }
+
         try
         {
             var (stamped, image) = await Task.Run(() =>
             {
-                var result = PdfPages.Stamp(data, mark);
+                var result = edit();
                 return (result, PdfPages.Render(result, page.Index, 1, PdfWidth).Pages[0]);
             });
-            if (ActiveStamp != stamp)
+            if (!stillWanted())
             {
-                return; // cancelled meanwhile
+                return; // cancelled or changed meanwhile
             }
 
             RestorePlaced();
@@ -160,6 +240,9 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
         _placedOn = null; // the page keeps the stamped picture
         HasPlacedStamp = false;
         ActiveStamp = null;
+        IsAddingText = false;
+        TextContent = string.Empty;
+        _textAt = null;
         IsStamped = true;
         _forAction?.TrySetResult(_data);
         _forAction = null;
@@ -170,6 +253,8 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
     {
         RestorePlaced();
         ActiveStamp = null;
+        IsAddingText = false;
+        _textAt = null;
         _forAction?.TrySetResult(null);
         _forAction = null;
     }

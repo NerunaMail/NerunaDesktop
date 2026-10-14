@@ -149,6 +149,16 @@ internal static class Snapshots
         await SaveAsync(window, output, "mail-pdf-stamped.png");
         Console.WriteLine($"Stamped: {stampPreview.IsStamped}, stamping: {stampPreview.IsStamping}");
 
+        // Own text: clicked first, then typed – shown where it begins.
+        stampPreview.StartTextCommand.Execute(null);
+        await stampPreview.PlaceAsync(stampPreview.Pages[0], 0.08, 0.36);
+        stampPreview.TextContent = "Bitte bis Freitag bestätigen\nVisum: AM";
+        stampPreview.TextColor = "#C42B1C";
+        await Task.Delay(800);
+        await SaveAsync(window, output, "mail-pdf-text.png");
+        stampPreview.ApplyStampCommand.Execute(null);
+        Console.WriteLine($"Text added: {stampPreview.IsStamped}, adding: {stampPreview.IsAddingText}");
+
         // A quick action for mails with a PDF: its button in the coloured bar.
         var quick = services.GetRequiredService<Neruna.Core.Mail.QuickActionService>();
         var firstStamp = (await quick.GetStampsAsync())[0];
