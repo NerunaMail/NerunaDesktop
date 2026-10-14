@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Neruna.Core.Accounts;
 using Neruna.Core.Mail;
 
@@ -144,5 +145,22 @@ public class MailControllerTests
 
         Assert.Empty(await env.Mail.GetFoldersAsync(connection.Id, TestContext.Current.CancellationToken));
         Assert.False(Directory.Exists(Path.Combine(env.Directory, "messages", connection.Id.ToString("N"))));
+    }
+
+    [Fact]
+    public async Task A_server_timing_out_is_a_failed_connection_not_an_aborted_sync()
+    {
+        await using var env = await TestEnvironment.CreateAsync(s => s.AddSingleton<Neruna.Core.SyncActivity>());
+        await env.AddAccountAsync(ServiceKind.Mail, FakeMailProviderFactory.Id);
+        // HttpClient reports its timeout as a cancelled task – nobody cancelled the sync.
+        env.MailServer.FolderListingGate = () => throw new TaskCanceledException("timeout", new TimeoutException());
+
+        var report = await env.Mail.SyncAllAsync(TestContext.Current.CancellationToken);
+
+        var failure = Assert.Single(report.Failures);
+        Assert.IsType<TaskCanceledException>(failure.Error);
+        var entry = Assert.Single(env.Get<Neruna.Core.SyncActivity>().Entries);
+        Assert.Equal(Neruna.Core.SyncState.Failed, entry.State);
+        Assert.StartsWith("Zeitüberschreitung", entry.Error, StringComparison.Ordinal);
     }
 }

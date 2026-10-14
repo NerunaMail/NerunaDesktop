@@ -43,7 +43,7 @@ public sealed class SyncReport
                     report._skipped.Add(connection);
                     activity?.Skipped(connection);
                 }
-                catch (OperationCanceledException ex)
+                catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
                 {
                     activity?.Finished(connection, ex);
                     throw;

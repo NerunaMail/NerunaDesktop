@@ -1,4 +1,5 @@
 using Neruna.Core.Accounts;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core;
 
@@ -66,9 +67,15 @@ public sealed class SyncActivity(TimeProvider time)
         {
             State = error is null ? SyncState.Done : SyncState.Failed,
             Duration = time.GetUtcNow() - previous.StartedAt,
-            Error = error?.Message,
+            Error = error is null ? null : Describe(error),
             LastSuccess = error is null ? time.GetUtcNow() : previous.LastSuccess,
         });
+
+    /// <summary>The error for the status window; a timeout in words instead of .NET's "The request was canceled …".</summary>
+    internal static string Describe(Exception error) =>
+        error is OperationCanceledException or TimeoutException || error.InnerException is TimeoutException
+            ? T("Zeitüberschreitung: Der Server hat nicht rechtzeitig geantwortet.")
+            : error.Message;
 
     internal void Skipped(ServiceConnection connection) =>
         Update(connection.Id, previous => previous is null ? null : previous with { State = SyncState.Skipped, Duration = TimeSpan.Zero });

@@ -688,7 +688,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                     ? F("Synchronisiert um {0:t} – 1 Verbindung fehlgeschlagen", DateTime.Now)
                     : F("Synchronisiert um {0:t} – {1} Verbindungen fehlgeschlagen", DateTime.Now, failures.Count);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException)
+        {
+            StatusText = T("Synchronisierung abgebrochen.");
+        }
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Sync failed");
             HasSyncProblems = true;
