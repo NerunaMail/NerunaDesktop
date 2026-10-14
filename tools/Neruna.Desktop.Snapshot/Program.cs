@@ -798,6 +798,8 @@ internal static class Snapshots
             vm.SettingsPage.Cloud.Pin = Environment.GetEnvironmentVariable("NERUNA_SNAPSHOT_CLOUD_PIN") ?? string.Empty;
             await vm.SettingsPage.Cloud.ConnectCommand.ExecuteAsync(null);
             Console.WriteLine($"Cloud: {vm.SettingsPage.Cloud.ConnectedText ?? vm.SettingsPage.Cloud.Error}");
+            vm.SettingsPage.SelectedTab = 7; // Neruna Cloud (the AI shots before left Einstellungen → KI open)
+            await Task.Delay(300);
             await SaveAsync(window, output, "settings-cloud-connected.png");
 
             // The organisation's signatures arrived with the connection.
