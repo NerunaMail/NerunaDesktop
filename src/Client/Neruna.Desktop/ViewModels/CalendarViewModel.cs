@@ -109,6 +109,31 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     /// <summary>One entry per slot of the day: full hours get a solid line, subdivisions a lighter one.</summary>
     public IReadOnlyList<GridLine> GridLines => GridLine.ForDay(GridMinutes);
 
+    /// <summary>Time grid: the hours that fill the view (07:00–21:00 unless chosen otherwise); before and after, it scrolls.</summary>
+    [ObservableProperty]
+    public partial int VisibleFrom { get; set; } = 7;
+
+    [ObservableProperty]
+    public partial int VisibleTo { get; set; } = 21;
+
+    /// <summary>The visible hours changed: the view fits the hours again and scrolls to the start.</summary>
+    public event EventHandler? VisibleRangeChanged;
+
+    public void SetVisibleRange(int from, int to)
+    {
+        from = Math.Clamp(from, 0, 23);
+        to = Math.Clamp(to, from + 1, 24);
+        // Settings are read again with every reload (after each sync): only a real change moves the view.
+        if (from == VisibleFrom && to == VisibleTo)
+        {
+            return;
+        }
+
+        VisibleFrom = from;
+        VisibleTo = to;
+        VisibleRangeChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>The hour labels' height (follows <see cref="TimedEventItem.HourHeight"/>).</summary>
     [ObservableProperty]
     public partial double HourHeight { get; set; } = TimedEventItem.HourHeight;
@@ -163,6 +188,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         IsWorkWeek = await settings.GetBoolAsync(SettingKeys.CalendarWorkWeek);
         _loadingSettings = false;
         GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
+        SetVisibleRange(
+            int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleFrom), out var from) ? from : 7,
+            int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleTo), out var to) ? to : 21);
         var hidden = await calendar.GetHiddenCalendarsAsync();
 
         // The new list is built first and swapped in at once: a week load starting meanwhile must never see no calendars.
@@ -619,13 +647,13 @@ internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string co
 internal sealed class TimedEventItem(CalendarEventItem item, double top, double height, int column, int columns)
 {
     /// <summary>The least height of an hour in the time grid.</summary>
-    public const double MinHourHeight = 48;
+    public const double MinHourHeight = 24;
 
     /// <summary>
-    /// Height of an hour: at least <see cref="MinHourHeight"/>, more on tall screens so the day fills the view
-    /// (set by the view from its height, see CalendarView).
+    /// Height of an hour: so the chosen visible hours (Einstellungen → Kalender) fill the view, at least
+    /// <see cref="MinHourHeight"/> (set by the view from its height, see CalendarView).
     /// </summary>
-    public static double HourHeight { get; set; } = MinHourHeight;
+    public static double HourHeight { get; set; } = 48;
     private const double MinHeight = 22;
 
     public CalendarEventItem Item { get; } = item;

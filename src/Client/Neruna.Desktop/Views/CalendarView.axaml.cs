@@ -12,7 +12,6 @@ namespace Neruna.Desktop.Views;
 
 internal sealed partial class CalendarView : UserControl
 {
-    private const int FirstVisibleHour = 7;
     private readonly DispatcherTimer _nowTimer = new() { Interval = TimeSpan.FromMinutes(1) };
     private bool _scrolledToMorning;
 
@@ -22,22 +21,66 @@ internal sealed partial class CalendarView : UserControl
         ColumnMemory.Attach(this, "columns.calendar", 0);
         _nowTimer.Tick += (_, _) => (DataContext as CalendarViewModel)?.RefreshNow();
 
-        // The time grid opens at 07:00 (start of the working day); afterwards the user's scroll position stays.
+        // The chosen hours (Einstellungen → Kalender, 07:00–21:00) fill the view; the time grid opens at their start.
+        // Afterwards the user's scroll position stays – also when the window is resized.
         var scroll = this.FindControl<ScrollViewer>("TimeScroll")!;
         scroll.PropertyChanged += (_, e) =>
         {
-            // Tall screens: the hours grow until the whole day fills the view (never below the normal height).
-            if (e.Property == BoundsProperty && scroll.Bounds.Height > 0 && DataContext is CalendarViewModel calendar)
+            if (e.Property == BoundsProperty && scroll.Bounds.Height > 0)
             {
-                _ = calendar.SetHourHeightAsync(Math.Max(TimedEventItem.MinHourHeight, Math.Floor(scroll.Bounds.Height / 24)));
+                Fit(scroll, toStart: !_scrolledToMorning);
             }
-
-            if (e.Property == BoundsProperty && !_scrolledToMorning && scroll.Bounds.Height > 0 && scroll.Extent.Height > 0)
+            else if (e.Property == ScrollViewer.ExtentProperty)
             {
-                _scrolledToMorning = true;
-                scroll.Offset = new Vector(0, (FirstVisibleHour - 0.25) * TimedEventItem.HourHeight);
+                ScrollToPending(scroll);
             }
         };
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is CalendarViewModel calendar)
+            {
+                calendar.VisibleRangeChanged += (_, _) => Fit(scroll, toStart: true);
+                Fit(scroll, toStart: !_scrolledToMorning);
+            }
+        };
+    }
+
+    private async void Fit(ScrollViewer scroll, bool toStart)
+    {
+        if (DataContext is not CalendarViewModel calendar || scroll.Bounds.Height <= 0)
+        {
+            return;
+        }
+
+        var hours = Math.Max(1, calendar.VisibleTo - calendar.VisibleFrom);
+        // A position not yet applied (the size changes several times while opening) wins over the current one.
+        // A quarter hour of room above and below, so the first hour's label is not cut off.
+        var top = toStart ? Math.Max(0, calendar.VisibleFrom - 0.25) : _pendingTop ?? scroll.Offset.Y / TimedEventItem.HourHeight;
+        _scrolledToMorning = true;
+        // Noted before the relayout: a resize arriving meanwhile keeps this target. Applied once the grid is tall
+        // enough (the week may still be loading), else the offset would be cut to 0.
+        _pendingTop = top;
+        await calendar.SetHourHeightAsync(Math.Max(TimedEventItem.MinHourHeight, Math.Floor(scroll.Bounds.Height / (hours + 0.5))));
+        Dispatcher.UIThread.Post(() => ScrollToPending(scroll), DispatcherPriority.Background);
+    }
+
+    private double? _pendingTop;
+
+    private void ScrollToPending(ScrollViewer scroll)
+    {
+        if (_pendingTop is not { } top)
+        {
+            return;
+        }
+
+        var offset = top * TimedEventItem.HourHeight;
+        if (scroll.Extent.Height - scroll.Viewport.Height + 0.5 < offset)
+        {
+            return; // not yet tall enough: again when the extent grows
+        }
+
+        scroll.Offset = new Vector(0, offset);
+        _pendingTop = null;
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

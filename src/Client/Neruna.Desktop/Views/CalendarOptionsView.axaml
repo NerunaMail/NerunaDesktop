@@ -38,6 +38,16 @@
       <RadioButton GroupName="GridMinutes" Content="{l:T '15 Minuten'}" IsChecked="{Binding Grid15}" />
     </StackPanel>
 
+    <TextBlock Text="{l:T 'Sichtbereich im Zeitraster'}" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap"
+               Text="{l:T 'Diese Stunden füllen die Höhe des Fensters; was davor und danach liegt, erreichen Sie mit Scrollen. Ganztägige Termine stehen immer oben.'}" />
+    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,14">
+      <TextBlock Text="{l:T 'von'}" VerticalAlignment="Center" />
+      <ComboBox ItemsSource="{x:Static vm:CalendarOptionsViewModel.HourOptions}" SelectedItem="{Binding VisibleFrom}" Width="100" />
+      <TextBlock Text="{l:T 'bis'}" VerticalAlignment="Center" />
+      <ComboBox ItemsSource="{x:Static vm:CalendarOptionsViewModel.HourOptions}" SelectedItem="{Binding VisibleTo}" Width="100" />
+    </StackPanel>
+
     <TextBlock Text="{l:T 'Monatsübersicht'}" FontSize="16" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap"
                Text="{l:T 'Der Monatskalender links über der Kalenderliste – Klick auf einen Tag oder eine Kalenderwoche zeigt diese Woche.'}" />

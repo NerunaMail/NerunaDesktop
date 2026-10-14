@@ -61,6 +61,48 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         }
     }
 
+    /// <summary>The hours offered for the visible range: 00:00 … 24:00.</summary>
+    public static IReadOnlyList<HourOption> HourOptions { get; } = [.. Enumerable.Range(0, 25).Select(h => new HourOption(h))];
+
+    /// <summary>Time grid: these hours fill the view, the rest is reached by scrolling.</summary>
+    [ObservableProperty]
+    public partial HourOption? VisibleFrom { get; set; }
+
+    [ObservableProperty]
+    public partial HourOption? VisibleTo { get; set; }
+
+    partial void OnVisibleFromChanged(HourOption? value) => SaveVisibleRange(changedFrom: true);
+
+    partial void OnVisibleToChanged(HourOption? value) => SaveVisibleRange(changedFrom: false);
+
+    private void SaveVisibleRange(bool changedFrom)
+    {
+        if (_loading || VisibleFrom is not { } from || VisibleTo is not { } to)
+        {
+            return;
+        }
+
+        // "From" after "to": the other one moves along (at least one hour).
+        if (from.Hour >= to.Hour)
+        {
+            _loading = true;
+            if (changedFrom)
+            {
+                VisibleTo = HourOptions[Math.Min(24, from.Hour + 1)];
+            }
+            else
+            {
+                VisibleFrom = HourOptions[Math.Max(0, to.Hour - 1)];
+            }
+
+            _loading = false;
+        }
+
+        calendarPage.SetVisibleRange(VisibleFrom!.Hour, VisibleTo!.Hour);
+        _ = settings.SetAsync(SettingKeys.CalendarVisibleFrom, VisibleFrom.Hour.ToString(CultureInfo.InvariantCulture));
+        _ = settings.SetAsync(SettingKeys.CalendarVisibleTo, VisibleTo.Hour.ToString(CultureInfo.InvariantCulture));
+    }
+
     partial void OnGridMinutesChanged(int value)
     {
         if (_loading)
@@ -120,6 +162,10 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
             TwoMonths = await settings.GetAsync(SettingKeys.CalendarNavigatorMonths) == "2";
             TimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) != "list"; // default: time grid
             GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
+            var from = int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleFrom), out var f) ? Math.Clamp(f, 0, 23) : 7;
+            var to = int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleTo), out var t) ? Math.Clamp(t, from + 1, 24) : 21;
+            VisibleFrom = HourOptions[from];
+            VisibleTo = HourOptions[Math.Max(to, from + 1)];
         }
         finally
         {
@@ -138,4 +184,10 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         calendarPage.NavigatorMonthCount = months;
         _ = settings.SetAsync(SettingKeys.CalendarNavigatorMonths, months.ToString(CultureInfo.InvariantCulture));
     }
+}
+
+/// <summary>A full hour in a choice list ("07:00").</summary>
+internal sealed record HourOption(int Hour)
+{
+    public override string ToString() => $"{Hour:00}:00";
 }

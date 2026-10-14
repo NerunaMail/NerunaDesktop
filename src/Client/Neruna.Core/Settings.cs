@@ -93,6 +93,11 @@ public static class SettingKeys
     /// <summary>"true": the week view shows Monday–Friday only.</summary>
     public const string CalendarWorkWeek = "calendar.workWeek";
 
+    /// <summary>Time grid: the hours that fill the view ("7" and "21": 07:00–21:00); the rest is reached by scrolling.</summary>
+    public const string CalendarVisibleFrom = "calendar.visibleFrom";
+
+    public const string CalendarVisibleTo = "calendar.visibleTo";
+
     /// <summary>Order of the account groups in "Meine Kalender" (JSON list of account ids); others follow in account order.</summary>
     public const string CalendarGroupOrder = "calendar.groupOrder";
 
