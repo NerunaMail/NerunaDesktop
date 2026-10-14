@@ -137,7 +137,8 @@ internal static class Snapshots
 
         await SaveAsync(window, output, "mail-attachment-preview.png");
         Console.WriteLine($"Attachment preview: {vm.MailPage.ReadingPane.Preview?.Pages.Count} page(s), {vm.MailPage.ReadingPane.Preview?.PageInfo}, problem={vm.MailPage.ReadingPane.Preview?.Problem}");
-        // Stamping the PDF: placed (shown on the page at once), then kept.
+        // Stamping the PDF: placed (shown on the page at once), then kept – with the person's name, not the login.
+        await services.GetRequiredService<Neruna.Core.Mail.QuickActionService>().SetStampNameAsync("Anna Muster");
         var stampPreview = vm.MailPage.ReadingPane.Preview!;
         Console.WriteLine($"Can stamp: {stampPreview.CanStamp}, stamps: {string.Join(", ", stampPreview.Stamps.Select(s => s.Text))}");
         stampPreview.StartStampCommand.Execute(stampPreview.Stamps[0]);
@@ -168,7 +169,7 @@ internal static class Snapshots
                 new Neruna.Core.Mail.QuickActionCondition { Attachment = Neruna.Core.Mail.QuickActionAttachmentKind.Pdf },
                 [
                     new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.StampPdf) { StampId = firstStamp.Id },
-                    new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.SaveAttachment) { Folder = "/home/anna/Offerten", FileName = "{Datum}_{Absender}_{Dateiname}" },
+                    new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.SaveAttachment) { Folder = @"\\fileserver\Offerten\Genehmigt", FileName = "{Datum}_{Absender}_{Dateiname}" },
                     new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.Reply),
                     new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.MoveToFolder) { FolderName = "Projekte" },
                 ]),
