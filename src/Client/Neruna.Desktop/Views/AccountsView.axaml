@@ -31,7 +31,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AccountItem">
               <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,0,0,10">
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
                   <StackPanel>
                     <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding Sender}" Classes="subtle" />
@@ -65,6 +65,12 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
+                  <!-- How far back the mail is complete on this computer (also offline) -->
+                  <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0" IsVisible="{Binding HasMail}">
+                    <TextBlock Text="{l:T 'Offline verfügbar'}" FontWeight="SemiBold" VerticalAlignment="Center" Width="140" />
+                    <ComboBox ItemsSource="{x:Static vm:AccountItem.OfflineOptions}" SelectedItem="{Binding Offline}" MinWidth="200"
+                              ToolTip.Tip="{l:T 'Mails aus diesem Zeitraum lädt Neruna samt Anhängen herunter, damit sie auch ohne Internet lesbar sind. Ältere werden beim Öffnen geladen.'}" />
+                  </StackPanel>
                 </Grid>
               </Border>
             </DataTemplate>

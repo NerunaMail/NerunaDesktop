@@ -211,6 +211,33 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         File.Move(temp, path, overwrite: true);
     }
 
+    public async Task<IReadOnlyList<(string RemoteId, long Size)>> GetMessagesWithoutContentAsync(Guid connectionId, string folderRemoteId, DateTimeOffset? since, int take, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var folderId = await db.MailFolders.Where(f => f.ConnectionId == connectionId && f.RemoteId == folderRemoteId).Select(f => (long?)f.Id).SingleOrDefaultAsync(cancellationToken);
+        if (folderId is null)
+        {
+            return [];
+        }
+
+        var from = since?.ToUnixTimeMilliseconds() ?? long.MinValue;
+        var candidates = await db.Messages.Where(m => m.FolderId == folderId && m.DateUnixMs >= from)
+            .OrderByDescending(m => m.DateUnixMs).Select(m => new { m.RemoteId, m.Size }).ToListAsync(cancellationToken);
+        return [.. candidates.Where(m => !File.Exists(files.PathFor(connectionId, folderRemoteId, m.RemoteId))).Take(take).Select(m => (m.RemoteId, m.Size))];
+    }
+
+    public async Task<int> RemoveMessageContentBeforeAsync(Guid connectionId, string folderRemoteId, DateTimeOffset before, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var folderId = await db.MailFolders.Where(f => f.ConnectionId == connectionId && f.RemoteId == folderRemoteId).Select(f => (long?)f.Id).SingleOrDefaultAsync(cancellationToken);
+        var until = before.ToUnixTimeMilliseconds();
+        var old = folderId is null ? [] : await db.Messages.Where(m => m.FolderId == folderId && m.DateUnixMs < until)
+            .Select(m => m.RemoteId).ToListAsync(cancellationToken);
+        var cached = old.Where(id => File.Exists(files.PathFor(connectionId, folderRemoteId, id))).ToList();
+        files.DeleteMessages(connectionId, folderRemoteId, cached);
+        return cached.Count;
+    }
+
     private static async Task<long> FolderIdAsync(NerunaDbContext db, Guid connectionId, string folderRemoteId, CancellationToken cancellationToken) =>
         await db.MailFolders.Where(f => f.ConnectionId == connectionId && f.RemoteId == folderRemoteId).Select(f => (long?)f.Id).SingleOrDefaultAsync(cancellationToken)
         ?? throw new InvalidOperationException($"Folder '{folderRemoteId}' is not known.");

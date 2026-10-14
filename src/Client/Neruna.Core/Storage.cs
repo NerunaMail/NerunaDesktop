@@ -45,6 +45,15 @@ public interface IMailStore
     Task<Stream?> OpenMessageContentAsync(Guid connectionId, string folderRemoteId, string remoteId, CancellationToken cancellationToken = default);
 
     Task SaveMessageContentAsync(Guid connectionId, string folderRemoteId, string remoteId, Stream mime, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Messages of the folder dated on or after <paramref name="since"/> (null: all) whose content is not on this
+    /// device yet, newest first – for keeping them offline. Remote id and size.
+    /// </summary>
+    Task<IReadOnlyList<(string RemoteId, long Size)>> GetMessagesWithoutContentAsync(Guid connectionId, string folderRemoteId, DateTimeOffset? since, int take, CancellationToken cancellationToken = default);
+
+    /// <summary>Removes the downloaded content of messages dated before <paramref name="before"/>; they stay in the list.</summary>
+    Task<int> RemoveMessageContentBeforeAsync(Guid connectionId, string folderRemoteId, DateTimeOffset before, CancellationToken cancellationToken = default);
 }
 
 public interface ICalendarStore

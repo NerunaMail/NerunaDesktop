@@ -12,7 +12,8 @@ namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Account list, removal and diagnostics (where data and logs live).</summary>
 internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountSetupService setup, ICredentialStore credentials, IFileService files, AppOptions options,
-    Neruna.Core.Cloud.AccountTransferService transfer) : ViewModelBase
+    Neruna.Core.Cloud.AccountTransferService transfer,
+    Neruna.Core.Mail.MailController mail) : ViewModelBase
 {
     // ── Konto aufs Handy übertragen: QR code + PIN for the Neruna app, after the computer login ──
 
@@ -121,7 +122,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         Items.Clear();
         foreach (var account in await accounts.GetAccountsAsync())
         {
-            Items.Add(new AccountItem(account, setup.Summary) { HasAutoReply = HasAutoReply(account) });
+            var item = new AccountItem(account, setup.Summary) { HasAutoReply = HasAutoReply(account) };
+            item.SetOffline(await mail.GetOfflinePeriodAsync(account.Id), period => _ = mail.SetOfflinePeriodAsync(account.Id, period));
+            Items.Add(item);
         }
 
         UpdatePositions();
@@ -231,6 +234,28 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
 
     public bool HasMail => Account.ConnectionsOf(ServiceKind.Mail).Any();
 
+    /// <summary>How far back the mail is kept complete on this computer (content and attachments), for offline use.</summary>
+    public static IReadOnlyList<OfflineOption> OfflineOptions { get; } = [.. Neruna.Core.Mail.OfflinePeriods.All.Select(p => new OfflineOption(p))];
+
+    [ObservableProperty]
+    public partial OfflineOption? Offline { get; set; }
+
+    private Action<Neruna.Core.Mail.OfflinePeriod>? _saveOffline;
+
+    internal void SetOffline(Neruna.Core.Mail.OfflinePeriod period, Action<Neruna.Core.Mail.OfflinePeriod> save)
+    {
+        Offline = OfflineOptions.First(o => o.Period == period);
+        _saveOffline = save;
+    }
+
+    partial void OnOfflineChanged(OfflineOption? value)
+    {
+        if (value is not null)
+        {
+            _saveOffline?.Invoke(value.Period);
+        }
+    }
+
     public IReadOnlyList<ConnectionLine> Connections { get; } = account.Connections.OrderBy(c => c.Kind).Select(c => ConnectionLine.From(c, summary(c))).ToList();
 
     [ObservableProperty]
@@ -267,4 +292,10 @@ internal sealed record ConnectionLine(string Kind, string Provider, string Detai
 
         return new ConnectionLine(kind, connection.ProviderId.ToUpperInvariant(), detail);
     }
+}
+
+/// <summary>A choice for "Offline verfügbar".</summary>
+internal sealed record OfflineOption(Neruna.Core.Mail.OfflinePeriod Period)
+{
+    public override string ToString() => Neruna.Core.Mail.OfflinePeriods.Label(Period);
 }

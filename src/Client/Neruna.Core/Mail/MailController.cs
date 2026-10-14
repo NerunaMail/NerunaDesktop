@@ -17,8 +17,14 @@ public sealed class MailController(
     IMailStore store,
     ProviderRegistry providers,
     ILogger<MailController> logger,
-    SyncActivity? activity = null)
+    SyncActivity? activity = null,
+    ISettingsStore? settings = null)
 {
+    // Per sync run and account at most this much is fetched ahead for offline use; the next run goes on.
+    private const int OfflineBatch = 200;
+    private const long OfflineBytesPerRun = 100L * 1024 * 1024;
+    private const long OfflineMaxMessageSize = 50L * 1024 * 1024;
+
     /// <summary>The folder list of a connection was read (new folders may be there); raised on the syncing thread.</summary>
     public event EventHandler<Guid>? FoldersSynced;
 
@@ -42,6 +48,86 @@ public sealed class MailController(
         {
             await SyncFolderAsync(provider, folder, cancellationToken);
             FolderSynced?.Invoke(this, folder);
+        }
+
+        await KeepOfflineAsync(provider, connection, folders, cancellationToken);
+    }
+
+    /// <summary>How far back the account keeps its mail complete on this device (Einstellungen → Konten).</summary>
+    public async Task<OfflinePeriod> GetOfflinePeriodAsync(Guid accountId, CancellationToken cancellationToken = default) =>
+        settings is not null && Enum.TryParse<OfflinePeriod>(await settings.GetAsync(OfflinePeriods.Key(accountId), cancellationToken), out var period)
+            ? period
+            : OfflinePeriods.Default;
+
+    public Task SetOfflinePeriodAsync(Guid accountId, OfflinePeriod period, CancellationToken cancellationToken = default) =>
+        settings?.SetAsync(OfflinePeriods.Key(accountId), period == OfflinePeriods.Default ? null : period.ToString(), cancellationToken) ?? Task.CompletedTask;
+
+    /// <summary>
+    /// After a sync: the content of the account's mail within its offline period is fetched ahead (newest first, the
+    /// inbox first, a limited amount per run), older content leaves the device – the messages stay in the list and
+    /// are fetched again when opened. Trash and junk are not fetched ahead.
+    /// </summary>
+    private async Task KeepOfflineAsync(IMailProvider provider, ServiceConnection connection, IReadOnlyList<MailFolder> folders, CancellationToken cancellationToken)
+    {
+        if (settings is null
+            || (await accounts.GetAccountsAsync(cancellationToken)).FirstOrDefault(a => a.Connections.Any(c => c.Id == connection.Id)) is not { } account)
+        {
+            return;
+        }
+
+        var period = await GetOfflinePeriodAsync(account.Id, cancellationToken);
+        if (period == OfflinePeriod.OpenedOnly)
+        {
+            return;
+        }
+
+        var since = OfflinePeriods.Since(period, DateTimeOffset.UtcNow);
+        var count = 0;
+        var bytes = 0L;
+        foreach (var folder in folders.OrderBy(f => f.Role == FolderRole.Inbox ? 0 : 1))
+        {
+            if (since is { } oldest)
+            {
+                await store.RemoveMessageContentBeforeAsync(folder.ConnectionId, folder.RemoteId, oldest, cancellationToken);
+            }
+
+            if (folder.Role is FolderRole.Trash or FolderRole.Junk || count >= OfflineBatch || bytes >= OfflineBytesPerRun)
+            {
+                continue;
+            }
+
+            foreach (var (remoteId, size) in await store.GetMessagesWithoutContentAsync(folder.ConnectionId, folder.RemoteId, since, OfflineBatch - count, cancellationToken))
+            {
+                if (size > OfflineMaxMessageSize)
+                {
+                    continue; // very large: only when opened
+                }
+
+                try
+                {
+                    var message = await provider.GetMessageAsync(folder, remoteId, cancellationToken);
+                    using var buffer = new MemoryStream();
+                    await message.WriteToAsync(buffer, cancellationToken);
+                    buffer.Position = 0;
+                    await store.SaveMessageContentAsync(folder.ConnectionId, folder.RemoteId, remoteId, buffer, cancellationToken);
+                    count++;
+                    bytes += buffer.Length;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+                {
+                    logger.LogDebug(ex, "Message {RemoteId} in {Folder} not kept offline", remoteId, folder.RemoteId);
+                }
+
+                if (bytes >= OfflineBytesPerRun)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (count > 0)
+        {
+            logger.LogInformation("Kept {Count} messages ({Bytes} bytes) of {Account} offline", count, bytes, account.Id);
         }
     }
 
