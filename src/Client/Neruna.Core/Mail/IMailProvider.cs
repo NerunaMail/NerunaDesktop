@@ -100,6 +100,21 @@ public interface IMailProvider : IAsyncDisposable
     /// <summary>Creates a top-level folder, e.g. "Drafts" on a server that has none.</summary>
     /// <exception cref="NotSupportedException">The provider lacks <see cref="MailProviderCapabilities.Append"/>.</exception>
     Task<MailFolder> CreateFolderAsync(string name, FolderRole role, CancellationToken cancellationToken = default);
+
+    /// <summary>Characters the server does not take in a folder name (IMAP: hierarchy separators and wildcards).</summary>
+    string ForbiddenFolderNameCharacters => string.Empty;
+
+    /// <summary>A new folder under <paramref name="parent"/> (null: at the top), shown at once.</summary>
+    Task<MailFolder> CreateSubfolderAsync(string name, MailFolder? parent, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    /// <summary>Renames the folder in place (its subfolders go along).</summary>
+    Task RenameFolderAsync(MailFolder folder, string name, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    /// <summary>Deletes the (empty) folder on the server.</summary>
+    Task DeleteFolderAsync(MailFolder folder, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    /// <summary>Every message in the folder on the server – also those never loaded on this device.</summary>
+    Task<IReadOnlyList<string>> GetAllRemoteIdsAsync(MailFolder folder, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 /// <param name="IsFullResync">The previous state is void (e.g. IMAP UIDVALIDITY changed): replace the folder's contents.</param>

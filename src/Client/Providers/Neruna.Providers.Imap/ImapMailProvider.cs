@@ -43,6 +43,7 @@ public sealed partial class ImapMailProvider(
         MessageSummaryItems.PreviewText;
 
     private ImapClient? _imap;
+    private IMailFolder? _selected;
 
     public MailProviderCapabilities Capabilities =>
         MailProviderCapabilities.Send | MailProviderCapabilities.Flags | MailProviderCapabilities.Move |
@@ -415,6 +416,109 @@ public sealed partial class ImapMailProvider(
         return ToMailFolder(created, role);
     }
 
+    // Separators of any server (".", "/"), the list wildcards and quotes and backslashes, which servers treat apart.
+    public string ForbiddenFolderNameCharacters => "./\\%*\"";
+
+    public async Task<MailFolder> CreateSubfolderAsync(string name, MailFolder? parent, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var imap = await GetImapAsync(cancellationToken);
+        var root = parent is null ? imap.GetFolder(imap.PersonalNamespaces[0]) : await imap.GetFolderAsync(parent.RemoteId, cancellationToken);
+        var created = await root.CreateAsync(name, true, cancellationToken)
+                      ?? throw new InvalidOperationException(F("Ordner «{0}» konnte nicht angelegt werden.", name));
+        if (await UsesSubscriptionsAsync(imap, cancellationToken))
+        {
+            await created.SubscribeAsync(cancellationToken);
+        }
+
+        return ToMailFolder(created, FolderRole.None);
+    }
+
+    public async Task RenameFolderAsync(MailFolder folder, string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var imap = await GetImapAsync(cancellationToken);
+        var subscriptions = await UsesSubscriptionsAsync(imap, cancellationToken);
+        var imapFolder = await imap.GetFolderAsync(folder.RemoteId, cancellationToken);
+        await LeaveAsync(imap, imapFolder, cancellationToken);
+
+        // Subscriptions belong to names: the old ones go, the new names (with the subfolders) are subscribed.
+        var tree = subscriptions ? await SelfAndSubfoldersAsync(imapFolder, cancellationToken) : [];
+        foreach (var old in tree)
+        {
+            await old.UnsubscribeAsync(cancellationToken);
+        }
+
+        var parent = imapFolder.ParentFolder ?? imap.GetFolder(imap.PersonalNamespaces[0]);
+        await imapFolder.RenameAsync(parent, name, cancellationToken);
+        if (subscriptions)
+        {
+            foreach (var renamed in await SelfAndSubfoldersAsync(imapFolder, cancellationToken))
+            {
+                await renamed.SubscribeAsync(cancellationToken);
+            }
+        }
+    }
+
+    public async Task DeleteFolderAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        var imap = await GetImapAsync(cancellationToken);
+        var imapFolder = await imap.GetFolderAsync(folder.RemoteId, cancellationToken);
+        await LeaveAsync(imap, imapFolder, cancellationToken);
+
+        if (imapFolder.IsSubscribed)
+        {
+            await imapFolder.UnsubscribeAsync(cancellationToken);
+        }
+
+        await imapFolder.DeleteAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetAllRemoteIdsAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        var imapFolder = await OpenAsync(folder.RemoteId, FolderAccess.ReadOnly, cancellationToken);
+        return [.. (await imapFolder.SearchAsync(SearchQuery.NotDeleted, cancellationToken)).Select(u => u.Id.ToString(CultureInfo.InvariantCulture))];
+    }
+
+    // Renaming or deleting the folder this connection has selected: the inbox is selected instead. Closing alone is
+    // not enough everywhere – without UNSELECT some servers keep it selected (GreenMail then drops the connection).
+    private static async Task LeaveAsync(ImapClient imap, IMailFolder folder, CancellationToken cancellationToken)
+    {
+        if (folder.IsOpen)
+        {
+            await imap.Inbox.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
+        }
+    }
+
+    // A server where nothing is subscribed shows every folder (see GetSubscriptionsAsync) – subscribing one there
+    // would hide all the others.
+    private static async Task<bool> UsesSubscriptionsAsync(ImapClient imap, CancellationToken cancellationToken)
+    {
+        foreach (var ns in imap.PersonalNamespaces)
+        {
+            if ((await imap.GetFoldersAsync(ns, StatusItems.None, true, cancellationToken)).Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task<List<IMailFolder>> SelfAndSubfoldersAsync(IMailFolder folder, CancellationToken cancellationToken)
+    {
+        var result = new List<IMailFolder> { folder };
+        foreach (var child in await folder.GetSubfoldersAsync(false, cancellationToken))
+        {
+            result.AddRange(await SelfAndSubfoldersAsync(child, cancellationToken));
+        }
+
+        return result;
+    }
+
     public async Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -441,6 +545,13 @@ public sealed partial class ImapMailProvider(
             {
                 try
                 {
+                    // Not leaving another folder selected: some servers (GreenMail) keep the logged-out session on it
+                    // and fail when that folder is deleted later.
+                    if (_selected is { IsOpen: true } selected && selected != imap.Inbox)
+                    {
+                        await imap.Inbox.OpenAsync(FolderAccess.ReadOnly);
+                    }
+
                     await imap.DisconnectAsync(true);
                 }
                 catch (Exception ex) when (ex is IOException or ImapProtocolException or ImapCommandException)
@@ -525,6 +636,7 @@ public sealed partial class ImapMailProvider(
             await folder.OpenAsync(access, cancellationToken);
         }
 
+        _selected = folder;
         return folder;
     }
 

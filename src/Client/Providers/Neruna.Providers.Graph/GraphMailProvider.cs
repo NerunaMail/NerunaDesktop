@@ -276,6 +276,31 @@ internal sealed class GraphMailProvider(Guid connectionId, GraphClient graph, IL
         return new MailFolder(connectionId, created.Str("id")!, name, null, role);
     }
 
+    public async Task<MailFolder> CreateSubfolderAsync(string name, MailFolder? parent, CancellationToken cancellationToken = default)
+    {
+        var path = parent is null ? "me/mailFolders" : $"me/mailFolders/{parent.RemoteId}/childFolders";
+        var created = await graph.SendJsonAsync(HttpMethod.Post, path, new { displayName = name }, cancellationToken);
+        return new MailFolder(connectionId, created.Str("id")!, name, parent?.RemoteId, FolderRole.None);
+    }
+
+    public async Task RenameFolderAsync(MailFolder folder, string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        await graph.SendJsonAsync(HttpMethod.Patch, $"me/mailFolders/{folder.RemoteId}", new { displayName = name }, cancellationToken);
+    }
+
+    public async Task DeleteFolderAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        await graph.SendJsonAsync(HttpMethod.Delete, $"me/mailFolders/{folder.RemoteId}", null, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<string>> GetAllRemoteIdsAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        return [.. (await graph.GetAllAsync($"me/mailFolders/{folder.RemoteId}/messages?$select=id&$top=500", cancellationToken)).Select(m => m.Str("id")!)];
+    }
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private static string InitialDelta(string folderId, bool sinceDays)

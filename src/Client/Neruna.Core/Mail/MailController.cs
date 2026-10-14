@@ -178,6 +178,80 @@ public sealed class MailController(
     public Task<IReadOnlyList<MailFolder>> GetFoldersAsync(Guid connectionId, CancellationToken cancellationToken = default) =>
         store.GetFoldersAsync(connectionId, cancellationToken);
 
+    /// <summary>Characters the account's server does not take in folder names (checked while typing).</summary>
+    public async Task<string> GetForbiddenFolderCharactersAsync(ServiceConnection connection)
+    {
+        await using var provider = providers.CreateMail(connection);
+        return provider.ForbiddenFolderNameCharacters;
+    }
+
+    /// <summary>A new folder under <paramref name="parent"/> (null: at the top of the account); the folder list follows.</summary>
+    public async Task CreateFolderAsync(ServiceConnection connection, string name, MailFolder? parent, CancellationToken cancellationToken = default)
+    {
+        await using var provider = providers.CreateMail(connection);
+        await provider.CreateSubfolderAsync(name, parent, cancellationToken);
+        await RefreshFoldersAsync(provider, connection, cancellationToken);
+    }
+
+    /// <summary>Renames a folder on the server; its mail is loaded again under the new name.</summary>
+    public async Task RenameFolderAsync(ServiceConnection connection, MailFolder folder, string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        await using var provider = providers.CreateMail(connection);
+        await provider.RenameFolderAsync(folder, name, cancellationToken);
+        foreach (var current in await RefreshFoldersAsync(provider, connection, cancellationToken))
+        {
+            if (current.Role == FolderRole.None && (current.Name == name || current.RemoteId == folder.RemoteId))
+            {
+                await SyncFolderAsync(provider, current, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>How many messages are in the folder on the server (asked before deleting it).</summary>
+    public async Task<int> CountFolderMessagesAsync(ServiceConnection connection, MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        await using var provider = providers.CreateMail(connection);
+        return (await provider.GetAllRemoteIdsAsync(folder, cancellationToken)).Count;
+    }
+
+    /// <summary>
+    /// Deletes a folder: its messages go to the trash first (also those never loaded here), then the folder goes on
+    /// the server. Only folders without subfolders.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">There are messages but no trash to move them to.</exception>
+    public async Task DeleteFolderAsync(ServiceConnection connection, MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        await using var provider = providers.CreateMail(connection);
+        var ids = await provider.GetAllRemoteIdsAsync(folder, cancellationToken);
+        var trash = await FindFolderAsync(folder.ConnectionId, FolderRole.Trash, cancellationToken);
+        if (ids.Count > 0)
+        {
+            if (trash is null)
+            {
+                throw new InvalidOperationException(T("Dieses Konto hat keinen Papierkorb – die E-Mails im Ordner können nicht verschoben werden."));
+            }
+
+            await provider.MoveAsync(folder, ids, trash, cancellationToken);
+        }
+
+        await provider.DeleteFolderAsync(folder, cancellationToken);
+        await RefreshFoldersAsync(provider, connection, cancellationToken);
+        if (trash is not null && ids.Count > 0)
+        {
+            await SyncFolderAsync(provider, await CurrentAsync(trash, cancellationToken), cancellationToken);
+        }
+    }
+
+    // The folder list from the server again (deleted and renamed folders leave with their stored mail).
+    private async Task<IReadOnlyList<MailFolder>> RefreshFoldersAsync(IMailProvider provider, ServiceConnection connection, CancellationToken cancellationToken)
+    {
+        var folders = await store.MergeFoldersAsync(connection.Id, await provider.GetFoldersAsync(cancellationToken), cancellationToken);
+        FoldersSynced?.Invoke(this, connection.Id);
+        return folders;
+    }
+
     public Task<IReadOnlyList<MessageSummary>> GetMessagesAsync(MailFolder folder, int skip = 0, int take = 200, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(folder);

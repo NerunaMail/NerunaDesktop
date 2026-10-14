@@ -55,6 +55,7 @@
                       <MenuItem Header="{l:T 'Konto nach oben'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).Tree.MoveAccountUpCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="{l:T 'Konto nach unten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).Tree.MoveAccountDownCommand}" CommandParameter="{Binding}" />
                       <Separator />
+                      <MenuItem Header="{l:T 'Neuer Ordner …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).NewFolderCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="{l:T 'Ordner abonnieren …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).Tree.SubscribeFoldersCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="{l:T 'Abwesenheitsnotiz …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).Tree.AutoReplyCommand}" CommandParameter="{Binding}" />
                     </ContextMenu>
@@ -110,6 +111,13 @@
                                 Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MarkFolderReadCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="{l:T 'Leeren …'}" IsVisible="{Binding CanEmpty}"
                                 Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).EmptyFolderCommand}" CommandParameter="{Binding}" />
+                      <Separator />
+                      <MenuItem Header="{l:T 'Neuer Ordner …'}"
+                                Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).NewFolderCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Umbenennen …'}" IsVisible="{Binding CanManage}"
+                                Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).RenameFolderCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Löschen …'}" IsVisible="{Binding CanManage}"
+                                Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).DeleteFolderCommand}" CommandParameter="{Binding}" />
                     </ContextMenu>
                   </Grid.ContextMenu>
                   <PathIcon Data="{Binding Folder.Role, Converter={x:Static app:Converters.FolderIcon}}" Width="14" Height="14" Margin="0,0,8,0"

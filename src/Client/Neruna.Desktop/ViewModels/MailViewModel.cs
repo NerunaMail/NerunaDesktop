@@ -268,6 +268,120 @@ internal sealed partial class MailViewModel(
         }
     }
 
+    // ── Folders: new, rename, delete (context menu of the folder tree) ──
+
+    /// <summary>"Neuer Ordner …": under a folder, or at the top of an account (its name in the tree).</summary>
+    [RelayCommand]
+    private async Task NewFolderAsync(object? node)
+    {
+        var (account, parent) = node switch
+        {
+            MailFolderNode folder => (folder.Account, folder),
+            MailAccountNode root => (root, null),
+            _ => ((MailAccountNode?)null, (MailFolderNode?)null),
+        };
+        if (account is null)
+        {
+            return;
+        }
+
+        var forbidden = await mail.GetForbiddenFolderCharactersAsync(account.Connection);
+        var siblings = (parent?.Children ?? account.Folders).Select(f => f.Folder.Name).ToList();
+        var name = await Views.InputDialog.ShowInFrontAsync(T("Neuer Ordner"),
+            parent is null ? F("Name des neuen Ordners in «{0}»:", account.Title) : F("Name des neuen Ordners in «{0}»:", parent.Name),
+            string.Empty, T("Erstellen"), n => FolderNames.Problem(n, forbidden, siblings));
+        if (name is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() => mail.CreateFolderAsync(account.Connection, name, parent?.Folder));
+            StatusMessage?.Invoke(this, F("Ordner «{0}» erstellt.", name));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(F("Ordner «{0}» erstellen fehlgeschlagen", name), ex);
+        }
+    }
+
+    [RelayCommand]
+    private async Task RenameFolderAsync(MailFolderNode? folder)
+    {
+        if (folder is not { CanManage: true })
+        {
+            return;
+        }
+
+        var forbidden = await mail.GetForbiddenFolderCharactersAsync(folder.Account.Connection);
+        var parent = folder.Account.AllFolders().FirstOrDefault(f => f.Children.Contains(folder));
+        var siblings = (parent?.Children ?? folder.Account.Folders).Where(f => f != folder).Select(f => f.Folder.Name).ToList();
+        var name = await Views.InputDialog.ShowInFrontAsync(T("Ordner umbenennen"), F("Neuer Name für «{0}»:", folder.Name),
+            folder.Folder.Name, T("Umbenennen"), n => FolderNames.Problem(n, forbidden, siblings));
+        if (name is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() => mail.RenameFolderAsync(folder.Account.Connection, folder.Folder, name));
+            StatusMessage?.Invoke(this, F("Ordner in «{0}» umbenannt.", name));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(F("Ordner «{0}» umbenennen fehlgeschlagen", folder.Name), ex);
+        }
+    }
+
+    /// <summary>"Löschen …": its mail goes to the trash, after a question that says how many there are.</summary>
+    [RelayCommand]
+    private async Task DeleteFolderAsync(MailFolderNode? folder)
+    {
+        if (folder is not { CanManage: true })
+        {
+            return;
+        }
+
+        if (folder.Children.Count > 0)
+        {
+            await Views.ChoiceDialog.ShowInFrontAsync(F("«{0}» löschen", folder.Name),
+                F("«{0}» hat Unterordner. Bitte zuerst die Unterordner löschen oder verschieben.", folder.Name), (T("OK"), true, true));
+            return;
+        }
+
+        int count;
+        try
+        {
+            count = await Task.Run(() => mail.CountFolderMessagesAsync(folder.Account.Connection, folder.Folder));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(F("Ordner «{0}» löschen fehlgeschlagen", folder.Name), ex);
+            return;
+        }
+
+        var question = count == 0 ? F("Den leeren Ordner «{0}» löschen?", folder.Name)
+            : count == 1 ? F("1 E-Mail befindet sich in «{0}». Sie wird in den Papierkorb verschoben, dann wird der Ordner gelöscht.", folder.Name)
+            : F("{0} E-Mails befinden sich in «{1}». Sie werden in den Papierkorb verschoben, dann wird der Ordner gelöscht.", count, folder.Name);
+        if (!await Views.ChoiceDialog.ShowInFrontAsync(F("«{0}» löschen", folder.Name), question, (T("Ordner löschen"), true, false), (T("Abbrechen"), false, true)))
+        {
+            return;
+        }
+
+        try
+        {
+            // The folder list is loaded again afterwards; was this folder open, the inbox opens.
+            await Task.Run(() => mail.DeleteFolderAsync(folder.Account.Connection, folder.Folder));
+            StatusMessage?.Invoke(this, count == 0 ? F("Ordner «{0}» gelöscht.", folder.Name) : F("Ordner «{0}» gelöscht, {1} E-Mails im Papierkorb.", folder.Name, count));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(F("Ordner «{0}» löschen fehlgeschlagen", folder.Name), ex);
+        }
+    }
+
     /// <summary>"Leeren" (trash, junk): everything deleted for good, after a question.</summary>
     [RelayCommand]
     private async Task EmptyFolderAsync(MailFolderNode folder)
@@ -1445,6 +1559,9 @@ internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObje
     public MailAccountNode Account { get; set; } = null!;
 
     public MailFolder Folder { get; } = folder;
+
+    /// <summary>Own folders can be renamed and deleted; inbox, sent, trash and the other system folders not.</summary>
+    public bool CanManage => Folder.Role == FolderRole.None;
 
     [ObservableProperty]
     public partial bool IsExpanded { get; set; } = true;
