@@ -82,6 +82,41 @@ public class QuickActionTests
     }
 
     [Fact]
+    public void ExportedActionsFitTheOtherComputer()
+    {
+        var stamp = new PdfStamp(Guid.NewGuid(), "Visiert", "#0F6CBD");
+        var (accountHere, accountThere, templateHere, templateThere) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var action = new QuickAction(Guid.NewGuid(), "Rechnung ablegen", "#CA5010",
+            new QuickActionCondition { Attachment = QuickActionAttachmentKind.Pdf, AccountId = accountHere, FolderRemoteId = "INBOX/Rechnungen", FolderName = "Rechnungen" },
+            [
+                new QuickActionStep(QuickActionStepKind.StampPdf) { StampId = stamp.Id },
+                new QuickActionStep(QuickActionStepKind.SaveAttachment) { Folder = @"\\server\buchhaltung" },
+                new QuickActionStep(QuickActionStepKind.Reply) { TemplateId = templateHere },
+            ]);
+        var file = QuickActionService.Export([action], [stamp, new PdfStamp(Guid.NewGuid(), "Unbenutzt", "#000000")],
+            new Dictionary<Guid, string> { [accountHere] = "info@firma.ch" }, new Dictionary<Guid, string> { [templateHere] = "Rechnung erhalten" });
+
+        // Another computer: the same mailbox and template under other ids.
+        var (actions, stamps) = QuickActionService.Import(file,
+            new Dictionary<Guid, string> { [accountThere] = "INFO@firma.ch" }, new Dictionary<Guid, string> { [templateThere] = "Rechnung erhalten" });
+        var imported = Assert.Single(actions);
+        Assert.Equal(accountThere, imported.When.AccountId);
+        Assert.Equal("INBOX/Rechnungen", imported.When.FolderRemoteId);
+        Assert.Equal(templateThere, imported.Steps[2].TemplateId);
+        Assert.Equal(@"\\server\buchhaltung", imported.Steps[1].Folder);
+        Assert.Equal("Visiert", Assert.Single(stamps).Text); // only the stamps it uses
+
+        // A computer without that mailbox and template: for all accounts, without template.
+        var (elsewhere, _) = QuickActionService.Import(file, new Dictionary<Guid, string>(), new Dictionary<Guid, string>());
+        Assert.Null(elsewhere[0].When.AccountId);
+        Assert.Null(elsewhere[0].When.FolderRemoteId);
+        Assert.Null(elsewhere[0].Steps[2].TemplateId);
+
+        Assert.Throws<FormatException>(() => QuickActionService.Import("{\"format\":\"other\"}", new Dictionary<Guid, string>(), new Dictionary<Guid, string>()));
+        Assert.Throws<FormatException>(() => QuickActionService.Import("kein json", new Dictionary<Guid, string>(), new Dictionary<Guid, string>()));
+    }
+
+    [Fact]
     public void StampLinesAsChosen()
     {
         var stamp = new PdfStamp(Guid.NewGuid(), "Genehmigt", "#107C10");

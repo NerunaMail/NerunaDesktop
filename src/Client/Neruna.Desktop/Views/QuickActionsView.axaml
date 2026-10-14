@@ -15,6 +15,26 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Margin" Value="0,12,0,4" />
     </Style>
+    <!-- Folders: a fixed width, indented under account and parent folders; accounts are headings, not choices -->
+    <Style Selector="ComboBox.folders">
+      <Setter Property="Width" Value="420" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="MaxDropDownHeight" Value="420" />
+      <Setter Property="ItemTemplate">
+        <DataTemplate x:DataType="vm:FolderChoice">
+          <TextBlock Text="{Binding Name}" Margin="{Binding Indent}" TextTrimming="CharacterEllipsis"
+                     FontWeight="{Binding IsAccount, Converter={x:Static l:Converters.BoldIf}}" />
+        </DataTemplate>
+      </Setter>
+      <Setter Property="SelectionBoxItemTemplate">
+        <DataTemplate x:DataType="vm:FolderChoice">
+          <TextBlock Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+        </DataTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ComboBox.folders ComboBoxItem" x:DataType="vm:FolderChoice">
+      <Setter Property="IsEnabled" Value="{Binding IsFolder}" />
+    </Style>
     <!-- Colour swatches in a row -->
     <Style Selector="ListBox.swatches">
       <Setter Property="Background" Value="Transparent" />
@@ -42,13 +62,22 @@
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,0,16,0"
                      Text="{l:T 'Eine Schnellaktion erscheint als Button in der farbigen Leiste oben, wenn die geöffnete E-Mail ihre Bedingungen erfüllt. Ein Klick führt ihre Schritte nacheinander aus – z. B. ein PDF stempeln, in einen festen Ordner speichern und mit dem gestempelten PDF antworten.'}" />
-          <Button Grid.Column="1" Classes="accent" Command="{Binding NewCommand}" VerticalAlignment="Top">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
-              <TextBlock Text="{l:T 'Neue Schnellaktion'}" />
-            </StackPanel>
-          </Button>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+            <!-- As a file, to share in the company (file share, mail) -->
+            <Button Content="{l:T 'Importieren …'}" Command="{Binding ImportCommand}" />
+            <Button Content="{l:T 'Exportieren …'}" Command="{Binding ExportCommand}" IsEnabled="{Binding HasActions}" />
+            <Button Classes="accent" Command="{Binding NewCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+                <TextBlock Text="{l:T 'Neue Schnellaktion'}" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
         </Grid>
+        <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,6"
+                IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" />
+        </Border>
 
         <TextBlock Classes="subtle" Text="{l:T 'Noch keine Schnellaktion eingerichtet.'}" IsVisible="{Binding !HasActions}" Margin="0,12" />
         <ItemsControl ItemsSource="{Binding Actions}" Margin="0,4,0,0">
@@ -60,7 +89,10 @@
                   <Border Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" CornerRadius="4" Padding="10,4" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Label}" Foreground="White" FontWeight="SemiBold" />
                   </Border>
-                  <TextBlock Grid.Column="1" Text="{Binding Summary}" Classes="subtle" TextWrapping="Wrap" VerticalAlignment="Center" Margin="14,0" />
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0">
+                    <TextBlock Text="{Binding Summary}" Classes="subtle" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource ErrorBrush}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
+                  </StackPanel>
                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <Button Content="{l:T 'Bearbeiten'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
                     <Button Padding="8,6" ToolTip.Tip="{l:T 'Weitere Aktionen'}">
@@ -152,7 +184,7 @@
           <TextBlock Grid.Row="3" Classes="label" Text="{l:T 'Konto'}" />
           <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Accounts}" SelectedItem="{Binding Account}" MinWidth="320" />
           <TextBlock Grid.Row="4" Classes="label" Text="{l:T 'Ordner'}" IsVisible="{Binding ShowsFolders}" />
-          <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Folders}" SelectedItem="{Binding Folder}" MinWidth="320" IsVisible="{Binding ShowsFolders}" />
+          <ComboBox Grid.Row="4" Grid.Column="1" Classes="folders" ItemsSource="{Binding Folders}" SelectedItem="{Binding Folder}" IsVisible="{Binding ShowsFolders}" />
         </Grid>
 
         <TextBlock Classes="section" Text="{l:T 'Was passiert beim Klick?'}" />
@@ -196,7 +228,7 @@
                   </Grid>
                   <Grid ColumnDefinitions="140,*" IsVisible="{Binding ShowsMoveFolder}">
                     <TextBlock Classes="label" Text="{l:T 'Nach'}" />
-                    <ComboBox Grid.Column="1" ItemsSource="{Binding MoveFolders}" SelectedItem="{Binding MoveFolder}" MinWidth="220" />
+                    <ComboBox Grid.Column="1" Classes="folders" ItemsSource="{Binding MoveFolders}" SelectedItem="{Binding MoveFolder}" />
                   </Grid>
                 </StackPanel>
               </Border>

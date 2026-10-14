@@ -72,10 +72,101 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         Actions.Clear();
         foreach (var action in _actions)
         {
-            Actions.Add(new QuickActionItem(action, Describe(action)));
+            Actions.Add(new QuickActionItem(action, Describe(action), Warn(action)));
         }
 
         OnPropertyChanged(nameof(HasActions));
+    }
+
+    // Imported from another computer: a save folder that does not exist here is pointed out (to adjust it).
+    private static string? Warn(QuickAction action)
+    {
+        var missing = action.Steps.Where(s => s.Kind == QuickActionStepKind.SaveAttachment && !string.IsNullOrWhiteSpace(s.Folder) && !Directory.Exists(s.Folder))
+            .Select(s => s.Folder!).Distinct().ToList();
+        return missing.Count == 0 ? null : F("Ordner nicht gefunden: {0} – bitte unter «Bearbeiten» anpassen.", string.Join(", ", missing));
+    }
+
+    private async Task<(Dictionary<Guid, string> Accounts, Dictionary<Guid, string> Templates)> LookupsAsync() =>
+        ((await accounts.GetAccountsAsync()).Where(a => a.EmailAddress is not null).ToDictionary(a => a.Id, a => a.EmailAddress!),
+         (await templates.GetAllAsync()).ToDictionary(t => t.Id, t => t.Name));
+
+    /// <summary>Notices after export and import (shown above the list).</summary>
+    [ObservableProperty]
+    public partial string? Notice { get; set; }
+
+    [RelayCommand]
+    private async Task ExportAsync()
+    {
+        if (_actions.Count == 0)
+        {
+            return;
+        }
+
+        var (accountAddresses, templateNames) = await LookupsAsync();
+        var json = QuickActionService.Export(_actions, [.. Stamps.Select(s => s.ToStamp())], accountAddresses, templateNames);
+        var target = await files.SaveFileAsync(T("Schnellaktionen exportieren"), T("Schnellaktionen") + ".nerunaactions");
+        if (target is null)
+        {
+            return;
+        }
+
+        await using (target)
+        await using (var writer = new StreamWriter(target))
+        {
+            await writer.WriteAsync(json);
+        }
+
+        Notice = _actions.Count == 1 ? T("1 Schnellaktion exportiert.") : F("{0} Schnellaktionen exportiert.", _actions.Count);
+    }
+
+    [RelayCommand]
+    private async Task ImportAsync()
+    {
+        var paths = await files.PickFilesAsync(T("Schnellaktionen importieren"));
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        var (accountAddresses, templateNames) = await LookupsAsync();
+        var count = 0;
+        foreach (var path in paths)
+        {
+            try
+            {
+                var (imported, stamps) = QuickActionService.Import(await File.ReadAllTextAsync(path), accountAddresses, templateNames);
+                foreach (var stamp in stamps.Where(s => Stamps.All(here => here.Id != s.Id)))
+                {
+                    Stamps.Add(NewStampEditor(stamp));
+                }
+
+                foreach (var action in imported)
+                {
+                    var index = _actions.FindIndex(a => a.Id == action.Id);
+                    if (index >= 0)
+                    {
+                        _actions[index] = action; // the same action, a newer version
+                    }
+                    else
+                    {
+                        _actions.Add(action);
+                    }
+
+                    count++;
+                }
+            }
+            catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
+            {
+                Notice = F("«{0}» ist keine Datei mit Schnellaktionen.", Path.GetFileName(path));
+                return;
+            }
+        }
+
+        await SaveStampsAsync();
+        await service.SaveActionsAsync(_actions);
+        ShowActions();
+        Notice = (count == 1 ? T("1 Schnellaktion importiert.") : F("{0} Schnellaktionen importiert.", count))
+            + (Actions.Any(a => a.HasWarning) ? " " + T("Bitte die markierten Ordner anpassen.") : string.Empty);
     }
 
     private static string Describe(QuickAction action)
@@ -171,7 +262,8 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
     private async Task<EditorOptions> LoadOptionsAsync()
     {
         var accountChoices = new List<Choice<Guid?>> { new(null, T("Alle Konten")) };
-        var folders = new Dictionary<Guid, IReadOnlyList<Choice<string?>>>();
+        var folders = new Dictionary<Guid, IReadOnlyList<FolderChoice>>();
+        var allFolders = new List<FolderChoice>();
         foreach (var account in await accounts.GetAccountsAsync())
         {
             if (account.Connections.FirstOrDefault(c => c.Kind == ServiceKind.Mail) is not { } connection)
@@ -180,15 +272,46 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
             }
 
             accountChoices.Add(new Choice<Guid?>(account.Id, account.Title));
-            folders[account.Id] = [.. (await mail.GetFoldersAsync(connection.Id))
-                .OrderBy(f => f.Role == FolderRole.None ? 1 : 0).ThenBy(f => f.Role).ThenBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase)
-                .Select(f => new Choice<string?>(f.RemoteId, MailFolderNode.DisplayName(f)))];
+            var tree = FolderTree(await mail.GetFoldersAsync(connection.Id), account.Title);
+            folders[account.Id] = tree;
+            allFolders.Add(new FolderChoice(null, account.Title, account.Title, 0, IsAccount: true));
+            allFolders.AddRange(tree.Select(f => f with { Depth = f.Depth + 1 }));
         }
 
         var templateChoices = new List<Choice<Guid?>> { new(null, T("Keine")) };
         templateChoices.AddRange((await templates.GetAllAsync()).Select(t => new Choice<Guid?>(t.Id, t.Name)));
         var stampChoices = Stamps.Select(s => new Choice<Guid?>(s.Id, s.Text)).ToList();
-        return new EditorOptions(accountChoices, folders, templateChoices, stampChoices);
+        return new EditorOptions(accountChoices, folders, allFolders, templateChoices, stampChoices);
+    }
+
+    // As in the folder tree: special folders first, each with its subfolders, then the others by name.
+    private static List<FolderChoice> FolderTree(IReadOnlyList<MailFolder> folders, string account)
+    {
+        var result = new List<FolderChoice>();
+        var byParent = folders.ToLookup(f => f.ParentRemoteId);
+        var known = folders.Select(f => f.RemoteId).ToHashSet(StringComparer.Ordinal);
+        void Add(MailFolder folder, int depth, string parentPath)
+        {
+            var name = MailFolderNode.DisplayName(folder);
+            var path = parentPath + " › " + name;
+            result.Add(new FolderChoice(folder.RemoteId, name, path, depth));
+            foreach (var child in byParent[folder.RemoteId].Where(f => f.Role == FolderRole.None).OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase))
+            {
+                Add(child, depth + 1, path);
+            }
+        }
+
+        foreach (var folder in folders.Where(f => f.Role != FolderRole.None).OrderBy(f => f.Role))
+        {
+            Add(folder, 0, account);
+        }
+
+        foreach (var folder in folders.Where(f => f.Role == FolderRole.None && (f.ParentRemoteId is null || !known.Contains(f.ParentRemoteId))).OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            Add(folder, 0, account);
+        }
+
+        return result;
     }
 
     // ── Stamps: saved on every change ──
@@ -220,8 +343,23 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
     }
 }
 
-internal sealed record QuickActionItem(QuickAction Action, string Summary)
+/// <summary>
+/// A folder in a list, indented under its account and parent folders; account rows are headings that cannot be chosen.
+/// <see cref="Path"/> ("info@firma.ch › Posteingang › Rechnungen") is what the closed list shows.
+/// </summary>
+internal sealed record FolderChoice(string? RemoteId, string Name, string Path, int Depth, bool IsAccount = false)
 {
+    public bool IsFolder => !IsAccount;
+
+    public Avalonia.Thickness Indent => new(Depth * 16, 0, 0, 0);
+
+    public override string ToString() => Path;
+}
+
+internal sealed record QuickActionItem(QuickAction Action, string Summary, string? Warning = null)
+{
+    public bool HasWarning => Warning is not null;
+
     public string Label => Action.Label;
 
     public string Color => Action.Color;
@@ -229,7 +367,8 @@ internal sealed record QuickActionItem(QuickAction Action, string Summary)
 
 internal sealed record EditorOptions(
     IReadOnlyList<Choice<Guid?>> Accounts,
-    IReadOnlyDictionary<Guid, IReadOnlyList<Choice<string?>>> Folders,
+    IReadOnlyDictionary<Guid, IReadOnlyList<FolderChoice>> Folders,
+    IReadOnlyList<FolderChoice> AllFolders,
     IReadOnlyList<Choice<Guid?>> Templates,
     IReadOnlyList<Choice<Guid?>> Stamps);
 
@@ -281,7 +420,7 @@ internal sealed partial class QuickActionEditor : ObservableObject
         SenderContains = action.When.SenderContains ?? string.Empty;
         SubjectContains = action.When.SubjectContains ?? string.Empty;
         Account = options.Accounts.FirstOrDefault(a => a.Value == action.When.AccountId) ?? options.Accounts[0];
-        Folder = Folders.FirstOrDefault(f => f.Value == action.When.FolderRemoteId) ?? Folders[0];
+        Folder = Folders.FirstOrDefault(f => f.RemoteId == action.When.FolderRemoteId) ?? Folders[0];
         foreach (var step in action.Steps)
         {
             Steps.Add(NewStep(step));
@@ -332,13 +471,13 @@ internal sealed partial class QuickActionEditor : ObservableObject
 
     partial void OnAccountChanged(Choice<Guid?> value) => Folder = Folders[0];
 
-    public IReadOnlyList<Choice<string?>> Folders =>
-        [new(null, T("Alle Ordner")), .. Account?.Value is { } id && _options.Folders.TryGetValue(id, out var folders) ? folders : []];
+    public IReadOnlyList<FolderChoice> Folders =>
+        [new(null, T("Alle Ordner"), T("Alle Ordner"), 0), .. Account?.Value is { } id && _options.Folders.TryGetValue(id, out var folders) ? folders : []];
 
     public bool ShowsFolders => Account?.Value is not null;
 
     [ObservableProperty]
-    public partial Choice<string?>? Folder { get; set; }
+    public partial FolderChoice? Folder { get; set; }
 
     // ── Steps ──
 
@@ -392,8 +531,8 @@ internal sealed partial class QuickActionEditor : ObservableObject
             SenderContains = string.IsNullOrWhiteSpace(SenderContains) ? null : SenderContains.Trim(),
             SubjectContains = string.IsNullOrWhiteSpace(SubjectContains) ? null : SubjectContains.Trim(),
             AccountId = Account.Value,
-            FolderRemoteId = Account.Value is null ? null : Folder?.Value,
-            FolderName = Account.Value is null || Folder?.Value is null ? null : Folder.Title,
+            FolderRemoteId = Account.Value is null ? null : Folder?.RemoteId,
+            FolderName = Account.Value is null || Folder?.RemoteId is null ? null : Folder.Name,
         },
         [.. Steps.Select(s => s.ToStep())]));
 
@@ -416,10 +555,10 @@ internal sealed partial class StepEditor : ObservableObject
         _files = files;
         Stamps = options.Stamps;
         Templates = options.Templates;
-        MoveFolders = [.. options.Folders.Values.SelectMany(f => f).GroupBy(f => f.Title, StringComparer.CurrentCultureIgnoreCase).Select(g => g.First())];
+        MoveFolders = options.AllFolders;
         Stamp = Stamps.FirstOrDefault(s => s.Value == step.StampId) ?? Stamps.FirstOrDefault();
         Template = Templates.FirstOrDefault(t => t.Value == step.TemplateId) ?? Templates[0];
-        MoveFolder = MoveFolders.FirstOrDefault(f => f.Value == step.FolderRemoteId) ?? MoveFolders.FirstOrDefault(f => f.Title == step.FolderName);
+        MoveFolder = MoveFolders.FirstOrDefault(f => f.IsFolder && f.RemoteId == step.FolderRemoteId) ?? MoveFolders.FirstOrDefault(f => f.IsFolder && f.Name == step.FolderName);
         Folder = step.Folder ?? string.Empty;
         FileName = step.FileName ?? string.Empty;
         To = step.To ?? string.Empty;
@@ -478,10 +617,19 @@ internal sealed partial class StepEditor : ObservableObject
     [ObservableProperty]
     public partial Choice<Guid?>? Template { get; set; }
 
-    public IReadOnlyList<Choice<string?>> MoveFolders { get; }
+    public IReadOnlyList<FolderChoice> MoveFolders { get; }
 
     [ObservableProperty]
-    public partial Choice<string?>? MoveFolder { get; set; }
+    public partial FolderChoice? MoveFolder { get; set; }
+
+    // Accounts are headings: choosing one keeps the folder chosen before.
+    partial void OnMoveFolderChanged(FolderChoice? oldValue, FolderChoice? newValue)
+    {
+        if (newValue is { IsAccount: true })
+        {
+            MoveFolder = oldValue;
+        }
+    }
 
     [ObservableProperty]
     public partial string Folder { get; set; }
@@ -521,7 +669,7 @@ internal sealed partial class StepEditor : ObservableObject
         TemplateId = ShowsTemplate ? Template?.Value : null,
         To = ShowsTo && !string.IsNullOrWhiteSpace(To) ? To.Trim() : null,
         Subject = ShowsSubject && !string.IsNullOrWhiteSpace(Subject) ? Subject.Trim() : null,
-        FolderRemoteId = ShowsMoveFolder ? MoveFolder?.Value : null,
-        FolderName = ShowsMoveFolder ? MoveFolder?.Title : null,
+        FolderRemoteId = ShowsMoveFolder ? MoveFolder?.RemoteId : null,
+        FolderName = ShowsMoveFolder ? MoveFolder?.Name : null,
     };
 }

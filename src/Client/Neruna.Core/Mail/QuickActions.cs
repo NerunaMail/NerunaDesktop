@@ -204,6 +204,91 @@ public sealed class QuickActionService(ISettingsStore settings)
         }
     }
 
+    // ── Export and import: a file to share in a company (file share, mail); accounts by address, templates by name ──
+
+    private const string FileFormat = "neruna.quickactions";
+
+    private static readonly JsonSerializerOptions JsonIndented = new(Json) { WriteIndented = true };
+
+    private sealed record ExportFile(
+        string Format,
+        int Version,
+        IReadOnlyList<QuickAction> Actions,
+        IReadOnlyList<PdfStamp> Stamps,
+        IReadOnlyDictionary<Guid, string> Accounts,
+        IReadOnlyDictionary<Guid, string> Templates);
+
+    /// <summary>The actions as a file, with the stamps they use and the addresses and template names they point at.</summary>
+    /// <param name="accounts">Account id → e-mail address (to find the same mailbox on another computer).</param>
+    /// <param name="templates">Text template id → name.</param>
+    public static string Export(IReadOnlyList<QuickAction> actions, IReadOnlyList<PdfStamp> stamps, IReadOnlyDictionary<Guid, string> accounts, IReadOnlyDictionary<Guid, string> templates)
+    {
+        ArgumentNullException.ThrowIfNull(actions);
+        ArgumentNullException.ThrowIfNull(stamps);
+        ArgumentNullException.ThrowIfNull(accounts);
+        ArgumentNullException.ThrowIfNull(templates);
+        var usedStamps = actions.SelectMany(a => a.Steps).Select(s => s.StampId).OfType<Guid>().ToHashSet();
+        var usedAccounts = actions.Select(a => a.When.AccountId).OfType<Guid>().ToHashSet();
+        var usedTemplates = actions.SelectMany(a => a.Steps).Select(s => s.TemplateId).OfType<Guid>().ToHashSet();
+        var file = new ExportFile(FileFormat, 1, actions,
+            [.. stamps.Where(s => usedStamps.Contains(s.Id))],
+            accounts.Where(a => usedAccounts.Contains(a.Key)).ToDictionary(),
+            templates.Where(t => usedTemplates.Contains(t.Key)).ToDictionary());
+        return JsonSerializer.Serialize(file, JsonIndented);
+    }
+
+    /// <summary>
+    /// The actions of an exported file, fitted to this computer: accounts found by their address (else "Alle Konten"),
+    /// templates by their name (else none); stamps that are not here yet come along. Actions with the same id replace
+    /// the ones here (a newer version of the same file).
+    /// </summary>
+    /// <exception cref="FormatException">Not a file of Neruna quick actions.</exception>
+    public static (IReadOnlyList<QuickAction> Actions, IReadOnlyList<PdfStamp> Stamps) Import(string json, IReadOnlyDictionary<Guid, string> accounts, IReadOnlyDictionary<Guid, string> templates)
+    {
+        ArgumentNullException.ThrowIfNull(accounts);
+        ArgumentNullException.ThrowIfNull(templates);
+        ExportFile? file;
+        try
+        {
+            file = JsonSerializer.Deserialize<ExportFile>(json, Json);
+        }
+        catch (JsonException ex)
+        {
+            throw new FormatException("Not a quick action file", ex);
+        }
+
+        if (file is not { Format: FileFormat, Actions: not null })
+        {
+            throw new FormatException("Not a quick action file");
+        }
+
+        Guid? Account(Guid? exported) =>
+            exported is { } id && file.Accounts?.GetValueOrDefault(id) is { } address
+                ? accounts.FirstOrDefault(a => string.Equals(a.Value, address, StringComparison.OrdinalIgnoreCase)).Key is var here && here != Guid.Empty ? here : null
+                : null;
+
+        Guid? Template(Guid? exported) =>
+            exported is { } id && file.Templates?.GetValueOrDefault(id) is { } name
+                ? templates.FirstOrDefault(t => string.Equals(t.Value, name, StringComparison.OrdinalIgnoreCase)).Key is var here && here != Guid.Empty ? here : null
+                : null;
+
+        var actions = file.Actions.Select(action =>
+        {
+            var account = Account(action.When.AccountId);
+            return action with
+            {
+                When = action.When with
+                {
+                    AccountId = account,
+                    FolderRemoteId = account is null ? null : action.When.FolderRemoteId,
+                    FolderName = account is null ? null : action.When.FolderName,
+                },
+                Steps = [.. action.Steps.Select(s => s with { TemplateId = Template(s.TemplateId) })],
+            };
+        }).ToList();
+        return (actions, file.Stamps ?? []);
+    }
+
     /// <summary>Whether the button of <paramref name="action"/> appears for this mail.</summary>
     public static bool Matches(QuickAction action, QuickActionMessage message)
     {

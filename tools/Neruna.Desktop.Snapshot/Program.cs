@@ -170,6 +170,7 @@ internal static class Snapshots
                     new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.StampPdf) { StampId = firstStamp.Id },
                     new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.SaveAttachment) { Folder = "/home/anna/Offerten", FileName = "{Datum}_{Absender}_{Dateiname}" },
                     new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.Reply),
+                    new Neruna.Core.Mail.QuickActionStep(Neruna.Core.Mail.QuickActionStepKind.MoveToFolder) { FolderName = "Projekte" },
                 ]),
             new Neruna.Core.Mail.QuickAction(Guid.NewGuid(), "An Buchhaltung", "#CA5010",
                 new Neruna.Core.Mail.QuickActionCondition { Attachment = Neruna.Core.Mail.QuickActionAttachmentKind.Pdf },
@@ -187,6 +188,16 @@ internal static class Snapshots
         await vm.SettingsPage.QuickActions.EditCommand.ExecuteAsync(vm.SettingsPage.QuickActions.Actions[0]);
         await Task.Delay(300);
         await SaveAsync(window, output, "settings-quick-action-edit.png");
+        // The move step's folder list: accounts as headings, folders indented below.
+        var editorScroll = window.GetVisualDescendants().OfType<ScrollViewer>().First(v => v.DataContext is QuickActionsViewModel);
+        editorScroll.Offset = new Vector(0, 10000);
+        await Task.Delay(300);
+        var folderBox = window.GetVisualDescendants().OfType<ComboBox>().Last(c => c.Classes.Contains("folders"));
+        Console.WriteLine($"Move folder chosen: {(folderBox.SelectedItem as FolderChoice)?.Path}, choices: {string.Join(" | ", ((IEnumerable<FolderChoice>)folderBox.ItemsSource!).Select(f => new string(' ', f.Depth) + f.Name + (f.IsAccount ? " (Konto)" : "")))}");
+        folderBox.IsDropDownOpen = true;
+        await Task.Delay(400);
+        await SaveAsync(window, output, "settings-quick-action-folders.png");
+        folderBox.IsDropDownOpen = false;
         vm.SettingsPage.QuickActions.Editing!.CancelCommand.Execute(null);
         vm.NavigateCommand.Execute(Section.Mail);
         await Task.Delay(200);
