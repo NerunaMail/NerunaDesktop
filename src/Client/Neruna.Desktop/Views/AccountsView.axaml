@@ -58,7 +58,7 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="acc:LinkItem">
-                          <Button Classes="command" Padding="0,1" Margin="0,0,14,0" FontSize="12" Content="{Binding Text}" ToolTip.Tip="{Binding Url}"
+                          <Button Classes="command" Padding="0,1" Margin="0,0,14,0" FontSize="12" Content="{Binding Text}" ToolTip.Tip="{Binding Url}" Foreground="{DynamicResource AccentTextBrush}"
                                   Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).OpenLinkCommand}" CommandParameter="{Binding}" />
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>

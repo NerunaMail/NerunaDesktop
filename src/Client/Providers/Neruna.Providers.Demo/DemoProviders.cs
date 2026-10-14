@@ -17,12 +17,23 @@ public static class DemoData
 {
     public const string ProviderId = "demo";
 
+    // What a provider's configuration brings along: webmail, instructions, support (shown with the account).
+    private static readonly Neruna.Contracts.Discovery.MailProviderConfig Links = new("example.com", null, [], [], [])
+    {
+        WebmailUrl = new Uri("https://webmail.example.com/"),
+        Documentation =
+        [
+            new(new Uri("https://example.com/hilfe/mail"), new Dictionary<string, string> { ["de"] = "Anleitung", ["en"] = "Instructions", ["fr"] = "Instructions", ["it"] = "Istruzioni" }),
+            new(new Uri("mailto:support@example.com"), new Dictionary<string, string> { ["de"] = "Support", ["en"] = "Support", ["fr"] = "Assistance", ["it"] = "Assistenza" }),
+        ],
+    };
+
     public static Account CreateAccount() => new(
         Guid.Parse("4e2b8d3c-0000-4000-8000-00000000d3e0"),
         "Anna Muster",
         "anna.muster@example.com",
         [
-            new ServiceConnection(Guid.Parse("4e2b8d3c-0000-4000-8000-00000000d3e1"), ServiceKind.Mail, ProviderId, new Dictionary<string, string>()),
+            new ServiceConnection(Guid.Parse("4e2b8d3c-0000-4000-8000-00000000d3e1"), ServiceKind.Mail, ProviderId, new Dictionary<string, string>(ProviderLinks.ToSettings(Links))),
             new ServiceConnection(Guid.Parse("4e2b8d3c-0000-4000-8000-00000000d3e2"), ServiceKind.Calendar, ProviderId, new Dictionary<string, string>()),
             new ServiceConnection(Guid.Parse("4e2b8d3c-0000-4000-8000-00000000d3e3"), ServiceKind.Contacts, ProviderId, new Dictionary<string, string>()),
         ]);

@@ -241,7 +241,7 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="acc:LinkItem">
-              <Button Classes="command" Padding="0,2" Margin="0,0,16,0" Content="{Binding Text}" ToolTip.Tip="{Binding Url}"
+              <Button Classes="command" Padding="0,2" Margin="0,0,16,0" Content="{Binding Text}" ToolTip.Tip="{Binding Url}" Foreground="{DynamicResource AccentTextBrush}"
                       Command="{Binding $parent[UserControl].((vm:AccountSetupViewModel)DataContext).OpenLinkCommand}" CommandParameter="{Binding}" />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
