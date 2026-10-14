@@ -211,9 +211,12 @@ public sealed class OAuthClient(HttpClient http)
         var body = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken);
         if (!response.IsSuccessStatusCode || body?.AccessToken is null)
         {
+            // Refreshing: a refused grant means signing in again. Signing in: nothing has expired – the provider's
+            // own reason says more (e.g. an account that may not use this).
             var invalidGrant = body?.Error is "invalid_grant" or "interaction_required";
+            var reason = body?.ErrorDescription ?? body?.Error ?? response.StatusCode.ToString();
             throw new OAuthException(
-                invalidGrant ? T("Die Anmeldung ist abgelaufen – bitte erneut anmelden.") : F("Anmeldung fehlgeschlagen: {0}", body?.ErrorDescription ?? response.StatusCode.ToString()),
+                invalidGrant && previous is not null ? T("Die Anmeldung ist abgelaufen – bitte erneut anmelden.") : F("Anmeldung fehlgeschlagen: {0}", reason),
                 invalidGrant);
         }
 

@@ -61,7 +61,18 @@ public sealed class OpenAiProvider(HttpClient http, ICredentialStore credentials
     {
         var hostId = await HostIdAsync(cancellationToken);
         var issued = await settings.GetAsync(ClientIdKey, cancellationToken);
-        var tokens = await new OAuthClient(http).SignInAsync(Endpoints(issued ?? DynamicClient, hostId, registering: issued is null), null, browser, cancellationToken);
+        OAuthTokens tokens;
+        try
+        {
+            tokens = await new OAuthClient(http).SignInAsync(Endpoints(issued ?? DynamicClient, hostId, registering: issued is null), null, browser, cancellationToken);
+        }
+        catch (OAuthException ex) when (issued is not null)
+        {
+            // The app id OpenAI issued earlier may be gone (app removed in ChatGPT, disconnected): the next attempt
+            // registers Neruna anew.
+            await settings.SetAsync(ClientIdKey, null, cancellationToken);
+            throw new AiException(ex.Message + " " + T("Bitte nochmals «Mit ChatGPT anmelden» – Neruna meldet sich dann neu bei OpenAI an."), false, ex);
+        }
         if (tokens.ClientId is { } clientId)
         {
             await settings.SetAsync(ClientIdKey, clientId, cancellationToken);

@@ -40,7 +40,7 @@ internal sealed partial class AiOptionsViewModel : ViewModelBase
 
     public string SignInText => F("Mit {0} anmelden", SelectedProvider?.SignInName ?? string.Empty);
 
-    public string SignInHelp => F("Nutzt Ihr {0}-Abo: zählt zu dessen Kontingent, ohne zusätzliche Kosten. Die Anmeldung öffnet sich im Browser.", SelectedProvider?.SignInName ?? string.Empty);
+    public string SignInHelp => F("Nutzt Ihr bezahltes {0}-Abo: zählt zu dessen Kontingent, ohne zusätzliche Kosten. Ein kostenloses Konto genügt dafür nicht – dann einen API-Schlüssel verwenden. Die Anmeldung öffnet sich im Browser.", SelectedProvider?.SignInName ?? string.Empty);
 
     public string PrivacyText => F("Neruna schickt nur dann Text an {0}, wenn Sie eine KI-Funktion auslösen – direkt von diesem Gerät, ohne Umweg über Neruna. Dafür gelten die Datenschutzbestimmungen von {0}.",
         (_ai.Connection is { } c ? _ai.Provider(c.ProviderId) : SelectedProvider)?.Name ?? string.Empty);
