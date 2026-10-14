@@ -422,7 +422,7 @@ internal sealed partial class CloudViewModel(
         CertificatesNeedAttention = status.Problem is not null || (status.Available && !status.Approved);
         CertificatesText = !status.Available ? null
             : status.Problem ?? (!status.Approved
-                ? T("Zertifikate: Dieses Gerät wartet auf die Freigabe im Portal (Zertifikate → Ausstehende Freigaben).")
+                ? T("Zertifikate: Dieses Gerät wartet auf die Freigabe im Portal (Freigaben).")
                 : status.Waiting > 0
                     ? F("Zertifikate: {0} auf diesem Gerät, {1} warten noch auf die Zustellung im Portal.", status.Received, status.Waiting)
                     : status.Received == 0

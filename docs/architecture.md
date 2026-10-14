@@ -459,7 +459,7 @@ DEK (256 bit, zufällig)
   Sicherung erstellen?» beim Verlassen der Einstellungen.
 - Wiederherstellen: Vorschau (wird erstellt/überschrieben/entfernt), danach entspricht das Gerät der Sicherung.
 - Geräteschlüssel (Anmeldung, Zertifikats-Verschlüsselung) sind nie Teil davon: Jedes Gerät hat eigene; ein neues
-  Gerät erhält Cloud-Zertifikate nach der Freigabe im Portal (Hinweis auf dem Dashboard, alle auf einmal).
+  Gerät erhält Cloud-Zertifikate nach der Freigabe im Portal (Seite «Freigaben», Badge im Menü, alle auf einmal).
 
 ## 6b. S/MIME-Zertifikate aus dem Portal (Zero-Knowledge)
 

@@ -1366,7 +1366,7 @@
  "Zertifikate (S/MIME)": "Certificats (S/MIME)",
  "Zertifikate konnten nicht abgeglichen werden: ": "Les certificats n'ont pas pu être synchronisés : ",
  "Zertifikate von Kontakten ({0})": "Certificats des contacts ({0})",
- "Zertifikate: Dieses Gerät wartet auf die Freigabe im Portal (Zertifikate → Ausstehende Freigaben).": "Certificats : cet appareil attend l'autorisation dans le portail (Certificats → Autorisations en attente).",
+ "Zertifikate: Dieses Gerät wartet auf die Freigabe im Portal (Freigaben).": "Certificats : cet appareil attend l'autorisation dans le portail (Autorisations).",
  "Zertifikate: Ihnen ist noch kein Zertifikat zugeordnet.": "Certificats : aucun certificat ne vous est encore attribué.",
  "Zertifikate: {0} auf diesem Gerät, {1} warten noch auf die Zustellung im Portal.": "Certificats : {0} sur cet appareil, {1} attendent encore la livraison dans le portail.",
  "Zertifikate: {0} von der Organisation auf diesem Gerät.": "Certificats : {0} de l'organisation sur cet appareil.",
