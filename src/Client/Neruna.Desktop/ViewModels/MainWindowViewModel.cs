@@ -263,7 +263,9 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         };
 
         // Restored from a backup: every page from the store again, then the servers of the restored accounts.
-        cloud.Restored += async (_, _) =>
+        SettingsPage.FileBackup.Restored += async (_, _) => await AfterRestoreAsync();
+        cloud.Restored += async (_, _) => await AfterRestoreAsync();
+        async Task AfterRestoreAsync()
         {
             ShowBackupHint = false;
             await MailPage.Preferences.LoadAsync();
@@ -272,7 +274,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
             await UpdatePushAsync();
             await SyncAsync();
-        };
+        }
+
         cloud.BackedUp += (_, _) => ShowBackupHint = false;
 
         var accountsPage = SettingsPage.Accounts;

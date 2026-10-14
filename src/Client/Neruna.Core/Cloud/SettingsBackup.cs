@@ -36,6 +36,9 @@ public sealed record BackupCertificate(string Thumbprint, byte[] Der, byte[]? Pk
 /// <summary>The file inside the encrypted envelope.</summary>
 internal sealed record BackupDocument(int Format, DateTimeOffset CreatedAt, BackupContent Content);
 
+/// <summary>A backup file: who made it when, and the encrypted <see cref="BackupDocument"/> (a vault opened only by its password).</summary>
+internal sealed record BackupFile(string Kind, int Version, DateTimeOffset CreatedAt, string? DeviceName, VaultEnvelope? Envelope);
+
 /// <summary>Einstellungen → Cloud → Sicherung, as far as the server knows it (notes decrypted when this device has the key).</summary>
 /// <param name="HasVault">A vault exists for the person on the server.</param>
 /// <param name="IsUnlocked">This device keeps the vault's key (set up or unlocked here) and can make and read backups.</param>
@@ -227,6 +230,88 @@ public sealed class SettingsBackupService(
         return new RestorePlan(entry, document.Content, Compare(await CollectAsync(cancellationToken), document.Content));
     }
 
+    // ── Backup file: the same content, without Neruna Cloud – to move to a new computer ──
+
+    /// <summary>The ending of backup files.</summary>
+    public const string FileExtension = ".nerunabackup";
+
+    /// <summary>Least length of a backup file's password (it is the only protection of the file).</summary>
+    public const int MinFilePasswordLength = 12;
+
+    private const string FileKind = "neruna-backup";
+
+    /// <summary>
+    /// Writes the personal settings (accounts with their passwords, signatures, templates, certificates, settings) into
+    /// <paramref name="target"/>, encrypted with <paramref name="password"/> (Argon2id → AES-256-GCM, as the vault): without
+    /// the password the file is of no use. There is no recovery code – a lost password means a lost file.
+    /// </summary>
+    /// <exception cref="BackupException">The password is too short.</exception>
+    public async Task ExportToFileAsync(Stream target, string password, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if ((password ?? string.Empty).Length < MinFilePasswordLength)
+        {
+            throw new BackupException(F("Das Passwort muss mindestens {0} Zeichen lang sein.", MinFilePasswordLength));
+        }
+
+        var content = await CollectAsync(cancellationToken);
+        var document = Compress(JsonSerializer.SerializeToUtf8Bytes(new BackupDocument(Format, clock.GetUtcNow(), content), NerunaJson.Options));
+        VaultEnvelope envelope;
+        using (var vault = await Task.Run(() => UnlockedVault.Create(password!, out _), cancellationToken))
+        {
+            envelope = vault.Seal(document);
+        }
+
+        // Only the password opens it (the recovery code of a new vault is never shown, so it does not go along).
+        envelope = envelope with { Keys = [.. envelope.Keys.Where(k => k.Kind == WrappedKeyKind.Password)] };
+        await JsonSerializer.SerializeAsync(target, new BackupFile(FileKind, 1, clock.GetUtcNow(), Environment.MachineName, envelope), NerunaJson.Options, cancellationToken);
+        logger.LogInformation("Settings written to a backup file");
+    }
+
+    /// <summary>Opens a backup file and compares it with this computer – the preview before restoring.</summary>
+    /// <exception cref="BackupException">Not a backup file, wrong password, damaged, or from a newer Neruna.</exception>
+    public async Task<RestorePlan> PrepareRestoreFromFileAsync(Stream source, string password, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        BackupFile? file;
+        try
+        {
+            file = await JsonSerializer.DeserializeAsync<BackupFile>(source, NerunaJson.Options, cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+            throw new BackupException(T("Das ist keine Neruna-Sicherungsdatei."), ex);
+        }
+
+        if (file is not { Kind: FileKind } || file.Envelope is null)
+        {
+            throw new BackupException(T("Das ist keine Neruna-Sicherungsdatei."));
+        }
+
+        BackupDocument document;
+        try
+        {
+            using var vault = await Task.Run(() => UnlockedVault.UnlockWithPassword(file.Envelope, password ?? string.Empty), cancellationToken);
+            document = JsonSerializer.Deserialize<BackupDocument>(Decompress(vault.Open(file.Envelope)), NerunaJson.Options) ?? throw new JsonException("empty");
+        }
+        catch (VaultUnlockException ex)
+        {
+            throw new BackupException(T("Das Passwort stimmt nicht, oder die Datei ist beschädigt."), ex);
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidDataException or FormatException)
+        {
+            throw new BackupException(T("Die Sicherungsdatei ist beschädigt."), ex);
+        }
+
+        if (document.Format > Format)
+        {
+            throw new BackupException(T("Die Sicherung stammt aus einer neueren Neruna-Version. Bitte zuerst aktualisieren."));
+        }
+
+        var entry = new BackupEntry(FileKind, file.CreatedAt, file.DeviceName, null, source.CanSeek ? source.Length : 0);
+        return new RestorePlan(entry, document.Content, Compare(await CollectAsync(cancellationToken), document.Content));
+    }
+
     /// <summary>Makes the personal settings exactly those of the backup (accounts, passwords, signatures, …).</summary>
     public async Task RestoreAsync(RestorePlan plan, CancellationToken cancellationToken = default)
     {
@@ -304,12 +389,20 @@ public sealed class SettingsBackupService(
         await certificates.ReplacePersonalAsync(
             [.. content.Certificates.Select(c => (new StoredCertificate(c.Thumbprint, c.Der, c.Pkcs12, c.Source, c.AddedAt), c.Password))], cancellationToken);
 
-        // Now equal to the backup: no reminder until something changes again.
-        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault;
-        using var vault = info is null ? null : await LocalVaultAsync(info, cancellationToken);
-        if (vault is not null)
+        // Now equal to the backup: no reminder until something changes again (only with a vault in the cloud; a backup
+        // file is restored without one).
+        try
         {
-            await RememberAsync(vault, await CollectAsync(cancellationToken), cancellationToken);
+            var info = (await cloud.GetVaultAsync(cancellationToken)).Vault;
+            using var vault = info is null ? null : await LocalVaultAsync(info, cancellationToken);
+            if (vault is not null)
+            {
+                await RememberAsync(vault, await CollectAsync(cancellationToken), cancellationToken);
+            }
+        }
+        catch (Exception ex) when (ex is CloudException or HttpRequestException or InvalidOperationException)
+        {
+            logger.LogDebug(ex, "No cloud vault to compare the restored settings with");
         }
 
         logger.LogInformation("Settings backup {Id} restored ({Changes} changes)", plan.Backup.Id, plan.Changes.Count);

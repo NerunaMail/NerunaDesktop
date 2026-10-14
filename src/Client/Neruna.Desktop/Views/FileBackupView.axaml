@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:views="using:Neruna.Desktop.Views"
+             x:Class="Neruna.Desktop.Views.FileBackupView"
+             x:DataType="vm:FileBackupViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,20">
+      <TextBlock Text="{l:T 'Datensicherung'}" FontSize="22" FontWeight="SemiBold" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap"
+                 Text="{l:T 'Sichert Ihre persönlichen Einstellungen in eine Datei – Konten samt Passwörtern, Signaturen, Textvorlagen, Zertifikate und Einstellungen –, zum Beispiel für den Umzug auf einen neuen Computer. Ohne Neruna Cloud; mit ihr gibt es die Sicherung auch unter «Neruna Cloud».'}" />
+
+      <views:LoginGateView DataContext="{Binding Login}" />
+
+      <!-- In eine Datei -->
+      <TextBlock Text="{l:T 'In Datei sichern'}" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0" />
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                 Text="{l:T 'Die Datei ist mit diesem Passwort verschlüsselt. Wer sie findet, kann ohne das Passwort nichts damit anfangen – aber auch Sie nicht, wenn Sie es vergessen.'}" />
+      <TextBox Text="{Binding Password}" PasswordChar="•" PlaceholderText="{Binding MinLength, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Passwort (mindestens {0} Zeichen)'}" MaxWidth="360" HorizontalAlignment="Left" Width="360" />
+      <TextBox Text="{Binding PasswordRepeat}" PasswordChar="•" PlaceholderText="{l:T 'Passwort wiederholen'}" Width="360" HorizontalAlignment="Left" />
+      <Button Classes="accent" Content="{l:T 'In Datei sichern …'}" Command="{Binding ExportCommand}" HorizontalAlignment="Left" />
+      <TextBlock Text="{Binding ExportMessage}" TextWrapping="Wrap" Classes.error="{Binding ExportFailed}"
+                 IsVisible="{Binding ExportMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+      <!-- Aus einer Datei -->
+      <TextBlock Text="{l:T 'Aus Datei wiederherstellen'}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
+      <Button Content="{l:T 'Sicherungsdatei wählen …'}" Command="{Binding ChooseFileCommand}" HorizontalAlignment="Left" IsVisible="{Binding !HasFile}" />
+      <StackPanel Spacing="8" IsVisible="{Binding HasFile}">
+        <SelectableTextBlock Text="{Binding FilePath}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !HasPlan}">
+          <TextBox Text="{Binding FilePassword}" PasswordChar="•" PlaceholderText="{l:T 'Passwort der Sicherung'}" Width="300">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding OpenFileCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button Content="{l:T 'Öffnen'}" Command="{Binding OpenFileCommand}" />
+          <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelRestoreCommand}" />
+        </StackPanel>
+      </StackPanel>
+      <!-- What restoring changes here, before anything happens -->
+      <StackPanel Spacing="8" IsVisible="{Binding HasPlan}">
+        <TextBlock Text="{Binding PlanText}" TextWrapping="Wrap" />
+        <ItemsControl ItemsSource="{Binding Changes}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:BackupChangeRow">
+              <Grid ColumnDefinitions="140,*,Auto" Margin="0,2">
+                <TextBlock Text="{Binding Area}" Classes="subtle" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Text="{Binding What}" Classes="subtle" Margin="12,0,0,0" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Classes="accent" Content="{l:T 'Wiederherstellen'}" Command="{Binding RestoreCommand}" />
+          <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelRestoreCommand}" />
+        </StackPanel>
+      </StackPanel>
+      <TextBlock Text="{Binding RestoreMessage}" TextWrapping="Wrap" Classes.error="{Binding RestoreFailed}"
+                 IsVisible="{Binding RestoreMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

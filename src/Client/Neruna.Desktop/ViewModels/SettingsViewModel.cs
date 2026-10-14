@@ -4,8 +4,11 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup) : ViewModelBase
 {
+    /// <summary>Settings → Datensicherung: the personal settings into a password-protected file and back.</summary>
+    public FileBackupViewModel FileBackup => fileBackup;
+
     /// <summary>Settings → KI: AI provider and model.</summary>
     public AiOptionsViewModel Ai => ai;
 
@@ -56,6 +59,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(5, T("Zertifikate (S/MIME)"), "IconCertificate", IsIndented: true),
         new(2, T("Kalender"), "IconCalendar"),
         new(7, T("Neruna Cloud"), "IconCloud"),
+        new(10, T("Datensicherung"), "IconArchive"),
         new(6, T("Darstellung"), "IconPalette"),
         new(8, T("KI"), "IconAi"),
         new(9, T("Über Neruna"), "IconInfo"),

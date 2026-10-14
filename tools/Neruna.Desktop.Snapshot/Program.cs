@@ -614,6 +614,8 @@ internal static class Snapshots
 
         vm.SettingsPage.SelectedTab = 9;
         await SaveAsync(window, output, "settings-about-diagnosis.png");
+        vm.SettingsPage.SelectedTab = 10;
+        await SaveAsync(window, output, "settings-file-backup.png");
         vm.SettingsPage.SelectedTab = 0;
         vm.SettingsPage.Accounts.EditCommand.Execute(vm.SettingsPage.Accounts.Items[0]);
         await Task.Delay(300);

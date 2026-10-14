@@ -25,6 +25,7 @@ internal sealed class ViewLocator : IDataTemplate
         SyncStatusViewModel => new SyncStatusView(),
         BackupChangesViewModel => new BackupChangesView(),
         AccountTransferDialogViewModel => new AccountTransferDialogView(),
+        FileBackupViewModel => new FileBackupView(),
         AutoReplyViewModel => new AutoReplyView(),
         CalendarSelectionViewModel => new CalendarSelectionView(),
         ReadingPaneViewModel => new ReadingPaneView(),
