@@ -35,6 +35,20 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
 
     public ObservableCollection<StampEditor> Stamps { get; } = [];
 
+    /// <summary>The name on stamps; empty: the person logged in to the computer (shown as placeholder).</summary>
+    [ObservableProperty]
+    public partial string StampName { get; set; } = string.Empty;
+
+    public static string SystemName => SystemUserName.Get();
+
+    partial void OnStampNameChanged(string value)
+    {
+        if (!_loadingStamps)
+        {
+            _ = service.SetStampNameAsync(value);
+        }
+    }
+
     public static IReadOnlyList<string> Colors => QuickActionService.Colors;
 
     public async Task ReloadAsync()
@@ -43,6 +57,7 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         ShowActions();
 
         _loadingStamps = true;
+        StampName = await service.GetStampNameAsync() ?? string.Empty;
         Stamps.Clear();
         foreach (var stamp in await service.GetStampsAsync())
         {

@@ -130,6 +130,7 @@ public sealed class QuickActionService(ISettingsStore settings)
 {
     private const string ActionsKey = "mail.quickActions";
     private const string StampsKey = "pdf.stamps";
+    private const string StampNameKey = "pdf.stampName";
 
     private static readonly JsonSerializerOptions Json = new() { Converters = { new JsonStringEnumConverter() }, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
@@ -178,6 +179,12 @@ public sealed class QuickActionService(ISettingsStore settings)
         await settings.SetAsync(StampsKey, JsonSerializer.Serialize(stamps, Json), cancellationToken);
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>The name on stamps when set by hand; null means the name of the person logged in to the computer.</summary>
+    public Task<string?> GetStampNameAsync(CancellationToken cancellationToken = default) => settings.GetAsync(StampNameKey, cancellationToken);
+
+    public Task SetStampNameAsync(string? name, CancellationToken cancellationToken = default) =>
+        settings.SetAsync(StampNameKey, string.IsNullOrWhiteSpace(name) ? null : name.Trim(), cancellationToken);
 
     private static T? Read<T>(string? json)
         where T : class

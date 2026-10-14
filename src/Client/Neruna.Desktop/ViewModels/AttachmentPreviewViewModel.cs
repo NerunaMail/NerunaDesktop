@@ -14,8 +14,8 @@ internal interface IAttachmentActions
 {
     Task<IReadOnlyList<PdfStamp>> GetStampsAsync();
 
-    /// <summary>The name on the stamp: the sender name of the open mail's account.</summary>
-    string? UserName { get; }
+    /// <summary>The name on the stamp: the one set in the settings, else the person logged in to the computer.</summary>
+    Task<string?> GetStampNameAsync();
 
     /// <summary>Answer or forward the open mail with the (stamped) attachment.</summary>
     Task RespondWithAsync(AttachmentViewModel attachment, byte[] content, QuickActionStepKind kind);
@@ -121,7 +121,8 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
             return;
         }
 
-        var mark = new PdfStampMark(page.Index, x, y, stamp.Text, stamp.Lines(_actions?.UserName, DateTime.Now), stamp.Color);
+        var name = _actions is null ? null : await _actions.GetStampNameAsync();
+        var mark = new PdfStampMark(page.Index, x, y, stamp.Text, stamp.Lines(name, DateTime.Now), stamp.Color);
         try
         {
             var (stamped, image) = await Task.Run(() =>

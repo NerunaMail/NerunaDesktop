@@ -24,7 +24,7 @@ internal sealed partial class MailViewModel
 
     Task<IReadOnlyList<PdfStamp>> IAttachmentActions.GetStampsAsync() => quickActions.GetStampsAsync();
 
-    string? IAttachmentActions.UserName => OpenAccount?.DisplayName;
+    async Task<string?> IAttachmentActions.GetStampNameAsync() => await quickActions.GetStampNameAsync() ?? Infrastructure.SystemUserName.Get();
 
     // The account of the open mail (a search may show mails of several).
     private Neruna.Core.Accounts.Account? OpenAccount => OpenFolder?.Account.Account ?? CurrentAccount?.Account;

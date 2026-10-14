@@ -84,7 +84,13 @@
         <!-- Stamps for PDFs (also in the PDF preview under «Stempeln») -->
         <TextBlock Classes="section" Text="{l:T 'Stempel'}" Margin="0,20,0,0" />
         <TextBlock Classes="subtle" TextWrapping="Wrap"
-                   Text="{l:T 'Zum Stempeln von PDFs in der Vorschau und in Schnellaktionen. Unter dem Text stehen auf Wunsch Ihr Name (Absendername des Kontos) und Datum mit Uhrzeit. Ein Stempel ist ein sichtbarer Vermerk, keine digitale Signatur.'}" />
+                   Text="{l:T 'Zum Stempeln von PDFs in der Vorschau und in Schnellaktionen. Unter dem Text stehen auf Wunsch Ihr Name und Datum mit Uhrzeit. Ein Stempel ist ein sichtbarer Vermerk, keine digitale Signatur.'}" />
+        <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,6,0,4">
+          <TextBlock Text="{l:T 'Name auf dem Stempel'}" VerticalAlignment="Center" Margin="0,0,12,0" />
+          <TextBox Grid.Column="1" Text="{Binding StampName}" PlaceholderText="{x:Static vm:QuickActionsViewModel.SystemName}" Width="260" />
+          <TextBlock Grid.Column="2" Classes="subtle" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,0"
+                     Text="{l:T 'Leer: der Name, mit dem Sie am Computer angemeldet sind – nicht der Name des Postfachs.'}" />
+        </Grid>
         <ItemsControl ItemsSource="{Binding Stamps}" Margin="0,6,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:StampEditor">
