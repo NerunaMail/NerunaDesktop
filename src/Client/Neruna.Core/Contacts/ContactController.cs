@@ -99,8 +99,29 @@ public sealed class ContactController(
 
     private static string KnownKey(Guid connectionId) => $"addressbooks.known.{connectionId:N}";
 
-    public Task<IReadOnlyList<AddressBookInfo>> GetAddressBooksAsync(CancellationToken cancellationToken = default) =>
-        store.GetAddressBooksAsync(null, cancellationToken);
+    /// <summary>All address books, with the user's own display names where set (as for calendars).</summary>
+    public async Task<IReadOnlyList<AddressBookInfo>> GetAddressBooksAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new List<AddressBookInfo>();
+        foreach (var book in await store.GetAddressBooksAsync(null, cancellationToken))
+        {
+            result.Add(await settings.GetAsync(DisplayNameKey(book), cancellationToken) is { Length: > 0 } own
+                ? book with { Name = own, ServerName = book.Name }
+                : book);
+        }
+
+        return result;
+    }
+
+    /// <summary>The user's own name for an address book (kept in Neruna); null or empty restores the server's.</summary>
+    public Task SetDisplayNameAsync(AddressBookInfo addressBook, string? name, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(addressBook);
+        var own = name?.Trim();
+        return settings.SetAsync(DisplayNameKey(addressBook), string.IsNullOrEmpty(own) || own == (addressBook.ServerName ?? addressBook.Name) ? null : own, cancellationToken);
+    }
+
+    private static string DisplayNameKey(AddressBookInfo book) => $"addressbook.name.{book.ConnectionId:N}.{book.RemoteId}";
 
     public async Task<ContactObject?> GetContactAsync(AddressBookInfo addressBook, string remoteId, CancellationToken cancellationToken = default)
     {

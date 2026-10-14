@@ -204,7 +204,7 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
 
     private static string Key(AddressBookInfo book) => $"{book.ConnectionId:N}.{book.RemoteId}";
 
-    private static string ColorKey(AddressBookInfo book) => "contacts.color." + Key(book);
+    private static string ColorKey(AddressBookInfo book) => Neruna.Core.Calendar.CollectionColors.Key(book);
 }
 
 internal sealed partial class AddressBookItem(AddressBookInfo info, string color, int count) : ObservableObject

@@ -38,7 +38,8 @@ public sealed record AddressBookInfo(
     string RemoteId,
     string Name,
     bool IsReadOnly,
-    string? SyncState = null);
+    string? SyncState = null,
+    string? ServerName = null);
 
 /// <param name="VCardData">Complete vCard text; the source of truth.</param>
 public sealed record ContactObject(

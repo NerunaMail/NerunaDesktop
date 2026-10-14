@@ -387,7 +387,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         return result;
     }
 
-    internal static string ColorKey(CalendarInfo info) => $"calendar.color.{info.ConnectionId:N}.{info.RemoteId}";
+    internal static string ColorKey(CalendarInfo info) => Neruna.Core.Calendar.CollectionColors.Key(info);
 
     [RelayCommand]
     private void Subscribe() => SubscribeRequested?.Invoke(this, EventArgs.Empty);
