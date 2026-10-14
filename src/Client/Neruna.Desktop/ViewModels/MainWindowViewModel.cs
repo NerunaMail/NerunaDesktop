@@ -375,11 +375,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     public bool HasOverlay => Overlay is not null;
 
-    /// <summary>The group editor shows members and contacts side by side and needs more room.</summary>
+    /// <summary>Some dialogs show two things side by side and need more room (group editor, the transfer's QR code and PIN).</summary>
     public double OverlayWidth => Overlay switch
     {
         GroupEditorViewModel { IsReadOnly: false } => 980,
         CalendarSelectionViewModel { HasSeveralSources: true } => 900,
+        AccountTransferDialogViewModel => 900, // the QR code (up to ~520 px) with PIN and instructions beside it
         _ => 640,
     };
 

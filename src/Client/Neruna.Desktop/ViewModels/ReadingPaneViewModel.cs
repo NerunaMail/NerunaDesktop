@@ -393,7 +393,7 @@ internal sealed partial class AttachmentViewModel(MimeEntity entity, IFileServic
     }
 
     [RelayCommand]
-    private Task OpenAsync() => files.OpenAsync(FileName, WriteToAsync);
+    private async Task OpenAsync() => await files.OpenAsync(FileName, WriteToAsync);
 
     [RelayCommand]
     private async Task SaveAsync()

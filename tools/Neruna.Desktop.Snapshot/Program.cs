@@ -317,6 +317,13 @@ internal static class Snapshots
         var demoAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync()).First();
         await signatures.SetAssignmentAsync(demoAccount.Id, new Neruna.Core.Mail.SignatureAssignment(signature.Id, null));
 
+        // "Aufs Handy übertragen": QR code with the PIN and the instructions beside it.
+        var transferDialog = new AccountTransferDialogViewModel(services.GetRequiredService<Neruna.Core.Cloud.AccountTransferService>(), demoAccount);
+        transferDialog.ShowCode(new Neruna.Core.Cloud.AccountTransferCode(new string('A', 900), "482913"));
+        vm.Overlay = transferDialog;
+        await SaveAsync(window, output, "account-transfer.png");
+        vm.Overlay = null;
+
         // Own text templates (inserted at the caret, or by "kürzel::").
         var textTemplates = services.GetRequiredService<Neruna.Core.Mail.TextTemplateService>();
         await textTemplates.SaveAsync(new Neruna.Core.Mail.TextTemplate(Guid.NewGuid(), "Anrufnotiz",
