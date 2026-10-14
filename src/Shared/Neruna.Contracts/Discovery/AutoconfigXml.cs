@@ -48,7 +48,38 @@ public static class AutoconfigXml
             provider.Element("displayName")?.Value.Trim(),
             incoming,
             outgoing,
-            dav);
+            dav)
+        {
+            // <webMail> stands next to <emailProvider>; some files have it inside.
+            WebmailUrl = HttpsUrl(root.Descendants("webMail").Elements("loginPage").Attributes("url").FirstOrDefault()?.Value),
+            Documentation = [.. provider.Elements("documentation").Concat(root.Elements("documentation"))
+                .Select(d => HttpsUrl(d.Attribute("url")?.Value, allowMail: true) is { } url ? new ProviderLink(url, Texts(d, "descr")) : null)
+                .OfType<ProviderLink>()],
+            Enable = provider.Element("enable") is { } enable && HttpsUrl(enable.Attribute("visiturl")?.Value) is { } visit
+                ? new ProviderLink(visit, Texts(enable, "instruction"))
+                : null,
+        };
+    }
+
+    // Only links a user can safely open: https (and mailto for support).
+    private static Uri? HttpsUrl(string? value, bool allowMail = false) =>
+        Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var url) && (url.Scheme == Uri.UriSchemeHttps || (allowMail && url.Scheme == Uri.UriSchemeMailto)) ? url : null;
+
+    // <descr lang="de">…</descr> per language; without lang: English.
+    private static Dictionary<string, string> Texts(XElement parent, string name)
+    {
+        var texts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var text in parent.Elements(name))
+        {
+            var language = text.Attribute("lang")?.Value.Trim().ToLowerInvariant() is { Length: >= 2 } lang ? lang[..2] : "en";
+            var value = string.Join(' ', text.Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            if (value.Length > 0)
+            {
+                texts.TryAdd(language, value);
+            }
+        }
+
+        return texts;
     }
 
     public static string Write(MailProviderConfig config)
@@ -68,7 +99,15 @@ public static class AutoconfigXml
         provider.Add(config.IncomingServers.Select(s => WriteMailServer("incomingServer", s)));
         provider.Add(config.OutgoingServers.Select(s => WriteMailServer("outgoingServer", s)));
 
+        provider.Add(config.Documentation.Select(d => new XElement("documentation", new XAttribute("url", d.Url.AbsoluteUri),
+            d.Text.Select(t => new XElement("descr", new XAttribute("lang", t.Key), t.Value)))));
+
         var root = new XElement("clientConfig", new XAttribute("version", "1.1"), provider);
+        if (config.WebmailUrl is { } webmail)
+        {
+            root.Add(new XElement("webMail", new XElement("loginPage", new XAttribute("url", webmail.AbsoluteUri))));
+        }
+
         root.Add(config.DavServers.Where(s => s.Protocol is ServerProtocol.CalDav or ServerProtocol.CardDav).Select(WriteDavServer));
 
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + root;

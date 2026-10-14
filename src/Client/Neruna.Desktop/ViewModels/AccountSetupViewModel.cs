@@ -237,6 +237,16 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
 
         Email = account.EmailAddress ?? string.Empty;
+        _linkSettings = account.Connections.Select(c => c.Settings).FirstOrDefault(s => s.Keys.Any(k => k.StartsWith("provider.", StringComparison.Ordinal)))
+            ?.Where(p => p.Key.StartsWith("provider.", StringComparison.Ordinal)).ToDictionary(p => p.Key, p => p.Value) ?? [];
+        ProviderLinkItems.Clear();
+        foreach (var link in ProviderLinks.Of(account))
+        {
+            ProviderLinkItems.Add(link);
+        }
+
+        HasProviderLinks = ProviderLinkItems.Count > 0;
+
         var config = setup.Describe(account);
         ImapHost = SmtpHost = string.Empty;
         if (config.IncomingServers.FirstOrDefault() is { } imap)
@@ -294,6 +304,47 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     [ObservableProperty]
     public partial string? DiscoverySource { get; set; }
+
+    /// <summary>Webmail, instructions and support of the provider, from its configuration (kept with the account).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<LinkItem> ProviderLinkItems { get; } = [];
+
+    [ObservableProperty]
+    public partial bool HasProviderLinks { get; set; }
+
+    /// <summary>What the provider says to switch on first (e.g. IMAP in the webmail settings); null if nothing.</summary>
+    [ObservableProperty]
+    public partial LinkItem? EnableHint { get; set; }
+
+    private Dictionary<string, string> _linkSettings = [];
+
+    private void ShowLinks(MailProviderConfig config)
+    {
+        _linkSettings = new Dictionary<string, string>(ProviderLinks.ToSettings(config));
+        ProviderLinkItems.Clear();
+        foreach (var link in ProviderLinks.Of(config))
+        {
+            ProviderLinkItems.Add(link);
+        }
+
+        EnableHint = config.Enable is { } enable ? ProviderLinks.Item(enable) : null;
+        HasProviderLinks = ProviderLinkItems.Count > 0;
+    }
+
+    [RelayCommand]
+    private async Task OpenLinkAsync(LinkItem link)
+    {
+        if (Browser is not null)
+        {
+            try
+            {
+                await Browser.OpenAsync(link.Url);
+            }
+            catch (Neruna.Core.Auth.OAuthException)
+            {
+                Error = link.Url.AbsoluteUri; // no browser: at least the address to copy
+            }
+        }
+    }
 
     [ObservableProperty]
     public partial string ImapHost { get; set; } = string.Empty;
@@ -441,7 +492,13 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
                 BusyText = T("Suche Servereinstellungen …");
                 try
                 {
-                    if ((await discovery.DiscoverAsync(email))?.Config.Ews is { } found)
+                    var discovered = await discovery.DiscoverAsync(email);
+                    if (discovered is not null)
+                    {
+                        ShowLinks(discovered.Config);
+                    }
+
+                    if (discovered?.Config.Ews is { } found)
                     {
                         url = found.ServerUrl;
                         ExchangeServer = url.AbsoluteUri;
@@ -527,6 +584,11 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             {
                 aliases.Add(new MailIdentity(address, string.IsNullOrWhiteSpace(row.DisplayName) ? name : row.DisplayName.Trim()));
             }
+        }
+
+        foreach (var (key, value) in _linkSettings)
+        {
+            options.TryAdd(key, value);
         }
 
         var account = setup.BuildAccount(name, email, config, AcceptAnyCertificate && !IsCloud, options) with { Label = label, Aliases = aliases.Count > 0 ? aliases : null };
@@ -761,6 +823,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     private void Apply(DiscoveryResult result)
     {
+        ShowLinks(result.Config);
         DiscoverySource = result.OrganizationName is { } org
             ? F("Konfiguration von {0} (Neruna) übernommen", org)
             : F("Konfiguration gefunden über {0}", result.Source);

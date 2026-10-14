@@ -33,6 +33,19 @@ public class AutoconfigXmlTests
         Assert.Equal(new Uri("https://dav.example-hosting.net/addressbooks/"), config.CardDav?.ServerUrl);
         Assert.Equal(new DavServerSettings(ServerProtocol.Ews, new Uri("https://exchange.example-hosting.net/EWS/Exchange.asmx"), "%EMAILADDRESS%"), config.Ews);
         Assert.Single(config.IncomingServers); // the exchange server is no IMAP/POP server
+
+        // For the user: webmail, Neruna's instructions and support, Mozilla's documentation, what to switch on first.
+        Assert.Equal(new Uri("https://webmail.example-hosting.net/"), config.WebmailUrl);
+        Assert.Equal(["https://example-hosting.net/neruna", "mailto:support@example-hosting.net", "https://example-hosting.net/help/mail"],
+            config.Documentation.Select(d => d.Url.OriginalString));
+        Assert.Equal(("Anleitung", "Assistance", "Mail settings"), (config.Documentation[0].TextFor("de"), config.Documentation[1].TextFor("fr"), config.Documentation[2].TextFor("it")));
+        Assert.Equal("https://webmail.example-hosting.net/settings/imap", config.Enable?.Url.AbsoluteUri);
+        Assert.Equal("Switch on IMAP in the webmail settings first.", config.Enable?.TextFor("fr"));
+
+        // Written and read again: the same links.
+        var again = AutoconfigXml.Parse(AutoconfigXml.Write(config));
+        Assert.Equal(config.WebmailUrl, again.WebmailUrl);
+        Assert.Equal(config.Documentation.Select(d => d.Url), again.Documentation.Select(d => d.Url));
     }
 
     [Fact]

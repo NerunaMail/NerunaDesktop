@@ -13,8 +13,23 @@ namespace Neruna.Desktop.ViewModels;
 /// <summary>Account list, removal and diagnostics (where data and logs live).</summary>
 internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountSetupService setup, ICredentialStore credentials, IFileService files, AppOptions options,
     Neruna.Core.Cloud.AccountTransferService transfer,
-    Neruna.Core.Mail.MailController mail) : ViewModelBase
+    Neruna.Core.Mail.MailController mail,
+    Neruna.Core.Auth.IBrowserLauncher browser) : ViewModelBase
 {
+    /// <summary>Webmail, instructions or support of an account's provider, in the browser.</summary>
+    [RelayCommand]
+    private async Task OpenLinkAsync(LinkItem link)
+    {
+        try
+        {
+            await browser.OpenAsync(link.Url);
+        }
+        catch (Neruna.Core.Auth.OAuthException)
+        {
+            // no browser: nothing else to do here
+        }
+    }
+
     /// <summary>"Aufs Handy übertragen" for an account: the shell shows the dialog (computer login, QR code, PIN).</summary>
     public event EventHandler<AccountTransferDialogViewModel>? TransferRequested;
 
@@ -164,6 +179,11 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     public Account Account { get; } = account;
 
     public string Title => Account.Title;
+
+    /// <summary>Webmail, instructions and support of the provider (from its configuration).</summary>
+    public IReadOnlyList<LinkItem> Links { get; } = ProviderLinks.Of(account);
+
+    public bool HasLinks => Links.Count > 0;
 
     /// <summary>Set up by the organisation in Neruna Cloud: it goes when the organisation removes it, not here.</summary>
     public bool IsFromCloud => Account.IsFromCloud;

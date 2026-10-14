@@ -102,6 +102,20 @@ public class AccountSetupTests
     }
 
     [Fact]
+    public void The_providers_links_are_kept_with_the_account()
+    {
+        var config = AutoconfigXml.Parse(Fixture("autoconfig-directory-example.xml"));
+        var settings = ProviderLinks.ToSettings(config);
+        var account = new Account(Guid.NewGuid(), "Anna", "anna@example-hosting.net",
+            [new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, ProviderIds.Imap, new Dictionary<string, string>(settings))]);
+
+        Assert.Equal([("Webmail", "https://webmail.example-hosting.net/"), ("Anleitung", "https://example-hosting.net/neruna"),
+                      ("Support", "mailto:support@example-hosting.net"), ("Mail settings", "https://example-hosting.net/help/mail")],
+            ProviderLinks.Of(account).Select(l => (l.Text, l.Url.OriginalString)));
+        Assert.Empty(ProviderLinks.Of(account with { Connections = [] }));
+    }
+
+    [Fact]
     public async Task Discovery_returns_null_when_nothing_answers()
     {
         var discovery = new AccountDiscovery(new HttpClient(new StubHttpHandler()), NullLogger<AccountDiscovery>.Instance);

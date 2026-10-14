@@ -4,6 +4,7 @@
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
              xmlns:dc="using:Neruna.Contracts.Discovery"
+             xmlns:acc="using:Neruna.Core.Accounts"
              x:Class="Neruna.Desktop.Views.AccountSetupView"
              x:DataType="vm:AccountSetupViewModel">
 
@@ -218,6 +219,34 @@
       </StackPanel>
     </StackPanel>
 
+    </StackPanel>
+
+    <!-- From the provider's configuration: what to switch on first, and its webmail, instructions and support -->
+    <StackPanel IsVisible="{Binding IsMailForm}" Margin="0,12,0,0" Spacing="6">
+      <Border IsVisible="{Binding EnableHint, Converter={x:Static ObjectConverters.IsNotNull}}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8">
+        <StackPanel Spacing="4">
+          <TextBlock FontWeight="SemiBold" Text="{l:T 'Wichtig: beim Anbieter zuerst einschalten'}" />
+          <TextBlock TextWrapping="Wrap" Text="{Binding EnableHint.Text, FallbackValue=''}" />
+          <Button Classes="command" Padding="0,2" HorizontalAlignment="Left" Content="{l:T 'Einstellungen beim Anbieter öffnen'}"
+                  Command="{Binding OpenLinkCommand}" CommandParameter="{Binding EnableHint}" />
+        </StackPanel>
+      </Border>
+      <StackPanel IsVisible="{Binding HasProviderLinks}" Spacing="2">
+        <TextBlock Classes="label" Text="{l:T 'Hilfe vom Anbieter (falls etwas nicht klappt)'}" />
+        <ItemsControl ItemsSource="{Binding ProviderLinkItems}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="acc:LinkItem">
+              <Button Classes="command" Padding="0,2" Margin="0,0,16,0" Content="{Binding Text}" ToolTip.Tip="{Binding Url}"
+                      Command="{Binding $parent[UserControl].((vm:AccountSetupViewModel)DataContext).OpenLinkCommand}" CommandParameter="{Binding}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
     </StackPanel>
 
     <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0" TextWrapping="Wrap"

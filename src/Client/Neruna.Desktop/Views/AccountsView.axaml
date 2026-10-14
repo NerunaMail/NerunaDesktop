@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:acc="using:Neruna.Core.Accounts"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:views="using:Neruna.Desktop.Views"
              x:Class="Neruna.Desktop.Views.AccountsView"
@@ -48,6 +49,20 @@
                       <TextBlock Text="{l:T 'Von Ihrer Organisation verwaltet'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" />
                       <TextBlock Text="{l:T 'Abwesenheit aktiv'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding HasAutoReply}" />
                     </StackPanel>
+                    <!-- Webmail, instructions and support of the provider -->
+                    <ItemsControl ItemsSource="{Binding Links}" IsVisible="{Binding HasLinks}" Margin="0,2,0,0">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="acc:LinkItem">
+                          <Button Classes="command" Padding="0,1" Margin="0,0,14,0" FontSize="12" Content="{Binding Text}" ToolTip.Tip="{Binding Url}"
+                                  Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).OpenLinkCommand}" CommandParameter="{Binding}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                   </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <Button Content="{l:T 'Bearbeiten'}"
