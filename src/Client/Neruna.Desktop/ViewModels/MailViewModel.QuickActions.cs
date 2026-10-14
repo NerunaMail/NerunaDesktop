@@ -166,9 +166,11 @@ internal sealed partial class MailViewModel
                         break;
 
                     case QuickActionStepKind.Flag:
-                        if (!item.IsFlagged)
+                        // Only the open mail, not whatever else is selected in the list.
+                        if (!item.IsFlagged && FolderOf(item) is { } flagFolder)
                         {
-                            await ToggleFlagCommand.ExecuteAsync(null);
+                            await mail.SetFlagsAsync(flagFolder.Account.Connection, flagFolder.Folder, [item.Summary.RemoteId], MessageFlags.Flagged, true);
+                            item.IsFlagged = true;
                         }
 
                         break;
