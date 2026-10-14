@@ -286,6 +286,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
+        accountsPage.TransferRequested += async (_, dialog) =>
+        {
+            dialog.Finished += (_, _) => Overlay = null;
+            Overlay = dialog;
+            await dialog.StartAsync();
+        };
         accountsPage.AccountsChanged += async (_, _) =>
         {
             await RefreshPagesAsync();

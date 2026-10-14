@@ -48,6 +48,17 @@
                  Text="{l:T 'Neruna Desktop ist Open Source unter der Mozilla Public License 2.0 (MPL 2.0). Du darfst die App nutzen, verändern und weitergeben; Änderungen an Neruna-Dateien bleiben unter der MPL offen. Die App wird ohne Gewährleistung bereitgestellt.'}" />
       <HyperlinkButton Content="{l:T 'Lizenztext (mozilla.org/MPL/2.0)'}" NavigateUri="https://www.mozilla.org/MPL/2.0/" Padding="0" />
 
+      <TextBlock Text="{l:T 'Diagnose'}" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
+      <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto">
+        <TextBlock Text="{l:T 'Datenordner'}" Classes="subtle" VerticalAlignment="Center" />
+        <SelectableTextBlock Grid.Column="1" Text="{Binding Accounts.DataDirectory}" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <Button Grid.Column="2" Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Accounts.OpenDataFolderCommand}" />
+        <TextBlock Grid.Row="1" Text="{l:T 'Logs'}" Classes="subtle" VerticalAlignment="Center" />
+        <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Accounts.LogDirectory}" VerticalAlignment="Center" TextWrapping="Wrap" />
+        <Button Grid.Row="1" Grid.Column="2" Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Accounts.OpenLogFolderCommand}" />
+      </Grid>
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding Accounts.ProtocolLogText}" />
+
       <TextBlock Text="{l:T 'Verwendete Bibliotheken'}" FontSize="16" FontWeight="SemiBold" Margin="0,12,0,0" />
       <TextBlock TextWrapping="Wrap"
                  Text="{l:T 'Avalonia, MailKit, MimeKit, BouncyCastle, Ical.Net, Entity Framework Core mit SQLite, SkiaSharp, CommunityToolkit.Mvvm, Konscious Argon2 und weitere – unter MIT-, Apache-2.0- bzw. BSD-Lizenz. Vollständige Liste: THIRD-PARTY-NOTICES.md im Quellcode.'}" />

@@ -596,6 +596,25 @@ internal static class Snapshots
         var editedAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync())[0];
         vm.SettingsPage.SelectedTab = 0;
         await vm.SettingsPage.Accounts.ReloadAsync();
+        await SaveAsync(window, output, "settings-accounts.png");
+        // "⋯" of the first account, with "Offline verfügbar" opened.
+        if (window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Flyout is MenuFlyout && b.Content is TextBlock { Text: "⋯" }) is { Flyout: MenuFlyout accountMenu } moreButton)
+        {
+            accountMenu.ShowAt(moreButton);
+            await Task.Delay(300);
+            if (accountMenu.Items.OfType<MenuItem>().FirstOrDefault(m => m.ItemsSource is not null) is { } offline)
+            {
+                offline.Open();
+                await Task.Delay(300);
+            }
+
+            await SaveAsync(window, output, "settings-accounts-menu.png");
+            accountMenu.Hide();
+        }
+
+        vm.SettingsPage.SelectedTab = 9;
+        await SaveAsync(window, output, "settings-about-diagnosis.png");
+        vm.SettingsPage.SelectedTab = 0;
         vm.SettingsPage.Accounts.EditCommand.Execute(vm.SettingsPage.Accounts.Items[0]);
         await Task.Delay(300);
         if (vm.Overlay is AccountSetupViewModel accountEdit)

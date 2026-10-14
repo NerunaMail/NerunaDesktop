@@ -15,68 +15,11 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
     Neruna.Core.Cloud.AccountTransferService transfer,
     Neruna.Core.Mail.MailController mail) : ViewModelBase
 {
-    // ── Konto aufs Handy übertragen: QR code + PIN for the Neruna app, after the computer login ──
-
-    public Infrastructure.LoginGate Login { get; } = new();
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsTransferring))]
-    public partial IReadOnlyList<Neruna.Core.Accounts.Account>? TransferAccounts { get; set; }
-
-    public bool IsTransferring => TransferAccounts is not null;
-
-    [ObservableProperty]
-    public partial Neruna.Core.Accounts.Account? TransferAccount { get; set; }
-
-    [ObservableProperty]
-    public partial Avalonia.Media.Imaging.Bitmap? TransferQrCode { get; set; }
-
-    [ObservableProperty]
-    public partial string? TransferPin { get; set; }
+    /// <summary>"Aufs Handy übertragen" for an account: the shell shows the dialog (computer login, QR code, PIN).</summary>
+    public event EventHandler<AccountTransferDialogViewModel>? TransferRequested;
 
     [RelayCommand]
-    private async Task StartTransferAsync()
-    {
-        var list = await transfer.GetTransferableAsync();
-        if (list.Count == 0 || !await Login.VerifyAsync(T("Zum Übertragen eines Kontos aufs Handy bitte mit dem Login dieses Computers bestätigen.")))
-        {
-            return;
-        }
-
-        TransferAccount = null;
-        TransferAccounts = list;
-        TransferAccount = list[0];
-    }
-
-    partial void OnTransferAccountChanged(Neruna.Core.Accounts.Account? value) => _ = ShowTransferCodeAsync(value);
-
-    private async Task ShowTransferCodeAsync(Neruna.Core.Accounts.Account? account)
-    {
-        TransferQrCode = null;
-        TransferPin = null;
-        if (account is null)
-        {
-            return;
-        }
-
-        var code = await transfer.CreateCodeAsync(account);
-        // Error correction L (a screen does not get dirty) keeps the code coarse; whole pixels per module, about 500 pixels
-        // wide and shown unscaled, keep it sharp enough for a phone camera.
-        var data = new QRCoder.QRCodeGenerator().CreateQrCode(code.Code, QRCoder.QRCodeGenerator.ECCLevel.L);
-        var png = new QRCoder.PngByteQRCode(data).GetGraphic(Math.Max(4, 500 / data.ModuleMatrix.Count));
-        using var stream = new MemoryStream(png);
-        TransferQrCode = new Avalonia.Media.Imaging.Bitmap(stream);
-        TransferPin = code.Pin;
-    }
-
-    [RelayCommand]
-    private void CloseTransfer()
-    {
-        TransferAccounts = null;
-        TransferAccount = null;
-        TransferQrCode = null;
-        TransferPin = null;
-    }
+    private void Transfer(AccountItem item) => TransferRequested?.Invoke(this, new AccountTransferDialogViewModel(transfer, item.Account));
 
     public event EventHandler? AddAccountRequested;
 
@@ -130,12 +73,12 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         UpdatePositions();
 
         OnPropertyChanged(nameof(HasAccounts));
-        CanTransfer = (await transfer.GetTransferableAsync()).Count > 0;
+        var transferable = (await transfer.GetTransferableAsync()).Select(a => a.Id).ToHashSet();
+        foreach (var item in Items)
+        {
+            item.CanTransfer = transferable.Contains(item.Account.Id);
+        }
     }
-
-    /// <summary>There are own IMAP accounts the app can take over.</summary>
-    [ObservableProperty]
-    public partial bool CanTransfer { get; set; }
 
     [RelayCommand]
     private void AddAccount() => AddAccountRequested?.Invoke(this, EventArgs.Empty);
@@ -234,27 +177,40 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
 
     public bool HasMail => Account.ConnectionsOf(ServiceKind.Mail).Any();
 
-    /// <summary>How far back the mail is kept complete on this computer (content and attachments), for offline use.</summary>
-    public static IReadOnlyList<OfflineOption> OfflineOptions { get; } = [.. Neruna.Core.Mail.OfflinePeriods.All.Select(p => new OfflineOption(p))];
-
-    [ObservableProperty]
-    public partial OfflineOption? Offline { get; set; }
-
-    private Action<Neruna.Core.Mail.OfflinePeriod>? _saveOffline;
+    /// <summary>"⋯ → Offline verfügbar": how far back the mail is complete on this computer (content and attachments).</summary>
+    public IReadOnlyList<OfflineChoice> OfflineChoices { get; private set; } = [];
 
     internal void SetOffline(Neruna.Core.Mail.OfflinePeriod period, Action<Neruna.Core.Mail.OfflinePeriod> save)
     {
-        Offline = OfflineOptions.First(o => o.Period == period);
-        _saveOffline = save;
+        var choices = Neruna.Core.Mail.OfflinePeriods.All.Select(p => new OfflineChoice(p) { IsChecked = p == period }).ToList();
+        foreach (var choice in choices)
+        {
+            choice.Chosen = () =>
+            {
+                foreach (var other in choices)
+                {
+                    other.IsChecked = other == choice;
+                }
+
+                save(choice.Period);
+            };
+        }
+
+        OfflineChoices = choices;
+        OnPropertyChanged(nameof(OfflineChoices));
     }
 
-    partial void OnOfflineChanged(OfflineOption? value)
+    /// <summary>The app can take the account over (own account with IMAP, CalDAV or CardDAV).</summary>
+    [ObservableProperty]
+    public partial bool CanTransfer { get; set; }
+
+    /// <summary>Under the title: the services, e.g. "E-Mail · Kalender · Kontakte".</summary>
+    public string Services => string.Join(" · ", Account.Connections.Select(c => c.Kind).Distinct().Order().Select(k => k switch
     {
-        if (value is not null)
-        {
-            _saveOffline?.Invoke(value.Period);
-        }
-    }
+        ServiceKind.Mail => T("E-Mail"),
+        ServiceKind.Calendar => T("Kalender"),
+        _ => T("Kontakte"),
+    }));
 
     public IReadOnlyList<ConnectionLine> Connections { get; } = account.Connections.OrderBy(c => c.Kind).Select(c => ConnectionLine.From(c, summary(c))).ToList();
 
@@ -263,6 +219,9 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     public partial bool ConfirmRemove { get; set; }
 
     public string RemoveText => ConfirmRemove ? T("Wirklich entfernen?") : T("Entfernen");
+
+    [RelayCommand]
+    private void CancelRemove() => ConfirmRemove = false;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanMoveUp))]
@@ -294,8 +253,18 @@ internal sealed record ConnectionLine(string Kind, string Provider, string Detai
     }
 }
 
-/// <summary>A choice for "Offline verfügbar".</summary>
-internal sealed record OfflineOption(Neruna.Core.Mail.OfflinePeriod Period)
+/// <summary>A choice in "⋯ → Offline verfügbar" (a radio item).</summary>
+internal sealed partial class OfflineChoice(Neruna.Core.Mail.OfflinePeriod period) : ObservableObject
 {
-    public override string ToString() => Neruna.Core.Mail.OfflinePeriods.Label(Period);
+    public Neruna.Core.Mail.OfflinePeriod Period { get; } = period;
+
+    public string Label { get; } = Neruna.Core.Mail.OfflinePeriods.Label(period);
+
+    [ObservableProperty]
+    public partial bool IsChecked { get; set; }
+
+    internal Action? Chosen { get; set; }
+
+    [RelayCommand]
+    private void Choose() => Chosen?.Invoke();
 }

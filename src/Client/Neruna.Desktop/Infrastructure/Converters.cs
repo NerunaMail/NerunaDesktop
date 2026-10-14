@@ -20,6 +20,10 @@ internal static class Converters
         Color.TryParse(color, out var parsed) ? new SolidColorBrush(parsed) : Brushes.Transparent);
 
     /// <summary>Greyed out while another list is shown alone ("Nur diesen … anzeigen").</summary>
+    /// <summary>Settings: the page whose number is the parameter is shown.</summary>
+    public static FuncValueConverter<int, object?, bool> IsTab { get; } = new((tab, parameter) =>
+        parameter is not null && int.TryParse(parameter.ToString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var wanted) && tab == wanted);
+
     public static FuncValueConverter<bool, double> DimmedOpacity { get; } = new(dimmed => dimmed ? 0.45 : 1);
 
     public static FuncValueConverter<bool, FontWeight> BoldIf { get; } = new(bold => bold ? FontWeight.SemiBold : FontWeight.Normal);

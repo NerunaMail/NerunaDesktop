@@ -3,108 +3,46 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:views="using:Neruna.Desktop.Views"
+             xmlns:app="using:Neruna.Desktop"
              x:Class="Neruna.Desktop.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
-  <Border Classes="pane" Padding="20,12,20,0">
-    <TabControl SelectedIndex="{Binding SelectedTab}">
-      <!-- Icon and name per tab, so they read as tabs; a little smaller so all fit on one line -->
-      <TabControl.Styles>
-        <Style Selector="TabItem">
-          <Setter Property="FontSize" Value="16" />
-          <Setter Property="Padding" Value="10,4" />
-          <Setter Property="MinHeight" Value="40" />
-        </Style>
-      </TabControl.Styles>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconPeople}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'Konten'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding Accounts}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconMail}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'E-Mail'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding MailOptions}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconCalendar}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'Kalender'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding CalendarOptions}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconSignature}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'Signaturen'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding Signatures}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconTextTemplate}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'Textvorlagen'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding TextTemplates}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconCertificate}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'Zertifikate (S/MIME)'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding Certificates}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconPalette}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'Design'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding Appearance}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconCloud}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'Cloud'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding Cloud}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconAi}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'KI'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <ContentControl Content="{Binding Ai}" Margin="0,12,0,0" />
-      </TabItem>
-      <TabItem>
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="{StaticResource IconInfo}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{Binding $parent[TabItem].Foreground}" />
-            <TextBlock Text="{l:T 'Info'}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <views:AboutView Margin="0,12,0,0" />
-      </TabItem>
-    </TabControl>
+  <!-- Areas on the left (the mail ones grouped under a heading), the chosen one on the right -->
+  <Border Classes="pane" Padding="0">
+    <Grid ColumnDefinitions="230,*">
+      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0" Padding="10,14">
+        <ListBox ItemsSource="{x:Static vm:SettingsViewModel.Navigation}" SelectedItem="{Binding SelectedNav}" Background="Transparent">
+          <ListBox.Styles>
+            <Style Selector="ListBoxItem" x:DataType="vm:SettingsNavItem">
+              <Setter Property="Padding" Value="10,7" />
+              <Setter Property="CornerRadius" Value="6" />
+              <Setter Property="IsEnabled" Value="{Binding !IsHeading}" />
+            </Style>
+          </ListBox.Styles>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:SettingsNavItem">
+              <Panel Margin="{Binding Indent}">
+                <TextBlock Text="{Binding Title}" IsVisible="{Binding IsHeading}" Classes="subtle" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding !IsHeading}">
+                  <PathIcon Data="{Binding IconKey, Converter={x:Static app:Converters.Icon}}" Width="16" Height="16" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" />
+                </StackPanel>
+              </Panel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+      <Panel Grid.Column="1" Margin="24,16,16,0">
+        <ContentControl Content="{Binding Accounts}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=0}" />
+        <ContentControl Content="{Binding MailOptions}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=1}" />
+        <ContentControl Content="{Binding CalendarOptions}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=2}" />
+        <ContentControl Content="{Binding Signatures}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=3}" />
+        <ContentControl Content="{Binding TextTemplates}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=4}" />
+        <ContentControl Content="{Binding Certificates}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=5}" />
+        <ContentControl Content="{Binding Appearance}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=6}" />
+        <ContentControl Content="{Binding Cloud}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=7}" />
+        <ContentControl Content="{Binding Ai}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=8}" />
+        <views:AboutView IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=9}" />
+      </Panel>
+    </Grid>
   </Border>
 </UserControl>

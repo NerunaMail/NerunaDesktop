@@ -3,25 +3,32 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:views="using:Neruna.Desktop.Views"
-             xmlns:acc="using:Neruna.Core.Accounts"
              x:Class="Neruna.Desktop.Views.AccountsView"
              x:DataType="vm:AccountsViewModel">
 
   <ScrollViewer>
-      <StackPanel Spacing="8" MaxWidth="900" HorizontalAlignment="Left">
-        <Grid ColumnDefinitions="*,Auto,Auto">
+    <!-- As wide as there is room, at most 820 px, on the left -->
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MaxWidth="820" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="*,Auto">
           <TextBlock Text="{l:T 'Konten'}" FontSize="22" FontWeight="SemiBold" />
-          <Button Grid.Column="1" Classes="command" Command="{Binding SubscribeCommand}" Margin="0,0,8,0">
-            <StackPanel Orientation="Horizontal">
-              <PathIcon Data="{StaticResource IconRss}" />
-              <TextBlock Text="{l:T 'Internet-Kalender abonnieren'}" />
-            </StackPanel>
-          </Button>
-          <Button Grid.Column="2" Classes="accent" Command="{Binding AddAccountCommand}" Padding="12,6">
+          <!-- One button: an account, or a calendar subscribed by address -->
+          <Button Grid.Column="1" Classes="accent" Padding="12,6">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
-              <TextBlock Text="{l:T 'Konto hinzufügen'}" />
+              <TextBlock Text="{l:T 'Hinzufügen'}" />
+              <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10" />
             </StackPanel>
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuItem Header="{l:T 'Konto hinzufügen'}" Command="{Binding AddAccountCommand}" />
+                <MenuItem Header="{l:T 'Internet-Kalender abonnieren'}" Command="{Binding SubscribeCommand}" />
+              </MenuFlyout>
+            </Button.Flyout>
           </Button>
         </Grid>
 
@@ -30,99 +37,68 @@
         <ItemsControl ItemsSource="{Binding Items}" Margin="0,8,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AccountItem">
-              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,0,0,10">
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+              <!-- Compact: who and which services; servers, offline and the rest under "Bearbeiten" and "⋯" -->
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                   <StackPanel>
-                    <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding Sender}" Classes="subtle" />
-                    <TextBlock Text="{l:T 'Von Ihrer Organisation verwaltet'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" />
+                    <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Sender}" Classes="subtle" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
+                      <TextBlock Text="{Binding Services}" FontSize="12" Classes="subtle" />
+                      <TextBlock Text="{l:T 'Von Ihrer Organisation verwaltet'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" />
+                      <TextBlock Text="{l:T 'Abwesenheit aktiv'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding HasAutoReply}" />
+                    </StackPanel>
                   </StackPanel>
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
-                    <!-- Order in the folder tree and everywhere else -->
-                    <Button Classes="command" Padding="6" ToolTip.Tip="{l:T 'Nach oben'}" IsEnabled="{Binding CanMoveUp}"
-                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
-                      <PathIcon Data="{StaticResource IconChevronUp}" Width="12" Height="12" Margin="0" />
-                    </Button>
-                    <Button Classes="command" Padding="6" ToolTip.Tip="{l:T 'Nach unten'}" IsEnabled="{Binding CanMoveDown}"
-                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
-                      <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" Margin="0" />
-                    </Button>
-                    <Button Content="{Binding AutoReplyText}" Classes.accent="{Binding HasAutoReply}" Margin="4,0,0,0" IsVisible="{Binding HasMail}" ToolTip.Tip="{l:T 'Abwesenheitsnotiz'}"
-                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).AutoReplyCommand}" CommandParameter="{Binding}" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <Button Content="{l:T 'Bearbeiten'}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
-                    <Button Content="{Binding RemoveText}" IsVisible="{Binding !IsFromCloud}"
-                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                    <Button Padding="8,6" ToolTip.Tip="{l:T 'Weitere Aktionen'}">
+                      <TextBlock Text="⋯" FontWeight="Bold" />
+                      <Button.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                          <MenuItem Header="{Binding AutoReplyText}" IsVisible="{Binding HasMail}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).AutoReplyCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="{l:T 'Offline verfügbar'}" IsVisible="{Binding HasMail}" ItemsSource="{Binding OfflineChoices}">
+                            <MenuItem.Styles>
+                              <Style Selector="MenuItem > MenuItem" x:DataType="vm:OfflineChoice">
+                                <Setter Property="Header" Value="{Binding Label}" />
+                                <Setter Property="ToggleType" Value="Radio" />
+                                <Setter Property="IsChecked" Value="{Binding IsChecked}" />
+                                <Setter Property="Command" Value="{Binding ChooseCommand}" />
+                              </Style>
+                            </MenuItem.Styles>
+                          </MenuItem>
+                          <MenuItem Header="{l:T 'Aufs Handy übertragen'}" IsVisible="{Binding CanTransfer}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).TransferCommand}" CommandParameter="{Binding}" />
+                          <Separator />
+                          <MenuItem Header="{l:T 'Nach oben'}" IsEnabled="{Binding CanMoveUp}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="{l:T 'Nach unten'}" IsEnabled="{Binding CanMoveDown}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}" />
+                          <Separator IsVisible="{Binding !IsFromCloud}" />
+                          <MenuItem Header="{l:T 'Entfernen …'}" IsVisible="{Binding !IsFromCloud}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                        </MenuFlyout>
+                      </Button.Flyout>
+                    </Button>
                   </StackPanel>
-                  <ItemsControl Grid.Row="1" Grid.ColumnSpan="2" ItemsSource="{Binding Connections}" Margin="0,10,0,0">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:ConnectionLine">
-                        <Grid ColumnDefinitions="90,80,*" Margin="0,2">
-                          <TextBlock Text="{Binding Kind}" FontWeight="SemiBold" />
-                          <TextBlock Grid.Column="1" Text="{Binding Provider}" Classes="subtle" />
-                          <SelectableTextBlock Grid.Column="2" Text="{Binding Detail}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <!-- How far back the mail is complete on this computer (also offline) -->
-                  <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0" IsVisible="{Binding HasMail}">
-                    <TextBlock Text="{l:T 'Offline verfügbar'}" FontWeight="SemiBold" VerticalAlignment="Center" Width="140" />
-                    <ComboBox ItemsSource="{x:Static vm:AccountItem.OfflineOptions}" SelectedItem="{Binding Offline}" MinWidth="200"
-                              ToolTip.Tip="{l:T 'Mails aus diesem Zeitraum lädt Neruna samt Anhängen herunter, damit sie auch ohne Internet lesbar sind. Ältere werden beim Öffnen geladen.'}" />
-                  </StackPanel>
+                  <!-- "Entfernen …": asked once more, right in the card -->
+                  <Border Grid.Row="1" Grid.ColumnSpan="2" IsVisible="{Binding ConfirmRemove}" Margin="0,10,0,0" Padding="10,8" CornerRadius="4"
+                          Background="{DynamicResource InfoBackgroundBrush}">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                      <TextBlock Text="{l:T 'Dieses Konto samt seinen Daten auf diesem Computer entfernen? Auf dem Server bleibt alles.'}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Content="{l:T 'Abbrechen'}" Margin="8,0,0,0"
+                              Command="{Binding CancelRemoveCommand}" />
+                      <Button Grid.Column="2" Content="{l:T 'Entfernen'}" Margin="6,0,0,0" Foreground="{DynamicResource ErrorBrush}"
+                              Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                    </Grid>
+                  </Border>
                 </Grid>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <!-- Konto aufs Handy: QR code + PIN for the Neruna app (without Neruna Cloud; with it the backup brings the accounts) -->
-        <StackPanel Spacing="10" Margin="0,18,0,0" IsVisible="{Binding CanTransfer}">
-          <TextBlock Text="{l:T 'Konto aufs Handy übertragen'}" FontSize="18" FontWeight="SemiBold" />
-          <TextBlock Classes="subtle" TextWrapping="Wrap"
-                     Text="{l:T 'Ein eigenes Konto samt Passwort per QR-Code in die Neruna-App übernehmen, ohne es dort neu einzutippen. Der QR-Code ist mit der PIN daneben verschlüsselt.'}" />
-          <Button Content="{l:T 'Konto aufs Handy übertragen'}" Command="{Binding StartTransferCommand}" HorizontalAlignment="Left">
-            <Button.IsVisible>
-              <MultiBinding Converter="{x:Static BoolConverters.And}">
-                <Binding Path="!IsTransferring" />
-                <Binding Path="!Login.IsAsking" />
-              </MultiBinding>
-            </Button.IsVisible>
-          </Button>
-          <views:LoginGateView DataContext="{Binding Login}" />
-          <Border IsVisible="{Binding IsTransferring}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14" HorizontalAlignment="Left">
-            <Grid ColumnDefinitions="Auto,*">
-              <Border Background="White" Padding="8" CornerRadius="4" VerticalAlignment="Top">
-                <Image Source="{Binding TransferQrCode}" Stretch="None" RenderOptions.BitmapInterpolationMode="None" />
-              </Border>
-              <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="8" MaxWidth="320">
-                <ComboBox ItemsSource="{Binding TransferAccounts}" SelectedItem="{Binding TransferAccount}" MinWidth="240">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="acc:Account">
-                      <TextBlock Text="{Binding Title}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-                <TextBlock Text="{l:T 'PIN'}" Classes="subtle" />
-                <SelectableTextBlock Text="{Binding TransferPin}" FontSize="32" FontWeight="SemiBold" FontFamily="Consolas, Cascadia Mono, monospace" />
-                <TextBlock TextWrapping="Wrap" FontSize="12"
-                           Text="{l:T 'In der Neruna-App: Einstellungen → Konten → «Konto vom Computer übernehmen», QR-Code scannen und die PIN eingeben. Die PIN nicht zusammen mit dem QR-Code fotografieren oder weitergeben.'}" />
-                <Button Content="{l:T 'Fertig'}" Command="{Binding CloseTransferCommand}" HorizontalAlignment="Left" />
-              </StackPanel>
-            </Grid>
-          </Border>
-        </StackPanel>
-
-        <TextBlock Text="{l:T 'Diagnose'}" FontSize="16" FontWeight="SemiBold" Margin="0,16,0,0" />
-        <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
-          <TextBlock Text="{l:T 'Datenordner'}" Classes="subtle" VerticalAlignment="Center" />
-          <SelectableTextBlock Grid.Column="1" Text="{Binding DataDirectory}" VerticalAlignment="Center" />
-          <Button Grid.Column="2" Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding OpenDataFolderCommand}" />
-          <TextBlock Grid.Row="1" Text="{l:T 'Logs'}" Classes="subtle" VerticalAlignment="Center" />
-          <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LogDirectory}" VerticalAlignment="Center" />
-          <Button Grid.Row="1" Grid.Column="2" Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding OpenLogFolderCommand}" />
-        </Grid>
-        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding ProtocolLogText}" />
       </StackPanel>
+    </Grid>
   </ScrollViewer>
 </UserControl>

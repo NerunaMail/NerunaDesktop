@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -41,6 +42,44 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     [ObservableProperty]
     public partial int SelectedTab { get; set; }
 
+    /// <summary>
+    /// The list on the left: areas, the mail ones under a heading. <see cref="SettingsNavItem.Tab"/> keeps the old tab
+    /// numbers, so jumps into the settings (e.g. to <see cref="CloudTab"/>) keep working.
+    /// </summary>
+    public static IReadOnlyList<SettingsNavItem> Navigation { get; } =
+    [
+        new(0, T("Konten"), "IconPeople"),
+        new(-1, T("E-Mail"), null, IsHeading: true),
+        new(1, T("Allgemein"), "IconMail", IsIndented: true),
+        new(3, T("Signaturen"), "IconSignature", IsIndented: true),
+        new(4, T("Textvorlagen"), "IconTextTemplate", IsIndented: true),
+        new(5, T("Zertifikate (S/MIME)"), "IconCertificate", IsIndented: true),
+        new(2, T("Kalender"), "IconCalendar"),
+        new(7, T("Neruna Cloud"), "IconCloud"),
+        new(6, T("Darstellung"), "IconPalette"),
+        new(8, T("KI"), "IconAi"),
+        new(9, T("Über Neruna"), "IconInfo"),
+    ];
+
+    [ObservableProperty]
+    public partial SettingsNavItem? SelectedNav { get; set; } = Navigation[0];
+
+    partial void OnSelectedTabChanged(int value)
+    {
+        if (SelectedNav?.Tab != value)
+        {
+            SelectedNav = Navigation.FirstOrDefault(n => n.Tab == value);
+        }
+    }
+
+    partial void OnSelectedNavChanged(SettingsNavItem? value)
+    {
+        if (value is { IsHeading: false } item)
+        {
+            SelectedTab = item.Tab;
+        }
+    }
+
     /// <summary>Central signatures arrived or went: the list here follows.</summary>
     public void Attach(Neruna.Core.Cloud.CloudSignatureSync cloudSignatures, Neruna.Core.Cloud.CloudTextTemplateSync cloudTemplates, Neruna.Core.Cloud.CloudCertificateSync cloudCertificates)
     {
@@ -63,4 +102,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         await TextTemplates.ReloadAsync();
         await Cloud.ReloadAsync();
     }
+}
+
+/// <summary>An entry of the settings navigation (or a heading over a group).</summary>
+internal sealed record SettingsNavItem(int Tab, string Title, string? IconKey, bool IsHeading = false, bool IsIndented = false)
+{
+    public Avalonia.Thickness Indent => IsIndented ? new Avalonia.Thickness(14, 0, 0, 0) : default;
 }
