@@ -529,7 +529,12 @@ public sealed partial class ImapMailProvider(
             await smtp.DisconnectAsync(true, cancellationToken);
         }
 
-        // Most IMAP servers do not file sent mail themselves; users expect it in "Sent".
+        // Most IMAP servers do not file sent mail themselves; users expect it in "Sent". Proton Mail Bridge does.
+        if (settings.ServerSavesSent)
+        {
+            return;
+        }
+
         var imap = await GetImapAsync(cancellationToken);
         if (imap.Capabilities.HasFlag(ImapCapabilities.SpecialUse) && imap.GetFolder(SpecialFolder.Sent) is { } sent)
         {
@@ -573,7 +578,7 @@ public sealed partial class ImapMailProvider(
         }
 
         var password = await GetPasswordAsync(cancellationToken);
-        var imap = new ImapClient(CreateProtocolLogger("imap")) { ServerCertificateValidationCallback = TlsCertificates.For(settings.AcceptAnyCertificate) };
+        var imap = new ImapClient(CreateProtocolLogger("imap")) { ServerCertificateValidationCallback = settings.AcceptAnyCertificate ? TlsCertificates.For(acceptAny: true) : TlsCertificates.For(settings.Raw) };
         try
         {
             await imap.ConnectAsync(settings.ImapHost, settings.ImapPort, MapSecurity(settings.ImapSecurity), cancellationToken);
@@ -592,7 +597,7 @@ public sealed partial class ImapMailProvider(
     private async Task<SmtpClient> ConnectSmtpAsync(CancellationToken cancellationToken)
     {
         var password = await GetPasswordAsync(cancellationToken);
-        var smtp = new SmtpClient(CreateProtocolLogger("smtp")) { ServerCertificateValidationCallback = TlsCertificates.For(settings.AcceptAnyCertificate) };
+        var smtp = new SmtpClient(CreateProtocolLogger("smtp")) { ServerCertificateValidationCallback = settings.AcceptAnyCertificate ? TlsCertificates.For(acceptAny: true) : TlsCertificates.For(settings.Raw) };
         try
         {
             await smtp.ConnectAsync(settings.SmtpHost, settings.SmtpPort, MapSecurity(settings.SmtpSecurity), cancellationToken);

@@ -22,6 +22,26 @@ public sealed record ImapSettings(
     private const string SmtpSecurityKey = "smtp.security";
     private const string UsernameKey = "username";
 
+    /// <summary>"true": the server files sent mail in "Sent" itself (Proton Mail Bridge) – Neruna adds no copy.</summary>
+    public const string ServerSavesSentKey = "imap.serverSavesSent";
+
+    /// <summary>"proton-bridge": set up through Proton Mail Bridge on this computer (the account dialog shows that step).</summary>
+    public const string KindKey = "imap.kind";
+
+    public const string ProtonBridgeKind = "proton-bridge";
+
+    /// <summary>All settings of the connection (TLS options, kind …), for what this record does not type.</summary>
+    public IReadOnlyDictionary<string, string> Raw { get; init; } = new Dictionary<string, string>();
+
+    public bool ServerSavesSent => Raw.TryGetValue(ServerSavesSentKey, out var value) && value == "true";
+
+    // Equal are the same servers and user; Raw is only carried along.
+    public bool Equals(ImapSettings? other) =>
+        other is not null && (ImapHost, ImapPort, ImapSecurity, SmtpHost, SmtpPort, SmtpSecurity, Username, AcceptAnyCertificate)
+            == (other.ImapHost, other.ImapPort, other.ImapSecurity, other.SmtpHost, other.SmtpPort, other.SmtpSecurity, other.Username, other.AcceptAnyCertificate);
+
+    public override int GetHashCode() => HashCode.Combine(ImapHost, ImapPort, ImapSecurity, SmtpHost, SmtpPort, SmtpSecurity, Username, AcceptAnyCertificate);
+
     public IReadOnlyDictionary<string, string> ToDictionary() => new Dictionary<string, string>
     {
         [ImapHostKey] = ImapHost,
@@ -45,7 +65,7 @@ public sealed record ImapSettings(
             int.Parse(Required(settings, SmtpPortKey), CultureInfo.InvariantCulture),
             Enum.Parse<SocketSecurity>(Required(settings, SmtpSecurityKey)),
             Required(settings, UsernameKey),
-            Neruna.Core.Security.TlsCertificates.AcceptsAnyCertificate(settings));
+            Neruna.Core.Security.TlsCertificates.AcceptsAnyCertificate(settings)) { Raw = settings };
     }
 
     /// <summary>Null unless the configuration offers both an IMAP and an SMTP server.</summary>

@@ -579,6 +579,19 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   (`EwsClientCertificateTests`). Gegen einen echten Exchange-Server noch nicht geprüft.
 - Android: Der Provider hängt nur am Core und läuft unverändert mit; dort fehlen Kontoart und Zertifikatsauswahl in der UI.
 
+## 6h. Proton Mail (Bridge)
+
+- Eigene Kontoart «Proton Mail (Bridge)»: Proton bietet IMAP/SMTP nur über die Proton Mail Bridge auf demselben
+  Computer (127.0.0.1, Standard IMAP 1143 / SMTP 1025, STARTTLS, selbst signiertes Zertifikat). Technisch ein
+  IMAP-Konto mit drei Einstellungen: `imap.kind=proton-bridge` (Dialog beim Bearbeiten), `imap.serverSavesSent=true`
+  (die Bridge legt Gesendetes selbst ab – keine zweite Kopie) und `tls.pinnedCertificate` (SHA-256 des
+  Bridge-Zertifikats, beim Einrichten gemerkt – statt «jedes Zertifikat akzeptieren»).
+- `ProtonBridge.DetectAsync`: erst die Standard-Ports, dann alle lokal offenen Ports (`GetActiveTcpListeners`, ohne
+  Liste der Bereich 1024–2223), je Port die Begrüssung im Klartext bzw. nach TLS-Handshake; die Bridge erkennt man am
+  IMAP-Gruss «Proton Mail Bridge», SMTP am Standard-Port oder als einziger lokaler SMTP-Server (sonst wählt der Benutzer).
+- Der Dialog erklärt, wo in der Bridge Benutzername und Passwort stehen («Mailbox details»).
+- Tests mit nachgebauten Bridge-Servern (`ProtonBridgeTests`); gegen eine echte Bridge noch nicht geprüft.
+
 ## 7. Offene Entscheide
 
 | # | Thema | Optionen |

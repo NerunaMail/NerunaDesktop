@@ -8,6 +8,7 @@ using Neruna.Core.Security;
 using Neruna.Desktop.Infrastructure;
 using Neruna.Providers.Dav;
 using Neruna.Providers.Ews;
+using Neruna.Providers.Imap;
 using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
@@ -29,9 +30,10 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     // ── Step 1 for a new account: which kind. Everything with IMAP/CalDAV/CardDAV is one choice (found automatically);
     //    only providers that need their own sign-in are listed separately. ──
 
-    /// <summary>"choose", "imap", "exchange" or "microsoft".</summary>
+    /// <summary>"choose", "imap", "exchange", "proton" or "microsoft".</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsMailForm), nameof(IsMicrosoft), nameof(CanGoBack), nameof(Subtitle), nameof(NeedsPassword))]
+    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsMailForm), nameof(IsMicrosoft), nameof(CanGoBack),
+        nameof(Subtitle), nameof(NeedsPassword), nameof(PasswordLabel))]
     [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
     public partial string Step { get; set; } = "choose";
 
@@ -42,8 +44,13 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     /// <summary>Exchange on premises through EWS (also behind a reverse proxy with client certificate).</summary>
     public bool IsExchange => Step == "exchange";
 
-    /// <summary>Name, address, aliases and password: the same for IMAP and Exchange.</summary>
-    public bool IsMailForm => IsImap || IsExchange;
+    /// <summary>Proton Mail through Proton Mail Bridge on this computer (IMAP/SMTP on 127.0.0.1).</summary>
+    public bool IsProton => Step == "proton";
+
+    /// <summary>Name, address, aliases and password: the same for IMAP, Exchange and Proton.</summary>
+    public bool IsMailForm => IsImap || IsExchange || IsProton;
+
+    public string PasswordLabel => IsProton ? T("Passwort aus der Bridge") : T("Passwort");
 
     public bool IsMicrosoft => Step == "microsoft";
 
@@ -58,6 +65,19 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     [RelayCommand]
     private void ChooseImap() => Step = "imap";
+
+    [RelayCommand]
+    private async Task ChooseProtonAsync()
+    {
+        Step = "proton";
+        ShowServerSettings = true;
+
+        // The Bridge's own defaults until the search finds others.
+        ImapPort = ProtonBridge.DefaultImapPort.ToString(CultureInfo.InvariantCulture);
+        SmtpPort = ProtonBridge.DefaultSmtpPort.ToString(CultureInfo.InvariantCulture);
+        ImapSecurity = SmtpSecurity = SocketSecurity.StartTls;
+        await DetectBridgeAsync();
+    }
 
     [RelayCommand]
     private async Task ChooseExchangeAsync()
@@ -185,6 +205,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         ? T("Welche Art von Konto möchten Sie einrichten?")
         : IsMicrosoft
             ? T("Mail, Kalender und Kontakte Ihres Microsoft-Kontos – angemeldet wird im Browser.")
+            : IsProton
+            ? T("Proton Mail über die Proton Mail Bridge auf diesem Computer. Die Bridge braucht ein kostenpflichtiges Proton-Abo; Kalender und Kontakte bietet sie nicht an.")
             : IsExchange && !IsCloud
             ? IsEditing
                 ? T("Namen, Passwort, Server und Zertifikat ändern. Die Verbindung wird vor dem Speichern geprüft; Mails, Termine und Kontakte bleiben erhalten.")
@@ -203,7 +225,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         ArgumentNullException.ThrowIfNull(account);
         Editing = account;
         var ews = account.Connections.FirstOrDefault(c => c.ProviderId == Neruna.Core.Providers.ProviderIds.Ews);
-        Step = setup.IsSignedIn(account) ? "microsoft" : ews is not null ? "exchange" : "imap";
+        var bridge = account.Connections.FirstOrDefault(c => c.Settings.GetValueOrDefault(ImapSettings.KindKey) == ImapSettings.ProtonBridgeKind);
+        Step = setup.IsSignedIn(account) ? "microsoft" : ews is not null ? "exchange" : bridge is not null ? "proton" : "imap";
+        _bridgeFingerprints = bridge?.Settings.GetValueOrDefault(TlsCertificates.PinnedCertificateKey)?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;
         Aliases.Clear();
@@ -454,6 +478,21 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
         else if (ImapHost.Trim().Length > 0)
         {
+            if (IsProton)
+            {
+                ImapHost = SmtpHost = ProtonBridge.Host;
+                if (_bridgeFingerprints.Count == 0 && int.TryParse(ImapPort, NumberStyles.None, CultureInfo.InvariantCulture, out var bridgeImap)
+                    && int.TryParse(SmtpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var bridgeSmtp))
+                {
+                    _bridgeFingerprints = await ProtonBridge.FingerprintsAsync(bridgeImap, ImapSecurity, bridgeSmtp, SmtpSecurity);
+                }
+
+                foreach (var (key, value) in ProtonBridge.ConnectionOptions(_bridgeFingerprints))
+                {
+                    options[key] = value;
+                }
+            }
+
             if (!int.TryParse(ImapPort, NumberStyles.None, CultureInfo.InvariantCulture, out var imapPort)
                 || !int.TryParse(SmtpPort, NumberStyles.None, CultureInfo.InvariantCulture, out var smtpPort))
             {
@@ -529,6 +568,60 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, false);
+
+    // ── Proton Mail Bridge ──
+
+    private IReadOnlyList<string> _bridgeFingerprints = [];
+
+    /// <summary>What the search found (or not), shown in the Proton step.</summary>
+    [ObservableProperty]
+    public partial string? BridgeStatus { get; set; }
+
+    [ObservableProperty]
+    public partial bool BridgeFound { get; set; }
+
+    /// <summary>
+    /// Looks for the Bridge: its usual ports first, then every port open on this computer. Fills in ports and
+    /// encryption and remembers the Bridge's certificate.
+    /// </summary>
+    [RelayCommand]
+    private async Task DetectBridgeAsync()
+    {
+        Error = null;
+        IsBusy = true;
+        BusyText = T("Suche Proton Mail Bridge …");
+        try
+        {
+            var found = await ProtonBridge.DetectAsync();
+            ImapHost = SmtpHost = ProtonBridge.Host;
+            if (found.Imap is { } imap)
+            {
+                ImapPort = imap.Port.ToString(CultureInfo.InvariantCulture);
+                ImapSecurity = imap.Security;
+            }
+
+            if (found.Smtp is { } smtp)
+            {
+                SmtpPort = smtp.Port.ToString(CultureInfo.InvariantCulture);
+                SmtpSecurity = smtp.Security;
+            }
+
+            _bridgeFingerprints = [.. new[] { found.Imap?.CertificateFingerprint, found.Smtp?.CertificateFingerprint }.OfType<string>().Distinct()];
+            BridgeFound = found.IsComplete;
+            BridgeStatus = found.IsComplete
+                ? F("Bridge gefunden: IMAP Port {0}, SMTP Port {1}.", found.Imap!.Port, found.Smtp!.Port)
+                : found.Imap is not null
+                    ? found.SmtpCandidates.Count > 0
+                        ? F("Bridge gefunden (IMAP Port {0}), SMTP nicht eindeutig – in Frage kommen die Ports {1}. Bitte den SMTP-Port aus der Bridge eintragen.", found.Imap.Port, string.Join(", ", found.SmtpCandidates))
+                        : F("Bridge gefunden (IMAP Port {0}), aber kein SMTP. Bitte den SMTP-Port aus der Bridge eintragen.", found.Imap.Port)
+                    : T("Keine Bridge gefunden. Läuft die Proton Mail Bridge, und ist Ihr Konto dort angemeldet? Danach erneut suchen – oder die Ports aus der Bridge unten eintragen.");
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyText = null;
+        }
+    }
 
     // ── Exchange (EWS) ──
 

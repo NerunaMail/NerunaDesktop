@@ -44,6 +44,12 @@
           <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Exchange-Server der Firma (2013 oder neuer): Mail, Kalender und Kontakte – auch hinter einem Reverse Proxy mit Client-Zertifikat.'}" />
         </StackPanel>
       </Button>
+      <Button Classes="choice" Command="{Binding ChooseProtonCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
+        <StackPanel Spacing="2">
+          <TextBlock Text="Proton Mail (Bridge)" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Über die Proton Mail Bridge auf diesem Computer – Neruna findet sie selbst.'}" />
+        </StackPanel>
+      </Button>
       <Button Classes="choice" Command="{Binding ChooseMicrosoftCommand}" IsEnabled="{Binding MicrosoftAvailable}"
               HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
         <StackPanel Spacing="2">
@@ -99,8 +105,41 @@
     </ItemsControl>
     <Button Classes="command" Content="{l:T '+ Alias hinzufügen'}" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left" Padding="0,2" IsVisible="{Binding !IsCloud}" />
 
-    <TextBlock Classes="label" Text="{l:T 'Passwort'}" IsVisible="{Binding NeedsPassword}" />
+    <TextBlock Classes="label" Text="{Binding PasswordLabel}" IsVisible="{Binding NeedsPassword}" />
     <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="{Binding PasswordHint}" IsVisible="{Binding NeedsPassword}" />
+
+    <!-- Proton Mail Bridge: found on this computer; where user name and password are in the Bridge -->
+    <StackPanel IsVisible="{Binding IsProton}" Margin="0,12,0,0" Spacing="6">
+      <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8">
+        <StackPanel Spacing="4">
+          <TextBlock FontWeight="SemiBold" Text="{l:T 'So finden Sie Benutzername und Passwort'}" />
+          <TextBlock TextWrapping="Wrap" Text="{l:T '1. Proton Mail Bridge installieren (proton.me/mail/bridge), starten und mit Ihrem Proton-Konto anmelden.'}" />
+          <TextBlock TextWrapping="Wrap" Text="{l:T '2. In der Bridge Ihr Konto anklicken. Unter «Mailbox details» (je nach Version «Configure email client») stehen Benutzername und Passwort, jeweils mit Knopf zum Kopieren.'}" />
+          <TextBlock TextWrapping="Wrap" Text="{l:T '3. Beides hier eintragen. Das Passwort der Bridge ist nicht Ihr Proton-Passwort; die Bridge muss laufen, solange Neruna Mails abruft.'}" />
+        </StackPanel>
+      </Border>
+      <Grid ColumnDefinitions="*,8,Auto">
+        <TextBlock Text="{Binding BridgeStatus}" TextWrapping="Wrap" VerticalAlignment="Center"
+                   Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding BridgeStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <Button Grid.Column="2" Content="{l:T 'Bridge suchen'}" Command="{Binding DetectBridgeCommand}" />
+      </Grid>
+      <TextBlock Classes="label" Text="{l:T 'Benutzername aus der Bridge (leer = E-Mail-Adresse)'}" />
+      <TextBox Text="{Binding Username}" />
+      <Grid ColumnDefinitions="80,80,8,170" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
+        <TextBlock Grid.Column="1" Classes="label" Text="Port" />
+        <TextBlock Grid.Column="3" Classes="label" Text="{l:T 'Verschlüsselung'}" />
+        <TextBlock Grid.Row="1" Text="IMAP" VerticalAlignment="Center" />
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ImapPort}" />
+        <ComboBox Grid.Row="1" Grid.Column="3" HorizontalAlignment="Stretch"
+                  ItemsSource="{x:Static vm:AccountSetupViewModel.SecurityOptions}" SelectedItem="{Binding ImapSecurity}" />
+        <TextBlock Grid.Row="2" Text="SMTP" VerticalAlignment="Center" />
+        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SmtpPort}" Margin="0,6,0,0" />
+        <ComboBox Grid.Row="2" Grid.Column="3" HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                  ItemsSource="{x:Static vm:AccountSetupViewModel.SecurityOptions}" SelectedItem="{Binding SmtpSecurity}" />
+      </Grid>
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                 Text="{l:T 'Die Ports stehen in der Bridge ebenfalls unter «Mailbox details». Das Zertifikat der Bridge merkt sich Neruna beim Einrichten.'}" />
+    </StackPanel>
 
     <!-- Exchange: one address for mail, calendar and contacts; sign-in and client certificate for a reverse proxy -->
     <StackPanel IsVisible="{Binding IsExchange}" IsEnabled="{Binding !IsCloud}" Margin="0,12,0,0" Spacing="2">

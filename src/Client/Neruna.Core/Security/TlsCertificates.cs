@@ -29,6 +29,37 @@ public static class TlsCertificates
     public static string? ClientCertificateOf(IReadOnlyDictionary<string, string> settings) =>
         settings is not null && settings.TryGetValue(ClientCertificateKey, out var value) && !string.IsNullOrWhiteSpace(value) ? value : null;
 
+    /// <summary>
+    /// Connection setting: SHA-256 fingerprints (hex, comma-separated) of server certificates accepted as they are –
+    /// e.g. the self-signed certificate of Proton Mail Bridge on this computer, remembered when the account was set up.
+    /// Any other certificate gets the usual check.
+    /// </summary>
+    public const string PinnedCertificateKey = "tls.pinnedCertificate";
+
+    /// <summary>SHA-256 fingerprint of a certificate as stored in <see cref="PinnedCertificateKey"/>.</summary>
+    public static string Fingerprint(X509Certificate certificate)
+    {
+        ArgumentNullException.ThrowIfNull(certificate);
+        return Convert.ToHexString(certificate.GetCertHash(System.Security.Cryptography.HashAlgorithmName.SHA256));
+    }
+
+    /// <summary>The check for a connection with these settings: any certificate, a pinned one, or the usual check.</summary>
+    public static RemoteCertificateValidationCallback For(IReadOnlyDictionary<string, string> settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (AcceptsAnyCertificate(settings))
+        {
+            return For(acceptAny: true);
+        }
+
+        var pinned = settings.TryGetValue(PinnedCertificateKey, out var value)
+            ? value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : [];
+        return pinned.Count == 0
+            ? Validate
+            : (sender, certificate, chain, errors) => (certificate is not null && pinned.Contains(Fingerprint(certificate))) || Validate(sender, certificate, chain, errors);
+    }
+
     public static bool AcceptsAnyCertificate(IReadOnlyDictionary<string, string> settings) =>
         settings is not null && settings.TryGetValue(AcceptAnyCertificateKey, out var value) && value == "true";
 

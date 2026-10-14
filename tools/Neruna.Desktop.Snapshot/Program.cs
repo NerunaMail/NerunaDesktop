@@ -913,6 +913,12 @@ internal static class Snapshots
         exchange.Username = "MUSTER\\anna";
         exchange.ExchangeAuthentication = AccountSetupViewModel.AuthenticationChoices[1];
         await SaveAsync(window, output, "account-setup-exchange.png");
+        vm.ShowAccountSetupCommand.Execute(null);
+        var proton = (AccountSetupViewModel)vm.Overlay!;
+        await proton.ChooseProtonCommand.ExecuteAsync(null);
+        proton.DisplayName = "Anna Muster";
+        proton.Email = "anna.muster@proton.me";
+        await SaveAsync(window, output, "account-setup-proton.png");
 
         window.Close();
         Directory.Delete(dataDir, recursive: true);
