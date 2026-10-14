@@ -46,13 +46,14 @@ public sealed class CalendarController(
     ICalendarStore store,
     ProviderRegistry providers,
     ISettingsStore settings,
-    ILogger<CalendarController> logger)
+    ILogger<CalendarController> logger,
+    SyncActivity? activity = null)
 {
     // Events that started this long before the visible range are still checked for overlap.
     internal static readonly TimeSpan MaxEventLength = TimeSpan.FromDays(31);
 
     public Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default) =>
-        SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Calendar, SyncConnectionAsync, logger, cancellationToken);
+        SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Calendar, SyncConnectionAsync, logger, cancellationToken, activity);
 
     public async Task SyncConnectionAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
     {

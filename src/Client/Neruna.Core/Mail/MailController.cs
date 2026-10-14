@@ -16,7 +16,8 @@ public sealed class MailController(
     IAccountStore accounts,
     IMailStore store,
     ProviderRegistry providers,
-    ILogger<MailController> logger)
+    ILogger<MailController> logger,
+    SyncActivity? activity = null)
 {
     /// <summary>The folder list of a connection was read (new folders may be there); raised on the syncing thread.</summary>
     public event EventHandler<Guid>? FoldersSynced;
@@ -25,7 +26,7 @@ public sealed class MailController(
     public event EventHandler<MailFolder>? FolderSynced;
 
     public Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default) =>
-        SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Mail, SyncConnectionAsync, logger, cancellationToken);
+        SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Mail, SyncConnectionAsync, logger, cancellationToken, activity);
 
     public async Task SyncConnectionAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
     {

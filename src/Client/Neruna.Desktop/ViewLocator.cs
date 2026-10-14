@@ -22,6 +22,7 @@ internal sealed class ViewLocator : IDataTemplate
         CloudAccountPasswordViewModel => new CloudAccountPasswordView(),
         CrashReportViewModel => new CrashReportView(),
         FolderSubscriptionsViewModel => new FolderSubscriptionsView(),
+        SyncStatusViewModel => new SyncStatusView(),
         AutoReplyViewModel => new AutoReplyView(),
         CalendarSelectionViewModel => new CalendarSelectionView(),
         ReadingPaneViewModel => new ReadingPaneView(),

@@ -33,6 +33,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly CalendarController _calendar;
     private readonly ContactController _contacts;
     private readonly Neruna.Core.SyncCoordinator _sync;
+    private readonly Neruna.Core.SyncActivity _syncActivity;
     private int _syncCalls;
     private readonly AccountSetupService _setup;
     private readonly AccountDiscovery _discovery;
@@ -65,6 +66,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarController calendar,
         ContactController contacts,
         Neruna.Core.SyncCoordinator sync,
+        Neruna.Core.SyncActivity syncActivity,
         AccountSetupService setup,
         AccountDiscovery discovery,
         IAccountStore accounts,
@@ -96,6 +98,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _calendar = calendar;
         _contacts = contacts;
         _sync = sync;
+        _syncActivity = syncActivity;
         _setup = setup;
         _discovery = discovery;
         _accounts = accounts;
@@ -378,6 +381,19 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     public partial string StatusText { get; set; } = T("Bereit");
 
+    /// <summary>The last run had failures: the status bar shows them in red.</summary>
+    [ObservableProperty]
+    public partial bool HasSyncProblems { get; set; }
+
+    /// <summary>Click on the status bar: what synchronises, since when, how the last runs ended.</summary>
+    [RelayCommand]
+    private void OpenSyncStatus()
+    {
+        var status = new SyncStatusViewModel(_syncActivity, SyncCommand);
+        status.Finished += (_, _) => Overlay = null;
+        Overlay = status;
+    }
+
     [ObservableProperty]
     public partial bool HasAccounts { get; set; } = true;
 
@@ -646,6 +662,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         StatusText = T("Synchronisiere …");
         try
         {
+            // Accounts removed meanwhile leave the status window.
+            _syncActivity.Forget((await _accounts.GetAccountsAsync()).SelectMany(a => a.Connections).Select(c => c.Id));
             var reports = await _sync.SyncAllAsync();
             await RefreshPagesAsync();
             await MailPage.Agenda.ReloadAsync();
@@ -663,13 +681,17 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
 
             var failures = reports.SelectMany(r => r.Failures).ToList();
+            HasSyncProblems = failures.Count > 0;
             StatusText = failures.Count == 0
                 ? F("Synchronisiert um {0:t}", DateTime.Now)
-                : F("Synchronisiert um {0:t} – {1} Verbindung(en) fehlgeschlagen: {2} (Details im Log)", DateTime.Now, failures.Count, failures[0].Error.Message);
+                : failures.Count == 1
+                    ? F("Synchronisiert um {0:t} – 1 Verbindung fehlgeschlagen", DateTime.Now)
+                    : F("Synchronisiert um {0:t} – {1} Verbindungen fehlgeschlagen", DateTime.Now, failures.Count);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Sync failed");
+            HasSyncProblems = true;
             StatusText = T("Synchronisierung fehlgeschlagen: ") + ex.Message;
         }
         finally

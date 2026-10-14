@@ -450,6 +450,12 @@ internal static class Snapshots
         await SaveAsync(window, output, "event-attendees.png");
         vm.Overlay = null;
 
+        // Status bar → status window: per account and service how the last run went.
+        await vm.SyncCommand.ExecuteAsync(null);
+        vm.OpenSyncStatusCommand.Execute(null);
+        await SaveAsync(window, output, "sync-status.png");
+        vm.Overlay = null;
+
         // The reminder window with the next events of the demo week.
         var upcoming = (await calendarController.GetOccurrencesAsync(await calendarController.GetCalendarsAsync(), DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now.AddDays(4)))
             .Where(o => !o.IsAllDay).Take(3).ToList();

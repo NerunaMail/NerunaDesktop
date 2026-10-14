@@ -23,26 +23,36 @@ public sealed class SyncReport
         ServiceKind kind,
         Func<ServiceConnection, CancellationToken, Task> sync,
         ILogger logger,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SyncActivity? activity = null)
     {
         var report = new SyncReport();
         foreach (var account in await accounts.GetAccountsAsync(cancellationToken))
         {
             foreach (var connection in account.ConnectionsOf(kind))
             {
+                activity?.Started(account, connection);
                 try
                 {
                     await sync(connection, cancellationToken);
                     report.SucceededConnections++;
+                    activity?.Finished(connection, null);
                 }
                 catch (ProviderNotFoundException)
                 {
                     report._skipped.Add(connection);
+                    activity?.Skipped(connection);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (OperationCanceledException ex)
+                {
+                    activity?.Finished(connection, ex);
+                    throw;
+                }
+                catch (Exception ex)
                 {
                     logger.LogWarning(ex, "{Kind} sync failed for connection {ConnectionId}", kind, connection.Id);
                     report._failures.Add((connection, ex));
+                    activity?.Finished(connection, ex);
                 }
             }
         }

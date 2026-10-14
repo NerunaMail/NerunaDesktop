@@ -37,10 +37,11 @@ public sealed class ContactController(
     IContactStore store,
     ProviderRegistry providers,
     ISettingsStore settings,
-    ILogger<ContactController> logger)
+    ILogger<ContactController> logger,
+    SyncActivity? activity = null)
 {
     public Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default) =>
-        SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Contacts, SyncConnectionAsync, logger, cancellationToken);
+        SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Contacts, SyncConnectionAsync, logger, cancellationToken, activity);
 
     public async Task SyncConnectionAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
     {
