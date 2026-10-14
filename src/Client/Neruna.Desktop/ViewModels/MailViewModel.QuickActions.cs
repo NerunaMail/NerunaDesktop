@@ -85,6 +85,7 @@ internal sealed partial class MailViewModel
 
         var sender = message.From.Mailboxes.FirstOrDefault() is { } from ? (string.IsNullOrWhiteSpace(from.Name) ? from.Address : from.Name) : string.Empty;
         var subject = message.Subject ?? string.Empty;
+        void Cancelled() => StatusMessage?.Invoke(this, F("Schnellaktion «{0}» abgebrochen.", action.Label));
         try
         {
             foreach (var step in action.Steps)
@@ -107,7 +108,7 @@ internal sealed partial class MailViewModel
                         {
                             if (await pane.StampAsync(attachment, stamp, changed.GetValueOrDefault(attachment)) is not { } stamped)
                             {
-                                StatusMessage?.Invoke(this, F("Schnellaktion «{0}» abgebrochen.", action.Label));
+                                Cancelled();
                                 return;
                             }
 
@@ -119,9 +120,12 @@ internal sealed partial class MailViewModel
                     case QuickActionStepKind.SaveAttachment:
                         foreach (var attachment in targets)
                         {
-                            if (await ContentOf(attachment) is { } content)
+                            // Cancelling the save dialog stops the action: the later steps (moving the mail away) assume it was saved.
+                            if (await ContentOf(attachment) is { } content
+                                && !await attachment.SaveContentAsync(content, QuickActionService.FileName(step.FileName, attachment.FileName, sender, subject, DateTime.Now), step.Folder))
                             {
-                                await attachment.SaveContentAsync(content, QuickActionService.FileName(step.FileName, attachment.FileName, sender, subject, DateTime.Now), step.Folder);
+                                Cancelled();
+                                return;
                             }
                         }
 
@@ -144,7 +148,11 @@ internal sealed partial class MailViewModel
                         {
                             if (await ContentOf(attachment) is { } content)
                             {
-                                await files.OpenAsync(attachment.FileName, stream => stream.WriteAsync(content).AsTask());
+                                if (!await files.OpenAsync(attachment.FileName, stream => stream.WriteAsync(content).AsTask()))
+                                {
+                                    Cancelled();
+                                    return;
+                                }
                             }
                         }
 

@@ -21,9 +21,9 @@ internal interface IFileService
 
     /// <summary>
     /// Writes the content to a private temp file, marks it as coming from the internet and opens it with the system's
-    /// default application – programs and scripts only after a confirmation.
+    /// default application – programs and scripts only after a confirmation. False when that was declined.
     /// </summary>
-    Task OpenAsync(string fileName, Func<Stream, Task> writeContent);
+    Task<bool> OpenAsync(string fileName, Func<Stream, Task> writeContent);
 
     Task OpenFolderAsync(string path);
 
@@ -70,18 +70,18 @@ internal sealed class FileService : IFileService
         return folders.Count == 0 ? null : folders[0].TryGetLocalPath();
     }
 
-    public async Task OpenAsync(string fileName, Func<Stream, Task> writeContent)
+    public async Task<bool> OpenAsync(string fileName, Func<Stream, Task> writeContent)
     {
         ArgumentNullException.ThrowIfNull(writeContent);
         if (Window is not { } window)
         {
-            return;
+            return false;
         }
 
         var name = SanitizeFileName(fileName);
         if (OpenedAttachments.IsRisky(name) && !await ConfirmRiskyAsync(name))
         {
-            return;
+            return false;
         }
 
         // A fresh private folder per file avoids clashes and keeps the original name for the opening application.
@@ -93,6 +93,7 @@ internal sealed class FileService : IFileService
 
         OpenedAttachments.MarkAsFromInternet(path);
         await window.Launcher.LaunchFileInfoAsync(new FileInfo(path));
+        return true;
     }
 
     // Asked over the window in front (a message window, or the main window).
