@@ -112,7 +112,7 @@ internal sealed partial class MailView : UserControl
             readingPane.IsVisible = position != ReadingPanePosition.None;
             paneSplitter.IsVisible = position == ReadingPanePosition.Right;
             rowSplitter.IsVisible = below;
-            columns.RowDefinitions[0].Height = below ? new GridLength(layout!.ListHeight) : new GridLength(1, GridUnitType.Star);
+            columns.RowDefinitions[0].Height = below && layout is not null ? new GridLength(layout.ListHeight) : new GridLength(1, GridUnitType.Star);
             columns.RowDefinitions[1].Height = new GridLength(below ? 6 : 0);
             columns.RowDefinitions[2].Height = below ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         }
@@ -128,26 +128,44 @@ internal sealed partial class MailView : UserControl
             }
         }
 
+        // One listener on the current layout: the DataContext changes (and is null for a moment) when switching pages.
+        void OnLayoutChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (sender != layout)
+            {
+                return;
+            }
+
+            if (e.PropertyName is nameof(MailListLayout.FromWidth) or nameof(MailListLayout.DateWidth) or nameof(MailListLayout.SizeWidth))
+            {
+                ApplyWidths();
+            }
+            else if (e.PropertyName == nameof(MailListLayout.IsTable) && layout.IsTable)
+            {
+                WidenListForTable();
+            }
+            else if (e.PropertyName is nameof(MailListLayout.Pane) or nameof(MailListLayout.ListHeight))
+            {
+                PlacePane();
+            }
+        }
+
         DataContextChanged += (_, _) =>
         {
+            if (ViewModel?.ListLayout == layout)
+            {
+                return;
+            }
+
+            if (layout is not null)
+            {
+                layout.PropertyChanged -= OnLayoutChanged;
+            }
+
             layout = ViewModel?.ListLayout;
             if (layout is not null)
             {
-                layout.PropertyChanged += (_, e) =>
-                {
-                    if (e.PropertyName is nameof(MailListLayout.FromWidth) or nameof(MailListLayout.DateWidth) or nameof(MailListLayout.SizeWidth))
-                    {
-                        ApplyWidths();
-                    }
-                    else if (e.PropertyName == nameof(MailListLayout.IsTable) && layout.IsTable)
-                    {
-                        WidenListForTable();
-                    }
-                    else if (e.PropertyName is nameof(MailListLayout.Pane) or nameof(MailListLayout.ListHeight))
-                    {
-                        PlacePane();
-                    }
-                };
+                layout.PropertyChanged += OnLayoutChanged;
                 ApplyWidths();
                 PlacePane();
             }
