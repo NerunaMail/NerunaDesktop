@@ -7,7 +7,7 @@ namespace Neruna.Core.Mail;
 /// <param name="Shortcut">Typed with "::" while writing (e.g. "tel" → "tel::"), the template replaces it.</param>
 public sealed record TextTemplate(Guid Id, string Name, string Html, DateTimeOffset UpdatedAt, string Source = Signature.LocalSource, string? Shortcut = null)
 {
-    public bool IsFromCloud => Source == Signature.CloudSource;
+    public bool IsFromCloud => Cloud.CloudSources.IsCloud(Source);
 
     /// <summary>Letters, digits, - and _; stored lower-case, empty is none.</summary>
     public static string? NormalizeShortcut(string? shortcut)

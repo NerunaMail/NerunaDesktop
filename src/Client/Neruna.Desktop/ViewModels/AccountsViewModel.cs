@@ -13,6 +13,7 @@ namespace Neruna.Desktop.ViewModels;
 /// <summary>Account list, removal and diagnostics (where data and logs live).</summary>
 internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountSetupService setup, ICredentialStore credentials, IFileService files, AppOptions options,
     Neruna.Core.Cloud.AccountTransferService transfer,
+    Neruna.Core.Cloud.CloudController cloud,
     Neruna.Core.Mail.MailController mail,
     Neruna.Core.Auth.IBrowserLauncher browser) : ViewModelBase
 {
@@ -78,9 +79,15 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
     public async Task ReloadAsync()
     {
         Items.Clear();
+        var organisations = await cloud.GetConnectionsAsync();
         foreach (var account in await accounts.GetAccountsAsync())
         {
             var item = new AccountItem(account, setup.Summary) { HasAutoReply = HasAutoReply(account) };
+            if (account.CloudId is { } cloudId && organisations.Count > 1 && organisations.FirstOrDefault(c => c.Owns(cloudId)) is { } organisation)
+            {
+                item.ManagedBy = F("Von {0} verwaltet", organisation.OrganizationName);
+            }
+
             item.SetOffline(await mail.GetOfflinePeriodAsync(account.Id), period => _ = mail.SetOfflinePeriodAsync(account.Id, period));
             Items.Add(item);
         }
@@ -187,6 +194,9 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
 
     /// <summary>Set up by the organisation in Neruna Cloud: it goes when the organisation removes it, not here.</summary>
     public bool IsFromCloud => Account.IsFromCloud;
+
+    /// <summary>"Von Ihrer Organisation verwaltet", or with several organisations the one that set it up.</summary>
+    public string ManagedBy { get; set; } = T("Von Ihrer Organisation verwaltet");
 
     /// <summary>Under the title: sender name and address (the title may be a label like "Privat").</summary>
     public string Sender => Account.EmailAddress is { } email ? $"{Account.DisplayName} <{email}>" : Account.DisplayName;

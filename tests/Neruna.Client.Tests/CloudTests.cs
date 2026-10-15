@@ -82,7 +82,7 @@ public class CloudTests
         Assert.NotNull(await env.Get<ICredentialStore>().GetSecretAsync(CloudController.KeyId, ct));
         Assert.Equal(connection.DeviceId, (await cloud.GetConnectionAsync(ct))!.DeviceId);
 
-        var me = await cloud.GetProfileAsync(ct);
+        var me = await cloud.GetProfileAsync(connection, ct);
         Assert.Equal(("Anna", "Projektleiterin", "Testgerät"), (me.Member.FirstName, me.Member.Position, me.Device.Name));
         Assert.Equal("Muster Informatik AG", me.Organization.Name);
 
@@ -90,7 +90,7 @@ public class CloudTests
         var again = await Assert.ThrowsAsync<CloudException>(() => cloud.ConnectAsync(CloudController.ParseServer(url!), code!, pin!, DeviceInfo.Current(), ct));
         Assert.Equal("invalid_code", again.Code);
 
-        await cloud.DisconnectAsync(ct);
+        await cloud.DisconnectAsync(connection, ct);
         Assert.Null(await cloud.GetConnectionAsync(ct));
         Assert.Null(await env.Get<ICredentialStore>().GetSecretAsync(CloudController.KeyId, ct));
     }

@@ -10,10 +10,10 @@ public sealed record Signature(Guid Id, string Name, string Html, DateTimeOffset
 {
     public const string LocalSource = "local";
 
-    /// <summary>Kept by the organisation in Neruna Cloud: read-only here, replaced on every refresh.</summary>
-    public const string CloudSource = "cloud";
+    /// <summary>Kept by the organisation in Neruna Cloud: read-only here, replaced on every refresh ("cloud:&lt;id&gt;" from further organisations).</summary>
+    public const string CloudSource = Cloud.CloudSources.Cloud;
 
-    public bool IsFromCloud => Source == CloudSource;
+    public bool IsFromCloud => Cloud.CloudSources.IsCloud(Source);
 }
 
 public interface ISignatureStore

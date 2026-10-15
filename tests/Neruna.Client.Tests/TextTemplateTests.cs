@@ -57,7 +57,8 @@ public class TextTemplateTests
         Assert.Equal("<p>leider</p>", shortcuts["nein"].Html);
 
         Assert.False(await sync.SyncAsync(ct));
-        Assert.True(await sync.RemoveAllAsync(ct));
+        await settings.SetAsync(SettingKeys.CloudConnection, null, ct);
+        Assert.True(await sync.RemoveDisconnectedAsync(ct));
         Assert.Equal(["Meine Notiz"], (await service.GetAllAsync(ct)).Select(t => t.Name));
     }
 }

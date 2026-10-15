@@ -74,7 +74,7 @@ public class AccountSetupTests
         Assert.Equal("example.com", withoutOrg?.Source);
         Assert.Equal("https://autoconfig.example.com/mail/config-v1.1.xml?emailaddress=anna%40example.com", http.Requested[0]);
 
-        discovery.OrganizationServer = new Uri("https://neruna.example/");
+        discovery.OrganizationServers = [new Uri("https://neruna.example/")];
         var withOrg = await discovery.DiscoverAsync("anna@example.com", TestContext.Current.CancellationToken);
         Assert.Equal("Example AG", withOrg?.OrganizationName);
         Assert.Equal("mail.example.com", withOrg?.Config.PreferredIncoming?.Host);

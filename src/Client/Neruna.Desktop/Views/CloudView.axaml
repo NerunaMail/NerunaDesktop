@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:views="using:Neruna.Desktop.Views"
+             xmlns:cloud="using:Neruna.Core.Cloud"
              x:Class="Neruna.Desktop.Views.CloudView"
              x:DataType="vm:CloudViewModel">
   <ScrollViewer>
@@ -11,8 +12,47 @@
       <TextBlock Classes="subtle" TextWrapping="Wrap"
                  Text="{l:T 'Verbindet Neruna mit dem Portal deiner Organisation – für zentral verwaltete Signaturen, Textvorlagen, S/MIME-Zertifikate und den Chat. Deine Mails, Termine und Kontakte bleiben auf deinem Mailserver.'}" />
 
-      <!-- Not connected: server, code and PIN from the portal -->
-      <StackPanel Spacing="10" IsVisible="{Binding IsNotConnected}" Margin="0,8,0,0">
+      <!-- Several organisations: pick the one shown below -->
+      <ListBox ItemsSource="{Binding Connections}" SelectedItem="{Binding Connection}" IsVisible="{Binding HasSeveral}" Margin="0,8,0,0"
+               Background="Transparent">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="cloud:CloudConnection">
+            <StackPanel Spacing="1" Margin="2,2">
+              <TextBlock Text="{Binding OrganizationName}" FontWeight="SemiBold" />
+              <TextBlock Classes="subtle" FontSize="12">
+                <Run Text="{Binding MemberName, Mode=OneWay}" />
+                <Run Text=" · " />
+                <Run Text="{Binding Server.Host, Mode=OneWay}" />
+              </TextBlock>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8" IsVisible="{Binding HasSeveral}" Margin="0,4,0,0">
+        <TextBlock Text="{l:T 'Chat von'}" VerticalAlignment="Center" />
+        <ComboBox Grid.Column="1" ItemsSource="{Binding Connections}" SelectedItem="{Binding ChatConnection}" MinWidth="260">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="cloud:CloudConnection">
+              <TextBlock Text="{Binding OrganizationName}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Grid.Row="1" Text="{l:T 'Sicherungen bei'}" VerticalAlignment="Center" />
+        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Connections}" SelectedItem="{Binding BackupConnection}" MinWidth="260">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="cloud:CloudConnection">
+              <TextBlock Text="{Binding OrganizationName}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </Grid>
+
+      <!-- Not connected, or another organisation: server, code and PIN from the portal -->
+      <StackPanel Spacing="10" IsVisible="{Binding ShowConnectForm}" Margin="0,8,0,0">
+        <TextBlock Text="{l:T 'Weitere Organisation verbinden'}" FontSize="16" FontWeight="SemiBold" IsVisible="{Binding IsAdding}" />
+        <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding IsAdding}"
+                   Text="{l:T 'Mit dem Verbindungscode einer weiteren Organisation erhält Neruna auch deren Signaturen, Vorlagen, Zertifikate und Konten. Die Organisationen erfahren nichts voneinander.'}" />
         <TextBlock Text="{l:T 'Server'}" FontWeight="SemiBold" />
         <TextBox Text="{Binding Server}" PlaceholderText="{l:T 'https://neruna.cloud'}" />
         <TextBlock Text="{l:T 'Verbindungscode'}" FontWeight="SemiBold" Margin="0,6,0,0" />
@@ -26,13 +66,19 @@
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding DeviceDescription, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Im Portal sichtbar: {0}'}" />
         <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
           <Button Classes="accent" Content="{l:T 'Verbinden'}" Command="{Binding ConnectCommand}" />
+          <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelAddingCommand}" IsVisible="{Binding IsAdding}" />
           <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
         </StackPanel>
       </StackPanel>
 
       <!-- Connected: who, which organisation, what the portal has on file -->
-      <Border IsVisible="{Binding Connection, Converter={x:Static ObjectConverters.IsNotNull}}" Background="{DynamicResource InfoBackgroundBrush}"
-              CornerRadius="6" Padding="16,14" Margin="0,8,0,0">
+      <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14" Margin="0,8,0,0">
+        <Border.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="Connection" Converter="{x:Static ObjectConverters.IsNotNull}" />
+            <Binding Path="!IsAdding" />
+          </MultiBinding>
+        </Border.IsVisible>
         <StackPanel Spacing="12">
           <Grid ColumnDefinitions="Auto,*">
             <Border Width="56" Height="56" CornerRadius="28" ClipToBounds="True" Background="{DynamicResource AccentTextBrush}" Margin="0,0,14,0" VerticalAlignment="Top">
@@ -75,6 +121,7 @@
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="{l:T 'Aktualisieren'}" Command="{Binding RefreshCommand}" />
             <Button Content="{l:T 'Trennen'}" Click="OnDisconnect" />
+            <Button Content="{l:T 'Weitere Organisation verbinden …'}" Command="{Binding AddConnectionCommand}" />
             <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
           </StackPanel>
         </StackPanel>
@@ -83,8 +130,16 @@
       <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
       <!-- Handy verbinden: the Neruna app scans the QR code; the PIN is typed in separately -->
-      <StackPanel Spacing="10" Margin="0,18,0,0" IsVisible="{Binding Connection, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel Spacing="10" Margin="0,18,0,0">
+        <StackPanel.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="Connection" Converter="{x:Static ObjectConverters.IsNotNull}" />
+            <Binding Path="!IsAdding" />
+          </MultiBinding>
+        </StackPanel.IsVisible>
         <TextBlock Text="{l:T 'Handy verbinden'}" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding PairingOrganizationText}" FontWeight="SemiBold" TextWrapping="Wrap"
+                   IsVisible="{Binding PairingOrganizationText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <TextBlock Classes="subtle" TextWrapping="Wrap"
                    Text="{l:T 'In der Neruna-App auf dem Handy «Mit Neruna Cloud verbinden» wählen, den QR-Code scannen und die PIN eingeben. Das Handy erhält danach die Zertifikate und Konten der Organisation von diesem Computer – verschlüsselt, die Cloud kann sie nicht lesen. Wie viele Handys erlaubt sind, legt ein Admin im Portal fest.'}" />
         <ItemsControl ItemsSource="{Binding PairedPhones}">
@@ -126,8 +181,16 @@
       </StackPanel>
 
       <!-- Sicherung: personal settings into the vault, encrypted on this device; only by hand, with a note -->
-      <StackPanel Spacing="10" Margin="0,18,0,0" IsVisible="{Binding Connection, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel Spacing="10" Margin="0,18,0,0">
+        <StackPanel.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="BackupConnection" Converter="{x:Static ObjectConverters.IsNotNull}" />
+            <Binding Path="!IsAdding" />
+          </MultiBinding>
+        </StackPanel.IsVisible>
         <TextBlock Text="{l:T 'Sicherung'}" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding BackupOrganizationText}" FontWeight="SemiBold" TextWrapping="Wrap"
+                   IsVisible="{Binding BackupOrganizationText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <TextBlock Classes="subtle" TextWrapping="Wrap"
                    Text="{l:T 'Sichert deine persönlichen Einstellungen – Konten samt Passwörtern, eigene Signaturen, Textvorlagen und Zertifikate, Einstellungen – verschlüsselt mit deinem Tresor-Passwort. Die Cloud kann sie nicht lesen. Was von deiner Organisation kommt, ist nicht dabei: Es kommt nach dem Verbinden automatisch wieder.'}" />
 

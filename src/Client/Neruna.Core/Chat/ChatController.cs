@@ -69,7 +69,7 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            var connected = await cloud.GetConnectionAsync(cancellationToken) is not null;
+            var connected = await CurrentConnectionAsync(cancellationToken) is not null;
             var state = await LoadStateAsync(cancellationToken);
             var messages = connected ? await store.GetAllAsync(cancellationToken) : [];
             Current = state is null || !connected
@@ -109,7 +109,7 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
     private async Task<bool> RefreshCoreAsync(CancellationToken cancellationToken)
     {
         var before = Current;
-        if (await cloud.GetConnectionAsync(cancellationToken) is null)
+        if (await CurrentConnectionAsync(cancellationToken) is not { } connection)
         {
             if (before.Connected || before.Messages.Count > 0)
             {
@@ -121,9 +121,23 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
             return false;
         }
 
+        var keptFor = await settings.GetAsync(SettingKeys.ChatConnection, cancellationToken);
+        if (keptFor != connection.Id)
+        {
+            // Another organisation's chat now: what is kept here belongs to the one before (kept by a version with
+            // only one connection: the first's).
+            if ((keptFor is not null || !connection.IsFirst) && (before.Connected || before.Messages.Count > 0))
+            {
+                await ClearAsync(cancellationToken);
+                before = Current = ChatSnapshot.Empty;
+            }
+
+            await settings.SetAsync(SettingKeys.ChatConnection, connection.Id, cancellationToken);
+        }
+
         if (!_presenceSent)
         {
-            await cloud.SetPresenceAsync(await GetPresenceAsync(cancellationToken), cancellationToken);
+            await cloud.SetPresenceAsync(connection, await GetPresenceAsync(cancellationToken), cancellationToken);
             _presenceSent = true;
         }
 
@@ -133,7 +147,7 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
         var added = new List<ChatMessage>();
         while (true)
         {
-            response = await cloud.GetChatAsync(after, cancellationToken);
+            response = await cloud.GetChatAsync(connection, after, cancellationToken);
             if (before.Me is not null && response.Me != before.Me && (messages.Count > 0 || added.Count > 0))
             {
                 // Connected as someone else (other organisation): the old conversations are not theirs.
@@ -202,7 +216,9 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
         ArgumentNullException.ThrowIfNull(conversation);
         var id = ChatConversation.IdOf(conversation);
         var request = ChatConversation.IsRoom(conversation) ? new ChatSendRequest(id, null, text) : new ChatSendRequest(null, id, text);
-        var sent = await cloud.SendChatMessageAsync(request, cancellationToken);
+        var connection = await CurrentConnectionAsync(cancellationToken)
+                         ?? throw new CloudException("not_connected", Localization.Texts.T("Neruna ist nicht mit einer Cloud verbunden."));
+        var sent = await cloud.SendChatMessageAsync(connection, request, cancellationToken);
         var message = new ChatMessage(sent.Id, sent.RoomId, sent.SenderId, sent.RecipientId, sent.Text, sent.SentAt);
 
         await _gate.WaitAsync(cancellationToken);
@@ -236,7 +252,10 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
 
         Current = current with { Reads = new Dictionary<string, long>(current.Reads) { [conversation] = last } };
         Changed?.Invoke(this, EventArgs.Empty);
-        await cloud.MarkChatReadAsync(new ChatReadRequest(conversation, last), cancellationToken);
+        if (await CurrentConnectionAsync(cancellationToken) is { } connection)
+        {
+            await cloud.MarkChatReadAsync(connection, new ChatReadRequest(conversation, last), cancellationToken);
+        }
     }
 
     public async Task<string> GetPresenceAsync(CancellationToken cancellationToken = default) =>
@@ -247,9 +266,9 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
     {
         presence = Presence.Normalize(presence);
         await settings.SetAsync(SettingKeys.ChatPresence, presence, cancellationToken);
-        if (await cloud.GetConnectionAsync(cancellationToken) is not null)
+        if (await CurrentConnectionAsync(cancellationToken) is { } connection)
         {
-            await cloud.SetPresenceAsync(presence, cancellationToken);
+            await cloud.SetPresenceAsync(connection, presence, cancellationToken);
             _presenceSent = true;
         }
     }
@@ -261,10 +280,35 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
     public async Task GoOfflineAsync(CancellationToken cancellationToken = default)
     {
         _presenceSent = false;
-        if (await cloud.GetConnectionAsync(cancellationToken) is not null)
+        if (await CurrentConnectionAsync(cancellationToken) is { } connection)
         {
-            await cloud.SetPresenceAsync(Presence.Offline, cancellationToken);
+            await cloud.SetPresenceAsync(connection, Presence.Offline, cancellationToken);
         }
+    }
+
+    /// <summary>The organisation whose chat is shown (Einstellungen → Cloud).</summary>
+    private Task<CloudConnection?> CurrentConnectionAsync(CancellationToken cancellationToken) => cloud.GetChatConnectionAsync(cancellationToken);
+
+    /// <summary>
+    /// Another organisation's chat was chosen: the old one's status goes offline there, the local chat is emptied and
+    /// filled from the new one.
+    /// </summary>
+    public async Task SwitchAsync(CloudConnection? previous, CancellationToken cancellationToken = default)
+    {
+        if (previous is not null)
+        {
+            try
+            {
+                await cloud.SetPresenceAsync(previous, Presence.Offline, cancellationToken);
+            }
+            catch (Exception ex) when (ex is CloudException or HttpRequestException)
+            {
+                logger.LogInformation(ex, "Previous chat not set offline");
+            }
+        }
+
+        _presenceSent = false;
+        await RefreshAsync(cancellationToken);
     }
 
     private async Task ClearAsync(CancellationToken cancellationToken)

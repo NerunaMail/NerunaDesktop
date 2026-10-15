@@ -12,10 +12,12 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Core.Cloud;
 
 /// <summary>An account of the organisation that came without a password: the user enters it to finish the setup.</summary>
-public sealed record PendingCloudAccount(string CloudId, string DisplayName, string Email, Account Account);
+/// <param name="CloudId">The local id (<see cref="CloudConnection.LocalId"/>), as in <c>Account.CloudId</c>.</param>
+public sealed record PendingCloudAccount(string CloudId, string DisplayName, string Email, Account Account, string ConnectionId = CloudConnection.FirstId);
 
 /// <summary>Where the organisation's accounts stand on this device (Einstellungen → Cloud).</summary>
-public sealed record CloudAccountStatus(int Received, int Waiting, IReadOnlyList<PendingCloudAccount> Pending, string? Problem)
+/// <param name="Elsewhere">Not set up: another organisation already brought an account with that address.</param>
+public sealed record CloudAccountStatus(int Received, int Waiting, IReadOnlyList<PendingCloudAccount> Pending, string? Problem, int Elsewhere = 0)
 {
     public static CloudAccountStatus None { get; } = new(0, 0, [], null);
 }
@@ -25,7 +27,7 @@ public sealed record CloudAccountStatus(int Received, int Waiting, IReadOnlyList
 /// certificates: this device's key opens the envelope, and an account is taken only when the organisation key signed
 /// it – servers included, so nobody else can point the password at another server. Server settings and aliases are the
 /// organisation's (read-only here); the label is the user's. Without a password the user is asked once. Accounts no
-/// longer assigned are removed.
+/// longer assigned are removed. Each connected organisation on its own (keys, signing key, state).
 /// </summary>
 public sealed class CloudAccountSync(
     CloudController cloud,
@@ -35,42 +37,65 @@ public sealed class CloudAccountSync(
     ISettingsStore settings,
     ILogger<CloudAccountSync> logger)
 {
-    /// <summary>Payload fingerprint per cloud account as last set up (unchanged = nothing to do).</summary>
-    private const string StateKey = "cloud.accounts";
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CloudAccountStatus> _status = new();
 
-    public CloudAccountStatus Status { get; private set; } = CloudAccountStatus.None;
+    /// <summary>All organisations together (the shell asks for the passwords of <see cref="CloudAccountStatus.Pending"/>).</summary>
+    public CloudAccountStatus Status
+    {
+        get
+        {
+            var all = _status.Values.ToList();
+            return all.Count == 0 ? CloudAccountStatus.None : new CloudAccountStatus(
+                all.Sum(s => s.Received), all.Sum(s => s.Waiting), [.. all.SelectMany(s => s.Pending)], all.Select(s => s.Problem).FirstOrDefault(p => p is not null), all.Sum(s => s.Elsewhere));
+        }
+    }
+
+    /// <summary>Where the accounts of one organisation stand.</summary>
+    public CloudAccountStatus StatusOf(string connectionId) => _status.GetValueOrDefault(connectionId, CloudAccountStatus.None);
 
     public event EventHandler? Changed;
 
     public async Task<bool> SyncAsync(CancellationToken cancellationToken = default)
     {
-        if (await cloud.GetConnectionAsync(cancellationToken) is not { } connection)
+        var connections = await cloud.GetConnectionsAsync(cancellationToken);
+        foreach (var gone in _status.Keys.Where(id => connections.All(c => c.Id != id)))
         {
-            Status = CloudAccountStatus.None;
-            return await RemoveAllAsync(cancellationToken);
+            _status.TryRemove(gone, out _);
         }
 
-        using var deviceKey = await CloudCertificateSync.DeviceKeyAsync(credentials, logger, cancellationToken);
-        var response = await cloud.GetMailAccountsAsync(cancellationToken);
+        var changed = await RemoveDisconnectedAsync(cancellationToken);
+        return await CloudSync.EachAsync(connections, c => SyncAsync(c, cancellationToken), logger, cancellationToken) | changed;
+    }
+
+    private async Task<bool> SyncAsync(CloudConnection connection, CancellationToken cancellationToken)
+    {
+        using var deviceKey = await CloudCertificateSync.DeviceKeyAsync(credentials, connection, logger, cancellationToken);
+        var response = await cloud.GetMailAccountsAsync(connection, cancellationToken);
         var signingKey = response.OrganizationKey?.SigningPublicKey;
-        var pinned = await settings.GetAsync(SettingKeys.CloudOrganizationSigningKey, cancellationToken);
+        var pinnedKey = connection.SettingKey(SettingKeys.CloudOrganizationSigningKey);
+        var pinned = await settings.GetAsync(pinnedKey, cancellationToken);
         if (signingKey is not null && pinned is null)
         {
-            await settings.SetAsync(SettingKeys.CloudOrganizationSigningKey, signingKey, cancellationToken);
+            await settings.SetAsync(pinnedKey, signingKey, cancellationToken);
             pinned = signingKey;
         }
 
         if (signingKey is not null && signingKey != pinned)
         {
             logger.LogWarning("The organisation key changed; no accounts taken");
-            Status = new CloudAccountStatus(0, response.Accounts.Count, [],
+            _status[connection.Id] = new CloudAccountStatus(0, response.Accounts.Count, [],
                 T("Der Organisationsschlüssel hat sich geändert – aus Sicherheitsgründen werden keine Konten übernommen. Bitte die Cloud-Verbindung neu einrichten."));
             return false;
         }
 
-        var state = await LoadStateAsync(cancellationToken);
-        var local = (await accounts.GetAccountsAsync(cancellationToken)).Where(a => a.IsFromCloud).ToDictionary(a => a.CloudId!, StringComparer.Ordinal);
-        var offeredIds = response.Accounts.Select(a => a.Id).ToHashSet(StringComparer.Ordinal);
+        var state = await LoadStateAsync(connection, cancellationToken);
+        var all = await accounts.GetAccountsAsync(cancellationToken);
+        var local = all.Where(a => a.IsFromCloud && connection.Owns(a.CloudId!)).ToDictionary(a => a.CloudId!, StringComparer.Ordinal);
+        // The same address from two organisations: the account that came first stays, the other is not set up.
+        var otherOrganisations = all.Where(a => a.IsFromCloud && !connection.Owns(a.CloudId!)).Select(a => a.EmailAddress)
+            .OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var elsewhere = 0;
+        var offeredIds = response.Accounts.Select(a => connection.LocalId(a.Id)).ToHashSet(StringComparer.Ordinal);
         var pending = new List<PendingCloudAccount>();
         var changed = false;
         var received = 0;
@@ -80,7 +105,8 @@ public sealed class CloudAccountSync(
             // With what this installation can set up: an update that brings calendars (the Android app) builds the
             // accounts again, so their CalDAV/CardDAV servers are taken too.
             var fingerprint = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(offered.Payload + "\n" + setup.Capabilities)));
-            if (local.ContainsKey(offered.Id) && state.GetValueOrDefault(offered.Id) == fingerprint)
+            var localId = connection.LocalId(offered.Id);
+            if (local.ContainsKey(localId) && state.GetValueOrDefault(localId) == fingerprint)
             {
                 received++;
                 continue;
@@ -113,17 +139,25 @@ public sealed class CloudAccountSync(
                 continue;
             }
 
-            var account = Build(offered.Id, data, local.GetValueOrDefault(offered.Id));
-            var password = data.Password ?? await credentials.GetSecretAsync(CloudAccountPasswords.SecretId(offered.Id), cancellationToken);
-            if (password is null)
+            if (otherOrganisations.Contains(data.Email))
             {
-                // Finished once the user typed the password (see CompleteAsync).
-                pending.Add(new PendingCloudAccount(offered.Id, data.DisplayName, data.Email, account));
+                logger.LogInformation("Account {Email} already comes from another organisation; not set up again", data.Email);
+                offeredIds.Remove(localId);
+                elsewhere++;
                 continue;
             }
 
-            await SaveAsync(account, local.GetValueOrDefault(offered.Id), password, cancellationToken);
-            state[offered.Id] = fingerprint;
+            var account = Build(localId, data, local.GetValueOrDefault(localId));
+            var password = data.Password ?? await credentials.GetSecretAsync(CloudAccountPasswords.SecretId(localId), cancellationToken);
+            if (password is null)
+            {
+                // Finished once the user typed the password (see CompleteAsync).
+                pending.Add(new PendingCloudAccount(localId, data.DisplayName, data.Email, account, connection.Id));
+                continue;
+            }
+
+            await SaveAsync(account, local.GetValueOrDefault(localId), password, cancellationToken);
+            state[localId] = fingerprint;
             received++;
             changed = true;
             logger.LogInformation("Account {Email} set up from the organisation", data.Email);
@@ -137,8 +171,8 @@ public sealed class CloudAccountSync(
             changed = true;
         }
 
-        await settings.SetAsync(StateKey, JsonSerializer.Serialize(state), cancellationToken);
-        Status = new CloudAccountStatus(received, waiting, pending, null);
+        await settings.SetAsync(connection.SettingKey(SettingKeys.CloudAccountsState), JsonSerializer.Serialize(state), cancellationToken);
+        _status[connection.Id] = new CloudAccountStatus(received, waiting, pending, null, elsewhere);
         if (changed)
         {
             Changed?.Invoke(this, EventArgs.Empty);
@@ -154,24 +188,31 @@ public sealed class CloudAccountSync(
         ArgumentNullException.ThrowIfNull(pending);
         await setup.CreateAsync(pending.Account, password, cancellationToken);
         await CloudAccountPasswords.SetAsync(credentials, accounts, pending.CloudId, password, cancellationToken);
-        var state = await LoadStateAsync(cancellationToken);
-        state.Remove(pending.CloudId); // the next sync records it as set up
-        await settings.SetAsync(StateKey, JsonSerializer.Serialize(state), cancellationToken);
-        Status = Status with { Pending = [.. Status.Pending.Where(p => p.CloudId != pending.CloudId)] };
+        if (await cloud.GetConnectionAsync(pending.ConnectionId, cancellationToken) is { } connection)
+        {
+            var state = await LoadStateAsync(connection, cancellationToken);
+            state.Remove(pending.CloudId); // the next sync records it as set up
+            await settings.SetAsync(connection.SettingKey(SettingKeys.CloudAccountsState), JsonSerializer.Serialize(state), cancellationToken);
+            if (_status.TryGetValue(connection.Id, out var status))
+            {
+                _status[connection.Id] = status with { Pending = [.. status.Pending.Where(p => p.CloudId != pending.CloudId)] };
+            }
+        }
+
         await SyncAsync(cancellationToken);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Disconnected: the organisation's accounts leave this device (with their passwords).</summary>
-    public async Task<bool> RemoveAllAsync(CancellationToken cancellationToken = default)
+    /// <summary>Disconnected: the accounts of organisations no longer connected leave this device (with their passwords).</summary>
+    public async Task<bool> RemoveDisconnectedAsync(CancellationToken cancellationToken = default)
     {
-        var cloudAccounts = (await accounts.GetAccountsAsync(cancellationToken)).Where(a => a.IsFromCloud).ToList();
+        var connections = await cloud.GetConnectionsAsync(cancellationToken);
+        var cloudAccounts = (await accounts.GetAccountsAsync(cancellationToken)).Where(a => a.IsFromCloud && !connections.Any(c => c.Owns(a.CloudId!))).ToList();
         foreach (var account in cloudAccounts)
         {
             await RemoveAsync(account, cancellationToken);
         }
 
-        await settings.SetAsync(StateKey, null, cancellationToken);
         if (cloudAccounts.Count > 0)
         {
             Changed?.Invoke(this, EventArgs.Empty);
@@ -239,11 +280,11 @@ public sealed class CloudAccountSync(
         logger.LogInformation("Account {Email} of the organisation removed", account.EmailAddress);
     }
 
-    private async Task<Dictionary<string, string>> LoadStateAsync(CancellationToken cancellationToken)
+    private async Task<Dictionary<string, string>> LoadStateAsync(CloudConnection connection, CancellationToken cancellationToken)
     {
         try
         {
-            return JsonSerializer.Deserialize<Dictionary<string, string>>(await settings.GetAsync(StateKey, cancellationToken) ?? "{}") ?? [];
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(await settings.GetAsync(connection.SettingKey(SettingKeys.CloudAccountsState), cancellationToken) ?? "{}") ?? [];
         }
         catch (JsonException)
         {

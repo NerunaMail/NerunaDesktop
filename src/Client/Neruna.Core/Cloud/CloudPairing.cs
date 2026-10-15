@@ -9,7 +9,7 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Core.Cloud;
 
 /// <summary>What the desktop shows while a phone pairs: the QR code (invitation) and, separately, the PIN.</summary>
-public sealed record PairingSession(string PairingId, PairingInvitation Invitation, string Pin, DateTimeOffset ExpiresAt);
+public sealed record PairingSession(string PairingId, PairingInvitation Invitation, string Pin, DateTimeOffset ExpiresAt, string ConnectionId = CloudConnection.FirstId);
 
 /// <summary>
 /// Pairs phones from this desktop and keeps them supplied, zero knowledge (contract: /device/pairings): the QR code
@@ -20,29 +20,32 @@ public sealed class CloudPairingService(CloudController cloud, ICredentialStore 
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
 
-    /// <exception cref="CloudException">Not connected, no phone allowed, device limit reached …</exception>
-    public async Task<PairingSession> StartAsync(CancellationToken cancellationToken = default)
+    /// <summary>Pairs a phone with the organisation of <paramref name="connection"/>.</summary>
+    /// <exception cref="CloudException">No phone allowed, device limit reached …</exception>
+    public async Task<PairingSession> StartAsync(CloudConnection connection, CancellationToken cancellationToken = default)
     {
-        var connection = await cloud.GetConnectionAsync(cancellationToken)
-                         ?? throw new CloudException("not_connected", T("Dieser Computer ist nicht mit Neruna Cloud verbunden."));
-        var started = await cloud.StartPairingAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(connection);
+        var started = await cloud.StartPairingAsync(connection, cancellationToken);
         var secret = PairingInvitation.NewSecret();
-        var organizationKey = await settings.GetAsync(SettingKeys.CloudOrganizationSigningKey, cancellationToken);
+        var organizationKey = await settings.GetAsync(connection.SettingKey(SettingKeys.CloudOrganizationSigningKey), cancellationToken);
         await credentials.SetSecretAsync(SecretId(started.PairingId), Convert.ToBase64String(secret), cancellationToken);
         return new PairingSession(
             started.PairingId,
             new PairingInvitation(connection.Server, started.Code, secret, organizationKey is null ? null : PairingInvitation.HashOfKey(organizationKey)),
             started.Pin,
-            started.ExpiresAt);
+            started.ExpiresAt,
+            connection.Id);
     }
 
     /// <summary>Waits until the phone connected (it is returned) or the code expired (null).</summary>
     public async Task<PairedDevice?> WaitAsync(PairingSession session, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(session);
+        var connection = await cloud.GetConnectionAsync(session.ConnectionId, cancellationToken)
+                         ?? throw new CloudException("not_connected", T("Dieser Computer ist nicht mit Neruna Cloud verbunden."));
         while (true)
         {
-            var status = await cloud.GetPairingAsync(session.PairingId, cancellationToken);
+            var status = await cloud.GetPairingAsync(connection, session.PairingId, cancellationToken);
             if (status is { Status: "connected", Device: { } phone })
             {
                 // From now on the secret belongs to the phone (checking its key proof, now and after a new key).
@@ -67,12 +70,18 @@ public sealed class CloudPairingService(CloudController cloud, ICredentialStore 
     /// </summary>
     public async Task<int> DeliverAsync(CancellationToken cancellationToken = default)
     {
-        if (await cloud.GetConnectionAsync(cancellationToken) is not { } connection)
+        var delivered = 0;
+        await CloudSync.EachAsync(await cloud.GetConnectionsAsync(cancellationToken), async connection =>
         {
-            return 0;
-        }
+            delivered += await DeliverAsync(connection, cancellationToken);
+            return false;
+        }, logger, cancellationToken);
+        return delivered;
+    }
 
-        var phones = (await cloud.GetPairedDevicesAsync(cancellationToken)).Devices
+    private async Task<int> DeliverAsync(CloudConnection connection, CancellationToken cancellationToken)
+    {
+        var phones = (await cloud.GetPairedDevicesAsync(connection, cancellationToken)).Devices
             .Where(p => p.EncryptionPublicKey is not null && (!p.Approved || p.Missing.Certificates.Count + p.Missing.Accounts.Count > 0))
             .ToList();
         if (phones.Count == 0)
@@ -82,7 +91,7 @@ public sealed class CloudPairingService(CloudController cloud, ICredentialStore 
 
         CertificatesResponse? certificates = null;
         MailAccountsResponse? accounts = null;
-        using var deviceKey = await CloudCertificateSync.DeviceKeyAsync(credentials, logger, cancellationToken);
+        using var deviceKey = await CloudCertificateSync.DeviceKeyAsync(credentials, connection, logger, cancellationToken);
         var delivered = 0;
         foreach (var phone in phones)
         {
@@ -95,12 +104,12 @@ public sealed class CloudPairingService(CloudController cloud, ICredentialStore 
 
             if (phone.Missing.Certificates.Count > 0)
             {
-                certificates ??= await cloud.GetCertificatesAsync(cancellationToken);
+                certificates ??= await cloud.GetCertificatesAsync(connection, cancellationToken);
             }
 
             if (phone.Missing.Accounts.Count > 0)
             {
-                accounts ??= await cloud.GetMailAccountsAsync(cancellationToken);
+                accounts ??= await cloud.GetMailAccountsAsync(connection, cancellationToken);
             }
 
             var certificateEnvelopes = Rewrap(phone, phone.Missing.Certificates,
@@ -118,7 +127,7 @@ public sealed class CloudPairingService(CloudController cloud, ICredentialStore 
                 continue;
             }
 
-            await cloud.DeliverToPairedDeviceAsync(phone.Id, new PairedEnvelopesRequest(certificateEnvelopes, accountEnvelopes), cancellationToken);
+            await cloud.DeliverToPairedDeviceAsync(connection, phone.Id, new PairedEnvelopesRequest(certificateEnvelopes, accountEnvelopes), cancellationToken);
             delivered += certificateEnvelopes.Count + accountEnvelopes.Count;
             logger.LogInformation("Paired device {Device}: {Certificates} certificate(s) and {Accounts} account(s) delivered",
                 phone.Id, certificateEnvelopes.Count, accountEnvelopes.Count);

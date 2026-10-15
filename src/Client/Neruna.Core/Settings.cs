@@ -36,14 +36,33 @@ public static class SettingKeys
     /// <summary>Connection to a Neruna Cloud/Control server (JSON of CloudConnection; the device key is in the keychain).</summary>
     public const string CloudConnection = "cloud.connection";
 
+    /// <summary>Further connections, to other organisations (JSON list of CloudConnection, each with its own id).</summary>
+    public const string CloudConnections = "cloud.connections";
+
+    /// <summary>Fingerprints of the certificates an organisation delivered to this device (JSON list; per connection).</summary>
+    public const string CloudCertificates = "cloud.certificates";
+
+    /// <summary>Payload fingerprint per account of an organisation as last set up (JSON; per connection).</summary>
+    public const string CloudAccountsState = "cloud.accounts";
+
+    /// <summary>Id of the connection whose chat is shown (none: the first).</summary>
+    public const string CloudChatConnection = "cloud.chatConnection";
+
+    /// <summary>Id of the connection that keeps the personal backups (none: the first).</summary>
+    public const string CloudBackupConnection = "cloud.backupConnection";
+
     /// <summary>
     /// The organisation's signing key for certificates (base64 SPKI), remembered the first time: certificates signed
-    /// with another key are not taken – a server could otherwise slip in a key of its own.
+    /// with another key are not taken – a server could otherwise slip in a key of its own. Per connection
+    /// (<see cref="Cloud.CloudConnection.SettingKey"/>).
     /// </summary>
     public const string CloudOrganizationSigningKey = "cloud.organizationSigningKey";
 
     /// <summary>Chat: rooms, people, read markers and retention from the last answer (JSON), for a start without network.</summary>
     public const string ChatState = "chat.state";
+
+    /// <summary>Id of the cloud connection the kept chat belongs to (another one chosen: it is emptied).</summary>
+    public const string ChatConnection = "chat.connection";
 
     /// <summary>Own online status chosen in the header (available, away, brb, dnd, offline; default: available).</summary>
     public const string ChatPresence = "chat.presence";

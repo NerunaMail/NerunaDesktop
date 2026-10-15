@@ -10,8 +10,9 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>
-/// Einstellungen → Cloud: connect Neruna with the organisation's Neruna Cloud/Control (server, one-time code and PIN from
-/// the portal), show the profile kept there, disconnect.
+/// Einstellungen → Cloud: connect Neruna with the Neruna Cloud/Control of one or more organisations (server, one-time
+/// code and PIN from the portal), show the profile kept there, choose whose chat is shown and where the backups go,
+/// disconnect. The selected connection (<see cref="Connection"/>) is the one shown in detail.
 /// </summary>
 internal sealed partial class CloudViewModel(
     CloudController cloud,
@@ -21,7 +22,8 @@ internal sealed partial class CloudViewModel(
     AccountDiscovery discovery,
     SettingsBackupService backup,
     CloudAccountSync accounts,
-    CloudPairingService pairing) : ViewModelBase
+    CloudPairingService pairing,
+    Neruna.Core.Chat.ChatController chat) : ViewModelBase
 {
     // ── Handy verbinden: QR code + PIN for the Neruna app; this desktop then re-encrypts for the phone ──
 
@@ -51,7 +53,7 @@ internal sealed partial class CloudViewModel(
     {
         PairingText = null;
         PairingFailed = false;
-        if (await Login.VerifyAsync(T("Zum Verbinden eines Handys bitte mit dem Login dieses Computers bestätigen.")))
+        if (Connection is not null && await Login.VerifyAsync(T("Zum Verbinden eines Handys bitte mit dem Login dieses Computers bestätigen.")))
         {
             await BeginPairingAsync();
         }
@@ -65,7 +67,8 @@ internal sealed partial class CloudViewModel(
         _cancelPairing = cancel.Cancel;
         try
         {
-            var session = await pairing.StartAsync(cancel.Token);
+            var connection = Connection ?? throw new CloudException("not_connected", T("Neruna ist nicht mit einer Cloud verbunden."));
+            var session = await pairing.StartAsync(connection, cancel.Token);
             var png = new QRCoder.PngByteQRCode(new QRCoder.QRCodeGenerator().CreateQrCode(session.Invitation.ToString(), QRCoder.QRCodeGenerator.ECCLevel.M)).GetGraphic(8);
             using (var stream = new MemoryStream(png))
             {
@@ -89,7 +92,7 @@ internal sealed partial class CloudViewModel(
             for (var attempt = 0; attempt < 30; attempt++)
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), cancel.Token);
-                var paired = (await cloud.GetPairedDevicesAsync(cancel.Token)).Devices.FirstOrDefault(d => d.Id == phone.Id);
+                var paired = (await cloud.GetPairedDevicesAsync(connection, cancel.Token)).Devices.FirstOrDefault(d => d.Id == phone.Id);
                 if (paired?.EncryptionPublicKey is not null && paired.PairingProof is not null)
                 {
                     await pairing.DeliverAsync(cancel.Token);
@@ -129,10 +132,16 @@ internal sealed partial class CloudViewModel(
 
     private async Task LoadPairedPhonesAsync()
     {
+        PairedPhones.Clear();
+        PairingLimitsText = null;
+        if (Connection is not { } connection)
+        {
+            return;
+        }
+
         try
         {
-            var paired = await cloud.GetPairedDevicesAsync();
-            PairedPhones.Clear();
+            var paired = await cloud.GetPairedDevicesAsync(connection);
             foreach (var phone in paired.Devices)
             {
                 PairedPhones.Add(new PairedPhone(
@@ -240,7 +249,7 @@ internal sealed partial class CloudViewModel(
     /// <summary>Loads the vault state from the cloud (when connected).</summary>
     public async Task LoadBackupsAsync()
     {
-        if (Connection is null)
+        if (BackupConnection is null)
         {
             BackupState = null;
             Backups.Clear();
@@ -418,7 +427,7 @@ internal sealed partial class CloudViewModel(
     /// <summary>After each certificate sync (here or in the background).</summary>
     public void UpdateCertificateStatus()
     {
-        var status = certificates.Status;
+        var status = Connection is { } connection ? certificates.StatusOf(connection.Id) : CloudCertificateStatus.None;
         CertificatesNeedAttention = status.Problem is not null || (status.Available && !status.Approved);
         CertificatesText = !status.Available ? null
             : status.Problem ?? (!status.Approved
@@ -429,15 +438,16 @@ internal sealed partial class CloudViewModel(
                         ? T("Zertifikate: Ihnen ist noch kein Zertifikat zugeordnet.")
                         : F("Zertifikate: {0} von der Organisation auf diesem Gerät.", status.Received));
 
-        var mail = accounts.Status;
-        AccountsNeedAttention = mail.Problem is not null || mail.Waiting > 0 || mail.Pending.Count > 0;
+        var mail = Connection is { } selected ? accounts.StatusOf(selected.Id) : CloudAccountStatus.None;
+        AccountsNeedAttention = mail.Problem is not null || mail.Waiting > 0 || mail.Pending.Count > 0 || mail.Elsewhere > 0;
         AccountsText = mail.Problem
-            ?? (mail.Received + mail.Waiting + mail.Pending.Count == 0 ? null
+            ?? (mail.Received + mail.Waiting + mail.Pending.Count + mail.Elsewhere == 0 ? null
                 : string.Join(" ", new[]
                 {
                     mail.Received > 0 ? F("E-Mail-Konten: {0} von der Organisation eingerichtet.", mail.Received) : T("E-Mail-Konten:"),
                     mail.Waiting > 0 ? F("{0} warten auf die Freigabe dieses Geräts im Portal.", mail.Waiting) : null,
                     mail.Pending.Count > 0 ? F("{0} brauchen noch Ihr Passwort.", mail.Pending.Count) : null,
+                    mail.Elsewhere > 0 ? F("{0} nicht eingerichtet: Die Adresse kommt bereits von einer anderen Organisation.", mail.Elsewhere) : null,
                 }.Where(t => t is not null)));
     }
 
@@ -454,11 +464,130 @@ internal sealed partial class CloudViewModel(
     public static readonly Avalonia.Data.Converters.IValueConverter Initials = new Avalonia.Data.Converters.FuncValueConverter<string?, string>(name =>
         string.Concat((name ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0]))));
 
+    /// <summary>The organisations this computer is connected to.</summary>
+    public ObservableCollection<CloudConnection> Connections { get; } = [];
+
+    /// <summary>The connection shown in detail (profile, phones, status).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsNotConnected))]
     public partial CloudConnection? Connection { get; set; }
 
-    public bool IsNotConnected => Connection is null;
+    public bool IsNotConnected => Connections.Count == 0;
+
+    /// <summary>Connected, and the form for another organisation is open.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowConnectForm))]
+    public partial bool IsAdding { get; set; }
+
+    public bool ShowConnectForm => IsNotConnected || IsAdding;
+
+    public bool HasSeveral => Connections.Count > 1;
+
+    /// <summary>Whose chat is shown (only offered with several connections).</summary>
+    [ObservableProperty]
+    public partial CloudConnection? ChatConnection { get; set; }
+
+    /// <summary>Where the backups go (only offered with several connections).</summary>
+    [ObservableProperty]
+    public partial CloudConnection? BackupConnection { get; set; }
+
+    public string? PairingOrganizationText => HasSeveral && Connection is { } c ? F("Das Handy wird mit {0} verbunden.", c.OrganizationName) : null;
+
+    public string? BackupOrganizationText => HasSeveral && BackupConnection is { } c ? F("Die Sicherungen liegen bei {0}.", c.OrganizationName) : null;
+
+    private bool _loadingConnections;
+
+    [RelayCommand]
+    private void AddConnection()
+    {
+        Error = null;
+        IsAdding = true;
+    }
+
+    [RelayCommand]
+    private void CancelAdding()
+    {
+        Error = null;
+        IsAdding = false;
+    }
+
+    partial void OnChatConnectionChanged(CloudConnection? oldValue, CloudConnection? newValue)
+    {
+        if (!_loadingConnections && newValue is not null && newValue.Id != oldValue?.Id)
+        {
+            _ = SwitchChatAsync(oldValue, newValue);
+        }
+    }
+
+    private async Task SwitchChatAsync(CloudConnection? previous, CloudConnection chosen)
+    {
+        try
+        {
+            await cloud.SetChatConnectionAsync(chosen.Id);
+            await chat.SwitchAsync(previous);
+        }
+        catch (Exception ex) when (ex is CloudException or HttpRequestException)
+        {
+            Error = ex.Message;
+        }
+
+        ChatChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Another organisation's chat was chosen (the chat page reloads).</summary>
+    public event EventHandler? ChatChanged;
+
+    partial void OnBackupConnectionChanged(CloudConnection? oldValue, CloudConnection? newValue)
+    {
+        OnPropertyChanged(nameof(BackupOrganizationText));
+        if (!_loadingConnections && newValue is not null && newValue.Id != oldValue?.Id)
+        {
+            _ = SwitchBackupAsync(newValue);
+        }
+    }
+
+    // The vault key of the other organisation's vault does not open this one: forget it, unlock (or set up) anew.
+    private async Task SwitchBackupAsync(CloudConnection chosen)
+    {
+        await cloud.SetBackupConnectionAsync(chosen.Id);
+        await backup.ForgetAsync();
+        RestorePlan = null;
+        IsWritingNote = false;
+        await LoadBackupsAsync();
+        BackedUp?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task LoadConnectionsAsync(string? select = null)
+    {
+        _loadingConnections = true;
+        try
+        {
+            var all = await cloud.GetConnectionsAsync();
+            var selected = select ?? Connection?.Id;
+            Connections.Clear();
+            foreach (var connection in all)
+            {
+                Connections.Add(connection);
+            }
+
+            Connection = all.FirstOrDefault(c => c.Id == selected) ?? all.FirstOrDefault();
+            ChatConnection = await cloud.GetChatConnectionAsync();
+            BackupConnection = await cloud.GetBackupConnectionAsync();
+
+            // The organisations' servers also answer "which mail server?" when an account is added.
+            discovery.OrganizationServers = [.. all.Select(c => c.Server)];
+        }
+        finally
+        {
+            _loadingConnections = false;
+        }
+
+        OnPropertyChanged(nameof(IsNotConnected));
+        OnPropertyChanged(nameof(ShowConnectForm));
+        OnPropertyChanged(nameof(HasSeveral));
+        OnPropertyChanged(nameof(BackupOrganizationText));
+        OnPropertyChanged(nameof(PairingOrganizationText));
+    }
 
     [ObservableProperty]
     public partial string Server { get; set; } = DefaultServer;
@@ -524,17 +653,41 @@ internal sealed partial class CloudViewModel(
         OnPropertyChanged(nameof(ConnectedText));
     }
 
-    partial void OnConnectionChanged(CloudConnection? value)
+    partial void OnConnectionChanged(CloudConnection? oldValue, CloudConnection? newValue)
     {
-        // The organisation's server also answers "which mail server?" when an account is added.
-        discovery.OrganizationServer = value?.Server;
+        OnPropertyChanged(nameof(PairingOrganizationText));
         OnPropertyChanged(nameof(PersonName));
         OnPropertyChanged(nameof(ConnectedText));
+        if (newValue?.Id != oldValue?.Id)
+        {
+            Profile = null;
+            Photo = null;
+            UpdateCertificateStatus();
+            if (!_loadingConnections && newValue is not null)
+            {
+                _ = ShowSelectedAsync();
+            }
+        }
+    }
+
+    // Another organisation selected: its profile and phones (the syncs cover all of them anyway).
+    private async Task ShowSelectedAsync()
+    {
+        Error = null;
+        try
+        {
+            await LoadPersonAsync();
+            await LoadPairedPhonesAsync();
+        }
+        catch (Exception ex) when (ex is CloudException or HttpRequestException)
+        {
+            Error = ex.Message;
+        }
     }
 
     public async Task ReloadAsync()
     {
-        Connection = await cloud.GetConnectionAsync();
+        await LoadConnectionsAsync();
         if (Connection is not null && Profile is null)
         {
             await RefreshAsync();
@@ -549,9 +702,12 @@ internal sealed partial class CloudViewModel(
         try
         {
             var server = CloudController.ParseServer(Server);
-            Connection = await cloud.ConnectAsync(server, Code, Pin, DeviceInfo.Current(DeviceName));
+            var connection = await cloud.ConnectAsync(server, Code, Pin, DeviceInfo.Current(DeviceName));
             Code = string.Empty;
             Pin = string.Empty;
+            IsAdding = false;
+            Server = DefaultServer;
+            await LoadConnectionsAsync(connection.Id);
             await LoadProfileAsync();
         }
         catch (CloudException ex)
@@ -585,31 +741,51 @@ internal sealed partial class CloudViewModel(
         }
     }
 
-    /// <summary>Ends the connection (asked first in the view).</summary>
+    /// <summary>Ends the selected connection (asked first in the view); what came from that organisation goes.</summary>
     [RelayCommand(CanExecute = nameof(CanUse))]
     private async Task DisconnectAsync()
     {
+        if (Connection is not { } connection)
+        {
+            return;
+        }
+
         IsBusy = true;
         try
         {
-            await cloud.DisconnectAsync();
-            await signatures.RemoveAllAsync();
-            await textTemplates.RemoveAllAsync();
-            await certificates.RemoveAllAsync();
-            if (await accounts.RemoveAllAsync())
+            var keptBackups = BackupConnection?.Id == connection.Id;
+            await cloud.DisconnectAsync(connection);
+            await signatures.RemoveDisconnectedAsync();
+            await textTemplates.RemoveDisconnectedAsync();
+            await certificates.RemoveDisconnectedAsync();
+            if (await accounts.RemoveDisconnectedAsync())
             {
                 AccountsArrived?.Invoke(this, EventArgs.Empty);
             }
 
-            await backup.ForgetAsync();
-            BackupState = null;
-            Backups.Clear();
-            RestorePlan = null;
-            UpdateCertificateStatus();
-            Connection = null;
+            if (keptBackups)
+            {
+                await backup.ForgetAsync();
+                BackupState = null;
+                Backups.Clear();
+                RestorePlan = null;
+            }
+
             Profile = null;
             Photo = null;
             Error = null;
+            await LoadConnectionsAsync();
+            UpdateCertificateStatus();
+            if (Connection is not null)
+            {
+                await ShowSelectedAsync();
+                if (keptBackups)
+                {
+                    await LoadBackupsAsync();
+                }
+            }
+
+            ChatChanged?.Invoke(this, EventArgs.Empty);
         }
         finally
         {
@@ -621,7 +797,7 @@ internal sealed partial class CloudViewModel(
 
     private async Task LoadProfileAsync()
     {
-        Profile = await cloud.GetProfileAsync();
+        await LoadPersonAsync();
         await LoadPairedPhonesAsync();
         await signatures.SyncAsync();
         await textTemplates.SyncAsync();
@@ -649,11 +825,28 @@ internal sealed partial class CloudViewModel(
 
         UpdateCertificateStatus();
         await LoadBackupsAsync();
-        Photo = null;
-        if (Profile.Member.HasPhoto && await cloud.GetPhotoAsync() is { } bytes)
+    }
+
+    private async Task LoadPersonAsync()
+    {
+        if (Connection is not { } connection)
+        {
+            return;
+        }
+
+        var profile = await cloud.GetProfileAsync(connection);
+        Bitmap? photo = null;
+        if (profile.Member.HasPhoto && await cloud.GetPhotoAsync(connection) is { } bytes)
         {
             using var stream = new MemoryStream(bytes);
-            Photo = new Bitmap(stream);
+            photo = new Bitmap(stream);
+        }
+
+        // Still the one shown (the user may have selected another meanwhile).
+        if (Connection?.Id == connection.Id)
+        {
+            Profile = profile;
+            Photo = photo;
         }
     }
 }

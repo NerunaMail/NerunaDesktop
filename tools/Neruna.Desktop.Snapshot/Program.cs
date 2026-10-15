@@ -23,6 +23,7 @@ var certificates = Array.IndexOf(args, "--certificates") is var ce and >= 0 ? ar
 var calendars = Array.IndexOf(args, "--calendars") is var cl and >= 0 ? new Uri(args[cl + 1]) : null;
 var cloudAccounts = Array.IndexOf(args, "--cloud-accounts") is var ca and >= 0 ? args[(ca + 1)..(ca + 4)] : null;
 var backup = Array.IndexOf(args, "--backup") is var bk and >= 0 ? args[(bk + 1)..(bk + 6)] : null;
+var twoOrganisations = Array.IndexOf(args, "--two-organisations") is var to and >= 0 ? args[(to + 1)..(to + 6)] : null;
 var firstStart = Array.IndexOf(args, "--first-start") is var fs and >= 0 ? args[fs + 1] : null;
 var live = Array.IndexOf(args, "--live") is var i and >= 0 ? (Host: args[i + 1], Dav: new Uri(args[i + 2])) : ((string Host, Uri Dav)?)null;
 Directory.CreateDirectory(output);
@@ -57,6 +58,10 @@ Dispatcher.UIThread.Post(async () =>
         else if (cloudAccounts is [var accountsServer, var accountsCode, var accountsPin])
         {
             await LiveScenario.CloudAccountsAsync(output, accountsServer, accountsCode, accountsPin);
+        }
+        else if (twoOrganisations is [var orgServer, var orgCode1, var orgPin1, var orgCode2, var orgPin2])
+        {
+            await LiveScenario.TwoOrganisationsAsync(output, orgServer, orgCode1, orgPin1, orgCode2, orgPin2);
         }
         else if (backup is [var backupServer, var code1, var pin1, var code2, var pin2])
         {

@@ -44,7 +44,7 @@ public class CloudCertificateSyncTests
         Assert.True(own.HasPrivateKey);
         Assert.Equal(CertificateSource.Cloud, own.Source);
         Assert.Equal(["anna@example.com", "info@example.com"], own.EmailAddresses);
-        Assert.Equal(new CloudCertificateStatus(true, true, 1, 0, null), sync.Status);
+        Assert.Equal(new CloudCertificateStatus(true, true, 1, 0, null), sync.StatusOf(CloudConnection.FirstId));
         // The device sent its own key (public half) – the one from the keychain.
         var sent = env.Http.Sent.Single(s => s.Url.EndsWith("device/encryption-key", StringComparison.Ordinal));
         Assert.Equal(device.GetProperty("publicKey").GetString(), JsonDocument.Parse(sent.Body).RootElement.GetProperty("publicKey").GetString());
@@ -59,7 +59,7 @@ public class CloudCertificateSyncTests
         changed["certificates"] = new JsonArray();
         env.Http.Responses[Server + "api/v1/certificates"] = (HttpStatusCode.OK, changed.ToJsonString());
         Assert.False(await sync.SyncAsync(ct));
-        Assert.NotNull(sync.Status.Problem);
+        Assert.NotNull(sync.StatusOf(CloudConnection.FirstId).Problem);
         Assert.Single(await manager.GetAllAsync(ct));
 
         // No longer assigned: removed here, too.

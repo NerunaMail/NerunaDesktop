@@ -44,7 +44,7 @@ public class CrashReportTests
         var account = new Account(Guid.NewGuid(), "Anna Muster", "anna@example.com",
             [new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, "imap", new Dictionary<string, string> { ["imap.host"] = "mail.firma.ch", ["imap.user"] = "amuster" })],
             Label: "Firma");
-        var words = CrashReportBuilder.SensitiveWords([account], new CloudConnection(new Uri("https://neruna.cloud/"), "d", "Example AG", "Anna Muster", DateTimeOffset.Now)).ToList();
+        var words = CrashReportBuilder.SensitiveWords([account], [new CloudConnection(new Uri("https://neruna.cloud/"), "d", "Example AG", "Anna Muster", DateTimeOffset.Now)]).ToList();
         var text = """
             Login failed for anna@example.com at imaps://mail.firma.ch:993 (Anna Muster, Firma, amuster)
             at C:\Users\amuster\AppData\Local\Neruna\neruna.db and /home/amuster/.local/share/neruna

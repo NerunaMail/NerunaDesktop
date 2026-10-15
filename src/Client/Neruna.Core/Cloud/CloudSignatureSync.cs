@@ -1,12 +1,10 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Neruna.Core.Mail;
 
 namespace Neruna.Core.Cloud;
 
 /// <summary>
-/// Brings the organisation's central signatures into the local signature list (source "cloud"): new ones added,
+/// Brings the organisations' central signatures into the local signature list (source "cloud"): new ones added,
 /// changed ones replaced, those no longer offered removed. The user's own signatures are never touched. A cloud
 /// signature keeps the same local id, so per-account default choices stay.
 /// </summary>
@@ -18,24 +16,26 @@ public sealed class CloudSignatureSync(CloudController cloud, SignatureService s
     /// <returns>Whether anything changed.</returns>
     public async Task<bool> SyncAsync(CancellationToken cancellationToken = default)
     {
-        if (await cloud.GetConnectionAsync(cancellationToken) is null)
-        {
-            return await RemoveAllAsync(cancellationToken);
-        }
+        var connections = await cloud.GetConnectionsAsync(cancellationToken);
+        var changed = await RemoveDisconnectedAsync(cancellationToken);
+        return await CloudSync.EachAsync(connections, c => SyncAsync(c, cancellationToken), logger, cancellationToken) | changed;
+    }
 
-        var response = await cloud.GetSignaturesAsync(cancellationToken);
-        var existing = (await signatures.GetAllAsync(cancellationToken)).Where(s => s.IsFromCloud).ToDictionary(s => s.Id);
+    private async Task<bool> SyncAsync(CloudConnection connection, CancellationToken cancellationToken)
+    {
+        var response = await cloud.GetSignaturesAsync(connection, cancellationToken);
+        var existing = (await signatures.GetAllAsync(cancellationToken)).Where(s => s.Source == connection.Source).ToDictionary(s => s.Id);
         var changed = false;
 
         foreach (var offered in response.Signatures)
         {
-            var id = LocalId(offered.Id);
+            var id = LocalId(offered.Id, connection);
             if (existing.Remove(id, out var current) && current.Name == offered.Name && current.Html == offered.Html)
             {
                 continue;
             }
 
-            await signatures.SaveAsync(new Signature(id, offered.Name, offered.Html, offered.UpdatedAt, Signature.CloudSource), cancellationToken);
+            await signatures.SaveAsync(new Signature(id, offered.Name, offered.Html, offered.UpdatedAt, connection.Source), cancellationToken);
             changed = true;
         }
 
@@ -47,36 +47,31 @@ public sealed class CloudSignatureSync(CloudController cloud, SignatureService s
 
         if (changed)
         {
-            logger.LogInformation("Cloud signatures updated: {Count} offered", response.Signatures.Count);
+            logger.LogInformation("Cloud signatures of {Organization} updated: {Count} offered", connection.OrganizationName, response.Signatures.Count);
             Changed?.Invoke(this, EventArgs.Empty);
         }
 
         return changed;
     }
 
-    /// <summary>After disconnecting: the organisation's signatures go too.</summary>
-    public async Task<bool> RemoveAllAsync(CancellationToken cancellationToken = default)
+    /// <summary>After disconnecting: the signatures of organisations no longer connected go too.</summary>
+    public async Task<bool> RemoveDisconnectedAsync(CancellationToken cancellationToken = default)
     {
-        var cloudSignatures = (await signatures.GetAllAsync(cancellationToken)).Where(s => s.IsFromCloud).ToList();
-        foreach (var signature in cloudSignatures)
+        var sources = (await cloud.GetConnectionsAsync(cancellationToken)).Select(c => c.Source).ToHashSet(StringComparer.Ordinal);
+        var gone = (await signatures.GetAllAsync(cancellationToken)).Where(s => s.IsFromCloud && !sources.Contains(s.Source)).ToList();
+        foreach (var signature in gone)
         {
             await signatures.DeleteAsync(signature.Id, cancellationToken);
         }
 
-        if (cloudSignatures.Count > 0)
+        if (gone.Count > 0)
         {
             Changed?.Invoke(this, EventArgs.Empty);
         }
 
-        return cloudSignatures.Count > 0;
+        return gone.Count > 0;
     }
 
     /// <summary>The same local id for a cloud signature on every refresh (keeps the per-account choices).</summary>
-    public static Guid LocalId(string cloudId)
-    {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes("neruna-cloud-signature:" + cloudId)).AsSpan(0, 16).ToArray();
-        hash[6] = (byte)((hash[6] & 0x0F) | 0x80); // RFC 9562 version 8 (custom, name-based)
-        hash[8] = (byte)((hash[8] & 0x3F) | 0x80);
-        return new Guid(hash, bigEndian: true);
-    }
+    public static Guid LocalId(string cloudId, CloudConnection? connection = null) => CloudSync.LocalId("neruna-cloud-signature", connection, cloudId);
 }

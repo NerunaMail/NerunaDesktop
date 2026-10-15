@@ -10,8 +10,48 @@ using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Cloud;
 
-/// <summary>This computer's connection to a Neruna Cloud/Control server (kept in the settings; the key in the keychain).</summary>
-public sealed record CloudConnection(Uri Server, string DeviceId, string OrganizationName, string MemberName, DateTimeOffset ConnectedAt);
+/// <summary>
+/// One of this computer's connections to a Neruna Cloud/Control server – one per organisation (kept in the settings; the
+/// keys in the keychain). The first connection made before there could be several keeps its places (<see cref="FirstId"/>):
+/// nothing had to be moved. Further ones keep theirs under their own <see cref="Id"/>.
+/// </summary>
+public sealed record CloudConnection(Uri Server, string DeviceId, string OrganizationName, string MemberName, DateTimeOffset ConnectedAt, string Id = CloudConnection.FirstId)
+{
+    /// <summary>The connection from <see cref="SettingKeys.CloudConnection"/> (single-connection versions).</summary>
+    public const string FirstId = "default";
+
+    public bool IsFirst => Id == FirstId;
+
+    /// <summary>The device key (signs the token assertions).</summary>
+    public Guid DeviceKeyId => IsFirst ? CloudController.KeyId : Derived("device-key");
+
+    /// <summary>This device's encryption key for the organisation's certificates and accounts.</summary>
+    public Guid EncryptionKeyId => IsFirst ? CloudController.EncryptionKeyId : Derived("encryption-key");
+
+    /// <summary>A setting of this connection ("cloud.accounts" → "cloud.accounts.&lt;id&gt;").</summary>
+    public string SettingKey(string key) => IsFirst ? key : $"{key}.{Id}";
+
+    /// <summary>Source of the signatures and text templates that came from this organisation.</summary>
+    public string Source => IsFirst ? CloudSources.Cloud : $"{CloudSources.Cloud}:{Id}";
+
+    /// <summary>The local id of something of this organisation (accounts: <c>Account.CloudId</c>).</summary>
+    public string LocalId(string remoteId) => IsFirst ? remoteId : $"{Id}:{remoteId}";
+
+    /// <summary>Whether a local id (see <see cref="LocalId"/>) belongs to this connection.</summary>
+    public bool Owns(string localId) => IsFirst ? !localId.Contains(':', StringComparison.Ordinal) : localId.StartsWith(Id + ":", StringComparison.Ordinal);
+
+    private Guid Derived(string purpose) =>
+        new(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"neruna-cloud|{purpose}|{Id}")).AsSpan(0, 16));
+}
+
+/// <summary>Where a signature or text template came from: "cloud" (first connection) or "cloud:&lt;connection id&gt;".</summary>
+public static class CloudSources
+{
+    public const string Cloud = "cloud";
+
+    public static bool IsCloud(string? source) =>
+        source is not null && (source == Cloud || source.StartsWith(Cloud + ":", StringComparison.Ordinal));
+}
 
 /// <summary>The server refused or could not be reached; <see cref="Exception.Message"/> is for the user (German).</summary>
 public sealed class CloudException(string code, string message, Exception? inner = null) : Exception(message, inner)
@@ -20,35 +60,92 @@ public sealed class CloudException(string code, string message, Exception? inner
 }
 
 /// <summary>
-/// Neruna Cloud/Control for the UI: connect with the one-time code and PIN from the portal, read the own profile,
-/// disconnect. The device's private key never leaves this computer; the server knows only its public half.
+/// Neruna Cloud/Control for the UI: connect with the one-time code and PIN from the portal – also to several
+/// organisations, each as a device of its own –, read the own profile, disconnect. The device's private keys never
+/// leave this computer; the servers know only their public halves.
 /// </summary>
 public sealed class CloudController(HttpClient http, ISettingsStore settings, ICredentialStore credentials, ILogger<CloudController> logger)
 {
-    /// <summary>Where the device key is kept in the credential store (not a mail/DAV connection).</summary>
+    /// <summary>Where the first connection's device key is kept in the credential store (not a mail/DAV connection).</summary>
     public static readonly Guid KeyId = new("6e657275-6e61-436c-6f75-640000000001");
 
-    /// <summary>Where this device's encryption key for certificates is kept (P-256 ECDH, PKCS#8).</summary>
+    /// <summary>Where the first connection's encryption key for certificates is kept (P-256 ECDH, PKCS#8).</summary>
     public static readonly Guid EncryptionKeyId = new("6e657275-6e61-436c-6f75-640000000002");
 
     /// <summary>Language of the server's messages: the app's UI language.</summary>
     public static string UiLanguage => Localization.Texts.Culture.Name;
 
-    private string? _token;
-    private DateTimeOffset _tokenExpires;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Token, DateTimeOffset Expires)> _tokens = new();
 
-    public async Task<CloudConnection?> GetConnectionAsync(CancellationToken cancellationToken = default)
+    /// <summary>A connection was added or removed (or the chat's or backups' organisation changed).</summary>
+    public event EventHandler? ConnectionsChanged;
+
+    /// <summary>All connections, the first one made first.</summary>
+    public async Task<IReadOnlyList<CloudConnection>> GetConnectionsAsync(CancellationToken cancellationToken = default)
     {
-        var json = await settings.GetAsync(SettingKeys.CloudConnection, cancellationToken);
+        var result = new List<CloudConnection>();
+        if (Read<CloudConnection>(await settings.GetAsync(SettingKeys.CloudConnection, cancellationToken)) is { } first)
+        {
+            result.Add(first with { Id = CloudConnection.FirstId });
+        }
+
+        result.AddRange(Read<List<CloudConnection>>(await settings.GetAsync(SettingKeys.CloudConnections, cancellationToken)) ?? []);
+        return result;
+    }
+
+    /// <summary>The first connection (the only one on the phone), or null.</summary>
+    public async Task<CloudConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) =>
+        (await GetConnectionsAsync(cancellationToken)).FirstOrDefault();
+
+    public async Task<CloudConnection?> GetConnectionAsync(string id, CancellationToken cancellationToken = default) =>
+        (await GetConnectionsAsync(cancellationToken)).FirstOrDefault(c => c.Id == id);
+
+    /// <summary>The organisation whose chat is shown (Einstellungen → Cloud); without a choice the first one.</summary>
+    public Task<CloudConnection?> GetChatConnectionAsync(CancellationToken cancellationToken = default) =>
+        ChosenAsync(SettingKeys.CloudChatConnection, cancellationToken);
+
+    /// <summary>The organisation that keeps the personal backups (Einstellungen → Cloud); without a choice the first one.</summary>
+    public Task<CloudConnection?> GetBackupConnectionAsync(CancellationToken cancellationToken = default) =>
+        ChosenAsync(SettingKeys.CloudBackupConnection, cancellationToken);
+
+    public Task SetChatConnectionAsync(string id, CancellationToken cancellationToken = default) => ChooseAsync(SettingKeys.CloudChatConnection, id, cancellationToken);
+
+    public Task SetBackupConnectionAsync(string id, CancellationToken cancellationToken = default) => ChooseAsync(SettingKeys.CloudBackupConnection, id, cancellationToken);
+
+    private async Task<CloudConnection?> ChosenAsync(string key, CancellationToken cancellationToken)
+    {
+        var connections = await GetConnectionsAsync(cancellationToken);
+        var chosen = await settings.GetAsync(key, cancellationToken);
+        return connections.FirstOrDefault(c => c.Id == chosen) ?? connections.FirstOrDefault();
+    }
+
+    private async Task ChooseAsync(string key, string id, CancellationToken cancellationToken)
+    {
+        await settings.SetAsync(key, id, cancellationToken);
+        ConnectionsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private T? Read<T>(string? json)
+        where T : class
+    {
         try
         {
-            return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<CloudConnection>(json, NerunaJson.Options);
+            return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<T>(json, NerunaJson.Options);
         }
         catch (JsonException ex)
         {
             logger.LogWarning(ex, "Stored cloud connection unreadable");
             return null;
         }
+    }
+
+    // The first connection stays where single-connection versions keep it; further ones go into the list.
+    private async Task SaveAsync(IReadOnlyList<CloudConnection> connections, CancellationToken cancellationToken)
+    {
+        var first = connections.FirstOrDefault(c => c.IsFirst);
+        await settings.SetAsync(SettingKeys.CloudConnection, first is null ? null : JsonSerializer.Serialize(first, NerunaJson.Options), cancellationToken);
+        var others = connections.Where(c => !c.IsFirst).ToList();
+        await settings.SetAsync(SettingKeys.CloudConnections, others.Count == 0 ? null : JsonSerializer.Serialize(others, NerunaJson.Options), cancellationToken);
     }
 
     /// <summary>The server address as typed: https required (http only for this computer, for development).</summary>
@@ -69,7 +166,10 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         return uri;
     }
 
-    /// <summary>Redeems code and PIN: creates the device key, registers it, remembers the connection.</summary>
+    /// <summary>
+    /// Redeems code and PIN: creates the device key, registers it, remembers the connection – next to the others. Connected
+    /// again to the same organisation, the new connection takes the old one's place (what came from it stays).
+    /// </summary>
     public async Task<CloudConnection> ConnectAsync(Uri server, string code, string pin, DeviceInfo device, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(server);
@@ -81,39 +181,51 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
             Content = JsonContent.Create(request, options: NerunaJson.Options),
         }, cancellationToken);
 
+        var connections = (await GetConnectionsAsync(cancellationToken)).ToList();
+        var previous = connections.FirstOrDefault(c => c.Server == server && c.OrganizationName == response.OrganizationName);
+        if (previous is not null)
+        {
+            await EndOnServerAsync(previous, cancellationToken);
+            connections.Remove(previous);
+        }
+
+        // The first connection ever keeps the places single-connection versions use.
+        var id = previous?.Id ?? (connections.Count == 0 ? CloudConnection.FirstId : Guid.NewGuid().ToString("N"));
+        var connection = new CloudConnection(server, response.DeviceId, response.OrganizationName, response.MemberName, DateTimeOffset.Now, id);
+
         // The key is only kept once the server has accepted it.
-        await credentials.SetSecretAsync(KeyId, key.ExportPrivateKey(), cancellationToken);
-        var connection = new CloudConnection(server, response.DeviceId, response.OrganizationName, response.MemberName, DateTimeOffset.Now);
-        await settings.SetAsync(SettingKeys.CloudConnection, JsonSerializer.Serialize(connection, NerunaJson.Options), cancellationToken);
-        _token = null;
+        await credentials.SetSecretAsync(connection.DeviceKeyId, key.ExportPrivateKey(), cancellationToken);
+        connections.Add(connection);
+        await SaveAsync(connections, cancellationToken);
+        _tokens.TryRemove(id, out _);
         logger.LogInformation("Connected to {Server} as device {Device}", server.Host, response.DeviceId);
+        ConnectionsChanged?.Invoke(this, EventArgs.Empty);
         return connection;
     }
 
     /// <summary>The connected person, organisation and add-ons.</summary>
-    public async Task<MeResponse> GetProfileAsync(CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<MeResponse>("api/v1/me", cancellationToken);
+    public async Task<MeResponse> GetProfileAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<MeResponse>(connection, "api/v1/me", cancellationToken);
 
     /// <summary>The organisation's central signatures, filled in for this person.</summary>
-    public async Task<SignaturesResponse> GetSignaturesAsync(CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<SignaturesResponse>("api/v1/signatures", cancellationToken);
+    public async Task<SignaturesResponse> GetSignaturesAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<SignaturesResponse>(connection, "api/v1/signatures", cancellationToken);
 
     /// <summary>The organisation's text templates, filled in for this person.</summary>
-    public async Task<TextTemplatesResponse> GetTextTemplatesAsync(CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<TextTemplatesResponse>("api/v1/text-templates", cancellationToken);
+    public async Task<TextTemplatesResponse> GetTextTemplatesAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<TextTemplatesResponse>(connection, "api/v1/text-templates", cancellationToken);
 
     /// <summary>Chat: everything newer than message <paramref name="after"/>; also keeps this person online.</summary>
-    public async Task<ChatResponse> GetChatAsync(long after, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<ChatResponse>($"api/v1/chat?after={after}", cancellationToken);
+    public async Task<ChatResponse> GetChatAsync(CloudConnection connection, long after, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<ChatResponse>(connection, $"api/v1/chat?after={after}", cancellationToken);
 
     /// <summary>Sends a chat message to a room or one person; returns it as stored (with its id).</summary>
-    public async Task<CloudChatMessage> SendChatMessageAsync(ChatSendRequest request, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<CloudChatMessage>(HttpMethod.Post, "api/v1/chat/messages", request, cancellationToken);
+    public async Task<CloudChatMessage> SendChatMessageAsync(CloudConnection connection, ChatSendRequest request, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<CloudChatMessage>(connection, HttpMethod.Post, "api/v1/chat/messages", request, cancellationToken);
 
     /// <summary>Marks a chat conversation read up to a message.</summary>
-    public async Task MarkChatReadAsync(ChatReadRequest request, CancellationToken cancellationToken = default)
+    public async Task MarkChatReadAsync(CloudConnection connection, ChatReadRequest request, CancellationToken cancellationToken = default)
     {
-        var connection = await RequireConnectionAsync(cancellationToken);
         using var response = await SendAuthorizedAsync(connection, HttpMethod.Post, "api/v1/chat/read", cancellationToken, request);
         if (!response.IsSuccessStatusCode)
         {
@@ -122,62 +234,61 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     }
 
     /// <summary>Sets the online status others see in the chat.</summary>
-    public async Task SetPresenceAsync(string presence, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<PresenceRequest>(HttpMethod.Put, "api/v1/presence", new PresenceRequest(presence), cancellationToken);
+    public async Task SetPresenceAsync(CloudConnection connection, string presence, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PresenceRequest>(connection, HttpMethod.Put, "api/v1/presence", new PresenceRequest(presence), cancellationToken);
 
     /// <summary>
     /// Registers this device's encryption key for certificates; true when it is approved (by an admin or, a phone, by
     /// the desktop it was paired from). A paired phone sends its proof with it (see PairingInvitation).
     /// </summary>
-    public async Task<bool> SetDeviceEncryptionKeyAsync(string publicKey, string? pairingProof = null, CancellationToken cancellationToken = default) =>
-        (await AuthorizedAsync<JsonElement>(HttpMethod.Put, "api/v1/device/encryption-key", new DeviceEncryptionKeyRequest(publicKey, pairingProof), cancellationToken))
+    public async Task<bool> SetDeviceEncryptionKeyAsync(CloudConnection connection, string publicKey, string? pairingProof = null, CancellationToken cancellationToken = default) =>
+        (await AuthorizedAsync<JsonElement>(connection, HttpMethod.Put, "api/v1/device/encryption-key", new DeviceEncryptionKeyRequest(publicKey, pairingProof), cancellationToken))
         .TryGetProperty("approved", out var approved) && approved.GetBoolean();
 
     /// <summary>A code + PIN for pairing a phone from this desktop (only as many phones as an admin allowed).</summary>
-    public async Task<PairingResponse> StartPairingAsync(CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<PairingResponse>(HttpMethod.Post, "api/v1/device/pairings", new { }, cancellationToken);
+    public async Task<PairingResponse> StartPairingAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PairingResponse>(connection, HttpMethod.Post, "api/v1/device/pairings", new { }, cancellationToken);
 
-    public async Task<PairingStatusResponse> GetPairingAsync(string pairingId, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<PairingStatusResponse>($"api/v1/device/pairings/{Uri.EscapeDataString(pairingId)}", cancellationToken);
+    public async Task<PairingStatusResponse> GetPairingAsync(CloudConnection connection, string pairingId, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PairingStatusResponse>(connection, $"api/v1/device/pairings/{Uri.EscapeDataString(pairingId)}", cancellationToken);
 
     /// <summary>The phones paired from this desktop, with what they still miss.</summary>
-    public async Task<PairedDevicesResponse> GetPairedDevicesAsync(CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<PairedDevicesResponse>("api/v1/device/paired", cancellationToken);
+    public async Task<PairedDevicesResponse> GetPairedDevicesAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PairedDevicesResponse>(connection, "api/v1/device/paired", cancellationToken);
 
-    public async Task<PairedDevice> DeliverToPairedDeviceAsync(string deviceId, PairedEnvelopesRequest envelopes, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<PairedDevice>(HttpMethod.Put, $"api/v1/device/paired/{Uri.EscapeDataString(deviceId)}/envelopes", envelopes, cancellationToken);
+    public async Task<PairedDevice> DeliverToPairedDeviceAsync(CloudConnection connection, string deviceId, PairedEnvelopesRequest envelopes, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<PairedDevice>(connection, HttpMethod.Put, $"api/v1/device/paired/{Uri.EscapeDataString(deviceId)}/envelopes", envelopes, cancellationToken);
 
     /// <summary>The S/MIME certificates assigned to this person, encrypted for this device.</summary>
-    public async Task<CertificatesResponse> GetCertificatesAsync(CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<CertificatesResponse>("api/v1/certificates", cancellationToken);
+    public async Task<CertificatesResponse> GetCertificatesAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<CertificatesResponse>(connection, "api/v1/certificates", cancellationToken);
 
     /// <summary>The mail accounts the organisation set up for this person, encrypted for this device.</summary>
-    public async Task<MailAccountsResponse> GetMailAccountsAsync(CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<MailAccountsResponse>("api/v1/mail-accounts", cancellationToken);
+    public async Task<MailAccountsResponse> GetMailAccountsAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<MailAccountsResponse>(connection, "api/v1/mail-accounts", cancellationToken);
 
     /// <summary>The config vault (wrapped keys) and the list of backups.</summary>
-    public async Task<VaultResponse> GetVaultAsync(CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<VaultResponse>("api/v1/vault", cancellationToken);
+    public async Task<VaultResponse> GetVaultAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<VaultResponse>(connection, "api/v1/vault", cancellationToken);
 
     /// <summary>Sets up the vault or replaces its wrapped keys.</summary>
-    public async Task<CloudVault> SetVaultAsync(VaultUpdateRequest request, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<CloudVault>(HttpMethod.Put, "api/v1/vault", request, cancellationToken);
+    public async Task<CloudVault> SetVaultAsync(CloudConnection connection, VaultUpdateRequest request, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<CloudVault>(connection, HttpMethod.Put, "api/v1/vault", request, cancellationToken);
 
     /// <summary>Deletes the vault and all backups (start over).</summary>
-    public Task DeleteVaultAsync(CancellationToken cancellationToken = default) => SendWithoutAnswerAsync(HttpMethod.Delete, "api/v1/vault", cancellationToken);
+    public Task DeleteVaultAsync(CloudConnection connection, CancellationToken cancellationToken = default) => SendWithoutAnswerAsync(connection, HttpMethod.Delete, "api/v1/vault", cancellationToken);
 
-    public async Task<VaultBackupSummary> CreateVaultBackupAsync(VaultBackupRequest request, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<VaultBackupSummary>(HttpMethod.Post, "api/v1/vault/backups", request, cancellationToken);
+    public async Task<VaultBackupSummary> CreateVaultBackupAsync(CloudConnection connection, VaultBackupRequest request, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<VaultBackupSummary>(connection, HttpMethod.Post, "api/v1/vault/backups", request, cancellationToken);
 
-    public async Task<VaultBackupResponse> GetVaultBackupAsync(string id, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<VaultBackupResponse>($"api/v1/vault/backups/{Uri.EscapeDataString(id)}", cancellationToken);
+    public async Task<VaultBackupResponse> GetVaultBackupAsync(CloudConnection connection, string id, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<VaultBackupResponse>(connection, $"api/v1/vault/backups/{Uri.EscapeDataString(id)}", cancellationToken);
 
-    public Task DeleteVaultBackupAsync(string id, CancellationToken cancellationToken = default) =>
-        SendWithoutAnswerAsync(HttpMethod.Delete, $"api/v1/vault/backups/{Uri.EscapeDataString(id)}", cancellationToken);
+    public Task DeleteVaultBackupAsync(CloudConnection connection, string id, CancellationToken cancellationToken = default) =>
+        SendWithoutAnswerAsync(connection, HttpMethod.Delete, $"api/v1/vault/backups/{Uri.EscapeDataString(id)}", cancellationToken);
 
-    private async Task SendWithoutAnswerAsync(HttpMethod method, string path, CancellationToken cancellationToken)
+    private async Task SendWithoutAnswerAsync(CloudConnection connection, HttpMethod method, string path, CancellationToken cancellationToken)
     {
-        var connection = await RequireConnectionAsync(cancellationToken);
         using var response = await SendAuthorizedAsync(connection, method, path, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
@@ -197,7 +308,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     {
         ArgumentNullException.ThrowIfNull(report);
         const string path = "api/v1/crash-reports";
-        var connection = await GetConnectionAsync(cancellationToken);
+        var connection = await GetChatConnectionAsync(cancellationToken);
         HttpResponseMessage? response = null;
         try
         {
@@ -236,46 +347,50 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     }
 
     /// <summary>The person's photo from the portal, if there is one.</summary>
-    public async Task<byte[]?> GetPhotoAsync(CancellationToken cancellationToken = default)
+    public async Task<byte[]?> GetPhotoAsync(CloudConnection connection, CancellationToken cancellationToken = default)
     {
-        var connection = await RequireConnectionAsync(cancellationToken);
         using var response = await SendAuthorizedAsync(connection, HttpMethod.Get, "api/v1/me/photo", cancellationToken);
         return response.StatusCode == HttpStatusCode.NotFound ? null : await response.EnsureSuccessStatusCode().Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
-    /// <summary>Ends the connection on the server (when reachable) and forgets key and connection here.</summary>
-    public async Task DisconnectAsync(CancellationToken cancellationToken = default)
+    /// <summary>Ends the connection on the server (when reachable) and forgets its keys and the connection here.</summary>
+    public async Task DisconnectAsync(CloudConnection connection, CancellationToken cancellationToken = default)
     {
-        if (await GetConnectionAsync(cancellationToken) is { } connection)
+        ArgumentNullException.ThrowIfNull(connection);
+        await EndOnServerAsync(connection, cancellationToken);
+        await credentials.DeleteSecretAsync(connection.DeviceKeyId, cancellationToken);
+        await credentials.DeleteSecretAsync(connection.EncryptionKeyId, cancellationToken);
+        foreach (var key in new[] { SettingKeys.CloudOrganizationSigningKey, SettingKeys.CloudCertificates, SettingKeys.CloudAccountsState })
         {
-            try
-            {
-                using var response = await SendAuthorizedAsync(connection, HttpMethod.Delete, "api/v1/device", cancellationToken);
-            }
-            catch (Exception ex) when (ex is HttpRequestException or CloudException or TaskCanceledException)
-            {
-                // Unreachable or already blocked in the portal: forgetting it here is what matters.
-                logger.LogWarning(ex, "Disconnecting on the server failed");
-            }
+            await settings.SetAsync(connection.SettingKey(key), null, cancellationToken);
         }
 
-        await credentials.DeleteSecretAsync(KeyId, cancellationToken);
-        await credentials.DeleteSecretAsync(EncryptionKeyId, cancellationToken);
-        await settings.SetAsync(SettingKeys.CloudConnection, null, cancellationToken);
-        await settings.SetAsync(SettingKeys.CloudOrganizationSigningKey, null, cancellationToken);
-        _token = null;
+        await SaveAsync([.. (await GetConnectionsAsync(cancellationToken)).Where(c => c.Id != connection.Id)], cancellationToken);
+        _tokens.TryRemove(connection.Id, out _);
+        ConnectionsChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private async Task<T> AuthorizedAsync<T>(string path, CancellationToken cancellationToken)
+    private async Task EndOnServerAsync(CloudConnection connection, CancellationToken cancellationToken)
     {
-        var connection = await RequireConnectionAsync(cancellationToken);
+        try
+        {
+            using var response = await SendAuthorizedAsync(connection, HttpMethod.Delete, "api/v1/device", cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or CloudException or TaskCanceledException)
+        {
+            // Unreachable or already blocked in the portal: forgetting it here is what matters.
+            logger.LogWarning(ex, "Disconnecting on the server failed");
+        }
+    }
+
+    private async Task<T> AuthorizedAsync<T>(CloudConnection connection, string path, CancellationToken cancellationToken)
+    {
         using var response = await SendAuthorizedAsync(connection, HttpMethod.Get, path, cancellationToken);
         return await ReadAsync<T>(response, cancellationToken);
     }
 
-    private async Task<T> AuthorizedAsync<T>(HttpMethod method, string path, object body, CancellationToken cancellationToken)
+    private async Task<T> AuthorizedAsync<T>(CloudConnection connection, HttpMethod method, string path, object body, CancellationToken cancellationToken)
     {
-        var connection = await RequireConnectionAsync(cancellationToken);
         using var response = await SendAuthorizedAsync(connection, method, path, cancellationToken, body);
         return await ReadAsync<T>(response, cancellationToken);
     }
@@ -303,18 +418,18 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
             }
 
             response.Dispose();
-            _token = null;
+            _tokens.TryRemove(connection.Id, out _);
         }
     }
 
     private async Task<string> TokenAsync(CloudConnection connection, CancellationToken cancellationToken)
     {
-        if (_token is not null && DateTimeOffset.UtcNow < _tokenExpires)
+        if (_tokens.TryGetValue(connection.Id, out var cached) && DateTimeOffset.UtcNow < cached.Expires)
         {
-            return _token;
+            return cached.Token;
         }
 
-        var secret = await credentials.GetSecretAsync(KeyId, cancellationToken)
+        var secret = await credentials.GetSecretAsync(connection.DeviceKeyId, cancellationToken)
                      ?? throw new CloudException("no_key", T("Der Geräteschlüssel fehlt. Bitte die Cloud-Verbindung neu einrichten."));
         using var key = DeviceKey.Import(secret);
         var tokenUrl = new Uri(connection.Server, "api/v1/token");
@@ -324,13 +439,9 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
             Content = JsonContent.Create(new TokenRequest(assertion), options: NerunaJson.Options),
         }, cancellationToken);
 
-        _token = issued.AccessToken;
-        _tokenExpires = DateTimeOffset.UtcNow.AddSeconds(Math.Max(30, issued.ExpiresIn - 60));
-        return _token;
+        _tokens[connection.Id] = (issued.AccessToken, DateTimeOffset.UtcNow.AddSeconds(Math.Max(30, issued.ExpiresIn - 60)));
+        return issued.AccessToken;
     }
-
-    private async Task<CloudConnection> RequireConnectionAsync(CancellationToken cancellationToken) =>
-        await GetConnectionAsync(cancellationToken) ?? throw new CloudException("not_connected", T("Neruna ist nicht mit einer Cloud verbunden."));
 
     private async Task<T> SendAsync<T>(Func<HttpRequestMessage> request, CancellationToken cancellationToken)
     {

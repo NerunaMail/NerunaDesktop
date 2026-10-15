@@ -237,9 +237,24 @@ ein Schlüsselpaar (ECDSA P-256); der private Schlüssel liegt im Schlüsselbund
 Schlüssel `CloudController.KeyId`), der Server kennt nur den öffentlichen Teil. Mitgeschickt werden Gerätename,
 Betriebssystem und -version, angemeldeter Benutzer und Neruna-Version (im Portal pro Gerät sichtbar). Danach meldet sich
 die App mit einer signierten JWT-Assertion (ES256, wie OAuth private_key_jwt) an und erhält ein 15-Minuten-Token.
-Verbindung (Server, Geräte-ID, Organisation) steht in den Einstellungen `cloud.connection`; ist sie gesetzt, fragt auch
-die Kontoeinrichtung zuerst den Server der Organisation (`AccountDiscovery.OrganizationServer`). Nur HTTPS, ausser
+Verbindung (Server, Geräte-ID, Organisation) steht in den Einstellungen `cloud.connection`; die Kontoeinrichtung fragt
+zuerst die Server der verbundenen Organisationen (`AccountDiscovery.OrganizationServers`). Nur HTTPS, ausser
 `localhost` zum Entwickeln. Vertrag: `server/contract/openapi.yaml` (enrollment, token, me).
+
+**Mehrere Organisationen:** Ein Computer kann mit mehreren Organisationen verbunden sein – jede Verbindung ist dort ein
+eigenes Gerät mit eigenen Schlüsseln; die Organisationen erfahren nichts voneinander. Die erste Verbindung behält die
+Plätze der Versionen mit nur einer Verbindung (`cloud.connection`, `CloudController.KeyId`/`EncryptionKeyId`,
+`cloud.organizationSigningKey`, Quelle `cloud`, `Account.CloudId` = Portal-ID) – nichts musste umziehen. Weitere stehen in
+`cloud.connections` mit eigener `Id`: Schlüssel unter abgeleiteten IDs (`CloudConnection.DeviceKeyId`/`EncryptionKeyId`),
+Einstellungen mit Suffix (`SettingKey`, z. B. `cloud.accounts.<id>`), Signaturen/Textvorlagen mit Quelle `cloud:<id>`,
+Konten mit `CloudId` = `<id>:<Portal-ID>`. Die Abgleiche (`CloudSignatureSync`, `CloudTextTemplateSync`,
+`CloudCertificateSync`, `CloudAccountSync`, Handy-Zustellung) laufen je Verbindung; eine nicht erreichbare hält die
+anderen nicht auf. `RemoveDisconnectedAsync` entfernt, was keiner verbundenen Organisation mehr gehört; Zertifikate
+merken sich je Verbindung, welche sie geliefert hat (`cloud.certificates`). Dieselbe Adresse von zwei Organisationen:
+das zuerst eingerichtete Konto bleibt. Chat und Sicherungen nutzen je eine gewählte Organisation (Einstellungen → Cloud,
+`cloud.chatConnection`, `cloud.backupConnection`; ohne Wahl die erste); beim Wechsel wird der lokale Chat geleert
+(`chat.connection`) und der Tresor-Schlüssel vergessen. Erneut mit derselben Organisation verbunden (gleicher Server und
+Name), übernimmt die neue Verbindung den Platz der alten.
 
 ### Kalendernamen und -farben
 

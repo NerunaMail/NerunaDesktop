@@ -63,7 +63,8 @@ public class CloudSignatureSyncTests
         Assert.Equal("<p>Anna Muster</p>", (await service.ResolveAsync(account, ComposeKind.New, ct))!.Html);
 
         // Disconnected: the organisation's signatures go, the own one stays.
-        Assert.True(await sync.RemoveAllAsync(ct));
+        await settings.SetAsync(SettingKeys.CloudConnection, null, ct);
+        Assert.True(await sync.RemoveDisconnectedAsync(ct));
         Assert.Equal(["Meine"], (await service.GetAllAsync(ct)).Select(s => s.Name));
         Assert.Equal(3, changes);
     }

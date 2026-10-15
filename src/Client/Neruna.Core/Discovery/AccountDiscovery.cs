@@ -23,15 +23,15 @@ public sealed class AccountDiscovery(HttpClient http, ILogger<AccountDiscovery> 
     /// </summary>
     public Uri Directory { get; set; } = new("https://autoconfig.neruna.cloud/v1/");
 
-    /// <summary>The organization's Neruna Cloud/Control server, if the client is enrolled.</summary>
-    public Uri? OrganizationServer { get; set; }
+    /// <summary>The Neruna Cloud/Control servers of the organisations the client is connected to (asked in this order).</summary>
+    public IReadOnlyList<Uri> OrganizationServers { get; set; } = [];
 
     public async Task<DiscoveryResult?> DiscoverAsync(string emailAddress, CancellationToken cancellationToken = default)
     {
         var (_, domain) = DiscoveryPlaceholders.SplitAddress(emailAddress);
         var email = Uri.EscapeDataString(emailAddress);
 
-        if (OrganizationServer is { } server)
+        foreach (var server in OrganizationServers.Distinct())
         {
             var neruna = await TryAsync(token => FetchNerunaAsync(new Uri(server, $"api/v1/discovery?email={email}"), token), server.Host, cancellationToken);
             if (neruna is not null)

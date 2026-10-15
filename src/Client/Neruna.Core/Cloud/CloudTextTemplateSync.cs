@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Neruna.Core.Mail;
 
@@ -15,24 +13,26 @@ public sealed class CloudTextTemplateSync(CloudController cloud, TextTemplateSer
 
     public async Task<bool> SyncAsync(CancellationToken cancellationToken = default)
     {
-        if (await cloud.GetConnectionAsync(cancellationToken) is null)
-        {
-            return await RemoveAllAsync(cancellationToken);
-        }
+        var connections = await cloud.GetConnectionsAsync(cancellationToken);
+        var changed = await RemoveDisconnectedAsync(cancellationToken);
+        return await CloudSync.EachAsync(connections, c => SyncAsync(c, cancellationToken), logger, cancellationToken) | changed;
+    }
 
-        var response = await cloud.GetTextTemplatesAsync(cancellationToken);
-        var existing = (await templates.GetAllAsync(cancellationToken)).Where(t => t.IsFromCloud).ToDictionary(t => t.Id);
+    private async Task<bool> SyncAsync(CloudConnection connection, CancellationToken cancellationToken)
+    {
+        var response = await cloud.GetTextTemplatesAsync(connection, cancellationToken);
+        var existing = (await templates.GetAllAsync(cancellationToken)).Where(t => t.Source == connection.Source).ToDictionary(t => t.Id);
         var changed = false;
         foreach (var offered in response.Templates)
         {
-            var id = LocalId(offered.Id);
+            var id = LocalId(offered.Id, connection);
             var shortcut = TextTemplate.NormalizeShortcut(offered.Shortcut);
             if (existing.Remove(id, out var current) && current.Name == offered.Name && current.Html == offered.Html && current.Shortcut == shortcut)
             {
                 continue;
             }
 
-            await templates.SaveAsync(new TextTemplate(id, offered.Name, offered.Html, offered.UpdatedAt, Signature.CloudSource, shortcut), cancellationToken);
+            await templates.SaveAsync(new TextTemplate(id, offered.Name, offered.Html, offered.UpdatedAt, connection.Source, shortcut), cancellationToken);
             changed = true;
         }
 
@@ -44,34 +44,30 @@ public sealed class CloudTextTemplateSync(CloudController cloud, TextTemplateSer
 
         if (changed)
         {
-            logger.LogInformation("Cloud text templates updated: {Count} offered", response.Templates.Count);
+            logger.LogInformation("Cloud text templates of {Organization} updated: {Count} offered", connection.OrganizationName, response.Templates.Count);
             Changed?.Invoke(this, EventArgs.Empty);
         }
 
         return changed;
     }
 
-    public async Task<bool> RemoveAllAsync(CancellationToken cancellationToken = default)
+    /// <summary>After disconnecting: the templates of organisations no longer connected go too.</summary>
+    public async Task<bool> RemoveDisconnectedAsync(CancellationToken cancellationToken = default)
     {
-        var cloudTemplates = (await templates.GetAllAsync(cancellationToken)).Where(t => t.IsFromCloud).ToList();
-        foreach (var template in cloudTemplates)
+        var sources = (await cloud.GetConnectionsAsync(cancellationToken)).Select(c => c.Source).ToHashSet(StringComparer.Ordinal);
+        var gone = (await templates.GetAllAsync(cancellationToken)).Where(t => t.IsFromCloud && !sources.Contains(t.Source)).ToList();
+        foreach (var template in gone)
         {
             await templates.DeleteAsync(template.Id, cancellationToken);
         }
 
-        if (cloudTemplates.Count > 0)
+        if (gone.Count > 0)
         {
             Changed?.Invoke(this, EventArgs.Empty);
         }
 
-        return cloudTemplates.Count > 0;
+        return gone.Count > 0;
     }
 
-    public static Guid LocalId(string cloudId)
-    {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes("neruna-cloud-text-template:" + cloudId)).AsSpan(0, 16).ToArray();
-        hash[6] = (byte)((hash[6] & 0x0F) | 0x80);
-        hash[8] = (byte)((hash[8] & 0x3F) | 0x80);
-        return new Guid(hash, bigEndian: true);
-    }
+    public static Guid LocalId(string cloudId, CloudConnection? connection = null) => CloudSync.LocalId("neruna-cloud-text-template", connection, cloudId);
 }

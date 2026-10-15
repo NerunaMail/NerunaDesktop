@@ -262,11 +262,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         // Connected or disconnected: the chat follows at once, not only with the next tick.
         cloud.PropertyChanged += async (_, e) =>
         {
-            if (e.PropertyName == nameof(CloudViewModel.Connection))
+            if (e.PropertyName == nameof(CloudViewModel.IsNotConnected))
             {
                 await ChatPage.RefreshNowAsync();
             }
         };
+        cloud.ChatChanged += async (_, _) => await ChatPage.RefreshNowAsync();
 
         // Restored from a backup: every page from the store again, then the servers of the restored accounts.
         SettingsPage.FileBackup.Restored += async (_, _) => await AfterRestoreAsync();

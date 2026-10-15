@@ -108,7 +108,7 @@ public static partial class CrashReportBuilder
     }
 
     /// <summary>Names, addresses and hosts this computer knows: the accounts, the user and computer, the organisation.</summary>
-    public static IEnumerable<string> SensitiveWords(IEnumerable<Account> accounts, CloudConnection? cloud)
+    public static IEnumerable<string> SensitiveWords(IEnumerable<Account> accounts, IEnumerable<CloudConnection> clouds)
     {
         ArgumentNullException.ThrowIfNull(accounts);
         foreach (var account in accounts)
@@ -148,7 +148,7 @@ public static partial class CrashReportBuilder
 
         yield return Environment.UserName;
         yield return Environment.MachineName;
-        if (cloud is not null)
+        foreach (var cloud in clouds ?? [])
         {
             yield return cloud.OrganizationName;
             yield return cloud.MemberName;
@@ -345,7 +345,7 @@ public sealed class CrashReportService(CrashReportStore store, ISettingsStore se
             return [];
         }
 
-        var words = CrashReportBuilder.SensitiveWords(await accounts.GetAccountsAsync(cancellationToken), await cloud.GetConnectionAsync(cancellationToken)).ToList();
+        var words = CrashReportBuilder.SensitiveWords(await accounts.GetAccountsAsync(cancellationToken), await cloud.GetConnectionsAsync(cancellationToken)).ToList();
         var language = Localization.Texts.Culture.TwoLetterISOLanguageName;
         return records.Select(r => new PendingCrash(r.File, r.Record, CrashReportBuilder.ToRequest(r.Record, language, words))).ToList();
     }

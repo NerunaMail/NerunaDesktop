@@ -139,7 +139,7 @@ public sealed class SettingsBackupService(
 
     public async Task<BackupOverview> GetOverviewAsync(CancellationToken cancellationToken = default)
     {
-        var response = await cloud.GetVaultAsync(cancellationToken);
+        var response = await cloud.GetVaultAsync(await ConnectionAsync(cancellationToken), cancellationToken);
         using var vault = response.Vault is null ? null : await LocalVaultAsync(response.Vault, cancellationToken);
         var backups = response.Backups
             .Select(b => new BackupEntry(b.Id, b.CreatedAt, b.DeviceName, vault?.DecryptText(b.Note), b.Size))
@@ -151,13 +151,13 @@ public sealed class SettingsBackupService(
     /// <returns>The recovery code – shown once, the only way back without the password.</returns>
     public async Task<string> SetUpAsync(string password, CancellationToken cancellationToken = default)
     {
-        if ((await cloud.GetVaultAsync(cancellationToken)).Vault is not null)
+        if ((await cloud.GetVaultAsync(await ConnectionAsync(cancellationToken), cancellationToken)).Vault is not null)
         {
             throw new BackupException(T("Es gibt bereits einen Tresor. Entsperre ihn mit dem Tresor-Passwort."));
         }
 
         using var vault = UnlockedVault.Create(password, out var recoveryCode);
-        await cloud.SetVaultAsync(new VaultUpdateRequest(vault.VaultId, JsonSerializer.SerializeToElement(vault.Keys, NerunaJson.Options)), cancellationToken);
+        await cloud.SetVaultAsync(await ConnectionAsync(cancellationToken), new VaultUpdateRequest(vault.VaultId, JsonSerializer.SerializeToElement(vault.Keys, NerunaJson.Options)), cancellationToken);
         await KeepAsync(vault, cancellationToken);
         return recoveryCode;
     }
@@ -165,7 +165,7 @@ public sealed class SettingsBackupService(
     /// <summary>On another device: unlock with the vault password or the recovery code; the key is then kept here.</summary>
     public async Task UnlockAsync(string passwordOrRecoveryCode, CancellationToken cancellationToken = default)
     {
-        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
+        var info = (await cloud.GetVaultAsync(await ConnectionAsync(cancellationToken), cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
         var envelope = new VaultEnvelope(VaultFormat.CurrentVersion, info.VaultId, Keys(info), string.Empty, string.Empty);
         UnlockedVault vault;
         try
@@ -192,13 +192,13 @@ public sealed class SettingsBackupService(
 
     public async Task<BackupEntry> CreateBackupAsync(string? note, CancellationToken cancellationToken = default)
     {
-        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
+        var info = (await cloud.GetVaultAsync(await ConnectionAsync(cancellationToken), cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
         using var vault = await LocalVaultAsync(info, cancellationToken) ?? throw new BackupException(T("Der Tresor ist auf diesem Gerät nicht entsperrt."));
         var content = await CollectAsync(cancellationToken);
         var document = Compress(JsonSerializer.SerializeToUtf8Bytes(new BackupDocument(Format, clock.GetUtcNow(), content), NerunaJson.Options));
         var envelope = vault.Seal(document);
         var text = string.IsNullOrWhiteSpace(note) ? null : vault.EncryptText(note.Trim());
-        var created = await cloud.CreateVaultBackupAsync(new VaultBackupRequest(vault.VaultId, envelope.Version, envelope.Nonce, envelope.Ciphertext, text), cancellationToken);
+        var created = await cloud.CreateVaultBackupAsync(await ConnectionAsync(cancellationToken), new VaultBackupRequest(vault.VaultId, envelope.Version, envelope.Nonce, envelope.Ciphertext, text), cancellationToken);
         await RememberAsync(vault, content, cancellationToken);
         logger.LogInformation("Settings backup {Id} created ({Size} bytes)", created.Id, created.Size);
         return new BackupEntry(created.Id, created.CreatedAt, created.DeviceName, note?.Trim(), created.Size);
@@ -207,9 +207,9 @@ public sealed class SettingsBackupService(
     /// <summary>Downloads and opens a backup and compares it with this device – the preview before restoring.</summary>
     public async Task<RestorePlan> PrepareRestoreAsync(string backupId, CancellationToken cancellationToken = default)
     {
-        var info = (await cloud.GetVaultAsync(cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
+        var info = (await cloud.GetVaultAsync(await ConnectionAsync(cancellationToken), cancellationToken)).Vault ?? throw new BackupException(T("Es ist noch kein Tresor eingerichtet."));
         using var vault = await LocalVaultAsync(info, cancellationToken) ?? throw new BackupException(T("Der Tresor ist auf diesem Gerät nicht entsperrt."));
-        var backup = await cloud.GetVaultBackupAsync(backupId, cancellationToken);
+        var backup = await cloud.GetVaultBackupAsync(await ConnectionAsync(cancellationToken), backupId, cancellationToken);
         BackupDocument document;
         try
         {
@@ -393,7 +393,7 @@ public sealed class SettingsBackupService(
         // file is restored without one).
         try
         {
-            var info = (await cloud.GetVaultAsync(cancellationToken)).Vault;
+            var info = (await cloud.GetVaultAsync(await ConnectionAsync(cancellationToken), cancellationToken)).Vault;
             using var vault = info is null ? null : await LocalVaultAsync(info, cancellationToken);
             if (vault is not null)
             {
@@ -408,16 +408,17 @@ public sealed class SettingsBackupService(
         logger.LogInformation("Settings backup {Id} restored ({Changes} changes)", plan.Backup.Id, plan.Changes.Count);
     }
 
-    public Task DeleteBackupAsync(string backupId, CancellationToken cancellationToken = default) => cloud.DeleteVaultBackupAsync(backupId, cancellationToken);
+    public async Task DeleteBackupAsync(string backupId, CancellationToken cancellationToken = default) =>
+        await cloud.DeleteVaultBackupAsync(await ConnectionAsync(cancellationToken), backupId, cancellationToken);
 
     /// <summary>Password and recovery code lost: the vault and all backups are deleted; a new one can be set up.</summary>
     public async Task ResetAsync(CancellationToken cancellationToken = default)
     {
-        await cloud.DeleteVaultAsync(cancellationToken);
+        await cloud.DeleteVaultAsync(await ConnectionAsync(cancellationToken), cancellationToken);
         await ForgetAsync(cancellationToken);
     }
 
-    /// <summary>When the cloud connection ends: the vault's key leaves this device too.</summary>
+    /// <summary>When the backups' cloud connection ends (or another organisation keeps them): the vault's key leaves this device.</summary>
     public async Task ForgetAsync(CancellationToken cancellationToken = default)
     {
         await credentials.DeleteSecretAsync(VaultKeyId, cancellationToken);
@@ -678,6 +679,10 @@ public sealed class SettingsBackupService(
             System.Security.Cryptography.CryptographicOperations.ZeroMemory(key);
         }
     }
+
+    // The organisation that keeps the backups (Einstellungen → Cloud, «Sicherungen bei»).
+    private async Task<CloudConnection> ConnectionAsync(CancellationToken cancellationToken) =>
+        await cloud.GetBackupConnectionAsync(cancellationToken) ?? throw new CloudException("not_connected", T("Neruna ist nicht mit einer Cloud verbunden."));
 
     // The kept key, if it belongs to the vault the server has (another vault = set up again elsewhere: forget it).
     private async Task<UnlockedVault?> LocalVaultAsync(CloudVault info, CancellationToken cancellationToken)

@@ -36,6 +36,48 @@ internal static class LiveScenario
     /// Mail accounts from the organisation, end to end: connect, then wait while an admin sets up an account in the portal
     /// and approves this device (a browser, run alongside) – one with password, one without (the user is asked).
     /// </summary>
+    /// <summary>Einstellungen → Cloud with two organisations (two codes of a running server): list, chat and backup choice.</summary>
+    public static async Task TwoOrganisationsAsync(string output, string server, string code1, string pin1, string code2, string pin2)
+    {
+        var dataDir = Path.Combine(Path.GetTempPath(), "neruna-two-organisations-" + Guid.NewGuid().ToString("N"));
+        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: false));
+        var vm = services.GetRequiredService<MainWindowViewModel>();
+        var window = new MainWindow { DataContext = vm, Width = 1440, Height = 1000 };
+        window.Show();
+        await vm.LoadLocalAsync();
+        var cloud = vm.SettingsPage.Cloud;
+        (cloud.Server, cloud.Code, cloud.Pin, cloud.DeviceName) = (server, code1, pin1, "Anna – Laptop");
+        await cloud.ConnectCommand.ExecuteAsync(null);
+        Console.WriteLine($"First: {cloud.ConnectedText ?? cloud.Error}");
+
+        vm.NavigateCommand.Execute(Section.Settings);
+        vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        cloud.AddConnectionCommand.Execute(null);
+        (cloud.Server, cloud.Code, cloud.Pin) = (server, code2, pin2);
+        await Task.Delay(300);
+        await Snapshots.SaveAsync(window, output, "cloud-two-1-adding.png");
+        await cloud.ConnectCommand.ExecuteAsync(null);
+        Console.WriteLine($"Second: {cloud.ConnectedText ?? cloud.Error}");
+        Console.WriteLine($"Organisations: {string.Join(", ", cloud.Connections.Select(c => c.OrganizationName))}; chat: {cloud.ChatConnection?.OrganizationName}; backups: {cloud.BackupConnection?.OrganizationName}");
+        await Task.Delay(500);
+        await Snapshots.SaveAsync(window, output, "cloud-two-2-second.png");
+
+        cloud.Connection = cloud.Connections[0];
+        for (var i = 0; i < 30 && cloud.Profile?.Organization.Name != cloud.Connections[0].OrganizationName; i++)
+        {
+            await Task.Delay(200);
+        }
+
+        cloud.ChatConnection = cloud.Connections[1];
+        await Task.Delay(1500);
+        await Snapshots.SaveAsync(window, output, "cloud-two-3-first-selected.png");
+        var signatures = await services.GetRequiredService<Neruna.Core.Mail.SignatureService>().GetAllAsync();
+        Console.WriteLine($"Signatures: {string.Join(", ", signatures.Select(s => $"{s.Name} [{s.Source}]"))}");
+        var chat = services.GetRequiredService<Neruna.Core.Chat.ChatController>();
+        await chat.RefreshAsync();
+        Console.WriteLine($"Chat: {chat.Current.Me} in {chat.Current.Rooms.Count} room(s)");
+    }
+
     public static async Task CloudAccountsAsync(string output, string server, string code, string pin)
     {
         var dataDir = Path.Combine(Path.GetTempPath(), "neruna-cloud-accounts-" + Guid.NewGuid().ToString("N"));
@@ -199,7 +241,7 @@ internal static class LiveScenario
 
         var sync = services.GetRequiredService<Neruna.Core.Cloud.CloudCertificateSync>();
         var manager = services.GetRequiredService<Neruna.Core.Security.CertificateManager>();
-        for (var i = 0; i < 120 && sync.Status.Received == 0; i++)
+        for (var i = 0; i < 120 && sync.StatusOf(cloud.Connection!.Id).Received == 0; i++)
         {
             await Task.Delay(2000);
             try
