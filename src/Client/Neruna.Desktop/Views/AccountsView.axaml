@@ -28,6 +28,7 @@
               <MenuFlyout Placement="BottomEdgeAlignedRight">
                 <MenuItem Header="{l:T 'Konto hinzufügen'}" Command="{Binding AddAccountCommand}" />
                 <MenuItem Header="{l:T 'Internet-Kalender abonnieren'}" Command="{Binding SubscribeCommand}" />
+                <MenuItem Header="{l:T 'Outlook-Datendatei (.pst) einbinden …'}" Command="{Binding AddPstCommand}" />
               </MenuFlyout>
             </Button.Flyout>
           </Button>
@@ -71,9 +72,9 @@
                       <TextBlock Text="⋯" FontWeight="Bold" />
                       <Button.Flyout>
                         <MenuFlyout Placement="BottomEdgeAlignedRight">
-                          <MenuItem Header="{Binding AutoReplyText}" IsVisible="{Binding HasMail}"
+                          <MenuItem Header="{Binding AutoReplyText}" IsVisible="{Binding HasServerMail}"
                                     Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).AutoReplyCommand}" CommandParameter="{Binding}" />
-                          <MenuItem Header="{l:T 'Offline verfügbar'}" IsVisible="{Binding HasMail}" ItemsSource="{Binding OfflineChoices}">
+                          <MenuItem Header="{l:T 'Offline verfügbar'}" IsVisible="{Binding HasServerMail}" ItemsSource="{Binding OfflineChoices}">
                             <MenuItem.Styles>
                               <Style Selector="MenuItem > MenuItem" x:DataType="vm:OfflineChoice">
                                 <Setter Property="Header" Value="{Binding Label}" />

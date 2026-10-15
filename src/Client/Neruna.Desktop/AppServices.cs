@@ -84,6 +84,7 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Security.ClientCertificates>();
         services.AddSingleton<Neruna.Providers.Ews.EwsConnectionFactory>();
         services.AddSingleton<IProviderFactory<IMailProvider>, Neruna.Providers.Ews.EwsMailProviderFactory>();
+        services.AddSingleton<IProviderFactory<IMailProvider>, Neruna.Providers.Pst.PstMailProviderFactory>();
         services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Ews.EwsCalendarProviderFactory>();
         services.AddSingleton<IProviderFactory<IContactProvider>, Neruna.Providers.Ews.EwsContactProviderFactory>();
         // AI providers (Settings → KI): one is connected at a time. Further ones (Claude, Gemini …) are added here.

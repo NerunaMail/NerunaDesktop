@@ -376,6 +376,9 @@ public sealed class MailController(
         }
 
         await using var sourceProvider = providers.CreateMail(sourceConnection);
+
+        // From a read-only source (an Outlook data file) it is a copy: the original stays.
+        var keepOriginal = !sourceProvider.Capabilities.HasFlag(MailProviderCapabilities.Delete);
         var moved = 0;
         try
         {
@@ -385,8 +388,12 @@ public sealed class MailController(
                 await targetProvider.AppendAsync(target, message, summary.Flags, summary.Date, cancellationToken);
 
                 // Only once the copy is stored in the target: remove the original.
-                await sourceProvider.DeleteAsync(source, [summary.RemoteId], cancellationToken);
-                await store.RemoveMessagesAsync(source.ConnectionId, source.RemoteId, [summary.RemoteId], cancellationToken);
+                if (!keepOriginal)
+                {
+                    await sourceProvider.DeleteAsync(source, [summary.RemoteId], cancellationToken);
+                    await store.RemoveMessagesAsync(source.ConnectionId, source.RemoteId, [summary.RemoteId], cancellationToken);
+                }
+
                 moved++;
             }
         }

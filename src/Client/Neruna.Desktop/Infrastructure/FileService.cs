@@ -12,6 +12,9 @@ internal interface IFileService
     /// <returns>Local paths of the chosen files (empty when cancelled).</returns>
     Task<IReadOnlyList<string>> PickFilesAsync(string title);
 
+    /// <returns>The local path of one chosen file of the given kind (e.g. "*.pst"), or null when cancelled.</returns>
+    Task<string?> PickFileAsync(string title, string kind, IReadOnlyList<string> patterns);
+
     /// <returns>A writable stream for the chosen target, or null when cancelled.</returns>
     /// <param name="folder">Where the dialog starts (a quick action's folder); the system's choice when null or missing.</param>
     Task<Stream?> SaveFileAsync(string title, string suggestedName, string? folder = null);
@@ -45,6 +48,22 @@ internal sealed class FileService : IFileService
 
         var files = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = title, AllowMultiple = true });
         return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
+    }
+
+    public async Task<string?> PickFileAsync(string title, string kind, IReadOnlyList<string> patterns)
+    {
+        if (Window is not { } window)
+        {
+            return null;
+        }
+
+        var files = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType(kind) { Patterns = [.. patterns] }, FilePickerFileTypes.All],
+        });
+        return files.Count == 0 ? null : files[0].TryGetLocalPath();
     }
 
     public async Task<Stream?> SaveFileAsync(string title, string suggestedName, string? folder = null)

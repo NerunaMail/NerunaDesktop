@@ -36,6 +36,48 @@ internal static class LiveScenario
     /// Mail accounts from the organisation, end to end: connect, then wait while an admin sets up an account in the portal
     /// and approves this device (a browser, run alongside) – one with password, one without (the user is asked).
     /// </summary>
+    /// <summary>An Outlook data file as an account: the dialog, then its folders and a message in the mail page.</summary>
+    public static async Task PstAsync(string output, string file)
+    {
+        var dataDir = Path.Combine(Path.GetTempPath(), "neruna-pst-" + Guid.NewGuid().ToString("N"));
+        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: false));
+        var vm = services.GetRequiredService<MainWindowViewModel>();
+        var window = new MainWindow { DataContext = vm, Width = 1440, Height = 900 };
+        window.Show();
+        await vm.LoadLocalAsync();
+        vm.NavigateCommand.Execute(Section.Settings);
+        vm.SettingsPage.Accounts.AddPstCommand.Execute(null);
+        var dialog = (PstAccountViewModel)vm.Overlay!;
+        (dialog.Path, dialog.Name) = (file, "Archiv 2014");
+        await Task.Delay(300);
+        await Snapshots.SaveAsync(window, output, "pst-1-dialog.png");
+        await dialog.ConfirmCommand.ExecuteAsync(null);
+        Console.WriteLine($"Dialog: {dialog.Error ?? "ok"}");
+        for (var i = 0; i < 100 && (vm.IsSyncing || vm.MailPage.Accounts.Count == 0); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await Task.Delay(500);
+        await Snapshots.SaveAsync(window, output, "pst-2-accounts.png");
+        vm.NavigateCommand.Execute(Section.Mail);
+        var account = vm.MailPage.Accounts.Single();
+        Console.WriteLine($"Folders: {string.Join(", ", account.AllFolders().Select(f => $"{f.Name} ({f.Folder.Role}, {f.Folder.TotalCount})"))}");
+        var inbox = account.AllFolders().First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox);
+        vm.MailPage.Tree.SelectedTreeItem = inbox;
+        for (var i = 0; i < 50 && vm.MailPage.Entries.Count == 0; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault();
+        await Task.Delay(1500);
+        Console.WriteLine($"Messages: {vm.MailPage.Entries.Count}; open: {vm.MailPage.ReadingPane?.Message?.Subject}");
+        await Snapshots.SaveAsync(window, output, "pst-3-mail.png");
+        await vm.MailPage.DeleteCommand.ExecuteAsync(null);
+        Console.WriteLine($"After delete: {vm.MailPage.Entries.Count} messages");
+    }
+
     /// <summary>Einstellungen → Cloud with two organisations (two codes of a running server): list, chat and backup choice.</summary>
     public static async Task TwoOrganisationsAsync(string output, string server, string code1, string pin1, string code2, string pin2)
     {

@@ -18,6 +18,7 @@ internal sealed class ViewLocator : IDataTemplate
         ChatViewModel => new ChatView(),
         AccountSetupViewModel => new AccountSetupView(),
         IcsSubscriptionViewModel => new IcsSubscriptionView(),
+        PstAccountViewModel => new PstAccountView(),
         SpecialCalendarViewModel => new SpecialCalendarView(),
         CloudAccountPasswordViewModel => new CloudAccountPasswordView(),
         CrashReportViewModel => new CrashReportView(),

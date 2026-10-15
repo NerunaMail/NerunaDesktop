@@ -41,6 +41,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
     public event EventHandler? SubscribeRequested;
 
+    /// <summary>"Outlook-Datendatei (.pst) einbinden …".</summary>
+    public event EventHandler? PstRequested;
+
     /// <summary>"Bearbeiten": the shell shows the setup dialog with this account.</summary>
     public event EventHandler<Neruna.Core.Accounts.Account>? EditRequested;
 
@@ -109,6 +112,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
     private void Subscribe() => SubscribeRequested?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
+    private void AddPst() => PstRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
     private void Edit(AccountItem item) => EditRequested?.Invoke(this, item.Account);
 
     [RelayCommand]
@@ -127,6 +133,10 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         foreach (var connection in item.Account.Connections)
         {
             await credentials.DeleteSecretAsync(connection.Id);
+            if (connection.ProviderId == ProviderIds.Pst)
+            {
+                Neruna.Providers.Pst.PstMailProviderFactory.Close(connection); // the file is free again (to move or delete it)
+            }
         }
 
         await ReloadAsync();
@@ -199,13 +209,21 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     public string ManagedBy { get; set; } = T("Von Ihrer Organisation verwaltet");
 
     /// <summary>Under the title: sender name and address (the title may be a label like "Privat").</summary>
-    public string Sender => Account.EmailAddress is { } email ? $"{Account.DisplayName} <{email}>" : Account.DisplayName;
+    public string Sender => Account.EmailAddress is { } email ? $"{Account.DisplayName} <{email}>"
+        : Account.Connections.FirstOrDefault(c => c.ProviderId == ProviderIds.Pst)?.Settings.GetValueOrDefault(Neruna.Providers.Pst.PstMailProvider.PathSetting)
+          ?? Account.DisplayName;
 
     public string? Email => Account.EmailAddress;
 
     public bool HasEmail => Email is not null;
 
     public bool HasMail => Account.ConnectionsOf(ServiceKind.Mail).Any();
+
+    /// <summary>An Outlook data file: read only – no out-of-office, no offline choice, nothing to transfer.</summary>
+    public bool IsDataFile => Account.Connections.Any(c => c.ProviderId == ProviderIds.Pst);
+
+    /// <summary>Mail of a server (out-of-office and offline choice apply).</summary>
+    public bool HasServerMail => HasMail && !IsDataFile;
 
     /// <summary>"⋯ → Offline verfügbar": how far back the mail is complete on this computer (content and attachments).</summary>
     public IReadOnlyList<OfflineChoice> OfflineChoices { get; private set; } = [];
@@ -235,7 +253,7 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     public partial bool CanTransfer { get; set; }
 
     /// <summary>Under the title: the services, e.g. "E-Mail · Kalender · Kontakte".</summary>
-    public string Services => string.Join(" · ", Account.Connections.Select(c => c.Kind).Distinct().Order().Select(k => k switch
+    public string Services => IsDataFile ? T("Outlook-Datendatei · nur lesen") : string.Join(" · ", Account.Connections.Select(c => c.Kind).Distinct().Order().Select(k => k switch
     {
         ServiceKind.Mail => T("E-Mail"),
         ServiceKind.Calendar => T("Kalender"),

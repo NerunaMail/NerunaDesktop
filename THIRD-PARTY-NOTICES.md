@@ -74,6 +74,10 @@ project pages and in the NuGet packages.
 | SQLitePCLRaw.provider.e_sqlite3 | 2.1.12 | Apache-2.0 | Eric Sink |  |
 | System.Security.Cryptography.Pkcs | 10.0.0 | MIT | Microsoft | https://dot.net/ |
 | Tmds.DBus.Protocol | 0.94.1 | MIT | Tom Deseyn |  |
+| XstReader.Api | 1.0.6 | MS-PL | Dijji, iluvadev and contributors | https://github.com/iluvadev/XstReader |
+
+XstReader.Api reads Outlook data files (.pst/.ost) and is licensed under the Microsoft Public License (MS-PL):
+https://opensource.org/license/ms-pl-html. It is used unchanged, as the published package.
 
 ## Icons
 

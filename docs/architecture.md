@@ -53,6 +53,7 @@ src/
       Neruna.Providers.Special  selbst berechnete Kalender: Geburtstage (aus allen Adressbüchern) und Feiertage (Land/Region)
       Neruna.Providers.Ews    Exchange im eigenen Netz über Exchange Web Services (Mail+Kalender+Kontakte, Client-Zertifikate)
       Neruna.Providers.Graph  Microsoft 365 / Outlook.com über Microsoft Graph (OAuth2, Mail+Kalender+Kontakte)
+      Neruna.Providers.Pst    Outlook-Datendateien (.pst/.ost) als Mailkonto, nur lesend (XstReader.Api, MS-PL)
       Neruna.Providers.Demo   Beispieldaten (--demo, Screenshots)
     Neruna.Desktop        Avalonia-App (Composition Root)
 server/                   → proprietär: Laravel-App (Neruna Cloud/Control)
@@ -83,6 +84,11 @@ IMailStore      ICalendarStore      IContactStore            ← SQLite (Neruna.
 
 - Ein **Konto** (`Account`) hat beliebig viele **Verbindungen** (`ServiceConnection`: Art, Provider-ID, Settings).
   Ein SOGo-Konto hat typischerweise Mail + Kalender + Kontakte; ein «Internet-Kalender» nur eine ICS-Verbindung.
+  Eine Outlook-Datendatei ist ein Konto ohne Adresse mit einer `pst`-Verbindung (Pfad der Datei). Die Datei wird nie
+  geschrieben: Gelesen/Gekennzeichnet bleiben lokal (Sync-State = Grösse:Änderungszeit, unveränderte Datei = kein
+  Abgleich), Löschen/Verschieben bietet die UI nicht an, Ziehen in ein anderes Konto kopiert. Bodies, die Outlook nur
+  als RTF hat, werden entkapselt (eingebettetes HTML, [MS-OXRTFEX]) oder als Text gezeigt; IDs sind Positionen in der
+  Datei mit Fingerabdruck. Offline-Vorhalt ist «nur Geöffnetes» – die Datei liegt ohnehin lokal.
 - Die `ProviderRegistry` löst Provider über ihre ID auf. Ein neuer Provider = neues Projekt + eine Zeile in
   `AppServices.cs`. Verbindungen, deren Provider fehlt, werden beim Sync übersprungen (nicht als Fehler gemeldet).
 - **Kanonische Formate** zwischen Provider und Speicher: MIME (Mail), iCalendar (Kalender), vCard (Kontakte).

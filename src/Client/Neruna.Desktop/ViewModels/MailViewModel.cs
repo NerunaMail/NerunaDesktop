@@ -516,10 +516,34 @@ internal sealed partial class MailViewModel(
         SelectedMessages.Count > 0 ? SelectedMessages : SelectedMessage is { } message ? [message] : [];
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private async Task DeleteAsync() => await RunOnMessagesAsync(ActionTargets, T("Löschen"), (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true);
+    private async Task DeleteAsync()
+    {
+        if (!InReadOnly(ActionTargets))
+        {
+            await RunOnMessagesAsync(ActionTargets, T("Löschen"), (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true);
+        }
+    }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private async Task ArchiveAsync() => await RunOnMessagesAsync(ActionTargets, T("Archivieren"), (connection, folder, ids) => mail.ArchiveAsync(connection, folder, ids), removesMessages: true);
+    private async Task ArchiveAsync()
+    {
+        if (!InReadOnly(ActionTargets))
+        {
+            await RunOnMessagesAsync(ActionTargets, T("Archivieren"), (connection, folder, ids) => mail.ArchiveAsync(connection, folder, ids), removesMessages: true);
+        }
+    }
+
+    // Outlook data files are only read: says so instead of failing.
+    private bool InReadOnly(IReadOnlyList<MessageItemViewModel> messages)
+    {
+        if (!messages.Any(m => FolderOf(m)?.Account.IsReadOnly == true))
+        {
+            return false;
+        }
+
+        StatusMessage?.Invoke(this, T("Outlook-Datendateien werden nur gelesen – Nachrichten lassen sich in ein anderes Konto kopieren (ziehen)."));
+        return true;
+    }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private async Task ToggleFlagAsync()
@@ -841,7 +865,7 @@ internal sealed partial class MailViewModel(
     }
 
     /// <summary>Drag &amp; drop target check: any other folder, also of another account.</summary>
-    public bool CanMoveTo(MailFolderNode target) => IsSearchMode || (CurrentFolder is { } folder && target != folder);
+    public bool CanMoveTo(MailFolderNode target) => !target.Account.IsReadOnly && (IsSearchMode || (CurrentFolder is { } folder && target != folder));
 
     /// <summary>
     /// Moves messages (dragged from the list) into <paramref name="target"/>. Within an account the server moves them
@@ -861,6 +885,34 @@ internal sealed partial class MailViewModel(
         var sameAccount = messages.All(m => FolderOf(m)!.Account.Connection.Id == target.Account.Connection.Id);
         var unread = messages.Count(m => m.IsUnread);
         var what = messages.Count == 1 ? T("Nachricht") : F("{0} Nachrichten", messages.Count);
+
+        // Out of an Outlook data file: copied, the file stays as it is.
+        var copies = messages.All(m => FolderOf(m)!.Account.IsReadOnly);
+        if (sameAccount && copies)
+        {
+            InReadOnly(messages);
+            return;
+        }
+
+        if (copies)
+        {
+            StatusMessage?.Invoke(this, F("{0} werden ins Konto {1} kopiert …", what, target.Account.Title));
+            if (await RunOnMessagesAsync(messages, T("Kopieren"), (connection, folder, ids) => mail.MoveToAccountAsync(connection, folder,
+                    messages.Where(m => ids.Contains(m.Summary.RemoteId) && FolderOf(m)!.Folder == folder).Select(m => m.Summary).ToList(), target.Account.Connection, target.Folder),
+                removesMessages: false))
+            {
+                target.UnreadCount += unread;
+                StatusMessage?.Invoke(this, F("{0} nach «{1}» ({2}) kopiert.", what, target.Name, target.Account.Title));
+            }
+
+            return;
+        }
+
+        if (InReadOnly(messages))
+        {
+            return;
+        }
+
         if (!sameAccount)
         {
             StatusMessage?.Invoke(this, F("{0} werden ins Konto {1} verschoben …", what, target.Account.Title));
@@ -1466,6 +1518,9 @@ internal sealed partial class MailViewModel(
 
 internal sealed partial class MailAccountNode : ObservableObject
 {
+    /// <summary>An Outlook data file: read only (copying out is possible, changing it is not).</summary>
+    public bool IsReadOnly => Connection.ProviderId == Neruna.Core.Providers.ProviderIds.Pst;
+
     public MailAccountNode(Account account, ServiceConnection connection, List<MailFolderNode> folders)
     {
         Account = account;

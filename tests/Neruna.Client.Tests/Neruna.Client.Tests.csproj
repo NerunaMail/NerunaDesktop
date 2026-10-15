@@ -7,6 +7,7 @@
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Ews\Neruna.Providers.Ews.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.OpenAi\Neruna.Providers.OpenAi.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Ics\Neruna.Providers.Ics.csproj" />
+    <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Pst\Neruna.Providers.Pst.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Special\Neruna.Providers.Special.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Dav\Neruna.Providers.Dav.csproj" />
   </ItemGroup>

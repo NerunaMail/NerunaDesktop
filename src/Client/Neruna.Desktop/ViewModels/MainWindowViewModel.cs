@@ -296,6 +296,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
+        accountsPage.PstRequested += (_, _) => ShowPstAccount();
         accountsPage.TransferRequested += async (_, dialog) =>
         {
             dialog.Finished += (_, _) => Overlay = null;
@@ -778,6 +779,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void ShowAccountSetup(Neruna.Core.Accounts.Account? editing = null)
     {
+        if (editing?.Connections.Any(c => c.ProviderId == Neruna.Core.Providers.ProviderIds.Pst) == true)
+        {
+            ShowPstAccount(editing);
+            return;
+        }
+
         var setup = new AccountSetupViewModel(_discovery, _setup, _http.CreateClient("dav"))
         {
             Browser = _browser,
@@ -908,6 +915,24 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         await SettingsPage.Accounts.ReloadAsync();
         HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
         await RefreshPagesAsync();
+    }
+
+    // An Outlook data file as an account (or its name and place changed).
+    private void ShowPstAccount(Neruna.Core.Accounts.Account? editing = null)
+    {
+        var dialog = new PstAccountViewModel(_setup, _accounts, _mail, _files, editing);
+        dialog.Finished += async (_, done) =>
+        {
+            Overlay = null;
+            if (done)
+            {
+                HasAccounts = true;
+                await SettingsPage.Accounts.ReloadAsync();
+                await RefreshPagesAsync();
+                await SyncAsync();
+            }
+        };
+        Overlay = dialog;
     }
 
     private void ShowIcsSubscription()

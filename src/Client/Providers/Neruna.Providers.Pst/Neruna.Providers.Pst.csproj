@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Outlook data files (.pst/.ost) for Neruna Desktop: old archives as a read-only mail account.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Neruna.Core\Neruna.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="XstReader.Api" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Neruna.Client.Tests" />
+  </ItemGroup>
+</Project>
