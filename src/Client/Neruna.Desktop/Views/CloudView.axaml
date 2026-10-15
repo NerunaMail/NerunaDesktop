@@ -151,6 +151,10 @@
                    IsVisible="{Binding PairingOrganizationText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <TextBlock Classes="subtle" TextWrapping="Wrap"
                    Text="{l:T 'In der Neruna-App auf dem Handy «Mit Neruna Cloud verbinden» wählen, den QR-Code scannen und die PIN eingeben. Das Handy erhält danach die Zertifikate und Konten der Organisation von diesem Computer – verschlüsselt, die Cloud kann sie nicht lesen. Wie viele Handys erlaubt sind, legt ein Admin im Portal fest.'}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding PhonesBusy}">
+          <ProgressBar IsIndeterminate="True" Width="80" VerticalAlignment="Center" />
+          <TextBlock Classes="subtle" FontSize="12" Text="{l:T 'Einen Moment …'}" VerticalAlignment="Center" />
+        </StackPanel>
         <ItemsControl ItemsSource="{Binding PairedPhones}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:PairedPhone">

@@ -70,13 +70,13 @@ internal static class LiveScenario
 
         var watch = System.Diagnostics.Stopwatch.StartNew();
         cloud.Connection = cloud.Connections[0];
-        Console.WriteLine($"Switched: backups shown {cloud.BackupState is not null}, busy {cloud.BackupBusy}");
-        while (cloud.BackupState is null && watch.Elapsed < TimeSpan.FromSeconds(30))
+        Console.WriteLine($"Switched: backups shown {cloud.BackupState is not null}, busy {cloud.BackupBusy}; phones {cloud.PairedPhones.Count}, busy {cloud.PhonesBusy}, limits «{cloud.PairingLimitsText}»");
+        while ((cloud.BackupState is null || cloud.PhonesBusy) && watch.Elapsed < TimeSpan.FromSeconds(30))
         {
             await Task.Delay(20);
         }
 
-        Console.WriteLine($"Backups of {cloud.Connection?.OrganizationName} after {watch.ElapsedMilliseconds} ms (vault: {cloud.BackupState?.HasVault})");
+        Console.WriteLine($"Backups and phones of {cloud.Connection?.OrganizationName} after {watch.ElapsedMilliseconds} ms (vault: {cloud.BackupState?.HasVault}; {cloud.PairingLimitsText})");
         for (var i = 0; i < 30 && cloud.Profile?.Organization.Name != cloud.Connections[0].OrganizationName; i++)
         {
             await Task.Delay(200);

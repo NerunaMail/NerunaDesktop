@@ -130,21 +130,32 @@ internal sealed partial class CloudViewModel(
     [ObservableProperty]
     public partial string? PairingLimitsText { get; set; }
 
+    /// <summary>The phones of the organisation just selected are on their way (the other's are already gone).</summary>
+    [ObservableProperty]
+    public partial bool PhonesBusy { get; set; }
+
+    private int _phonesLoad;
+
     private async Task LoadPairedPhonesAsync()
     {
-        PairedPhones.Clear();
-        PairingLimitsText = null;
+        var version = ++_phonesLoad;
         if (Connection is not { } connection)
         {
+            PairedPhones.Clear();
+            PairingLimitsText = null;
+            PhonesBusy = false;
             return;
         }
 
+        PhonesBusy = true;
+        var phones = new List<PairedPhone>();
+        string? limitsText = null;
         try
         {
             var paired = await cloud.GetPairedDevicesAsync(connection);
             foreach (var phone in paired.Devices)
             {
-                PairedPhones.Add(new PairedPhone(
+                phones.Add(new PairedPhone(
                     phone.Name,
                     string.Join(" · ", new[]
                     {
@@ -156,7 +167,7 @@ internal sealed partial class CloudViewModel(
                     }.Where(p => !string.IsNullOrWhiteSpace(p)))));
             }
 
-            PairingLimitsText = paired.Limits is not { } limits ? null
+            limitsText = paired.Limits is not { } limits ? null
                 : limits.MobileDevicesAllowed == 0
                     ? T("Für Sie sind keine mobilen Geräte freigegeben. Ein Admin kann sie im Portal unter Benutzer erlauben.")
                     : F("Mobile Geräte: {0} von {1} erlaubten verbunden.", limits.MobileDevicesAllowed - limits.MobileDevicesLeft, limits.MobileDevicesAllowed)
@@ -164,8 +175,23 @@ internal sealed partial class CloudViewModel(
         }
         catch (Exception ex) when (ex is CloudException or HttpRequestException)
         {
-            PairingLimitsText = null; // older server or offline: the list just stays empty
+            // older server or offline: the list just stays empty
         }
+
+        // Switched again meanwhile: the latest selection's list wins.
+        if (version != _phonesLoad)
+        {
+            return;
+        }
+
+        PairedPhones.Clear();
+        foreach (var phone in phones)
+        {
+            PairedPhones.Add(phone);
+        }
+
+        PairingLimitsText = limitsText;
+        PhonesBusy = false;
     }
 
     /// <summary>Accounts of the organisation were set up, changed or removed (the shell reloads and syncs).</summary>
@@ -693,6 +719,15 @@ internal sealed partial class CloudViewModel(
             BackupState = null;
             Backups.Clear();
             BackupBusy = !_loadingConnections && newValue is not null;
+            PairedPhones.Clear();
+            PairingLimitsText = null;
+            PairingText = null;
+            PhonesBusy = !_loadingConnections && newValue is not null;
+            if (IsPairing)
+            {
+                _cancelPairing?.Invoke(); // the QR code was for the other organisation
+            }
+
             UpdateCertificateStatus();
             if (!_loadingConnections && newValue is not null)
             {
@@ -705,17 +740,19 @@ internal sealed partial class CloudViewModel(
     private async Task ShowSelectedAsync()
     {
         Error = null;
-        var backups = LoadBackupsAsync(); // alongside, not after the profile and phones
+        // Profile, phones and backups side by side, not one after the other.
+        var phones = LoadPairedPhonesAsync();
+        var backups = LoadBackupsAsync();
         try
         {
             await LoadPersonAsync();
-            await LoadPairedPhonesAsync();
         }
         catch (Exception ex) when (ex is CloudException or HttpRequestException)
         {
             Error = ex.Message;
         }
 
+        await phones;
         await backups;
     }
 
