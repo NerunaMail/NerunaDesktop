@@ -590,6 +590,8 @@
  "Es ist ein Fehler aufgetreten": "An error occurred",
  "Es ist noch kein Tresor eingerichtet.": "No vault has been set up yet.",
  "Exchange antwortet mit HTTP {0} ({1}).": "Exchange answers with HTTP {0} ({1}).",
+ "Exchange gibt die Abwesenheitsnotiz nicht heraus: {0}": "Exchange does not give out the out-of-office reply: {0}",
+ "Exchange hat die Abwesenheitsnotiz abgelehnt: {0}": "Exchange refused the out-of-office reply: {0}",
  "Exchange-Server": "Exchange server",
  "Exchange-Server der Firma (2013 oder neuer): Mail, Kalender und Kontakte – auch hinter einem Reverse Proxy mit Client-Zertifikat.": "Your company’s Exchange server (2013 or later): mail, calendar and contacts – also behind a reverse proxy with a client certificate.",
  "Export fehlgeschlagen: {0}": "Export failed: {0}",

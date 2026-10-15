@@ -75,6 +75,41 @@ public class EwsProviderTests
     }
 
     [Fact]
+    public async Task The_out_of_office_reply_is_read_and_set_with_its_period()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (connection, factory, server, _) = Connect();
+        server.On("GetUserOofSettingsRequest", _ => """
+            <m:GetUserOofSettingsResponse><m:ResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode></m:ResponseMessage>
+              <OofSettings xmlns="http://schemas.microsoft.com/exchange/services/2006/types"><OofState>Scheduled</OofState><ExternalAudience>All</ExternalAudience>
+                <Duration><StartTime>2026-10-20T07:00:00Z</StartTime><EndTime>2026-10-27T07:00:00Z</EndTime></Duration>
+                <InternalReply><Message>&lt;html&gt;&lt;body&gt;Bin in den Ferien.&lt;br&gt;Gruss Anna&lt;/body&gt;&lt;/html&gt;</Message></InternalReply>
+                <ExternalReply><Message/></ExternalReply></OofSettings>
+              <m:AllowExternalOof>All</m:AllowExternalOof></m:GetUserOofSettingsResponse>
+            """);
+        server.On("SetUserOofSettingsRequest", _ => """<m:SetUserOofSettingsResponse><m:ResponseMessage ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode></m:ResponseMessage></m:SetUserOofSettingsResponse>""");
+        await using var mail = new EwsMailProviderFactory(factory).Create(connection);
+        var replies = Assert.IsAssignableFrom<IAutoReplyProvider>(mail);
+
+        var (reply, features) = await replies.GetAutoReplyAsync(ct);
+        Assert.True(reply.IsEnabled);
+        Assert.Contains("Bin in den Ferien.", reply.Message, StringComparison.Ordinal);
+        Assert.Equal(new DateTimeOffset(2026, 10, 27, 7, 0, 0, TimeSpan.Zero), reply.End);
+        Assert.True(features.HasFlag(AutoReplyFeatures.Schedule));
+
+        // Set with a period: Exchange keeps it ("Scheduled"); the text goes as HTML with its line breaks, to everyone.
+        await replies.SetAutoReplyAsync(new AutoReply(true, "Bis 27. Oktober weg.\nDringend: Lea", new DateTimeOffset(2026, 10, 20, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 27, 0, 0, 0, TimeSpan.Zero)), [], ct);
+        var set = server.Operations("SetUserOofSettingsRequest").Single();
+        Assert.Equal(["OofState", "ExternalAudience", "Duration", "InternalReply", "ExternalReply"], set.Descendants(T + "UserOofSettings").Single().Elements().Select(e => e.Name.LocalName));
+        Assert.Equal(("Scheduled", "All", "2026-10-20T00:00:00Z"), (set.Descendants(T + "OofState").Single().Value, set.Descendants(T + "ExternalAudience").Single().Value, set.Descendants(T + "StartTime").Single().Value));
+        Assert.Contains("weg.<br>Dringend: Lea", set.Descendants(T + "InternalReply").Single().Value, StringComparison.Ordinal);
+
+        await replies.SetAutoReplyAsync(AutoReply.Off, [], ct);
+        Assert.Equal("Disabled", server.Operations("SetUserOofSettingsRequest").Last().Descendants(T + "OofState").Single().Value);
+        Assert.Empty(server.Operations("SetUserOofSettingsRequest").Last().Descendants(T + "Duration"));
+    }
+
+    [Fact]
     public async Task Folders_have_their_roles_and_only_visible_mail_folders_are_listed()
     {
         var ct = TestContext.Current.CancellationToken;

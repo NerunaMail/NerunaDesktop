@@ -11,7 +11,7 @@ namespace Neruna.Providers.Ews;
 /// SyncFolderItems state. The first sync takes the newest <see cref="InitialMessages"/> (older ones with "load more"),
 /// messages travel as MIME. Exchange files sent mail in "Gesendete Elemente" itself. No push yet: polled every minute.
 /// </summary>
-internal sealed class EwsMailProvider(ServiceConnection connection, EwsConnectionFactory connections) : IMailProvider
+internal sealed partial class EwsMailProvider(ServiceConnection connection, EwsConnectionFactory connections) : IMailProvider
 {
     public const int InitialMessages = 2000;
 

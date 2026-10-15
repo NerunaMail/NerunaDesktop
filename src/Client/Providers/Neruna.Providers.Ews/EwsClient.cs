@@ -123,6 +123,24 @@ internal sealed class EwsClient(HttpClient http, EwsSettings settings, string? p
         return responses;
     }
 
+    /// <summary>
+    /// An operation with one response (GetUserOofSettings, SetUserOofSettings …): the whole response element, after its
+    /// ResponseMessage was checked.
+    /// </summary>
+    public async Task<XElement> CallSingleAsync(XElement operation, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var body = await SendAsync(operation, cancellationToken);
+        var response = body.Elements().FirstOrDefault() ?? throw new EwsException(null, "EWS: empty response");
+        if (response.Element(X.M + "ResponseMessage") is { } message && !message.IsSuccess())
+        {
+            var code = message.Code();
+            throw new EwsException(code, message.Element(X.M + "MessageText")?.Value ?? code ?? "EWS error");
+        }
+
+        return response;
+    }
+
     /// <summary>The response messages of an operation on many items, in groups of <paramref name="size"/> (EWS takes about 100–250).</summary>
     public async Task<IReadOnlyList<XElement>> CallInBatchesAsync<T>(IEnumerable<T> items, int size, Func<IReadOnlyList<T>, XElement> operation, CancellationToken cancellationToken, params string[] tolerated)
     {

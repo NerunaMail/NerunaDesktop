@@ -590,6 +590,8 @@
  "Es ist ein Fehler aufgetreten": "Si è verificato un errore",
  "Es ist noch kein Tresor eingerichtet.": "Non è ancora configurata una cassaforte.",
  "Exchange antwortet mit HTTP {0} ({1}).": "Exchange risponde con HTTP {0} ({1}).",
+ "Exchange gibt die Abwesenheitsnotiz nicht heraus: {0}": "Exchange non fornisce la risposta automatica: {0}",
+ "Exchange hat die Abwesenheitsnotiz abgelehnt: {0}": "Exchange ha rifiutato la risposta automatica: {0}",
  "Exchange-Server": "Server Exchange",
  "Exchange-Server der Firma (2013 oder neuer): Mail, Kalender und Kontakte – auch hinter einem Reverse Proxy mit Client-Zertifikat.": "Server Exchange dell’azienda (2013 o successivo): e-mail, calendario e contatti – anche dietro un reverse proxy con certificato client.",
  "Export fehlgeschlagen: {0}": "Esportazione non riuscita: {0}",

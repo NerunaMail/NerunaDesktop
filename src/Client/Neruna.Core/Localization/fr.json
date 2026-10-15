@@ -590,6 +590,8 @@
  "Es ist ein Fehler aufgetreten": "Une erreur s'est produite",
  "Es ist noch kein Tresor eingerichtet.": "Aucun coffre n'est encore configuré.",
  "Exchange antwortet mit HTTP {0} ({1}).": "Exchange répond avec HTTP {0} ({1}).",
+ "Exchange gibt die Abwesenheitsnotiz nicht heraus: {0}": "Exchange ne fournit pas la réponse d'absence : {0}",
+ "Exchange hat die Abwesenheitsnotiz abgelehnt: {0}": "Exchange a refusé la réponse d'absence : {0}",
  "Exchange-Server": "Serveur Exchange",
  "Exchange-Server der Firma (2013 oder neuer): Mail, Kalender und Kontakte – auch hinter einem Reverse Proxy mit Client-Zertifikat.": "Serveur Exchange de l’entreprise (2013 ou plus récent) : e-mail, calendrier et contacts – aussi derrière un reverse proxy avec certificat client.",
  "Export fehlgeschlagen: {0}": "L'exportation a échoué : {0}",
