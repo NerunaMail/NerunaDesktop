@@ -160,6 +160,7 @@ internal static class AppServices
         services.AddSingleton<TextTemplateService>();
         services.AddSingleton<MailSearchIndexer>();
         services.AddSingleton<SearchIndexViewModel>();
+        services.AddSingleton<LocalDataViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
 

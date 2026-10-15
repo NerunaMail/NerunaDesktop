@@ -11,13 +11,11 @@ namespace Neruna.Desktop.ViewModels;
 internal sealed partial class MailOptionsViewModel : ViewModelBase
 {
     private readonly ISettingsStore _settings;
-    private readonly IStorageMaintenance? _storage;
     private bool _loading;
 
-    public MailOptionsViewModel(ISettingsStore settings, IStorageMaintenance? storage = null)
+    public MailOptionsViewModel(ISettingsStore settings)
     {
         _settings = settings;
-        _storage = storage;
         MarkAsReadOptions =
         [
             new(MarkAsReadMode.OnSelect, T("Beim Anklicken (sofort)"), Select),
@@ -26,59 +24,6 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
             new(MarkAsReadMode.Never, T("Nie automatisch (nur manuell)"), Select),
         ];
     }
-
-    // ── Lokale Daten: the database's size, and making it smaller ──
-
-    /// <summary>"Datenbank: 412 MB".</summary>
-    [ObservableProperty]
-    public partial string DatabaseSizeText { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CompactCommand))]
-    public partial bool IsCompacting { get; set; }
-
-    [ObservableProperty]
-    public partial string? CompactResult { get; set; }
-
-    public void ShowDatabaseSize()
-    {
-        if (_storage is not null)
-        {
-            DatabaseSizeText = F("Datenbank auf diesem Computer: {0}", Megabytes(_storage.DatabaseSize));
-        }
-    }
-
-    [CommunityToolkit.Mvvm.Input.RelayCommand(CanExecute = nameof(CanCompact))]
-    private async Task CompactAsync()
-    {
-        if (_storage is not { } storage)
-        {
-            return;
-        }
-
-        IsCompacting = true;
-        CompactResult = null;
-        try
-        {
-            var before = storage.DatabaseSize;
-            await Task.Run(() => storage.CompactAsync());
-            var after = storage.DatabaseSize;
-            CompactResult = F("Verkleinert von {0} auf {1}.", Megabytes(before), Megabytes(after));
-        }
-        catch (Exception ex) when (ex is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException or IOException)
-        {
-            CompactResult = T("Verkleinern fehlgeschlagen: ") + ex.Message;
-        }
-        finally
-        {
-            IsCompacting = false;
-            ShowDatabaseSize();
-        }
-    }
-
-    private bool CanCompact() => !IsCompacting && _storage is not null;
-
-    private static string Megabytes(long bytes) => F("{0:N1} MB", bytes / 1024.0 / 1024.0);
 
     /// <summary>Preview at real size: 1pt = 4/3 px.</summary>
     public static FuncValueConverter<double, double> PointsToPixels { get; } = new(pt => pt * 4 / 3);

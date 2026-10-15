@@ -6,7 +6,7 @@
              xmlns:app="using:Neruna.Desktop"
              x:Class="Neruna.Desktop.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
-  <!-- Areas on the left (the mail ones grouped under a heading), the chosen one on the right -->
+  <!-- Areas on the left, in groups under headings; the chosen one on the right -->
   <Border Classes="pane" Padding="0">
     <Grid ColumnDefinitions="230,*">
       <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0" Padding="10,14">
@@ -44,6 +44,7 @@
         <ContentControl Content="{Binding QuickActions}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=11}" />
         <ContentControl Content="{Binding FileBackup}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=10}" />
         <ContentControl Content="{Binding SearchIndex}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=12}" />
+        <ContentControl Content="{Binding LocalData}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=13}" />
         <views:AboutView IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=9}" />
       </Panel>
     </Grid>

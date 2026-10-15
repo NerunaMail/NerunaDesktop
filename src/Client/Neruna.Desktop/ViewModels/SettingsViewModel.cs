@@ -4,8 +4,11 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData) : ViewModelBase
 {
+    /// <summary>Settings → Daten → Lokale Daten.</summary>
+    public LocalDataViewModel LocalData => localData;
+
     /// <summary>Settings → E-Mail → Suchindex.</summary>
     public SearchIndexViewModel SearchIndex => searchIndex;
 
@@ -57,24 +60,29 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     /// </summary>
     public static IReadOnlyList<SettingsNavItem> Navigation { get; } =
     [
+        new(-1, T("Konten"), null, IsHeading: true),
         new(0, T("Konten"), "IconPeople"),
-        new(-1, T("E-Mail"), null, IsHeading: true),
-        new(1, T("Allgemein"), "IconMail", IsIndented: true),
-        new(3, T("Signaturen"), "IconSignature", IsIndented: true),
-        new(4, T("Textvorlagen"), "IconTextTemplate", IsIndented: true),
-        new(11, T("Schnellaktionen"), "IconFlash", IsIndented: true),
-        new(5, T("Zertifikate (S/MIME)"), "IconCertificate", IsIndented: true),
-        new(12, T("Suchindex"), "IconSearch", IsIndented: true),
-        new(2, T("Kalender"), "IconCalendar"),
         new(7, T("Neruna Cloud"), "IconCloud"),
+        new(-1, T("E-Mail"), null, IsHeading: true),
+        new(1, T("Allgemein"), "IconMail"),
+        new(3, T("Signaturen"), "IconSignature"),
+        new(4, T("Textvorlagen"), "IconTextTemplate"),
+        new(11, T("Schnellaktionen"), "IconFlash"),
+        new(5, T("Zertifikate (S/MIME)"), "IconCertificate"),
+        new(-1, T("Kalender"), null, IsHeading: true),
+        new(2, T("Kalender"), "IconCalendar"),
+        new(-1, T("Daten"), null, IsHeading: true),
+        new(12, T("Suchindex"), "IconSearch"),
         new(10, T("Datensicherung"), "IconArchive"),
+        new(13, T("Lokale Daten"), "IconFolder"),
+        new(-1, T("Programm"), null, IsHeading: true),
         new(6, T("Darstellung"), "IconPalette"),
         new(8, T("KI"), "IconAi"),
         new(9, T("Über Neruna"), "IconInfo"),
     ];
 
     [ObservableProperty]
-    public partial SettingsNavItem? SelectedNav { get; set; } = Navigation[0];
+    public partial SettingsNavItem? SelectedNav { get; set; } = Navigation[1];
 
     partial void OnSelectedTabChanged(int value)
     {
@@ -93,9 +101,9 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             {
                 _ = SearchIndex.ReloadAsync();
             }
-            else if (item.Tab == 1)
+            else if (item.Tab == 13)
             {
-                MailOptions.ShowDatabaseSize();
+                LocalData.ShowDatabaseSize();
             }
         }
     }
