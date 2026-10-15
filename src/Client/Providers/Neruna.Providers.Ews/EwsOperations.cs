@@ -109,9 +109,14 @@ internal static class EwsOperations
     }
 
     /// <summary>An item shape: ids plus <paramref name="fields"/> (field URIs or extended field elements).</summary>
-    public static XElement Shape(IEnumerable<object> fields, string? bodyType = null, bool mime = false) =>
-        X.Msg("ItemShape", X.Typ("BaseShape", "IdOnly"),
+    /// <remarks>Without fields there is no AdditionalProperties: the schema wants at least one in it, Exchange refuses an
+    /// empty one ("The request failed schema validation").</remarks>
+    public static XElement Shape(IEnumerable<object> fields, string? bodyType = null, bool mime = false)
+    {
+        var properties = fields.Select(f => f is string uri ? X.Field(uri) : f).ToList();
+        return X.Msg("ItemShape", X.Typ("BaseShape", "IdOnly"),
             mime ? X.Typ("IncludeMimeContent", "true") : null,
             bodyType is null ? null : X.Typ("BodyType", bodyType),
-            X.Typ("AdditionalProperties", fields.Select(f => f is string uri ? X.Field(uri) : f)));
+            properties.Count == 0 ? null : X.Typ("AdditionalProperties", properties));
+    }
 }

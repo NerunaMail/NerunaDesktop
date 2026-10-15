@@ -47,6 +47,8 @@
                     <TextBlock Text="{Binding Sender}" Classes="subtle" TextTrimming="CharacterEllipsis" />
                     <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
                       <TextBlock Text="{Binding Services}" FontSize="12" Classes="subtle" />
+                      <TextBlock Text="{Binding OfflineText}" FontSize="12" Classes="subtle" IsVisible="{Binding HasServerMail}"
+                                 ToolTip.Tip="{l:T 'Wie weit zurück die Mails samt Anhängen auf diesem Computer liegen – ändern unter ⋯ → Offline verfügbar'}" />
                       <TextBlock Text="{Binding ManagedBy}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" />
                       <TextBlock Text="{l:T 'Abwesenheit aktiv'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding HasAutoReply}" />
                     </StackPanel>

@@ -228,6 +228,10 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     /// <summary>"⋯ → Offline verfügbar": how far back the mail is complete on this computer (content and attachments).</summary>
     public IReadOnlyList<OfflineChoice> OfflineChoices { get; private set; } = [];
 
+    /// <summary>On the card: "Offline: 3 Monate" – the choice, without opening the menu.</summary>
+    [ObservableProperty]
+    public partial string? OfflineText { get; set; }
+
     internal void SetOffline(Neruna.Core.Mail.OfflinePeriod period, Action<Neruna.Core.Mail.OfflinePeriod> save)
     {
         var choices = Neruna.Core.Mail.OfflinePeriods.All.Select(p => new OfflineChoice(p) { IsChecked = p == period }).ToList();
@@ -240,10 +244,12 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
                     other.IsChecked = other == choice;
                 }
 
+                OfflineText = F("Offline: {0}", choice.Label);
                 save(choice.Period);
             };
         }
 
+        OfflineText = F("Offline: {0}", Neruna.Core.Mail.OfflinePeriods.Label(period));
         OfflineChoices = choices;
         OnPropertyChanged(nameof(OfflineChoices));
     }

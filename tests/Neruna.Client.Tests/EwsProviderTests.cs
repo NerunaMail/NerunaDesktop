@@ -146,6 +146,8 @@ public class EwsProviderTests
                   <t:From><t:Mailbox><t:Name>Marco</t:Name><t:EmailAddress>marco@example.com</t:EmailAddress><t:RoutingType>SMTP</t:RoutingType></t:Mailbox></t:From>
                   <t:InternetMessageId>&lt;1@example.com&gt;</t:InternetMessageId><t:IsRead>true</t:IsRead></t:Message></m:Items>
                 """),
+            "M2" when op.Descendants(T + "IncludeMimeContent").Any() => Message("GetItem",
+                $"<m:Items><t:Message><t:ItemId Id=\"M2\" ChangeKey=\"b\"/><t:MimeContent CharacterSet=\"UTF-8\">{Convert.ToBase64String(Encoding.UTF8.GetBytes("Subject: Hallo\r\nFrom: lea@example.com\r\n\r\nGrüezi"))}</t:MimeContent></t:Message></m:Items>"),
             "M2" => Message("GetItem", "<m:Items><t:Message><t:ItemId Id=\"M2\" ChangeKey=\"b\"/><t:Subject>Hallo</t:Subject><t:DateTimeReceived>2026-10-08T08:00:00Z</t:DateTimeReceived><t:IsRead>false</t:IsRead></t:Message></m:Items>"),
             "M3" => Message("GetItem", "<m:Items><t:MeetingRequest><t:ItemId Id=\"M3\" ChangeKey=\"c\"/><t:Subject>Sitzung</t:Subject><t:DateTimeReceived>2026-10-10T08:00:00Z</t:DateTimeReceived><t:IsRead>false</t:IsRead></t:MeetingRequest></m:Items>"),
             _ => Error("GetItem", "ErrorItemNotFound"),
@@ -164,6 +166,10 @@ public class EwsProviderTests
         Assert.Equal(MessageFlags.Seen | MessageFlags.Flagged | MessageFlags.Answered, offer.Flags);
         Assert.Equal((true, 2048L, MessageSecurity.Signed), (offer.HasAttachments, offer.Size, offer.Security));
         Assert.Equal(["anna@example.com"], offer.To.Select(t => t.Address)); // the X.500 address is no mail address
+
+        // The whole message as MIME (only the MIME content is asked for – no empty list of further properties).
+        var opened = await mail.GetMessageAsync(inbox, "M2", ct);
+        Assert.Equal(("Hallo", "Grüezi"), (opened.Subject, opened.TextBody?.Trim()));
 
         // The newest first, by received date.
         var find = server.Operations("FindItem").Single();
@@ -515,6 +521,14 @@ public class EwsProviderTests
             Assert.Equal("Exchange2013", envelope.Descendants(T + "RequestServerVersion").Single().Attribute("Version")!.Value);
             var operation = envelope.Descendants(XName.Get("Body", "http://schemas.xmlsoap.org/soap/envelope/")).Single().Elements().Single();
             _operations.Add(operation);
+
+            // As Exchange: lists the schema wants at least one entry in may not be empty.
+            if (operation.Descendants(T + "AdditionalProperties").Any(p => !p.HasElements))
+            {
+                const string Fault = """<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode xmlns:a="http://schemas.microsoft.com/exchange/services/2006/types">a:ErrorSchemaValidation</faultcode><faultstring xml:lang="en-US">The request failed schema validation: The element 'AdditionalProperties' has incomplete content.</faultstring></s:Fault></s:Body></s:Envelope>""";
+                return new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent(Fault, Encoding.UTF8, "text/xml") };
+            }
+
             var body = _answers.TryGetValue(operation.Name.LocalName, out var answer)
                 ? answer(operation)
                 : Ok(operation.Name.LocalName, "<m:RootFolder IncludesLastItemInRange=\"true\"><t:Items/><t:Folders/></m:RootFolder>");
