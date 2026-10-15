@@ -15,21 +15,113 @@
                HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24" />
     <Grid IsVisible="{Binding IsMessage}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
       <SelectableTextBlock Text="{Binding Subject}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="24,20,24,0" />
-      <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="24,16,24,8">
+      <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="24,16,24,8">
         <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentTextBrush}" VerticalAlignment="Top">
           <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
-          <SelectableTextBlock Text="{Binding From}" FontWeight="SemiBold" />
+          <SelectableTextBlock Text="{Binding From}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding To, Converter={x:Static l:Fmt.Instance}, ConverterParameter='An: {0}'}" TextTrimming="CharacterEllipsis" />
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding Cc, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding Date}" />
         </StackPanel>
+        <!-- Security check: sender, envelope, display name, links, attachments -->
+        <Button Grid.Column="2" Classes="command" VerticalAlignment="Top" Command="{Binding ToggleAnalysisCommand}"
+                ToolTip.Tip="{l:T 'Prüft Absender, Links und Anhänge auf typische Merkmale von Phishing'}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconShield}" Width="15" Height="15" />
+            <TextBlock Text="{l:T 'Sicherheit prüfen'}" FontSize="12" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
       </Grid>
 
+      <StackPanel Grid.Row="2">
+      <!-- Warning above a suspicious mail (Einstellungen → Datenschutz) -->
+      <Border IsVisible="{Binding ShowsWarning}" CornerRadius="4" Padding="10,6" Margin="24,0,24,8" BorderThickness="3,0,0,0"
+              Classes.bad="{Binding IsDangerous}" Classes.warn="{Binding IsCaution}">
+        <Border.Styles>
+          <Style Selector="Border.warn"><Setter Property="Background" Value="{DynamicResource WarnBackgroundBrush}" /><Setter Property="BorderBrush" Value="#BC4B09" /></Style>
+          <Style Selector="Border.bad"><Setter Property="Background" Value="{DynamicResource BadBackgroundBrush}" /><Setter Property="BorderBrush" Value="#C50F1F" /></Style>
+        </Border.Styles>
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <PathIcon Data="{StaticResource IconWarning}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="{Binding AssessmentSummary}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button Grid.Column="2" Classes="command" Content="{l:T 'Details'}" FontSize="12" Command="{Binding ToggleAnalysisCommand}" />
+        </Grid>
+      </Border>
+
+      <!-- The security check in full -->
+      <Border IsVisible="{Binding IsAnalysisOpen}" Margin="24,0,24,10" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="14,10">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <PathIcon Data="{StaticResource IconShield}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{l:T 'Sicherheitsprüfung'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Content="✕" Command="{Binding ToggleAnalysisCommand}" Padding="6,0" Background="Transparent" BorderThickness="0"
+                    ToolTip.Tip="{l:T 'Schliessen'}" VerticalAlignment="Center" />
+          </Grid>
+          <Border CornerRadius="4" Padding="10,6" Classes.good="{Binding IsUnremarkable}" Classes.warn="{Binding IsCaution}" Classes.bad="{Binding IsDangerous}">
+            <Border.Styles>
+              <Style Selector="Border.good"><Setter Property="Background" Value="{DynamicResource GoodBackgroundBrush}" /></Style>
+              <Style Selector="Border.warn"><Setter Property="Background" Value="{DynamicResource WarnBackgroundBrush}" /></Style>
+              <Style Selector="Border.bad"><Setter Property="Background" Value="{DynamicResource BadBackgroundBrush}" /></Style>
+            </Border.Styles>
+            <TextBlock Text="{Binding AssessmentSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          </Border>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+            <Grid.Styles>
+              <Style Selector="TextBlock.key"><Setter Property="Margin" Value="0,1,12,1" /><Setter Property="FontSize" Value="12" /></Style>
+              <Style Selector="SelectableTextBlock"><Setter Property="FontSize" Value="12" /><Setter Property="Margin" Value="0,1" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
+            </Grid.Styles>
+            <TextBlock Classes="key subtle" Text="{l:T 'Absender'}" />
+            <SelectableTextBlock Grid.Column="1" Text="{Binding SenderFrom}" />
+            <TextBlock Grid.Row="1" Classes="key subtle" Text="{l:T 'Umschlag (Return-Path)'}" />
+            <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SenderEnvelope}" />
+            <TextBlock Grid.Row="2" Classes="key subtle" Text="{l:T 'Antwort an'}" />
+            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SenderReplyTo}" />
+            <TextBlock Grid.Row="3" Classes="key subtle" Text="{l:T 'Prüfung Ihres Servers'}" />
+            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SenderAuthentication}" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Findings}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:FindingItem">
+                <Grid ColumnDefinitions="22,*" Margin="0,3">
+                  <TextBlock Text="{Binding Mark}" FontWeight="Bold" Classes.good="{Binding IsGood}" Classes.medium="{Binding IsMedium}" Classes.high="{Binding IsHigh}" Classes.subtle="{Binding IsInfo}">
+                    <TextBlock.Styles>
+                      <Style Selector="TextBlock.good"><Setter Property="Foreground" Value="#107C10" /></Style>
+                      <Style Selector="TextBlock.medium"><Setter Property="Foreground" Value="#BC4B09" /></Style>
+                      <Style Selector="TextBlock.high"><Setter Property="Foreground" Value="#C50F1F" /></Style>
+                    </TextBlock.Styles>
+                  </TextBlock>
+                  <StackPanel Grid.Column="1" Spacing="1">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Detail}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasDetail}" Classes="subtle" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <StackPanel IsVisible="{Binding HasCheckedLinks}" Spacing="2">
+            <TextBlock Text="{l:T 'Auffällige Links'}" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0" />
+            <ItemsControl ItemsSource="{Binding CheckedLinks}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CheckedLinkItem">
+                  <Grid ColumnDefinitions="*,Auto,*" Margin="0,2" ToolTip.Tip="{Binding Href}">
+                    <TextBlock Text="{Binding Shown}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text=" → " FontSize="12" Classes="subtle" />
+                    <TextBlock Grid.Column="2" Text="{Binding Goes}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+          <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap"
+                     Text="{l:T 'Geprüft auf diesem Gerät, ohne etwas ins Internet zu senden. Eine Hilfe zur Einschätzung, keine Garantie.'}" />
+        </StackPanel>
+      </Border>
+
       <!-- S/MIME status -->
-      <Border Grid.Row="2" IsVisible="{Binding HasSecurity}" CornerRadius="4" Padding="10,6" Margin="24,0,24,8"
+      <Border IsVisible="{Binding HasSecurity}" CornerRadius="4" Padding="10,6" Margin="24,0,24,8"
               Classes.good="{Binding IsSecurityGood}" Classes.warn="{Binding IsSecurityWarning}" Classes.bad="{Binding IsSecurityBad}">
         <Border.Styles>
           <Style Selector="Border.good"><Setter Property="Background" Value="{DynamicResource GoodBackgroundBrush}" /></Style>
@@ -47,6 +139,7 @@
           </StackPanel>
         </Grid>
       </Border>
+      </StackPanel>
 
       <!-- Blocked remote content -->
       <!-- Invitation / answer / cancellation in this mail -->
@@ -80,14 +173,40 @@
         </StackPanel>
       </Border>
 
-      <Border Grid.Row="4" IsVisible="{Binding HasBlockedRemoteContent}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,4" Margin="24,0,24,8">
+      <StackPanel Grid.Row="4">
+      <!-- Plain text only (Einstellungen → Datenschutz) -->
+      <Border IsVisible="{Binding ShowsPlainTextOnly}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,4" Margin="24,0,24,8">
         <Grid ColumnDefinitions="Auto,*,Auto">
-          <PathIcon Data="{StaticResource IconImage}" Width="16" Height="16" Margin="0,0,8,0" />
+          <PathIcon Data="{StaticResource IconShield}" Width="16" Height="16" Margin="0,0,8,0" />
           <TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
-                     Text="{l:T 'Externe Bilder wurden zum Schutz Ihrer Privatsphäre nicht geladen.'}" />
-          <Button Grid.Column="2" Classes="command" Content="{l:T 'Bilder laden'}" FontSize="12" Command="{Binding LoadRemoteContentCommand}" />
+                     Text="{l:T 'Diese Mail wird als reiner Text angezeigt – ohne Gestaltung, Bilder und Tracking.'}" />
+          <Button Grid.Column="2" Classes="command" Content="{l:T 'Originaldarstellung anzeigen'}" FontSize="12" Command="{Binding ShowOriginalCommand}" />
         </Grid>
       </Border>
+      <!-- Blocked remote content -->
+      <Border IsVisible="{Binding HasBlockedRemoteContent}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,4" Margin="24,0,24,8">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <PathIcon Data="{StaticResource IconImage}" Width="16" Height="16" Margin="0,0,8,0" />
+          <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding RemoteContentText}" />
+            <TextBlock FontSize="11" Classes="subtle" Text="{Binding TrackersText}" IsVisible="{Binding HasTrackers}" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" IsVisible="{Binding CanLoadRemoteContent}">
+            <Button Classes="command" Content="{l:T 'Bilder laden'}" FontSize="12" Command="{Binding LoadRemoteContentCommand}" />
+            <DropDownButton Classes="command" FontSize="12" Content="{l:T 'Immer laden'}" IsVisible="{Binding CanTrustSender}">
+              <DropDownButton.Flyout>
+                <MenuFlyout>
+                  <MenuItem Header="{Binding TrustSenderText}" Command="{Binding TrustSenderCommand}" />
+                  <MenuItem Header="{Binding TrustDomainText}" Command="{Binding TrustDomainCommand}" />
+                </MenuFlyout>
+              </DropDownButton.Flyout>
+            </DropDownButton>
+          </StackPanel>
+        </Grid>
+      </Border>
+      <!-- Pictures loaded, trackers still kept out -->
+      <TextBlock IsVisible="{Binding ShowsTrackersOnly}" Margin="24,0,24,8" FontSize="11" Classes="subtle" Text="{Binding TrackersText}" />
+      </StackPanel>
 
       <!-- Attachments -->
       <ItemsControl Grid.Row="5" ItemsSource="{Binding Attachments}" IsVisible="{Binding HasAttachments}" Margin="24,0,24,8">

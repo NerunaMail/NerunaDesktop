@@ -565,6 +565,7 @@ public sealed class MailController(
             throw new NotSupportedException($"Provider '{connection.ProviderId}' cannot send mail.");
         }
 
+        Privacy.OutgoingMail.Prepare(message, settings is not null && await settings.GetBoolAsync(SettingKeys.PrivacyHideTimeZone, cancellationToken: cancellationToken));
         await provider.SendAsync(message, cancellationToken);
     }
 
@@ -585,7 +586,7 @@ public sealed class MailController(
             throw new NotSupportedException(T("Dieses Konto kann keine Entwürfe speichern."));
         }
 
-        draft.MessageId ??= MimeUtils.GenerateMessageId();
+        draft.MessageId ??= Privacy.OutgoingMail.NewMessageId(draft.From.Mailboxes.FirstOrDefault()?.Address);
         var folder = await GetDraftsFolderAsync(provider, connection.Id, cancellationToken);
         await provider.AppendAsync(folder, draft, MessageFlags.Seen | MessageFlags.Draft, DateTimeOffset.Now, cancellationToken);
 

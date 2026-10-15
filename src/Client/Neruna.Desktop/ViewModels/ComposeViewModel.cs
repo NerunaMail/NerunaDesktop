@@ -101,7 +101,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
 
         _draftRemoteId = draft.DraftRemoteId;
-        _messageId = draft.MessageId ?? MimeUtils.GenerateMessageId();
+        _messageId = draft.MessageId ?? Neruna.Core.Privacy.OutgoingMail.NewMessageId(draft.From);
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(To) or nameof(Cc) or nameof(Bcc) or nameof(Subject) or nameof(From))

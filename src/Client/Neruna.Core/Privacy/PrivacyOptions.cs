@@ -1,0 +1,123 @@
+using MimeKit;
+
+namespace Neruna.Core.Privacy;
+
+/// <summary>Pictures and styles from the internet in a mail.</summary>
+public enum RemoteContentPolicy
+{
+    /// <summary>Never loaded, not even on request.</summary>
+    Block,
+
+    /// <summary>Loaded on request, or at once for trusted senders (default).</summary>
+    Ask,
+
+    /// <summary>Always loaded (tracking pixels still blocked if <see cref="PrivacyOptions.BlockTrackers"/>).</summary>
+    Allow,
+}
+
+/// <summary>When a link in a mail is shown to the user before it opens.</summary>
+public enum LinkConfirmation
+{
+    Never,
+
+    /// <summary>Only when the link check finds something (default).</summary>
+    Suspicious,
+
+    Always,
+}
+
+/// <summary>Einstellungen → Datenschutz: what is blocked, what is asked for. Shared by desktop and app.</summary>
+public sealed record PrivacyOptions
+{
+    public RemoteContentPolicy RemoteContent { get; init; } = RemoteContentPolicy.Ask;
+
+    /// <summary>Addresses ("anna@example.ch") and domains ("@example.ch") whose pictures load without asking.</summary>
+    public IReadOnlyList<string> TrustedSenders { get; init; } = [];
+
+    public bool BlockTrackers { get; init; } = true;
+
+    public bool PlainText { get; init; }
+
+    public LinkConfirmation ConfirmLinks { get; init; } = LinkConfirmation.Suspicious;
+
+    public bool CleanLinks { get; init; } = true;
+
+    public bool WarnSuspicious { get; init; } = true;
+
+    public bool HideTimeZone { get; init; }
+
+    public static async Task<PrivacyOptions> LoadAsync(ISettingsStore settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return new PrivacyOptions
+        {
+            RemoteContent = await settings.GetAsync(SettingKeys.PrivacyRemoteContent, cancellationToken) switch
+            {
+                "block" => RemoteContentPolicy.Block,
+                "allow" => RemoteContentPolicy.Allow,
+                _ => RemoteContentPolicy.Ask,
+            },
+            TrustedSenders = await settings.GetListAsync(SettingKeys.PrivacyTrustedSenders, cancellationToken) ?? [],
+            BlockTrackers = await settings.GetBoolAsync(SettingKeys.PrivacyBlockTrackers, fallback: true, cancellationToken),
+            PlainText = await settings.GetBoolAsync(SettingKeys.PrivacyPlainText, cancellationToken: cancellationToken),
+            ConfirmLinks = await settings.GetAsync(SettingKeys.PrivacyConfirmLinks, cancellationToken) switch
+            {
+                "never" => LinkConfirmation.Never,
+                "always" => LinkConfirmation.Always,
+                _ => LinkConfirmation.Suspicious,
+            },
+            CleanLinks = await settings.GetBoolAsync(SettingKeys.PrivacyCleanLinks, fallback: true, cancellationToken),
+            WarnSuspicious = await settings.GetBoolAsync(SettingKeys.PrivacyWarnSuspicious, fallback: true, cancellationToken),
+            HideTimeZone = await settings.GetBoolAsync(SettingKeys.PrivacyHideTimeZone, cancellationToken: cancellationToken),
+        };
+    }
+
+    public async Task SaveAsync(ISettingsStore settings, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        await settings.SetAsync(SettingKeys.PrivacyRemoteContent, RemoteContent.ToString().ToLowerInvariant(), cancellationToken);
+        await settings.SetListAsync(SettingKeys.PrivacyTrustedSenders, TrustedSenders, cancellationToken);
+        await settings.SetBoolAsync(SettingKeys.PrivacyBlockTrackers, BlockTrackers, cancellationToken);
+        await settings.SetBoolAsync(SettingKeys.PrivacyPlainText, PlainText, cancellationToken);
+        await settings.SetAsync(SettingKeys.PrivacyConfirmLinks, ConfirmLinks.ToString().ToLowerInvariant(), cancellationToken);
+        await settings.SetBoolAsync(SettingKeys.PrivacyCleanLinks, CleanLinks, cancellationToken);
+        await settings.SetBoolAsync(SettingKeys.PrivacyWarnSuspicious, WarnSuspicious, cancellationToken);
+        await settings.SetBoolAsync(SettingKeys.PrivacyHideTimeZone, HideTimeZone, cancellationToken);
+    }
+
+    /// <summary>The sender is on the trusted list, by address or by domain.</summary>
+    public bool IsTrusted(MailboxAddress? sender)
+    {
+        if (sender?.Address is not { Length: > 0 } address)
+        {
+            return false;
+        }
+
+        var domain = "@" + DomainNames.OfAddress(address);
+        return TrustedSenders.Any(t => string.Equals(t, address, StringComparison.OrdinalIgnoreCase) || string.Equals(t, domain, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Whether the pictures of a mail load right away: never when blocked, always when allowed; when asking, for
+    /// trusted senders and for mails whose pictures the user loaded before (<paramref name="loadedBefore"/>).
+    /// A sender that fails the authentication check is never trusted (its address may be forged).
+    /// </summary>
+    public bool LoadsRemoteContent(MailboxAddress? sender, bool loadedBefore, bool senderForged = false) => RemoteContent switch
+    {
+        RemoteContentPolicy.Block => false,
+        RemoteContentPolicy.Allow => true,
+        _ => loadedBefore || (IsTrusted(sender) && !senderForged),
+    };
+
+    /// <summary>Whether a link is shown before it opens, given what the link check found.</summary>
+    public bool Confirms(LinkCheck check)
+    {
+        ArgumentNullException.ThrowIfNull(check);
+        return ConfirmLinks switch
+        {
+            LinkConfirmation.Always => true,
+            LinkConfirmation.Never => false,
+            _ => check.IsSuspicious,
+        };
+    }
+}

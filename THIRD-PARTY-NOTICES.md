@@ -79,6 +79,12 @@ project pages and in the NuGet packages.
 XstReader.Api reads Outlook data files (.pst/.ost) and is licensed under the Microsoft Public License (MS-PL):
 https://opensource.org/license/ms-pl-html. It is used unchanged, as the published package.
 
+## Data
+
+`src/Client/Neruna.Core/Privacy/public_suffix_list.dat` is the **Public Suffix List** (https://publicsuffix.org/),
+licensed under the Mozilla Public License 2.0, embedded with its comments removed. It tells the registrable part of a
+domain name ("bank.co.uk" in "login.bank.co.uk") for the phishing and link checks.
+
 ## Icons
 
 Several icons of the app (`src/Client/Neruna.Desktop/App.axaml`) – among them reply, reply all, forward, send, edit,

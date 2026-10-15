@@ -49,6 +49,27 @@ public sealed partial class MessageContent
         HasBlockedRemoteContent = hasBlockedRemoteContent;
     }
 
+    /// <summary>Tracking pixels found (and kept out, also when pictures are loaded and they are blocked).</summary>
+    public int Trackers { get; private init; }
+
+    /// <summary>Shown as plain text although the mail has a layout of its own (setting "Nur Text"); the UI offers the original.</summary>
+    public bool ShowsPlainTextOnly { get; private init; }
+
+    /// <summary>The links of the HTML body with their texts and hover texts, for the check before a link opens.</summary>
+    public IReadOnlyList<Privacy.HtmlLink> Links { get; private init; } = [];
+
+    /// <summary>Checks a clicked link with the text and hover text it has in this mail (the most deceptive one if it occurs more than once).</summary>
+    public Privacy.LinkCheck CheckLink(string href, bool clean)
+    {
+        ArgumentNullException.ThrowIfNull(href);
+        // The view may hand over the link normalized (Android's WebView does): compared as URLs too.
+        static string? Normal(string link) => Uri.TryCreate(link.Trim(), UriKind.Absolute, out var uri) ? uri.AbsoluteUri : null;
+        var normal = Normal(href);
+        var checks = Links.Where(l => string.Equals(l.Href.Trim(), href.Trim(), StringComparison.Ordinal) || (normal is not null && Normal(l.Href) == normal))
+            .Select(l => Privacy.LinkInspector.Inspect(href, l.Text, l.Title, clean)).ToList();
+        return checks.MaxBy(c => c.Findings.Count == 0 ? -1 : (int)c.Findings.Max(f => f.Severity)) ?? Privacy.LinkInspector.Inspect(href, clean: clean);
+    }
+
     /// <summary>Sanitized HTML document, safe to render (no scripts, no forms, remote content per settings).</summary>
     public string Html { get; }
 
@@ -63,7 +84,10 @@ public sealed partial class MessageContent
     /// <summary>True if remote images or styles were removed; the UI offers to load them.</summary>
     public bool HasBlockedRemoteContent { get; }
 
-    public static MessageContent From(MimeMessage message, bool allowRemoteContent = false)
+    /// <param name="allowRemoteContent">Pictures and styles from the internet are loaded.</param>
+    /// <param name="blockTrackers">Tracking pixels stay out even then.</param>
+    /// <param name="plainTextOnly">The body as plain text only (no layout, nothing from the internet).</param>
+    public static MessageContent From(MimeMessage message, bool allowRemoteContent = false, bool blockTrackers = true, bool plainTextOnly = false)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -75,11 +99,18 @@ public sealed partial class MessageContent
 
         string html;
         var blocked = false;
+        var trackers = 0;
         var referencedIds = new HashSet<string>(StringComparer.Ordinal);
+        var plainOnly = plainTextOnly && walker.HtmlBody is not null;
 
-        if (walker.HtmlBody is { } htmlPart)
+        if (plainOnly)
         {
-            html = Sanitize(htmlPart.Text ?? string.Empty, allowRemoteContent, referencedIds, ref blocked);
+            var text = walker.TextBody is { } textBody0 ? PlainTextOf(textBody0) : HtmlText.ToPlainText(walker.HtmlBody!.Text ?? string.Empty);
+            html = "<html><body>" + PlainTextToHtml(text.Trim()) + "</body></html>";
+        }
+        else if (walker.HtmlBody is { } htmlPart)
+        {
+            html = Sanitize(htmlPart.Text ?? string.Empty, allowRemoteContent, blockTrackers, referencedIds, ref blocked, ref trackers);
             foreach (var extra in walker.ExtraBodies)
             {
                 html += TextToHtmlFragment(extra);
@@ -110,7 +141,8 @@ public sealed partial class MessageContent
         }
 
         var plain = walker.TextBody is { } textBody ? PlainTextOf(textBody) : walker.HtmlBody?.Text is { } h ? HtmlText.ToPlainText(h) : string.Empty;
-        return new MessageContent(html, plain.Trim(), inline, attachments, blocked);
+        var links = walker.HtmlBody?.Text is { } source ? Privacy.HtmlScan.Of(source).Links : [];
+        return new MessageContent(html, plain.Trim(), inline, attachments, blocked) { Trackers = trackers, ShowsPlainTextOnly = plainOnly, Links = links };
     }
 
     /// <summary>"cid:part1.abc@x" → "part1.abc@x" (URL-decoded), or null for other URLs.</summary>
@@ -139,7 +171,8 @@ public sealed partial class MessageContent
         {
             var ignored = new HashSet<string>(StringComparer.Ordinal);
             var blocked = false;
-            return "<hr/>" + Sanitize(part.Text ?? string.Empty, false, ignored, ref blocked);
+            var trackers = 0;
+            return "<hr/>" + Sanitize(part.Text ?? string.Empty, false, true, ignored, ref blocked, ref trackers);
         }
 
         // format=flowed (Thunderbird) is first unwrapped to plain text: MimeKit's FlowedToHtml turns every line into
@@ -207,9 +240,10 @@ public sealed partial class MessageContent
     private static bool IsValidAttributeName(string name) =>
         name.Length > 0 && char.IsAsciiLetter(name[0]) && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or ':' or '.');
 
-    private static string Sanitize(string html, bool allowRemote, HashSet<string> referencedIds, ref bool blocked)
+    private static string Sanitize(string html, bool allowRemote, bool blockTrackers, HashSet<string> referencedIds, ref bool blocked, ref int trackers)
     {
         var blockedLocal = false;
+        var trackersLocal = 0;
         // Our tag callback is the sanitizer (MimeKit's FilterHtml is deprecated); the renderer runs no scripts anyway.
         var converter = new HtmlToHtml
         {
@@ -239,6 +273,12 @@ public sealed partial class MessageContent
                 }
 
                 context.WriteTag(writer, false);
+                var tracker = name.Equals("img", StringComparison.OrdinalIgnoreCase) && IsTrackingPixel(context.Attributes);
+                if (tracker)
+                {
+                    trackersLocal++;
+                }
+
                 var centered = false;
                 var styled = false;
                 foreach (var attribute in context.Attributes.OrderBy(a => a.Name.Equals("style", StringComparison.OrdinalIgnoreCase)))
@@ -259,9 +299,10 @@ public sealed partial class MessageContent
                         {
                             referencedIds.Add(cid);
                         }
-                        else if (IsRemote(value) && !allowRemote)
+                        else if (IsRemote(value) && (!allowRemote || (tracker && blockTrackers)))
                         {
-                            blockedLocal = true;
+                            // A tracker kept out although pictures are allowed is no reason to offer "Bilder laden" again.
+                            blockedLocal |= !allowRemote;
                             if (attributeName.Equals("src", StringComparison.OrdinalIgnoreCase))
                             {
                                 writer.WriteAttribute("src", TransparentPixel);
@@ -327,8 +368,49 @@ public sealed partial class MessageContent
         }
 
         blocked |= blockedLocal;
+        trackers += trackersLocal;
         return result;
     }
+
+    /// <summary>
+    /// A picture that only tells the sender the mail was opened: (almost) invisible – at most 25 pixels in area, or
+    /// limited to 1 pixel by its style – or from a known counting address (".../track/open", "/wf/open" …).
+    /// </summary>
+    private static bool IsTrackingPixel(HtmlAttributeCollection attributes)
+    {
+        string? Get(string attribute) => attributes.FirstOrDefault(a => a.Name.Equals(attribute, StringComparison.OrdinalIgnoreCase))?.Value;
+        var src = Get("src");
+        if (src is null || !IsRemote(src))
+        {
+            return false;
+        }
+
+        if (TrackingPath().IsMatch(src))
+        {
+            return true;
+        }
+
+        if (Get("style") is { } style && TinyStyle().IsMatch(style))
+        {
+            return true;
+        }
+
+        static int? Pixels(string? value) => int.TryParse(value?.Trim().Replace("px", string.Empty, StringComparison.OrdinalIgnoreCase), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : null;
+        var width = Pixels(Get("width"));
+        var height = Pixels(Get("height"));
+        if (width is null || height is null)
+        {
+            return width is 0 || height is 0;
+        }
+
+        return width.Value * height.Value <= 25;
+    }
+
+    [GeneratedRegex(@"/(track/open|wf/open|e/o/|open\.php|open\.aspx|trk/open|t/open|o\.gif|pixel\.gif|beacon|tracking/open)|[?&](open|pixel)=|google-analytics\.com/|/__utm\.gif", RegexOptions.IgnoreCase)]
+    private static partial Regex TrackingPath();
+
+    [GeneratedRegex(@"(?<![-\w])(max-)?(width|height)\s*:\s*[01](px)?\s*(;|$|!)|display\s*:\s*none|visibility\s*:\s*hidden", RegexOptions.IgnoreCase)]
+    private static partial Regex TinyStyle();
 
     /// <summary>
     /// Tables as the renderer can show them: a max-width cuts off content wider than it (browsers widen the table

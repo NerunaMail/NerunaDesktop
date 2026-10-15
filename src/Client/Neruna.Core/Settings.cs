@@ -164,6 +164,30 @@ public static class SettingKeys
 
     /// <summary>"Blue", "Red" or "Green".</summary>
     public const string ColorScheme = "appearance.colorScheme";
+
+    /// <summary>Pictures from the internet in mails: "block", "ask" (default) or "allow" (see Privacy.PrivacyOptions).</summary>
+    public const string PrivacyRemoteContent = "privacy.remoteContent";
+
+    /// <summary>Senders whose pictures load without asking (JSON list of addresses, or "@domain" for a whole domain).</summary>
+    public const string PrivacyTrustedSenders = "privacy.trustedSenders";
+
+    /// <summary>Tracking pixels stay blocked even when pictures are loaded (default: on).</summary>
+    public const string PrivacyBlockTrackers = "privacy.blockTrackers";
+
+    /// <summary>Mails are shown as plain text; the original layout on request (default: off).</summary>
+    public const string PrivacyPlainText = "privacy.plainText";
+
+    /// <summary>Before a link opens: "never", "suspicious" (default) or "always" ask.</summary>
+    public const string PrivacyConfirmLinks = "privacy.confirmLinks";
+
+    /// <summary>Tracking parameters are removed and redirect services skipped when a link opens (default: on).</summary>
+    public const string PrivacyCleanLinks = "privacy.cleanLinks";
+
+    /// <summary>A warning above mails that look like phishing (default: on).</summary>
+    public const string PrivacyWarnSuspicious = "privacy.warnSuspicious";
+
+    /// <summary>Sent mails carry the time in UTC instead of the own time zone (default: off).</summary>
+    public const string PrivacyHideTimeZone = "privacy.hideTimeZone";
 }
 
 /// <summary>When opening a message marks it as read (setting "E-Mail → Als gelesen markieren").</summary>

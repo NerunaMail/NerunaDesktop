@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MimeKit;
 using Neruna.Core.Mail;
+using Neruna.Core.Privacy;
 using Neruna.Core.Security;
 using Neruna.Desktop.Infrastructure;
 using static Neruna.Core.Localization.Texts;
@@ -17,6 +18,53 @@ internal enum SecurityLevel
     Good,
     Warning,
     Bad,
+}
+
+/// <summary>How a mail is shown this time: the privacy settings, the phishing check, pictures, original layout.</summary>
+internal sealed record MessageView(PrivacyOptions Privacy, ThreatAssessment? Assessment, bool AllowRemoteContent = false, bool ShowOriginal = false)
+{
+    /// <summary>Without settings (attached mails before their own check): as set by default, pictures on request.</summary>
+    public static MessageView Default { get; } = new(new PrivacyOptions(), null);
+}
+
+/// <summary>One line of the security check, for the list.</summary>
+internal sealed record FindingItem(Finding Finding)
+{
+    public string Title => Finding.Title;
+
+    public string? Detail => Finding.Detail;
+
+    public bool HasDetail => !string.IsNullOrEmpty(Finding.Detail);
+
+    public bool IsGood => Finding.Severity == Severity.Good;
+
+    public bool IsInfo => Finding.Severity == Severity.Info;
+
+    public bool IsLow => Finding.Severity == Severity.Low;
+
+    public bool IsMedium => Finding.Severity == Severity.Medium;
+
+    public bool IsHigh => Finding.Severity == Severity.High;
+
+    public string Mark => Finding.Severity switch
+    {
+        Severity.Good => "✓",
+        Severity.Info => "i",
+        Severity.Low => "!",
+        _ => "⚠",
+    };
+}
+
+/// <summary>A link of the mail with something to note: what it shows, where it really goes.</summary>
+internal sealed record CheckedLinkItem(LinkCheck Check)
+{
+    public string Shown => string.IsNullOrWhiteSpace(Check.Text) ? Check.Href : Check.Text!;
+
+    public string Goes => Check.Host ?? Check.Href;
+
+    public string Href => Check.Href;
+
+    public bool IsSuspicious => Check.IsSuspicious;
 }
 
 /// <summary>
@@ -145,16 +193,19 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     }
 
     // An attached mail as a message of its own: pictures from the internet only on request, as for any mail.
-    private ReadingPaneViewModel Attached(MimeMessage message, bool allowRemoteContent, IFileService files)
+    private ReadingPaneViewModel Attached(MimeMessage message, bool allowRemoteContent, IFileService files) =>
+        Attached(message, View with { Assessment = null, AllowRemoteContent = allowRemoteContent, ShowOriginal = false }, files);
+
+    private ReadingPaneViewModel Attached(MimeMessage message, MessageView view, IFileService files)
     {
         var summary = new MessageSummary(string.Empty, message.MessageId, message.InReplyTo, message.Subject ?? string.Empty, null, [],
             message.Date, MessageFlags.Seen, 0, false, null);
         ReadingPaneViewModel? pane = null;
-        pane = ForMessage(summary, new OpenedMessage(message, MessageSecurityInfo.None), allowRemoteContent, files, _http ?? new HttpClient(), () =>
+        pane = ForMessage(summary, new OpenedMessage(message, MessageSecurityInfo.None), view, files, _http ?? new HttpClient(), next =>
         {
             if (Preview is { } preview && preview.Message == pane)
             {
-                preview.Message = Attached(message, allowRemoteContent: true, files);
+                preview.Message = Attached(message, next, files);
             }
         });
         return pane;
@@ -176,6 +227,143 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     public bool AllowsRemoteContent { get; }
 
     public bool HasBlockedRemoteContent => _content?.HasBlockedRemoteContent ?? false;
+
+    /// <summary>How this mail is shown (privacy settings, check, pictures, layout).</summary>
+    public MessageView View { get; private init; } = MessageView.Default;
+
+    /// <summary>Shows the mail again with another view (pictures loaded, original layout).</summary>
+    private Action<MessageView>? Reshow { get; init; }
+
+    /// <summary>Adds a sender or domain to the trusted ones (pictures without asking).</summary>
+    private Func<string, Task>? Trust { get; init; }
+
+    /// <summary>"Bilder laden" is offered (not when pictures are blocked in the settings).</summary>
+    public bool CanLoadRemoteContent => View.Privacy.RemoteContent != RemoteContentPolicy.Block;
+
+    public string RemoteContentText => CanLoadRemoteContent
+        ? T("Externe Bilder wurden zum Schutz Ihrer Privatsphäre nicht geladen.")
+        : T("Externe Bilder sind in den Datenschutz-Einstellungen gesperrt.");
+
+    private string? SenderAddress => Message?.From.Mailboxes.FirstOrDefault()?.Address;
+
+    /// <summary>"Immer für diesen Absender": not for a sender that failed the check (the address may be forged).</summary>
+    public bool CanTrustSender => CanLoadRemoteContent && Trust is not null && SenderAddress is not null && View.Assessment?.SenderForged != true;
+
+    public string TrustSenderText => F("Immer von {0}", SenderAddress);
+
+    public string TrustDomainText => F("Immer von @{0}", DomainNames.OfAddress(SenderAddress));
+
+    /// <summary>Tracking pixels found in the mail; they stay out (also when pictures are loaded, as set).</summary>
+    public int Trackers => _content?.Trackers ?? 0;
+
+    public bool HasTrackers => Trackers > 0 && (View.Privacy.BlockTrackers || !AllowsRemoteContent);
+
+    /// <summary>Pictures are shown, but tracking pixels were kept out: a small note instead of the bar.</summary>
+    public bool ShowsTrackersOnly => !HasBlockedRemoteContent && AllowsRemoteContent && Trackers > 0 && View.Privacy.BlockTrackers;
+
+    public string TrackersText => Trackers == 1 ? T("1 Tracking-Pixel blockiert") : F("{0} Tracking-Pixel blockiert", Trackers);
+
+    /// <summary>Shown as text only (setting "Nur Text"); the original on request.</summary>
+    public bool ShowsPlainTextOnly => _content?.ShowsPlainTextOnly ?? false;
+
+    [RelayCommand]
+    private void ShowOriginal() => Reshow?.Invoke(View with { ShowOriginal = true });
+
+    [RelayCommand]
+    private async Task TrustSenderAsync()
+    {
+        if (SenderAddress is { } address && Trust is { } trust)
+        {
+            await trust(address);
+            Reshow?.Invoke(View with { AllowRemoteContent = true });
+        }
+    }
+
+    [RelayCommand]
+    private async Task TrustDomainAsync()
+    {
+        if (DomainNames.OfAddress(SenderAddress) is { } domain && Trust is { } trust)
+        {
+            await trust("@" + domain);
+            Reshow?.Invoke(View with { AllowRemoteContent = true });
+        }
+    }
+
+    // The security check: computed when the mail was opened, or here for an attached mail.
+    private ThreatAssessment? _assessment;
+
+    private ThreatAssessment? Assessment => _assessment ??= View.Assessment ?? (Message is { } m ? MessageAnalyzer.Analyze(m) : null);
+
+    /// <summary>The warning above a suspicious mail (setting "Bei verdächtigen Mails warnen").</summary>
+    public bool ShowsWarning => View.Privacy.WarnSuspicious && View.Assessment is { Level: not ThreatLevel.Unremarkable } && !IsAnalysisOpen;
+
+    public bool IsDangerous => Assessment?.Level == ThreatLevel.Dangerous;
+
+    public bool IsCaution => Assessment?.Level == ThreatLevel.Caution;
+
+    public bool IsUnremarkable => Assessment?.Level == ThreatLevel.Unremarkable;
+
+    public string AssessmentSummary => Assessment?.Summary ?? string.Empty;
+
+    /// <summary>The panel "Sicherheitsprüfung" with every finding, the sender in its places and the noteworthy links.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsWarning))]
+    public partial bool IsAnalysisOpen { get; set; }
+
+    public IReadOnlyList<FindingItem> Findings => Assessment?.Findings.Select(f => new FindingItem(f)).ToList() ?? [];
+
+    public IReadOnlyList<CheckedLinkItem> CheckedLinks => Assessment?.Links.Select(l => new CheckedLinkItem(l)).ToList() ?? [];
+
+    public bool HasCheckedLinks => Assessment?.Links.Count > 0;
+
+    public string SenderFrom => Assessment?.Sender.From ?? string.Empty;
+
+    public string SenderEnvelope => Assessment?.Sender.Envelope ?? T("(nicht angegeben)");
+
+    public string SenderReplyTo => Assessment?.Sender.ReplyTo ?? T("(wie Absender)");
+
+    public string SenderAuthentication => Assessment?.Sender.Authentication ?? T("(kein verwertbares Ergebnis Ihres Servers)");
+
+    [RelayCommand]
+    private void ToggleAnalysis()
+    {
+        IsAnalysisOpen = !IsAnalysisOpen;
+        OnPropertyChanged(nameof(Findings));
+        OnPropertyChanged(nameof(CheckedLinks));
+        OnPropertyChanged(nameof(HasCheckedLinks));
+        OnPropertyChanged(nameof(IsDangerous));
+        OnPropertyChanged(nameof(IsCaution));
+        OnPropertyChanged(nameof(IsUnremarkable));
+        OnPropertyChanged(nameof(AssessmentSummary));
+        OnPropertyChanged(nameof(SenderFrom));
+        OnPropertyChanged(nameof(SenderEnvelope));
+        OnPropertyChanged(nameof(SenderReplyTo));
+        OnPropertyChanged(nameof(SenderAuthentication));
+    }
+
+    /// <summary>A link in the mail was clicked: checked, shown first if the settings say so, then opened (cleaned up if set).</summary>
+    public async Task OpenLinkAsync(string href, Func<LinkCheck, Task<bool>> confirm, Func<string, Task> open)
+    {
+        ArgumentNullException.ThrowIfNull(confirm);
+        ArgumentNullException.ThrowIfNull(open);
+        var check = _content?.CheckLink(href, View.Privacy.CleanLinks) ?? LinkInspector.Inspect(href, clean: View.Privacy.CleanLinks);
+        if (check.Target is null)
+        {
+            if (check.IsSuspicious)
+            {
+                await confirm(check);
+            }
+
+            return; // no web address: never opened from here
+        }
+
+        if (View.Privacy.Confirms(check) && !await confirm(check))
+        {
+            return;
+        }
+
+        await open(check.Opens);
+    }
 
     public SecurityLevel SecurityLevel { get; }
 
@@ -220,13 +408,15 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     public static ReadingPaneViewModel ForMessage(
         MessageSummary summary,
         OpenedMessage opened,
-        bool allowRemoteContent,
+        MessageView view,
         IFileService files,
         HttpClient http,
-        Action loadRemoteContent)
+        Action<MessageView> reshow,
+        Func<string, Task>? trust = null)
     {
+        ArgumentNullException.ThrowIfNull(view);
         var message = opened.Readable;
-        var content = MessageContent.From(message, allowRemoteContent);
+        var content = MessageContent.From(message, view.AllowRemoteContent, view.Privacy.BlockTrackers, view.Privacy.PlainText && !view.ShowOriginal);
         return new ReadingPaneViewModel(
             message.Subject ?? summary.Subject,
             message.From.Mailboxes.FirstOrDefault() is { } from ? (string.IsNullOrWhiteSpace(from.Name) ? from.Address : $"{from.Name} <{from.Address}>") : string.Empty,
@@ -239,8 +429,13 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             content.Attachments.Select(a => new AttachmentViewModel(a, files)).ToList(),
             Describe(opened.Security),
             http,
-            loadRemoteContent,
-            allowRemoteContent);
+            () => reshow(view with { AllowRemoteContent = true }),
+            view.AllowRemoteContent)
+        {
+            View = view,
+            Reshow = reshow,
+            Trust = trust,
+        };
     }
 
     /// <summary>Called by the HTML view for every image; returns null for blocked or unreadable images.</summary>

@@ -131,6 +131,25 @@ IMailStore      ICalendarStore      IContactStore            ← SQLite (Neruna.
 - Grenzen: CSS-Unterstützung etwa CSS 2 (moderne Newsletter mit Flexbox werden einfacher dargestellt). Option für später:
   dieselbe native WebView wie beim Verfassen, mit dediziertem Sanitizer und CSP.
 
+### Datenschutz und Phishing-Schutz
+
+Alles in `Neruna.Core.Privacy`, von Desktop und App gemeinsam genutzt; geprüft wird nur lokal, nichts geht dafür ins
+Internet (keine DNS-Sperrlisten, keine Favicon- oder Whois-Abfragen).
+- `PrivacyOptions` (Einstellungen → Datenschutz): externe Bilder nie / auf Nachfrage / immer, vertrauenswürdige
+  Absender (Adresse oder `@domain`; nie, wenn die Absenderprüfung fehlschlägt), Tracking-Pixel immer blockieren
+  (≤ 25 px², 1-px-Stile, bekannte Zähl-Pfade), «Nur Text», Link-Bestätigung (nie / verdächtig / immer), Links bereinigen,
+  Warnung bei verdächtigen Mails, Zeitzone verbergen.
+- `LinkInspector`: Linktext oder Hover-Text nennt eine andere Domain, `user@host`-Täuschung, IP statt Name, gemischte
+  Schriften und Punycode, Kurzlinks, HTTP. Bereinigt `utm_*`, `fbclid` usw. und springt über Safe Links, Google-, Facebook-,
+  LinkedIn-, YouTube- und AWS-SES-Weiterleitungen. Klickzähler bekannter Newsletter-Dienste gelten nur als Hinweis.
+- `MessageAnalyzer` («Sicherheit prüfen»): oberster `Authentication-Results`-Header, und nur wenn er vom eigenen
+  Server stammt (Server-ID gehört zu einem `Received: by` darüber; ohne ID nur bei Exchange-Organisationsheadern) – vom
+  Absender mitgeschickte Ergebnisse zählen nicht. Dazu Envelope/Reply-To/Sender, Adresse im Anzeigenamen, Name eines
+  Kontakts mit fremder Adresse, Domains, die eigene oder Kontakt-Domains nachahmen (`DomainNames.LooksLike`, Public
+  Suffix List), gefälschte eigene Adresse, «Re:» ohne Bezug, versteckte Links und Texte, Programme, Makro- und
+  HTML/SVG-Anhänge, S/MIME. Ergebnis: Unauffällig / Vorsicht / Gefährlich mit Begründungen.
+- Gesendete Mails: Message- und Content-IDs mit der Domain des Absenders statt des Rechnernamens (`OutgoingMail`).
+
 ### Verfassen (HTML-Editor)
 
 - `Editor/editor.html`: `contenteditable`-Seite mit kleiner JS-API (`window.neruna`: `setContent`, `getHtml`, `exec`,

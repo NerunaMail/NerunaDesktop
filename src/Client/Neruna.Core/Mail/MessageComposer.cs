@@ -104,11 +104,7 @@ public static partial class MessageComposer
         ArgumentNullException.ThrowIfNull(from);
         ArgumentNullException.ThrowIfNull(draft);
 
-        var message = new MimeMessage { Subject = draft.Subject };
-        if (draft.MessageId is { } messageId)
-        {
-            message.MessageId = messageId;
-        }
+        var message = new MimeMessage { Subject = draft.Subject, MessageId = draft.MessageId ?? Privacy.OutgoingMail.NewMessageId(from.Address) };
 
         message.From.Add(from);
         AddRecipients(message.To, draft.To, forDraft);
@@ -279,7 +275,7 @@ public static partial class MessageComposer
 
             var type = ContentType.Parse(match.Groups[1].Value);
             var image = body.LinkedResources.Add("bild." + type.MediaSubtype, data, type);
-            image.ContentId = MimeUtils.GenerateMessageId();
+            image.ContentId = Privacy.OutgoingMail.NewMessageId(null);
             return "src=\"cid:" + image.ContentId + "\"";
         });
 

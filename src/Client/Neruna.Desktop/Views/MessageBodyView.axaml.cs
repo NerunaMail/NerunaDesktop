@@ -116,9 +116,13 @@ internal sealed partial class MessageBodyView : UserControl
             return;
         }
 
-        if (Uri.TryCreate(link, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http")
+        // Checked first (Einstellungen → Datenschutz): shown before opening if suspicious or always, cleaned up if set.
+        if (DataContext is ReadingPaneViewModel pane && TopLevel.GetTopLevel(this) is Window window)
         {
-            _ = TopLevel.GetTopLevel(this)?.Launcher.LaunchUriAsync(uri);
+            _ = pane.OpenLinkAsync(
+                link,
+                check => LinkDialog.ShowAsync(window, check),
+                target => Uri.TryCreate(target, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http" ? window.Launcher.LaunchUriAsync(uri) : Task.CompletedTask);
         }
     }
 }

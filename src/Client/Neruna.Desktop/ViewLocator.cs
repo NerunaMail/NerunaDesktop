@@ -42,6 +42,7 @@ internal sealed class ViewLocator : IDataTemplate
         CertificatesViewModel => new CertificatesView(),
         SettingsViewModel => new SettingsView(),
         MailOptionsViewModel => new MailOptionsView(),
+        PrivacyOptionsViewModel => new PrivacyOptionsView(),
         CalendarOptionsViewModel => new CalendarOptionsView(),
         AiOptionsViewModel => new AiOptionsView(),
         SignaturesViewModel => new SignaturesView(),

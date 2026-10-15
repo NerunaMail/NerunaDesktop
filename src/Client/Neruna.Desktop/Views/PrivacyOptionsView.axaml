@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:sys="using:System"
+             x:Class="Neruna.Desktop.Views.PrivacyOptionsView"
+             x:DataType="vm:PrivacyOptionsViewModel">
+  <!-- Einstellungen → Datenschutz: what is blocked and what only after asking -->
+  <ScrollViewer>
+    <StackPanel Spacing="22" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,20">
+      <TextBlock TextWrapping="Wrap" Classes="subtle"
+                 Text="{l:T 'Neruna zeigt keine Werbung, sammelt keine Nutzungsdaten und prüft alles hier auf diesem Gerät. Diese Einstellungen bestimmen, was Absender über Sie erfahren.'}" />
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="{l:T 'Bilder aus dem Internet'}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Beim Laden eines Bildes erfährt der Absender, dass und wann Sie die Mail geöffnet haben, und Ihre IP-Adresse.'}" />
+        <RadioButton GroupName="Remote" IsChecked="{Binding RemoteAsk}" Content="{l:T 'Nur auf Nachfrage laden (empfohlen)'}" />
+        <RadioButton GroupName="Remote" IsChecked="{Binding RemoteBlock}" Content="{l:T 'Nie laden'}" />
+        <RadioButton GroupName="Remote" IsChecked="{Binding RemoteAllow}" Content="{l:T 'Immer laden'}" />
+        <CheckBox IsChecked="{Binding BlockTrackers}" Content="{l:T 'Tracking-Pixel immer blockieren, auch wenn Bilder geladen werden'}" Margin="0,6,0,0" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
+                   Text="{l:T 'Unsichtbare Mini-Bilder, die nur melden, dass die Mail gelesen wurde.'}" />
+
+        <TextBlock Classes="subtle" Text="{l:T 'Bilder ohne Nachfrage von'}" Margin="0,8,0,0" IsVisible="{Binding HasTrustedSenders}" />
+        <ItemsControl ItemsSource="{Binding TrustedSenders}" IsVisible="{Binding HasTrustedSenders}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="sys:String">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="command" Content="{l:T 'Entfernen'}" FontSize="12"
+                        Command="{Binding $parent[ItemsControl].((vm:PrivacyOptionsViewModel)DataContext).RemoveTrustedCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasTrustedSenders}"
+                   Text="{l:T 'Absender fügen Sie über «Immer laden» in der Leiste über einer Mail hinzu.'}" />
+      </StackPanel>
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="{l:T 'Darstellung'}" FontSize="16" FontWeight="SemiBold" />
+        <CheckBox IsChecked="{Binding PlainText}" Content="{l:T 'E-Mails als reinen Text anzeigen'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
+                   Text="{l:T 'Ohne Gestaltung, Bilder und versteckte Inhalte – Tracking hat so keine Chance. Die Originaldarstellung ist jederzeit einen Klick entfernt.'}" />
+      </StackPanel>
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="{l:T 'Links'}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Classes="subtle" Text="{l:T 'Vor dem Öffnen eines Links das tatsächliche Ziel zeigen'}" />
+        <RadioButton GroupName="Links" IsChecked="{Binding ConfirmSuspicious}" Content="{l:T 'Nur bei verdächtigen Links (empfohlen)'}" />
+        <RadioButton GroupName="Links" IsChecked="{Binding ConfirmAlways}" Content="{l:T 'Immer'}" />
+        <RadioButton GroupName="Links" IsChecked="{Binding ConfirmNever}" Content="{l:T 'Nie'}" />
+        <CheckBox IsChecked="{Binding CleanLinks}" Content="{l:T 'Tracking-Parameter entfernen und Weiterleitungsdienste überspringen'}" Margin="0,6,0,0" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
+                   Text="{l:T 'Zum Beispiel «utm_source» oder «fbclid»: Sie dienen nur der Auswertung, wer wo geklickt hat.'}" />
+      </StackPanel>
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="{l:T 'Phishing-Schutz'}" FontSize="16" FontWeight="SemiBold" />
+        <CheckBox IsChecked="{Binding WarnSuspicious}" Content="{l:T 'Bei verdächtigen Mails eine Warnung anzeigen'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
+                   Text="{l:T 'Neruna prüft Absender, Umschlag-Absender, Anzeigenamen, Links und Anhänge. Mit «Sicherheit prüfen» sehen Sie die Prüfung jeder Mail im Detail.'}" />
+      </StackPanel>
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="{l:T 'Beim Senden'}" FontSize="16" FontWeight="SemiBold" />
+        <CheckBox IsChecked="{Binding HideTimeZone}" Content="{l:T 'Zeitzone nicht mitsenden (Uhrzeit in UTC)'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
+                   Text="{l:T 'Der Name Ihres Computers wird nie mitgesendet.'}" />
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

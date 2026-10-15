@@ -727,6 +727,8 @@ internal static class Snapshots
         await vm.SettingsPage.ReloadAsync();
         vm.SettingsPage.SelectedTab = 1;
         await SaveAsync(window, output, "settings-mail.png");
+        vm.SettingsPage.SelectedTab = 14;
+        await SaveAsync(window, output, "settings-privacy.png");
 
         // Konto bearbeiten with a label and an alias (sender address of the same mailbox).
         var editedAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync())[0];
@@ -834,6 +836,12 @@ internal static class Snapshots
         await Task.Delay(200);
         Console.WriteLine($"AI summary: {vm.MailPage.ReadingPane?.Summary?.Text.Length} characters, error={vm.MailPage.ReadingPane?.Summary?.Error}");
         await SaveAsync(window, output, "mail-ai-summary.png");
+        // "Sicherheit prüfen": the check of the open mail.
+        vm.MailPage.ReadingPane?.Summary = null;
+        vm.MailPage.ReadingPane?.ToggleAnalysisCommand.Execute(null);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "mail-security-check.png");
+        vm.MailPage.ReadingPane?.ToggleAnalysisCommand.Execute(null);
         // Antworten with AI: the bar above the text (instructions, "Schreiben", rewriting).
         await vm.MailPage.ReplyCommand.ExecuteAsync(null);
         await Task.Delay(1500);

@@ -4,8 +4,11 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy) : ViewModelBase
 {
+    /// <summary>Settings → Datenschutz.</summary>
+    public PrivacyOptionsViewModel Privacy => privacy;
+
     /// <summary>Settings → Daten → Lokale Daten.</summary>
     public LocalDataViewModel LocalData => localData;
 
@@ -69,6 +72,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(4, T("Textvorlagen"), "IconTextTemplate"),
         new(11, T("Schnellaktionen"), "IconFlash"),
         new(5, T("Zertifikate (S/MIME)"), "IconCertificate"),
+        new(14, T("Datenschutz"), "IconShield"),
         new(-1, T("Kalender"), null, IsHeading: true),
         new(2, T("Kalender"), "IconCalendar"),
         new(-1, T("Daten"), null, IsHeading: true),
@@ -123,6 +127,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     {
         await Accounts.ReloadAsync();
         await MailOptions.ReloadAsync();
+        await Privacy.ReloadAsync();
         await CalendarOptions.ReloadAsync();
         await Signatures.ReloadAsync();
         await Certificates.ReloadAsync();

@@ -23,5 +23,7 @@
   <ItemGroup>
     <!-- Translations of the UI texts (German is in the code): Neruna.Core.Localization.Texts -->
     <EmbeddedResource Include="Localization\*.json" />
+    <!-- Public Suffix List (MPL 2.0), for the registrable domain of links and senders: Privacy/DomainNames.cs -->
+    <EmbeddedResource Include="Privacy\public_suffix_list.dat" LogicalName="Neruna.Core.Privacy.public_suffix_list.dat" />
   </ItemGroup>
 </Project>

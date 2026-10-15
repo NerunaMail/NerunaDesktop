@@ -130,6 +130,7 @@ internal static class AppServices
         services.AddSingleton<UiLayout>();
         services.AddSingleton<UiPreferences>();
         services.AddSingleton<RecipientDirectory>();
+        services.AddSingleton<PrivacyService>();
         services.AddSingleton<AgendaViewModel>();
         services.AddSingleton<UpdateService>();
         services.AddSingleton<NotificationService>();
@@ -149,6 +150,7 @@ internal static class AppServices
         services.AddSingleton<FileBackupViewModel>();
         services.AddSingleton<CertificatesViewModel>();
         services.AddSingleton<MailOptionsViewModel>();
+        services.AddSingleton<PrivacyOptionsViewModel>();
         services.AddSingleton<CalendarOptionsViewModel>();
         services.AddSingleton<SignaturesViewModel>();
         services.AddSingleton<AppearanceViewModel>();

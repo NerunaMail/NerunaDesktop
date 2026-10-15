@@ -227,7 +227,7 @@ public static class ITip
     /// </summary>
     public static MimeMessage Mail(MailboxAddress from, IEnumerable<MailboxAddress> to, string subject, string text, string iCalendarData, string method)
     {
-        var message = new MimeMessage { Subject = subject };
+        var message = new MimeMessage { Subject = subject, MessageId = Privacy.OutgoingMail.NewMessageId(from.Address) };
         message.From.Add(from);
         message.To.AddRange(to);
 

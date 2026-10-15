@@ -8,6 +8,7 @@ using Neruna.Core;
 using Neruna.Core.Accounts;
 using Neruna.Core.Calendar;
 using Neruna.Core.Mail;
+using Neruna.Core.Privacy;
 using Neruna.Core.Security;
 using Neruna.Desktop.Infrastructure;
 using static Neruna.Core.Localization.Texts;
@@ -32,6 +33,7 @@ internal sealed partial class MailViewModel(
     Neruna.Core.Ai.AiController ai,
     QuickActionService quickActions,
     MailSearchIndexer searchIndex,
+    PrivacyService privacy,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
@@ -544,9 +546,9 @@ internal sealed partial class MailViewModel(
             {
                 CanDelete = false,
             };
-            void Show(bool allowRemoteContent) =>
-                window.Pane = ReadingPaneViewModel.ForMessage(summary, opened, allowRemoteContent, files, _imageClient, () => Show(allowRemoteContent: true));
-            Show(allowRemoteContent: false);
+            void Show(MessageView view) =>
+                window.Pane = ReadingPaneViewModel.ForMessage(summary, opened, view, files, _imageClient, Show, privacy.TrustAsync);
+            Show(await ViewForAsync(summary, opened, loadedBefore: false));
             windows.ShowMessage(window);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -824,20 +826,25 @@ internal sealed partial class MailViewModel(
                 _ => RespondAsync(MessageComposer.Reply(opened.Readable, OwnAddresses(account.Account), replyAll: true), ComposeKind.Reply),
                 _ => RespondAsync(MessageComposer.Forward(opened.Readable), ComposeKind.Forward),
                 _ => DeleteFromWindowAsync(message, folder));
-            async Task ShowAsync(bool allowRemoteContent)
+            async Task ShowAsync(MessageView view)
             {
-                var pane = window.Pane = ReadingPaneViewModel.ForMessage(message.Summary, opened, allowRemoteContent, files, _imageClient, () =>
+                var shown = view;
+                var pane = window.Pane = ReadingPaneViewModel.ForMessage(message.Summary, opened, view, files, _imageClient, next =>
                 {
-                    _ = RememberRemoteContentAsync(message.Summary);
-                    _ = ShowAsync(allowRemoteContent: true);
-                });
+                    if (next.AllowRemoteContent && !shown.AllowRemoteContent)
+                    {
+                        _ = RememberRemoteContentAsync(message.Summary);
+                    }
+
+                    _ = ShowAsync(next);
+                }, privacy.TrustAsync);
                 // The quick actions and the PDF stamps work here, for this mail (replies in their own window too).
                 var context = new QuickActionContext(pane, message, folder, InWindow: true, opened.Security.WasEncrypted, () => window.Pane == pane);
                 pane.AttachmentActions = AttachmentActionsFor(context);
                 window.QuickActions = await QuickActionsForWindowAsync(context);
             }
 
-            await ShowAsync(await IsRemoteContentAllowedAsync(message.Summary));
+            await ShowAsync(await ViewForAsync(message.Summary, opened, await IsRemoteContentAllowedAsync(message.Summary)));
             windows.ShowMessage(window);
 
             if (message.IsUnread && await GetMarkAsReadModeAsync() != MarkAsReadMode.Never)
@@ -1424,8 +1431,14 @@ internal sealed partial class MailViewModel(
                 return;
             }
 
-            _opened = await secureMime.OpenAsync(mime, token);
-            ShowOpened(message.Summary, allowRemoteContent: await IsRemoteContentAllowedAsync(message.Summary));
+            var opened = _opened = await secureMime.OpenAsync(mime, token);
+            var view = await ViewForAsync(message.Summary, opened, await IsRemoteContentAllowedAsync(message.Summary));
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            ShowOpened(message.Summary, view);
 
             if (message.IsUnread)
             {
@@ -1493,18 +1506,35 @@ internal sealed partial class MailViewModel(
         await settings.SetListAsync(SettingKeys.RemoteContentAllowed, allowed);
     }
 
-    private void ShowOpened(MessageSummary summary, bool allowRemoteContent)
+    /// <summary>
+    /// How an opened mail is shown: the privacy settings, its security check (on a background thread: links and
+    /// contacts), and whether its pictures load right away.
+    /// </summary>
+    private async Task<MessageView> ViewForAsync(MessageSummary summary, OpenedMessage opened, bool loadedBefore)
+    {
+        var options = await privacy.GetAsync();
+        var context = await privacy.ContextAsync();
+        var assessment = await Task.Run(() => MessageAnalyzer.Analyze(opened.Readable, context, opened.Security));
+        var allow = options.LoadsRemoteContent(opened.Readable.From.Mailboxes.FirstOrDefault(), loadedBefore, assessment.SenderForged);
+        return new MessageView(options, assessment, allow);
+    }
+
+    private void ShowOpened(MessageSummary summary, MessageView view)
     {
         if (_opened is not { } opened)
         {
             return;
         }
 
-        ReadingPane = ReadingPaneViewModel.ForMessage(summary, opened, allowRemoteContent, files, _imageClient, () =>
+        ReadingPane = ReadingPaneViewModel.ForMessage(summary, opened, view, files, _imageClient, next =>
         {
-            _ = RememberRemoteContentAsync(summary);
-            ShowOpened(summary, allowRemoteContent: true);
-        });
+            if (next.AllowRemoteContent && !view.AllowRemoteContent)
+            {
+                _ = RememberRemoteContentAsync(summary);
+            }
+
+            ShowOpened(summary, next);
+        }, privacy.TrustAsync);
         if (_invitation is { } shown && shown.RemoteId == summary.RemoteId)
         {
             ReadingPane.Invitation = shown.Banner;
