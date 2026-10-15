@@ -448,6 +448,7 @@
  "Die Nachricht ist in der Outlook-Datendatei nicht mehr vorhanden.": "The message is no longer in the Outlook data file.",
  "Die Nachricht ist nicht mehr auf dem Server.": "The message is no longer on the server.",
  "Die Nachricht ist unverändert. Um dem Aussteller zu vertrauen, dessen Stammzertifikat unter Einstellungen → Zertifikate importieren.": "The message is unchanged. To trust the issuer, import its root certificate under Settings → Certificates.",
+ "Die Nachricht kann nicht angezeigt werden. Bitte öffnen oder speichern.": "The message cannot be shown. Please open or save it.",
  "Die Nachricht konnte nicht entschlüsselt werden: ": "The message could not be decrypted: ",
  "Die Nachricht konnte nicht geladen werden: ": "The message could not be loaded: ",
  "Die Ordner konnten nicht vom Server geladen werden: ": "The folders could not be loaded from the server: ",

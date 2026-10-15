@@ -7,6 +7,9 @@ public enum AttachmentPreviewKind
     None,
     Image,
     Pdf,
+
+    /// <summary>A mail (.eml, message/rfc822): shown like a message, with its own attachments.</summary>
+    Message,
 }
 
 /// <summary>Which attachments the reading pane can show itself (instead of opening them in another program).</summary>
@@ -26,12 +29,22 @@ public static class AttachmentPreview
     public static AttachmentPreviewKind KindOf(MimeEntity entity, string fileName)
     {
         ArgumentNullException.ThrowIfNull(entity);
+        if (entity is MessagePart)
+        {
+            return AttachmentPreviewKind.Message;
+        }
+
         if (entity is not MimePart)
         {
             return AttachmentPreviewKind.None;
         }
 
         var extension = Path.GetExtension(fileName ?? string.Empty);
+        if (extension.Equals(".eml", StringComparison.OrdinalIgnoreCase))
+        {
+            return AttachmentPreviewKind.Message;
+        }
+
         if (extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
         {
             return AttachmentPreviewKind.Pdf;
@@ -47,6 +60,7 @@ public static class AttachmentPreview
 
     private static AttachmentPreviewKind KindOfType(ContentType type) =>
         type.IsMimeType("application", "pdf") ? AttachmentPreviewKind.Pdf
+        : type.IsMimeType("message", "rfc822") ? AttachmentPreviewKind.Message
         : type.MediaType.Equals("image", StringComparison.OrdinalIgnoreCase) && ImageTypes.Contains(type.MediaSubtype) ? AttachmentPreviewKind.Image
         : AttachmentPreviewKind.None;
 }

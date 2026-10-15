@@ -448,6 +448,7 @@
  "Die Nachricht ist in der Outlook-Datendatei nicht mehr vorhanden.": "Le message n'existe plus dans le fichier de données Outlook.",
  "Die Nachricht ist nicht mehr auf dem Server.": "Le message n’est plus sur le serveur.",
  "Die Nachricht ist unverändert. Um dem Aussteller zu vertrauen, dessen Stammzertifikat unter Einstellungen → Zertifikate importieren.": "Le message est intact. Pour faire confiance à l'émetteur, importez son certificat racine sous Paramètres → Certificats.",
+ "Die Nachricht kann nicht angezeigt werden. Bitte öffnen oder speichern.": "Le message ne peut pas être affiché. Veuillez l'ouvrir ou l'enregistrer.",
  "Die Nachricht konnte nicht entschlüsselt werden: ": "Le message n'a pas pu être déchiffré : ",
  "Die Nachricht konnte nicht geladen werden: ": "Le message n'a pas pu être chargé : ",
  "Die Ordner konnten nicht vom Server geladen werden: ": "Les dossiers n'ont pas pu être chargés depuis le serveur : ",

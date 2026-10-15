@@ -448,6 +448,7 @@
  "Die Nachricht ist in der Outlook-Datendatei nicht mehr vorhanden.": "Il messaggio non è più presente nel file di dati di Outlook.",
  "Die Nachricht ist nicht mehr auf dem Server.": "Il messaggio non è più sul server.",
  "Die Nachricht ist unverändert. Um dem Aussteller zu vertrauen, dessen Stammzertifikat unter Einstellungen → Zertifikate importieren.": "Il messaggio è invariato. Per fidarti dell'emittente, importa il suo certificato radice in Impostazioni → Certificati.",
+ "Die Nachricht kann nicht angezeigt werden. Bitte öffnen oder speichern.": "Il messaggio non può essere visualizzato. Aprirlo o salvarlo.",
  "Die Nachricht konnte nicht entschlüsselt werden: ": "Il messaggio non è stato decifrato: ",
  "Die Nachricht konnte nicht geladen werden: ": "Il messaggio non è stato caricato: ",
  "Die Ordner konnten nicht vom Server geladen werden: ": "Le cartelle non sono state caricate dal server: ",

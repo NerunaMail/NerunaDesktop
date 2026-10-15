@@ -146,6 +146,32 @@ internal static class Snapshots
         }
 
         await SaveAsync(window, output, "mail-attachment-preview.png");
+
+        // An attached mail (.eml): shown as a message in the reading pane.
+        var openMessage = vm.MailPage.SelectedEntry;
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.Summary.Subject == "Protokoll Kundenworkshop");
+        for (var i = 0; i < 50 && vm.MailPage.ReadingPane?.Message?.Subject != "Protokoll Kundenworkshop"; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await vm.MailPage.ReadingPane!.Attachments.First(a => a.PreviewKind == Neruna.Core.Mail.AttachmentPreviewKind.Message).ActivateCommand.ExecuteAsync(null);
+        await Task.Delay(800);
+        Console.WriteLine($"Attached mail: {vm.MailPage.ReadingPane.Preview?.Message?.Subject} problem={vm.MailPage.ReadingPane.Preview?.Problem}");
+        await SaveAsync(window, output, "mail-attached-message.png");
+        vm.MailPage.SelectedEntry = openMessage;
+        for (var i = 0; i < 50 && vm.MailPage.ReadingPane?.Attachments.Any(a => a.CanPreview) != true; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        pdfAttachment = vm.MailPage.ReadingPane!.Attachments.First(a => a.CanPreview);
+        await pdfAttachment.ActivateCommand.ExecuteAsync(null);
+        for (var i = 0; i < 50 && (vm.MailPage.ReadingPane.Preview?.IsBusy != false); i++)
+        {
+            await Task.Delay(100);
+        }
+
         Console.WriteLine($"Attachment preview: {vm.MailPage.ReadingPane.Preview?.Pages.Count} page(s), {vm.MailPage.ReadingPane.Preview?.PageInfo}, problem={vm.MailPage.ReadingPane.Preview?.Problem}");
         // Stamping the PDF: placed (shown on the page at once), then kept – with the person's name, not the login.
         await services.GetRequiredService<Neruna.Core.Mail.QuickActionService>().SetStampNameAsync("Anna Muster");

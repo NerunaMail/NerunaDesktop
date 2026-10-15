@@ -105,6 +105,30 @@ public class PstTests
     }
 
     [Fact]
+    public void Signed_and_encrypted_mail_comes_as_SMIME_for_Neruna_to_open()
+    {
+        using var key = System.Security.Cryptography.RSA.Create(2048);
+        var request = new System.Security.Cryptography.X509Certificates.CertificateRequest("CN=Anna Muster", key,
+            System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        var envelope = new System.Security.Cryptography.Pkcs.EnvelopedCms(new System.Security.Cryptography.Pkcs.ContentInfo(Encoding.ASCII.GetBytes("Content-Type: text/plain\r\n\r\nGeheim")));
+        envelope.Encrypt(new System.Security.Cryptography.Pkcs.CmsRecipient(certificate));
+        var item = new PstItem("Subject: Vertraulich\r\nFrom: lea@example.com\r\n", "Vertraulich", null, [], [], [], null, null, null, null, null, null, []);
+
+        var encrypted = PstMime.Build(item with { Smime = envelope.Encode() });
+        Assert.Equal(MimeKit.Cryptography.SecureMimeType.EnvelopedData, Assert.IsType<MimeKit.Cryptography.ApplicationPkcs7Mime>(encrypted.Body).SecureMimeType);
+        Assert.Equal("Vertraulich", encrypted.Subject);
+
+        const string Signed = "Content-Type: multipart/signed; protocol=\"application/pkcs7-signature\"; micalg=sha-256; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nUnterschrieben\r\n--b\r\nContent-Type: application/pkcs7-signature; name=smime.p7s\r\nContent-Transfer-Encoding: base64\r\n\r\nAAAA\r\n--b--\r\n";
+        var signed = PstMime.Build(item with { Smime = Encoding.ASCII.GetBytes(Signed), SmimeIsMime = true });
+        Assert.Equal("multipart/signed", signed.Body?.ContentType.MimeType);
+        Assert.Equal("Unterschrieben", signed.TextBody?.Trim());
+
+        // Not PKCS#7 at all: the normal body (here empty) instead of a broken one.
+        Assert.Equal("text/plain", PstMime.Build(item with { Smime = [1, 2, 3] }).Body?.ContentType.MimeType);
+    }
+
+    [Fact]
     public async Task A_real_data_file_is_read_as_an_account_that_does_not_change()
     {
         Assert.SkipWhen(File is null, "NERUNA_TEST_PST not set");

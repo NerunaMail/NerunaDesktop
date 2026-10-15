@@ -23,7 +23,16 @@ internal sealed record PstItem(
     string? Html,
     string? Text,
     string? Rtf,
-    IReadOnlyList<PstAttachment> Attachments);
+    IReadOnlyList<PstAttachment> Attachments)
+{
+    /// <summary>
+    /// S/MIME as Outlook keeps it, in place of the body: the whole multipart/signed MIME (<see cref="SmimeIsMime"/>), or
+    /// the PKCS#7 data of an encrypted or opaquely signed mail – Neruna verifies and decrypts it like any S/MIME mail.
+    /// </summary>
+    public byte[]? Smime { get; init; }
+
+    public bool SmimeIsMime { get; init; }
+}
 
 /// <summary>Outlook keeps messages as properties, not as MIME: this puts them together again.</summary>
 internal static class PstMime
@@ -88,6 +97,11 @@ internal static class PstMime
 
     private static MimeEntity Body(PstItem item)
     {
+        if (item.Smime is { } smime && SmimeBody(smime, item.SmimeIsMime) is { } secured)
+        {
+            return secured;
+        }
+
         var html = item.Html ?? RtfBody.HtmlOf(item.Rtf);
         var text = item.Text ?? (html is null ? RtfBody.TextOf(item.Rtf) : null);
 
@@ -142,6 +156,41 @@ internal static class PstMime
         }
 
         return mixed;
+    }
+
+    private static MimeEntity? SmimeBody(byte[] data, bool isMime)
+    {
+        if (isMime)
+        {
+            try
+            {
+                return MimeEntity.Load(new MemoryStream(data));
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
+        }
+
+        // Enveloped (encrypted) or signed data – by the content type at the start of the PKCS#7 structure.
+        string? type;
+        try
+        {
+            var reader = new System.Formats.Asn1.AsnReader(data, System.Formats.Asn1.AsnEncodingRules.BER).ReadSequence();
+            type = reader.ReadObjectIdentifier();
+        }
+        catch (System.Formats.Asn1.AsnContentException)
+        {
+            return null;
+        }
+
+        var kind = type switch
+        {
+            "1.2.840.113549.1.7.3" => MimeKit.Cryptography.SecureMimeType.EnvelopedData,
+            "1.2.840.113549.1.7.2" => MimeKit.Cryptography.SecureMimeType.SignedData,
+            _ => (MimeKit.Cryptography.SecureMimeType?)null,
+        };
+        return kind is { } known ? new MimeKit.Cryptography.ApplicationPkcs7Mime(known, new MemoryStream(data)) : null;
     }
 
     private static MimePart Part(PstAttachment attachment)

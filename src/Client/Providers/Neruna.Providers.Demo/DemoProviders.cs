@@ -141,6 +141,16 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
                 ContentTransferEncoding = ContentEncoding.Base64,
             };
             message.Body = new Multipart("mixed") { message.Body, pdf };
+
+            // The workshop's invitation goes along as an attached mail (shown in the reading pane like a message).
+            if (m.Subject == "Protokoll Kundenworkshop")
+            {
+                var invitation = new MimeMessage { Subject = "Einladung Kundenworkshop", Date = DateTimeOffset.Now.AddDays(-9) };
+                invitation.From.Add(new MailboxAddress("Nadia Rossi", "nadia.rossi@example.com"));
+                invitation.To.Add(new MailboxAddress("Anna Muster", "anna.muster@example.com"));
+                invitation.Body = new TextPart("html") { Text = "<p>Hoi zusammen</p><p>Der Workshop mit der Bernasconi AG findet am <b>Dienstag um 9 Uhr</b> im Sitzungszimmer Rigi statt.</p><p>Liebe Grüsse<br>Nadia</p>" };
+                ((Multipart)message.Body).Add(new MessagePart { Message = invitation, ContentDisposition = new ContentDisposition(ContentDisposition.Attachment) });
+            }
         }
 
         return Task.FromResult(message);

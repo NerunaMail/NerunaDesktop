@@ -203,7 +203,10 @@
             </StackPanel>
           </Grid>
         </Border>
-        <ScrollViewer Grid.Row="2" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
+        <!-- An attached mail: as a message of its own (its view is made only when needed – it is this view again) -->
+        <ContentControl Grid.Row="2" Content="{Binding Preview.Message}" IsVisible="{Binding Preview.Message, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
+        <ScrollViewer Grid.Row="2" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel"
+                      IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNull}, FallbackValue=True}">
           <StackPanel Margin="16" Spacing="12">
             <ItemsControl ItemsSource="{Binding Pages}">
               <ItemsControl.ItemsPanel>

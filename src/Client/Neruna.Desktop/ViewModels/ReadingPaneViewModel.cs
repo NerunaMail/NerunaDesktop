@@ -128,7 +128,7 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         }
 
         attachment.IsPreviewed = true;
-        Preview = new AttachmentPreviewViewModel(attachment, ClosePreview, AttachmentActions);
+        Preview = new AttachmentPreviewViewModel(attachment, ClosePreview, AttachmentActions, showMessage: m => Attached(m, allowRemoteContent: false, attachment.Files));
         _ = Preview.LoadAsync();
     }
 
@@ -142,6 +142,22 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         await preview.LoadAsync();
         var stamped = await preview.StampForActionAsync(stamp);
         return stamped;
+    }
+
+    // An attached mail as a message of its own: pictures from the internet only on request, as for any mail.
+    private ReadingPaneViewModel Attached(MimeMessage message, bool allowRemoteContent, IFileService files)
+    {
+        var summary = new MessageSummary(string.Empty, message.MessageId, message.InReplyTo, message.Subject ?? string.Empty, null, [],
+            message.Date, MessageFlags.Seen, 0, false, null);
+        ReadingPaneViewModel? pane = null;
+        pane = ForMessage(summary, new OpenedMessage(message, MessageSecurityInfo.None), allowRemoteContent, files, _http ?? new HttpClient(), () =>
+        {
+            if (Preview is { } preview && preview.Message == pane)
+            {
+                preview.Message = Attached(message, allowRemoteContent: true, files);
+            }
+        });
+        return pane;
     }
 
     private void ClosePreview()
@@ -299,6 +315,9 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
 internal sealed partial class AttachmentViewModel(MimeEntity entity, IFileService files) : ObservableObject
 {
+    /// <summary>For an attached mail's own attachments.</summary>
+    public IFileService Files => files;
+
     public string FileName { get; } = MessageContent.FileNameOf(entity);
 
     /// <summary>The part in the mail (forwarding replaces it with a stamped copy).</summary>

@@ -44,7 +44,21 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
         var summaries = await archive.ReadAsync(a =>
         {
             var source = a.Folder(folder.RemoteId);
-            return PstArchive.Messages(source).Select(m => PstArchive.Summary(m.Index, m.Message)).ToList();
+            // A message that cannot be read does not stop the folder: it is left out.
+            var list = new List<MessageSummary>();
+            foreach (var (index, message) in PstArchive.Messages(source))
+            {
+                try
+                {
+                    list.Add(PstArchive.Summary(index, message));
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException and not OperationCanceledException)
+                {
+                    // damaged or of a kind XstReader cannot read
+                }
+            }
+
+            return list;
         }, cancellationToken);
         var present = summaries.Select(s => s.RemoteId).ToHashSet(StringComparer.Ordinal);
 

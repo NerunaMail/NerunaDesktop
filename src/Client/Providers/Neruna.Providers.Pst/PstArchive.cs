@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using Neruna.Core.Mail;
@@ -177,7 +179,53 @@ internal sealed class PstArchive : IDisposable
 
     /// <summary>The mail of a folder (not appointments or contacts filed there), with its position.</summary>
     public static IEnumerable<(int Index, XstMessage Message)> Messages(XstFolder folder) =>
-        folder.Messages.Select((m, i) => (Index: i, Message: m)).Where(m => IsMail(m.Message));
+        All(folder).Select((m, i) => (Index: i, Message: m)).Where(m => IsMail(m.Message));
+
+    // The folder's contents table – read here, not with XstFolder.Messages: that one also tries to decrypt S/MIME mail
+    // itself (with the certificates of Windows) and on the first it cannot, ends the whole list ("ASN1 bad tag value").
+    // Neruna opens S/MIME itself (see Item). Internal API of XstReader.Api 1.0.6 (pinned); another version falls back.
+    private static readonly ConditionalWeakTable<XstFolder, List<XstMessage>> Contents = [];
+
+    private static List<XstMessage> All(XstFolder folder)
+    {
+        if (Contents.TryGetValue(folder, out var cached))
+        {
+            return cached;
+        }
+
+        var messages = folder.ContentCount == 0 ? [] : ReadContents(folder) ?? [.. folder.Messages];
+        Contents.AddOrUpdate(folder, messages);
+        return messages;
+    }
+
+    private static List<XstMessage>? ReadContents(XstFolder folder)
+    {
+        const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+        var assembly = typeof(XstFolder).Assembly;
+        var nidType = assembly.GetType("XstReader.NID");
+        var enidType = assembly.GetType("XstReader.EnidType");
+        var ltp = typeof(XstElement).GetProperty("Ltp", Any)?.GetValue(folder);
+        var nid = typeof(XstElement).GetProperty("Nid", Any)?.GetValue(folder);
+        var typed = nidType?.GetMethod("TypedNID", Any);
+        var initialize = typeof(XstMessage).GetMethod("Initialize", Any, [nidType!, typeof(XstFolder)]);
+        var readTable = ltp?.GetType().GetMethods(Any).FirstOrDefault(m => m.Name == "ReadTable" && m.GetParameters().Length == 3)?.MakeGenericMethod(typeof(XstMessage));
+        if (nidType is null || enidType is null || ltp is null || nid is null || typed is null || initialize is null || readTable is null)
+        {
+            return null;
+        }
+
+        var contents = typed.Invoke(null, [Enum.Parse(enidType, "CONTENTS_TABLE"), nid]);
+        Action<XstMessage, uint> create = (message, id) => initialize.Invoke(message, [Activator.CreateInstance(nidType, id), folder]);
+        Action<XstMessage> nothing = _ => { };
+        try
+        {
+            return [.. (IEnumerable<XstMessage>)readTable.Invoke(ltp, [contents, create, nothing])!];
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is { } inner)
+        {
+            throw inner;
+        }
+    }
 
     public static string RemoteIdOf(int index, XstMessage message) => $"{index.ToString(CultureInfo.InvariantCulture)}.{Fingerprint(message)}";
 
@@ -185,7 +233,7 @@ internal sealed class PstArchive : IDisposable
     public static XstMessage Message(XstFolder folder, string remoteId)
     {
         var dot = remoteId.IndexOf('.', StringComparison.Ordinal);
-        var all = folder.Messages.ToList();
+        var all = All(folder);
         if (dot > 0 && int.TryParse(remoteId.AsSpan(0, dot), NumberStyles.None, CultureInfo.InvariantCulture, out var index)
             && index < all.Count && RemoteIdOf(index, all[index]) == remoteId)
         {
@@ -241,14 +289,34 @@ internal sealed class PstArchive : IDisposable
             date,
             flags,
             message.PropertyValue(PropertyCanonicalName.PidTagMessageSize) is int size ? size : 0,
-            message.HasAttachments,
-            null);
+            message.HasAttachments && SmimeKind(message) is null,
+            null,
+            SmimeKind(message) switch
+            {
+                true => MessageSecurity.Signed,
+                false => MessageSecurity.Encrypted,
+                null => MessageSecurity.None,
+            });
     }
 
     /// <summary>Everything that goes into the MIME message, attached messages included.</summary>
     public static PstItem Item(XstMessage message, int depth = 0)
     {
         var (from, to, cc, bcc) = Recipients(message);
+
+        // S/MIME: Outlook keeps it as one attachment ("smime.p7m"); Neruna opens it itself.
+        if (SmimeKind(message) is { } multipartSigned && message.Attachments.FirstOrDefault() is { } secured)
+        {
+            using var data = new MemoryStream();
+            secured.SaveToStream(data);
+            return new PstItem(Headers(message), message.Subject, from, to, cc, bcc, Utc(message.SubmittedTime ?? message.Date ?? message.ReceivedTime),
+                message.InternetMessageId, message.PropertyValue(PropertyCanonicalName.PidTagInReplyToId) as string, null, null, null, [])
+            {
+                Smime = data.ToArray(),
+                SmimeIsMime = multipartSigned,
+            };
+        }
+
         string? html = null, text = null, rtf = null;
         var body = message.Body;
         switch (body?.Format)
@@ -284,7 +352,7 @@ internal sealed class PstArchive : IDisposable
         }
 
         return new PstItem(
-            message.PropertyValue(PropertyCanonicalName.PidTagTransportMessageHeaders) as string,
+            Headers(message),
             message.Subject,
             from,
             to,
@@ -298,6 +366,14 @@ internal sealed class PstArchive : IDisposable
             rtf,
             attachments);
     }
+
+    private static string? Headers(XstMessage message) => message.PropertyValue(PropertyCanonicalName.PidTagTransportMessageHeaders) as string;
+
+    /// <summary>Null: no S/MIME; true: signed as multipart/signed (clear text); false: encrypted or opaquely signed.</summary>
+    private static bool? SmimeKind(XstMessage message) =>
+        message.PropertyValue(PropertyCanonicalName.PidTagMessageClass) is string kind && kind.StartsWith("IPM.Note.SMIME", StringComparison.OrdinalIgnoreCase)
+            ? kind.Contains("MultipartSigned", StringComparison.OrdinalIgnoreCase)
+            : null;
 
     private static (PstAddress? From, List<PstAddress> To, List<PstAddress> Cc, List<PstAddress> Bcc) Recipients(XstMessage message)
     {

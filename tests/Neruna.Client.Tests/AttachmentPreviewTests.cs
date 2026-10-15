@@ -15,12 +15,14 @@ public class AttachmentPreviewTests
     [InlineData("image/svg+xml", "logo.svg", AttachmentPreviewKind.None)]
     [InlineData("image/heic", "IMG_0001.HEIC", AttachmentPreviewKind.None)]
     [InlineData("application/octet-stream", "setup.exe", AttachmentPreviewKind.None)]
+    [InlineData("application/octet-stream", "Weitergeleitet.eml", AttachmentPreviewKind.Message)]
+    [InlineData("message/rfc822", "anhang", AttachmentPreviewKind.Message)]
     public void KindByNameOrType(string mimeType, string fileName, AttachmentPreviewKind expected) =>
         Assert.Equal(expected, AttachmentPreview.KindOf(new MimePart(ContentType.Parse(mimeType)), fileName));
 
     [Fact]
-    public void AttachedMessageHasNoPreview() =>
-        Assert.Equal(AttachmentPreviewKind.None, AttachmentPreview.KindOf(new MessagePart(), "mail.pdf"));
+    public void AnAttachedMessageIsShownAsAMessage() =>
+        Assert.Equal(AttachmentPreviewKind.Message, AttachmentPreview.KindOf(new MessagePart(), "mail.pdf"));
 
     [Fact]
     public void RendersPdfPages()

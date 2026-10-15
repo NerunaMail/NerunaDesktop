@@ -46,9 +46,11 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
     private int _pageCount;
 
     /// <param name="content">Already changed content (stamped by an earlier step of a quick action) instead of the attachment's.</param>
-    public AttachmentPreviewViewModel(AttachmentViewModel attachment, Action close, IAttachmentActions? actions = null, byte[]? content = null)
+    public AttachmentPreviewViewModel(AttachmentViewModel attachment, Action close, IAttachmentActions? actions = null, byte[]? content = null,
+        Func<MimeKit.MimeMessage, ReadingPaneViewModel>? showMessage = null)
     {
         Attachment = attachment;
+        _showMessage = showMessage;
         _close = close;
         _actions = actions;
         _data = content;
@@ -56,6 +58,12 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
     }
 
     public AttachmentViewModel Attachment { get; }
+
+    private readonly Func<MimeKit.MimeMessage, ReadingPaneViewModel>? _showMessage;
+
+    /// <summary>An attached mail (.eml), shown as a message – its attachments open the same way.</summary>
+    [ObservableProperty]
+    public partial ReadingPaneViewModel? Message { get; set; }
 
     public ObservableCollection<PreviewPage> Pages { get; } = [];
 
@@ -322,11 +330,41 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
     [ObservableProperty]
     public partial string? PageInfo { get; set; }
 
+    private async Task ShowMessageAsync()
+    {
+        var message = Attachment.Entity is MimeKit.MessagePart { Message: { } attached } ? attached : null;
+        if (message is null && await Attachment.ReadAsync() is { } data)
+        {
+            try
+            {
+                message = await Task.Run(() => MimeKit.MimeMessage.Load(new MemoryStream(data)));
+            }
+            catch (FormatException)
+            {
+                message = null;
+            }
+        }
+
+        if (message is null || _showMessage is null)
+        {
+            Problem = T("Die Nachricht kann nicht angezeigt werden. Bitte öffnen oder speichern.");
+            return;
+        }
+
+        Message = _showMessage(message);
+    }
+
     public async Task LoadAsync()
     {
         IsBusy = true;
         try
         {
+            if (Attachment.PreviewKind == AttachmentPreviewKind.Message)
+            {
+                await ShowMessageAsync();
+                return;
+            }
+
             _data ??= await Attachment.ReadAsync();
             if (_data is null)
             {
