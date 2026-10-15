@@ -13,6 +13,14 @@ internal enum MailSort
     Size,
 }
 
+/// <summary>Where the reading pane is: beside the list, below it, or none (a double-click opens the mail in a window).</summary>
+internal enum ReadingPanePosition
+{
+    Right,
+    Below,
+    None,
+}
+
 /// <summary>
 /// How the mail list looks: as cards or as a table (one line per mail, in columns), the table's column widths and the
 /// sorting. Kept on this computer ("ui.layout…"), so it is the same after a restart and in every folder.
@@ -23,7 +31,7 @@ internal sealed partial class MailListLayout(ISettingsStore settings) : Observab
 
     private bool _loading;
 
-    private sealed record Stored(bool Table, double From, double Date, double Size, MailSort Sort, bool Descending);
+    private sealed record Stored(bool Table, double From, double Date, double Size, MailSort Sort, bool Descending, ReadingPanePosition Pane = ReadingPanePosition.Right, double ListHeight = 320);
 
     [ObservableProperty]
     public partial bool IsTable { get; set; }
@@ -37,6 +45,20 @@ internal sealed partial class MailListLayout(ISettingsStore settings) : Observab
 
     [ObservableProperty]
     public partial double SizeWidth { get; set; } = 60;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPaneRight), nameof(IsPaneBelow), nameof(IsPaneNone))]
+    public partial ReadingPanePosition Pane { get; set; }
+
+    public bool IsPaneRight => Pane == ReadingPanePosition.Right;
+
+    public bool IsPaneBelow => Pane == ReadingPanePosition.Below;
+
+    public bool IsPaneNone => Pane == ReadingPanePosition.None;
+
+    /// <summary>With the reading pane below: the list's height.</summary>
+    [ObservableProperty]
+    public partial double ListHeight { get; set; } = 320;
 
     [ObservableProperty]
     public partial MailSort Sort { get; set; } = MailSort.Date;
@@ -79,6 +101,8 @@ internal sealed partial class MailListLayout(ISettingsStore settings) : Observab
                 SizeWidth = Clamp(stored.Size, 60);
                 Sort = stored.Sort;
                 Descending = stored.Descending;
+                Pane = stored.Pane;
+                ListHeight = stored.ListHeight is >= 120 and <= 4000 ? stored.ListHeight : 320;
             }
         }
         catch (JsonException)
@@ -105,6 +129,15 @@ internal sealed partial class MailListLayout(ISettingsStore settings) : Observab
             _loading = false;
             Descending = sort is MailSort.Date or MailSort.Size; // newest and largest first; names A–Z
         }
+    }
+
+    /// <summary>After dragging the border between list and reading pane below it.</summary>
+    public void SetListHeight(double height)
+    {
+        _loading = true;
+        ListHeight = Math.Clamp(height, 120, 4000);
+        _loading = false;
+        _ = SaveAsync();
     }
 
     /// <summary>After dragging a column border in the table's header.</summary>
@@ -141,7 +174,7 @@ internal sealed partial class MailListLayout(ISettingsStore settings) : Observab
     }
 
     private Task SaveAsync() =>
-        settings.SetAsync(Key, JsonSerializer.Serialize(new Stored(IsTable, FromWidth, DateWidth, SizeWidth, Sort, Descending)));
+        settings.SetAsync(Key, JsonSerializer.Serialize(new Stored(IsTable, FromWidth, DateWidth, SizeWidth, Sort, Descending, Pane, ListHeight)));
 
     private static double Clamp(double width, double fallback) => double.IsFinite(width) && width >= 40 ? Math.Min(width, 800) : fallback;
 }

@@ -19,10 +19,11 @@
 
   <Grid>
 
-    <Grid x:Name="Columns" ColumnDefinitions="240,6,400,6,*,Auto">
+    <!-- Rows: with the reading pane below the list (list, border, pane); beside it or without, everything spans them -->
+    <Grid x:Name="Columns" ColumnDefinitions="240,6,400,6,*,Auto" RowDefinitions="*,0,0">
 
       <!-- Folder tree, with "Neue E-Mail" on top -->
-      <Border Classes="pane" Grid.Column="0" Padding="4,8">
+      <Border Classes="pane" Grid.Column="0" Grid.RowSpan="3" Padding="4,8">
         <DockPanel>
           <Button DockPanel.Dock="Top" Classes="accent" Command="{Binding NewMailCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                   Padding="12,7" Margin="6,0,6,8" ToolTip.Tip="{l:T 'Neue E-Mail (Ctrl+N)'}">
@@ -137,10 +138,10 @@
         </DockPanel>
       </Border>
 
-      <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" />
+      <GridSplitter Grid.Column="1" Grid.RowSpan="3" Background="Transparent" ResizeDirection="Columns" />
 
       <!-- Message list -->
-      <Border Classes="pane" Grid.Column="2">
+      <Border x:Name="ListPane" Classes="pane" Grid.Column="2" Grid.RowSpan="3">
         <Grid RowDefinitions="Auto,*,Auto">
           <StackPanel Margin="12,10,12,6" Spacing="8">
             <Grid ColumnDefinitions="*,Auto,Auto">
@@ -158,6 +159,10 @@
                     <MenuItem Header="{l:T 'Nach Betreff'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsBySubject, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Subject}" />
                     <MenuItem Header="{l:T 'Nach Grösse'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsBySize, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Size}" />
                     <MenuItem Header="{l:T 'Absteigend'}" ToggleType="CheckBox" IsChecked="{Binding ListLayout.Descending}" />
+                    <Separator />
+                    <MenuItem Header="{l:T 'Lesebereich rechts'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsPaneRight, Mode=OneWay}" Command="{Binding PlacePaneCommand}" CommandParameter="{x:Static vm:ReadingPanePosition.Right}" />
+                    <MenuItem Header="{l:T 'Lesebereich unten'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsPaneBelow, Mode=OneWay}" Command="{Binding PlacePaneCommand}" CommandParameter="{x:Static vm:ReadingPanePosition.Below}" />
+                    <MenuItem Header="{l:T 'Kein Lesebereich (Doppelklick öffnet)'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsPaneNone, Mode=OneWay}" Command="{Binding PlacePaneCommand}" CommandParameter="{x:Static vm:ReadingPanePosition.None}" />
                   </MenuFlyout>
                 </Button.Flyout>
               </Button>
@@ -371,10 +376,11 @@
         </Grid>
       </Border>
 
-      <GridSplitter Grid.Column="3" Background="Transparent" ResizeDirection="Columns" />
+      <GridSplitter x:Name="PaneSplitter" Grid.Column="3" Grid.RowSpan="3" Background="Transparent" ResizeDirection="Columns" />
+      <GridSplitter x:Name="RowSplitter" Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="3" Background="Transparent" ResizeDirection="Rows" IsVisible="False" />
 
       <!-- Reading pane / inline compose; the message actions on top of the message -->
-      <Border Classes="pane" Grid.Column="4">
+      <Border x:Name="ReadingPaneBox" Classes="pane" Grid.Column="4" Grid.RowSpan="3">
         <DockPanel>
           <Border DockPanel.Dock="Top" IsVisible="{Binding ShowMessageActions}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="12,6">
             <WrapPanel Orientation="Horizontal" ItemSpacing="2" LineSpacing="2">
@@ -402,7 +408,7 @@
       </Border>
 
       <!-- Tagesansicht (header button): today's and the next days' appointments -->
-      <Border Classes="pane" Grid.Column="5" Width="270" Margin="6,0,0,0" IsVisible="{Binding Agenda.IsOpen}">
+      <Border Classes="pane" Grid.Column="5" Grid.RowSpan="3" Width="270" Margin="6,0,0,0" IsVisible="{Binding Agenda.IsOpen}">
         <views:AgendaView DataContext="{Binding Agenda}" />
       </Border>
     </Grid>

@@ -91,6 +91,33 @@ internal sealed partial class MailView : UserControl
         // Table: the column heads take the kept widths; after a border was dragged, the new ones are kept.
         var header = this.FindControl<Grid>("TableHeader")!;
         MailListLayout? layout = null;
+
+        // Reading pane beside the list, below it (the list takes the width; its height is kept), or none.
+        var columns = this.FindControl<Grid>("Columns")!;
+        var listPane = this.FindControl<Border>("ListPane")!;
+        var readingPane = this.FindControl<Border>("ReadingPaneBox")!;
+        var paneSplitter = this.FindControl<GridSplitter>("PaneSplitter")!;
+        var rowSplitter = this.FindControl<GridSplitter>("RowSplitter")!;
+        void PlacePane()
+        {
+            var position = layout?.Pane ?? ReadingPanePosition.Right;
+            var below = position == ReadingPanePosition.Below;
+            var wide = position != ReadingPanePosition.Right;
+            Grid.SetColumnSpan(listPane, wide ? 3 : 1);
+            Grid.SetRowSpan(listPane, below ? 1 : 3);
+            Grid.SetRow(readingPane, below ? 2 : 0);
+            Grid.SetColumn(readingPane, below ? 2 : 4);
+            Grid.SetColumnSpan(readingPane, below ? 3 : 1);
+            Grid.SetRowSpan(readingPane, below ? 1 : 3);
+            readingPane.IsVisible = position != ReadingPanePosition.None;
+            paneSplitter.IsVisible = position == ReadingPanePosition.Right;
+            rowSplitter.IsVisible = below;
+            columns.RowDefinitions[0].Height = below ? new GridLength(layout!.ListHeight) : new GridLength(1, GridUnitType.Star);
+            columns.RowDefinitions[1].Height = new GridLength(below ? 6 : 0);
+            columns.RowDefinitions[2].Height = below ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        }
+
+        rowSplitter.DragCompleted += (_, _) => layout?.SetListHeight(columns.RowDefinitions[0].ActualHeight);
         void ApplyWidths()
         {
             if (layout is not null)
@@ -116,10 +143,16 @@ internal sealed partial class MailView : UserControl
                     {
                         WidenListForTable();
                     }
+                    else if (e.PropertyName is nameof(MailListLayout.Pane) or nameof(MailListLayout.ListHeight))
+                    {
+                        PlacePane();
+                    }
                 };
                 ApplyWidths();
+                PlacePane();
             }
         };
+
         // The table needs room for its columns: the list becomes wider (kept like any width the user drags).
         void WidenListForTable()
         {

@@ -218,6 +218,20 @@ internal sealed partial class MailViewModel(
     [RelayCommand]
     private void SortBy(MailSort sort) => ListLayout.SortBy(sort);
 
+    [RelayCommand]
+    private void PlacePane(ReadingPanePosition position)
+    {
+        ListLayout.Pane = position;
+        if (position == ReadingPanePosition.None)
+        {
+            ReadingPane = null; // nothing shows it now; a double-click opens the mail in its window
+        }
+        else if (SelectedMessage is { } open)
+        {
+            _ = LeaveComposeThenOpenAsync(open);
+        }
+    }
+
     public async Task ReloadAsync()
     {
         if (!_listLayoutLoaded)
@@ -260,7 +274,8 @@ internal sealed partial class MailViewModel(
 
     partial void OnSelectedEntryChanged(MessageListEntry? value)
     {
-        if (!_refreshing && value is MessageItemViewModel message)
+        // Without a reading pane, selecting only selects (a double-click opens the mail in its own window).
+        if (!_refreshing && value is MessageItemViewModel message && ListLayout.Pane != ReadingPanePosition.None)
         {
             _ = LeaveComposeThenOpenAsync(message);
         }
@@ -684,7 +699,8 @@ internal sealed partial class MailViewModel(
 
         try
         {
-            var window = inWindow ?? await settings.GetBoolAsync(SettingKeys.ComposeInWindow);
+            // Without a reading pane there is no room for it inline: its own window.
+            var window = inWindow ?? (ListLayout.Pane == ReadingPanePosition.None || await settings.GetBoolAsync(SettingKeys.ComposeInWindow));
             var compose = CreateCompose(account.Account, account.Connection, draft, kind, encrypt, window);
             compose.AfterSent = afterSent;
             await compose.InitializeAsync();

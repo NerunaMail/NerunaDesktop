@@ -146,8 +146,18 @@ internal static class Snapshots
         await SaveAsync(window, output, "mail-table-by-sender.png");
         Console.WriteLine($"Table: sort {vm.MailPage.ListLayout.Sort} desc={vm.MailPage.ListLayout.Descending}, first {vm.MailPage.Entries.OfType<MessageItemViewModel>().First().Sender}");
         vm.MailPage.SortByCommand.Execute(Neruna.Desktop.ViewModels.MailSort.Date);
+
+        // The reading pane below the list (tall screens), then none (a double-click opens the mail).
+        vm.MailPage.PlacePaneCommand.Execute(Neruna.Desktop.ViewModels.ReadingPanePosition.Below);
+        await Task.Delay(400);
+        await SaveAsync(window, output, "mail-pane-below.png");
+        vm.MailPage.PlacePaneCommand.Execute(Neruna.Desktop.ViewModels.ReadingPanePosition.None);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-pane-none.png");
+        vm.MailPage.PlacePaneCommand.Execute(Neruna.Desktop.ViewModels.ReadingPanePosition.Right);
         vm.MailPage.ListLayout.IsTable = false;
-        await Task.Delay(200);
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+        await Task.Delay(600);
 
         // A PDF attachment in the reading pane instead of the message; a second click shows the message again.
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.HasAttachments);
