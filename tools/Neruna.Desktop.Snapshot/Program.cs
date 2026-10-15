@@ -354,6 +354,7 @@ internal static class Snapshots
             DataContext = new MessageWindowViewModel(vm.MailPage.SelectedMessage!.Subject, vm.MailPage.Preferences, _ => Task.CompletedTask, _ => Task.CompletedTask, _ => Task.CompletedTask, _ => Task.FromResult(false))
             {
                 Pane = vm.MailPage.ReadingPane,
+                QuickActions = [.. vm.MailPage.QuickActionButtons],
             },
             Width = 900,
             Height = 700,

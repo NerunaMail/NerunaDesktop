@@ -25,6 +25,21 @@
         <ctl:ToolButton Icon="{StaticResource IconForward}" Label="{l:T 'Weiterleiten'}" Shortcut="Ctrl+F" Command="{Binding ForwardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
         <Separator Width="1" Height="28" Margin="6,0" VerticalAlignment="Center" Background="{DynamicResource DividerBrush}" />
         <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{l:T 'Löschen'}" Shortcut="Entf" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+        <!-- Schnellaktionen for this mail, as in the main window -->
+        <Separator Width="1" Height="28" Margin="6,0" VerticalAlignment="Center" Background="{DynamicResource DividerBrush}" IsVisible="{Binding HasQuickActions}" />
+        <ItemsControl ItemsSource="{Binding QuickActions}" VerticalAlignment="Center">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="6" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:QuickActionButton">
+              <Button Classes="quickAction" Content="{Binding Label}" Command="{Binding Command}" CommandParameter="{Binding Action}"
+                      Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" ToolTip.Tip="{l:T 'Schnellaktion'}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </StackPanel>
     </Border>
     <Border Classes="pane">

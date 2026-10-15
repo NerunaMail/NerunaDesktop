@@ -672,7 +672,8 @@ internal sealed partial class MailViewModel(
     private static string[] OwnAddresses(Account account) => [.. account.Identities.Select(i => i.Email)];
 
     /// <returns>The compose form shown, or null when none could be opened.</returns>
-    private async Task<ComposeViewModel?> StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false, Func<Task>? afterSent = null)
+    /// <param name="inWindow">Its own window whatever the setting (from a message window); null: as set.</param>
+    private async Task<ComposeViewModel?> StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false, Func<Task>? afterSent = null, bool? inWindow = null)
     {
         var chosen = draft.FromAccountId is { } fromId ? Accounts.FirstOrDefault(a => a.Account.Id == fromId) : null;
         if ((chosen ?? CurrentAccount) is not { Account.EmailAddress: not null } account)
@@ -683,8 +684,8 @@ internal sealed partial class MailViewModel(
 
         try
         {
-            var inWindow = await settings.GetBoolAsync(SettingKeys.ComposeInWindow);
-            var compose = CreateCompose(account.Account, account.Connection, draft, kind, encrypt, inWindow);
+            var window = inWindow ?? await settings.GetBoolAsync(SettingKeys.ComposeInWindow);
+            var compose = CreateCompose(account.Account, account.Connection, draft, kind, encrypt, window);
             compose.AfterSent = afterSent;
             await compose.InitializeAsync();
             await ShowComposeAsync(compose);
@@ -807,13 +808,20 @@ internal sealed partial class MailViewModel(
                 _ => RespondAsync(MessageComposer.Reply(opened.Readable, OwnAddresses(account.Account), replyAll: true), ComposeKind.Reply),
                 _ => RespondAsync(MessageComposer.Forward(opened.Readable), ComposeKind.Forward),
                 _ => DeleteFromWindowAsync(message, folder));
-            void Show(bool allowRemoteContent) =>
-                window.Pane = ReadingPaneViewModel.ForMessage(message.Summary, opened, allowRemoteContent, files, _imageClient, () =>
+            async Task ShowAsync(bool allowRemoteContent)
+            {
+                var pane = window.Pane = ReadingPaneViewModel.ForMessage(message.Summary, opened, allowRemoteContent, files, _imageClient, () =>
                 {
                     _ = RememberRemoteContentAsync(message.Summary);
-                    Show(allowRemoteContent: true);
+                    _ = ShowAsync(allowRemoteContent: true);
                 });
-            Show(await IsRemoteContentAllowedAsync(message.Summary));
+                // The quick actions and the PDF stamps work here, for this mail (replies in their own window too).
+                var context = new QuickActionContext(pane, message, folder, InWindow: true, opened.Security.WasEncrypted, () => window.Pane == pane);
+                pane.AttachmentActions = AttachmentActionsFor(context);
+                window.QuickActions = await QuickActionsForWindowAsync(context);
+            }
+
+            await ShowAsync(await IsRemoteContentAllowedAsync(message.Summary));
             windows.ShowMessage(window);
 
             if (message.IsUnread && await GetMarkAsReadModeAsync() != MarkAsReadMode.Never)

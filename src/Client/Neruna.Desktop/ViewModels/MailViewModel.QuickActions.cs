@@ -1,10 +1,17 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
 using MimeKit;
+using Neruna.Core;
 using Neruna.Core.Mail;
 using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
+
+/// <summary>
+/// Where a quick action runs: the open mail's pane (main window or a message window), its list entry and folder, and
+/// whether replies open in their own window.
+/// </summary>
+internal sealed record QuickActionContext(ReadingPaneViewModel Pane, MessageItemViewModel Item, MailFolderNode Folder, bool InWindow, bool Encrypted, Func<bool> IsOpen);
 
 /// <summary>A quick action's button in the coloured bar, for the open mail.</summary>
 internal sealed record QuickActionButton(QuickAction Action, System.Windows.Input.ICommand Command)
@@ -25,9 +32,6 @@ internal sealed partial class MailViewModel
     Task<IReadOnlyList<PdfStamp>> IAttachmentActions.GetStampsAsync() => quickActions.GetStampsAsync();
 
     async Task<string?> IAttachmentActions.GetStampNameAsync() => await quickActions.GetStampNameAsync() ?? Infrastructure.SystemUserName.Get();
-
-    // The account of the open mail (a search may show mails of several).
-    private Neruna.Core.Accounts.Account? OpenAccount => OpenFolder?.Account.Account ?? CurrentAccount?.Account;
 
     private MailFolderNode? OpenFolder => SelectedMessage is { } message ? FolderOf(message) : CurrentFolder;
 
@@ -54,26 +58,64 @@ internal sealed partial class MailViewModel
             return;
         }
 
-        var message = new QuickActionMessage(folder.Account.Account.Id, folder.Folder.RemoteId, pane.From, pane.Subject, [.. pane.Attachments.Select(a => a.Describe())]);
-        foreach (var action in _quickActionList.Where(a => QuickActionService.Matches(a, message)))
+        foreach (var action in MatchingQuickActions(pane, folder))
         {
             QuickActionButtons.Add(new QuickActionButton(action, RunQuickActionCommand));
         }
     }
 
+    private IEnumerable<QuickAction> MatchingQuickActions(ReadingPaneViewModel pane, MailFolderNode folder)
+    {
+        var message = new QuickActionMessage(folder.Account.Account.Id, folder.Folder.RemoteId, pane.From, pane.Subject, [.. pane.Attachments.Select(a => a.Describe())]);
+        return (_quickActionList ?? []).Where(a => QuickActionService.Matches(a, message));
+    }
+
+    // The PDF preview in a message window: stamps as in the main window, "Antworten/Weiterleiten mit PDF" for that mail.
+    private sealed class WindowAttachmentActions(MailViewModel mail, QuickActionContext context) : IAttachmentActions
+    {
+        public Task<IReadOnlyList<PdfStamp>> GetStampsAsync() => ((IAttachmentActions)mail).GetStampsAsync();
+
+        public Task<string?> GetStampNameAsync() => ((IAttachmentActions)mail).GetStampNameAsync();
+
+        public async Task RespondWithAsync(AttachmentViewModel attachment, byte[] content, QuickActionStepKind kind)
+        {
+            if (context.Pane.Message is { } message)
+            {
+                await mail.RespondWithAttachmentsAsync(message, kind, [attachment], new Dictionary<AttachmentViewModel, byte[]> { [attachment] = content }, null, context);
+            }
+        }
+    }
+
+    private WindowAttachmentActions AttachmentActionsFor(QuickActionContext context) => new(this, context);
+
+    /// <summary>The buttons for a mail in its own window (the same actions, run there).</summary>
+    private async Task<IReadOnlyList<QuickActionButton>> QuickActionsForWindowAsync(QuickActionContext context)
+    {
+        _quickActionList ??= await quickActions.GetActionsAsync();
+        var command = new AsyncRelayCommand<QuickAction?>(action => action is null ? Task.CompletedTask : RunQuickActionAsync(action, context));
+        return [.. MatchingQuickActions(context.Pane, context.Folder).Select(a => new QuickActionButton(a, command))];
+    }
+
     /// <summary>The PDF preview: answer or forward with the stamped PDF.</summary>
     async Task IAttachmentActions.RespondWithAsync(AttachmentViewModel attachment, byte[] content, QuickActionStepKind kind)
     {
-        if (ReadingPane?.Message is { } message)
+        if (ReadingPane is { Message: { } message } pane && SelectedMessage is { } item && OpenFolder is { } folder)
         {
-            await RespondWithAttachmentsAsync(message, kind, [attachment], new Dictionary<AttachmentViewModel, byte[]> { [attachment] = content }, null);
+            await RespondWithAttachmentsAsync(message, kind, [attachment], new Dictionary<AttachmentViewModel, byte[]> { [attachment] = content }, null,
+                new QuickActionContext(pane, item, folder, false, _opened?.Security.WasEncrypted == true, () => ReadingPane == pane));
         }
     }
 
     [RelayCommand]
-    private async Task RunQuickActionAsync(QuickAction? action)
+    private Task RunQuickActionAsync(QuickAction? action) =>
+        action is null || ReadingPane is not { Message: not null } pane || SelectedMessage is not { } item || OpenFolder is not { } folder
+            ? Task.CompletedTask
+            : RunQuickActionAsync(action, new QuickActionContext(pane, item, folder, false, _opened?.Security.WasEncrypted == true, () => ReadingPane == pane));
+
+    private async Task RunQuickActionAsync(QuickAction action, QuickActionContext context)
     {
-        if (action is null || ReadingPane is not { Message: { } message } pane || SelectedMessage is not { } item)
+        var (pane, item, folder) = (context.Pane, context.Item, context.Folder);
+        if (pane.Message is not { } message)
         {
             return;
         }
@@ -90,9 +132,9 @@ internal sealed partial class MailViewModel
         {
             foreach (var (step, index) in action.Steps.Select((s, i) => (s, i)))
             {
-                if (ReadingPane != pane)
+                if (!context.IsOpen())
                 {
-                    return; // another mail was opened meanwhile
+                    return; // another mail was opened meanwhile (or its window closed)
                 }
 
                 switch (step.Kind)
@@ -159,7 +201,7 @@ internal sealed partial class MailViewModel
                         break;
 
                     case QuickActionStepKind.Reply or QuickActionStepKind.ReplyAll or QuickActionStepKind.Forward or QuickActionStepKind.NewMail:
-                        var compose = await RespondWithAttachmentsAsync(message, step.Kind, targets, changed, step, sender, subject);
+                        var compose = await RespondWithAttachmentsAsync(message, step.Kind, targets, changed, step, context, sender, subject);
 
                         // The steps after it (mark read, move …) wait until the mail was sent; discarded, they do not run.
                         if (index < action.Steps.Count - 1)
@@ -175,7 +217,7 @@ internal sealed partial class MailViewModel
 
                     case QuickActionStepKind.MoveToFolder:
                         // The folder of the mail's account: by its id, else by its name (an action for several accounts).
-                        var folders = OpenFolder?.Account.AllFolders().ToList() ?? [];
+                        var folders = folder.Account.AllFolders().ToList();
                         if ((folders.FirstOrDefault(f => f.Folder.RemoteId == step.FolderRemoteId)
                              ?? folders.FirstOrDefault(f => string.Equals(f.Name, step.FolderName, StringComparison.OrdinalIgnoreCase))) is { } target)
                         {
@@ -216,12 +258,9 @@ internal sealed partial class MailViewModel
 
     // Answer, forward or a new mail with the attachments – stamped ones as stamped; a text template above the signature.
     private async Task<ComposeViewModel?> RespondWithAttachmentsAsync(MimeMessage message, QuickActionStepKind kind, IReadOnlyList<AttachmentViewModel> attachments,
-        Dictionary<AttachmentViewModel, byte[]> changed, QuickActionStep? step, string sender = "", string subject = "")
+        Dictionary<AttachmentViewModel, byte[]> changed, QuickActionStep? step, QuickActionContext context, string sender = "", string subject = "")
     {
-        if (OpenAccount is not { } account)
-        {
-            return null;
-        }
+        var account = context.Folder.Account.Account;
 
         MimeEntity PartOf(AttachmentViewModel a) => changed.TryGetValue(a, out var content) ? a.WithContent(content) : a.Entity;
 
@@ -261,9 +300,20 @@ internal sealed partial class MailViewModel
             draft = draft with { LeadHtml = template.Html };
         }
 
-        return kind == QuickActionStepKind.NewMail
-            ? await StartComposeAsync(draft, ComposeKind.New)
-            : await RespondAsync(draft, kind == QuickActionStepKind.Forward ? ComposeKind.Forward : ComposeKind.Reply);
+        if (kind == QuickActionStepKind.NewMail)
+        {
+            return await StartComposeAsync(draft, ComposeKind.New, inWindow: context.InWindow);
+        }
+
+        // Answered or forwarded: the original gets its mark once sent; and it counts as read.
+        var composeKind = kind == QuickActionStepKind.Forward ? ComposeKind.Forward : ComposeKind.Reply;
+        var compose = await StartComposeAsync(draft, composeKind, context.Encrypted, () => MarkRespondedAsync(context.Item, context.Folder, composeKind), context.InWindow);
+        if (context.Item is { IsUnread: true } && await GetMarkAsReadModeAsync() != MarkAsReadMode.Never)
+        {
+            await SetReadAsync(context.Item, read: true);
+        }
+
+        return compose;
     }
 
     // All attachments of the mail go along, the changed ones in their new version.

@@ -26,6 +26,13 @@ internal sealed partial class MessageWindowViewModel(
     /// <summary>False for a message opened from a file (.eml): nothing to delete in a mailbox.</summary>
     public bool CanDelete { get; init; } = true;
 
+    /// <summary>The quick actions whose conditions this mail meets (as in the main window's bar).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasQuickActions))]
+    public partial IReadOnlyList<QuickActionButton> QuickActions { get; set; } = [];
+
+    public bool HasQuickActions => QuickActions.Count > 0;
+
     /// <summary>The reading pane; replaced when the user allows remote images.</summary>
     [ObservableProperty]
     public partial ReadingPaneViewModel? Pane { get; set; }
