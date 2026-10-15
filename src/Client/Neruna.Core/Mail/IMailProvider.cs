@@ -18,6 +18,9 @@ public enum MailProviderCapabilities
 
     /// <summary>Folders can be subscribed and unsubscribed (IMAP SUBSCRIBE); only subscribed ones are listed.</summary>
     Subscriptions = 128,
+
+    /// <summary>The messages are on this device (a file): the search index reads their text directly.</summary>
+    LocalContent = 256,
 }
 
 /// <summary>A folder on the server and whether it shows up in Neruna (subscribed).</summary>

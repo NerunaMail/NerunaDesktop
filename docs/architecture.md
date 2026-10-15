@@ -247,6 +247,15 @@ Verbindung (Server, Geräte-ID, Organisation) steht in den Einstellungen `cloud.
 zuerst die Server der verbundenen Organisationen (`AccountDiscovery.OrganizationServers`). Nur HTTPS, ausser
 `localhost` zum Entwickeln. Vertrag: `server/contract/openapi.yaml` (enrollment, token, me).
 
+**Suchindex (Mail):** SQLite-FTS5-Tabelle `MessageSearch` (contentless, rowid = `Messages.Id`, Präfixe 2/3,
+`unicode61 remove_diacritics 2`), ein Trigger löscht Einträge mit der Nachricht. `Messages.SearchLevel`: 0 neu,
+1 Kopfdaten (Text nicht auf dem Gerät), 2 Text liegt vor, 3 mit Text. `MailSearchIndexer` (Core) arbeitet im
+Hintergrund: erst Absender/Empfänger/Betreff aller Nachrichten aus der gespeicherten Liste, dann den Text, wo er
+lokal ist (MIME-Cache oder Provider mit `LocalContent`, z. B. PST). Gespeicherter Inhalt hebt 1 → 2. Pro Konto
+abschaltbar (`search.index.<id>` = off, Gerätesetting; der Index des Kontos wird gelöscht). Die Suche fragt zuerst den
+Index (Schnellsuche beim Tippen, Ordner oder alle Ordner), dann auf Wunsch bzw. in der erweiterten Suche den Server
+für Text, der nur dort liegt; nicht indexierte Konten durchsucht sie über die gespeicherte Liste.
+
 **Gerät gesperrt (Fernlöschung):** Sperrt oder löscht ein Admin das Gerät im Portal, verweigert der Server jedes neue
 Token mit `device_revoked` (401). Der `CloudController` vergisst dann die Verbindung samt Schlüsseln und ruft die bei
 `OnRevoked` registrierten Aufräumer auf (`CloudRevocation`, beim Start aufgelöst – Desktop und App): Konten der

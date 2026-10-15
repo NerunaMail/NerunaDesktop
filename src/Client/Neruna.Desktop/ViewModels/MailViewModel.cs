@@ -31,6 +31,7 @@ internal sealed partial class MailViewModel(
     AgendaViewModel agenda,
     Neruna.Core.Ai.AiController ai,
     QuickActionService quickActions,
+    MailSearchIndexer searchIndex,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
@@ -416,6 +417,7 @@ internal sealed partial class MailViewModel(
     {
         RebuildEntries();
         OnPropertyChanged(nameof(ShowServerSearchHint));
+        _ = Search.TypedAsync(value);
     }
 
     partial void OnCurrentFolderChanged(MailFolderNode? value) => OnPropertyChanged(nameof(ListTitle));
@@ -1246,7 +1248,7 @@ internal sealed partial class MailViewModel(
 
     private MailSearchViewModel? _search;
 
-    public MailSearchViewModel Search => _search ??= new MailSearchViewModel(mail, this);
+    public MailSearchViewModel Search => _search ??= new MailSearchViewModel(mail, searchIndex, this);
 
     /// <summary>The list shows search results (from the server), not a folder.</summary>
     [ObservableProperty]
@@ -1259,8 +1261,8 @@ internal sealed partial class MailViewModel(
 
     public string ListTitle => IsSearchMode ? SearchTitle ?? T("Suchergebnisse") : CurrentFolder?.Name ?? string.Empty;
 
-    /// <summary>Under a quick search: the loaded messages were filtered; offer the whole folder on the server.</summary>
-    public bool ShowServerSearchHint => !IsSearchMode && SearchText.Trim().Length > 0 && CurrentFolder is not null;
+    /// <summary>Under the quick search's results (from this device): offer the server too.</summary>
+    public bool ShowServerSearchHint => IsSearchMode && Search.CanAskServer && SearchText.Trim().Length > 0;
 
     IReadOnlyList<MailAccountNode> IMailSearchHost.SearchAccounts => Accounts;
 
@@ -1294,6 +1296,8 @@ internal sealed partial class MailViewModel(
     void IMailSearchHost.ReportSearchFailure(Exception error) => Report(T("Suche fehlgeschlagen"), error);
 
     void IMailSearchHost.ShowStatus(string message) => StatusMessage?.Invoke(this, message);
+
+    void IMailSearchHost.EndQuickSearch() => _ = CloseSearchAsync();
 
     /// <summary>Back from the results to the folder.</summary>
     [RelayCommand]

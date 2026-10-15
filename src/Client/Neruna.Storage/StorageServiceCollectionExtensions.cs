@@ -24,7 +24,9 @@ public static class StorageServiceCollectionExtensions
         services.AddDbContextFactory<NerunaDbContext>(options => options.UseSqlite($"Data Source={databasePath}"));
         services.AddSingleton(new MessageContentFiles(dataDirectory));
         services.AddSingleton<IAccountStore, SqliteAccountStore>();
-        services.AddSingleton<IMailStore, SqliteMailStore>();
+        services.AddSingleton<SqliteMailStore>();
+        services.AddSingleton<IMailStore>(sp => sp.GetRequiredService<SqliteMailStore>());
+        services.AddSingleton<IMailSearchIndex>(sp => sp.GetRequiredService<SqliteMailStore>());
         services.AddSingleton<ICalendarStore, SqliteCalendarStore>();
         services.AddSingleton<IContactStore, SqliteContactStore>();
         services.AddSingleton<ICertificateStore, SqliteCertificateStore>();

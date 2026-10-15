@@ -76,6 +76,24 @@ internal static class LiveScenario
         await Snapshots.SaveAsync(window, output, "pst-3-mail.png");
         await vm.MailPage.DeleteCommand.ExecuteAsync(null);
         Console.WriteLine($"After delete: {vm.MailPage.Entries.Count} messages");
+
+        // The search index: built in the background; typing searches it (here: a word of the text).
+        var indexer = services.GetRequiredService<Neruna.Core.Mail.MailSearchIndexer>();
+        await indexer.RunOnceAsync();
+        vm.MailPage.SearchText = "automatically";
+        for (var i = 0; i < 30 && !vm.MailPage.IsSearchMode; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await Task.Delay(300);
+        Console.WriteLine($"Search: {vm.MailPage.Search.SearchInfo}; {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()} hits");
+        await Snapshots.SaveAsync(window, output, "pst-4-search.png");
+        vm.NavigateCommand.Execute(Section.Settings);
+        vm.SettingsPage.SelectedNav = SettingsViewModel.Navigation.First(n => n.Tab == 12);
+        await Task.Delay(800);
+        Console.WriteLine($"Index: {vm.SettingsPage.SearchIndex.StateText} {string.Join("; ", vm.SettingsPage.SearchIndex.Accounts.Select(a => a.Details))}");
+        await Snapshots.SaveAsync(window, output, "pst-5-index.png");
     }
 
     /// <summary>Einstellungen → Cloud with two organisations (two codes of a running server): list, chat and backup choice.</summary>

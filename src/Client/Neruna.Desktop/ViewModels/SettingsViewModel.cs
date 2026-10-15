@@ -4,8 +4,11 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex) : ViewModelBase
 {
+    /// <summary>Settings → E-Mail → Suchindex.</summary>
+    public SearchIndexViewModel SearchIndex => searchIndex;
+
     /// <summary>Settings → E-Mail → Schnellaktionen (and the PDF stamps).</summary>
     public QuickActionsViewModel QuickActions => quickActions;
 
@@ -61,6 +64,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(4, T("Textvorlagen"), "IconTextTemplate", IsIndented: true),
         new(11, T("Schnellaktionen"), "IconFlash", IsIndented: true),
         new(5, T("Zertifikate (S/MIME)"), "IconCertificate", IsIndented: true),
+        new(12, T("Suchindex"), "IconSearch", IsIndented: true),
         new(2, T("Kalender"), "IconCalendar"),
         new(7, T("Neruna Cloud"), "IconCloud"),
         new(10, T("Datensicherung"), "IconArchive"),
@@ -85,6 +89,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         if (value is { IsHeading: false } item)
         {
             SelectedTab = item.Tab;
+            if (item.Tab == 12)
+            {
+                _ = SearchIndex.ReloadAsync();
+            }
         }
     }
 

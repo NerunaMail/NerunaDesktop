@@ -329,6 +329,9 @@ namespace Neruna.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("SearchLevel")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Security")
                         .HasColumnType("INTEGER");
 
@@ -349,6 +352,8 @@ namespace Neruna.Storage.Migrations
 
                     b.HasIndex("FolderId", "RemoteId")
                         .IsUnique();
+
+                    b.HasIndex("SearchLevel", "DateUnixMs");
 
                     b.ToTable("Messages");
                 });

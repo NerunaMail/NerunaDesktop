@@ -21,14 +21,81 @@ internal interface IMailSearchHost
     void ReportSearchFailure(Exception error);
 
     void ShowStatus(string message);
+
+    /// <summary>The quick search was emptied: back to the folder.</summary>
+    void EndQuickSearch();
+
+    /// <summary>Whether the search shows results right now.</summary>
+    bool IsSearchMode { get; }
 }
 
 /// <summary>
-/// Searching on the server: the quick search term in the whole open folder ("Im ganzen Ordner suchen") and the
-/// advanced search (sender, subject, text; a folder or all folders of an account). The mail page shows the hits.
+/// Searching: while typing, the local index answers at once (the open folder, or all folders); Enter or "Auch auf
+/// dem Server suchen" adds what only the server knows (the text of mail not on this device). The advanced search
+/// (sender, subject, text; a folder or all folders of an account) asks both. The mail page shows the hits.
 /// </summary>
-internal sealed partial class MailSearchViewModel(MailController mail, IMailSearchHost host) : ViewModelBase
+internal sealed partial class MailSearchViewModel(MailController mail, MailSearchIndexer index, IMailSearchHost host) : ViewModelBase
 {
+    private int _typing;
+
+    // The quick search goes over all folders (after "In allen Ordnern").
+    private bool _everywhere;
+
+    /// <summary>The last results came from this device only: the server can still be asked.</summary>
+    [ObservableProperty]
+    public partial bool CanAskServer { get; set; }
+
+    /// <summary>The quick search shows the open folder: it can be widened to all folders.</summary>
+    [ObservableProperty]
+    public partial bool CanSearchEverywhere { get; set; }
+
+    /// <summary>Typed into the search box: after a short pause the index is asked (at least 2 characters).</summary>
+    public async Task TypedAsync(string text)
+    {
+        var term = text.Trim();
+        if (term == ServerTerm)
+        {
+            return; // the box shows the term of the results on screen
+        }
+
+        // Only the last keystroke of a short pause searches.
+        var typing = ++_typing;
+        await Task.Delay(250);
+        if (typing != _typing)
+        {
+            return;
+        }
+
+        if (term.Length < 2)
+        {
+            if (host.IsSearchMode && ServerTerm is not null)
+            {
+                host.EndQuickSearch();
+            }
+
+            return;
+        }
+
+        await QuickAsync(term, server: false);
+    }
+
+    private Task QuickAsync(string term, bool server)
+    {
+        var folders = _everywhere || host.CurrentFolder is null
+            ? host.SearchAccounts.SelectMany(a => a.AllFolders()).ToList()
+            : [host.CurrentFolder];
+        var where = _everywhere || host.CurrentFolder is null ? T("allen Ordnern") : host.CurrentFolder.Name;
+        CanSearchEverywhere = !_everywhere && host.CurrentFolder is not null;
+        return SearchAsync(new MailSearchQuery(Anywhere: term), folders, where, keepTerm: term, server: server);
+    }
+
+    /// <summary>"In allen Ordnern": the quick search term in every folder of every account.</summary>
+    [RelayCommand]
+    private Task SearchEverywhereAsync()
+    {
+        _everywhere = true;
+        return host.SearchText.Trim() is { Length: > 0 } term ? QuickAsync(term, server: false) : Task.CompletedTask;
+    }
     /// <summary>"Erweiterte Suche" is open above the list.</summary>
     [ObservableProperty]
     public partial bool IsAdvancedSearchOpen { get; set; }
@@ -91,15 +158,14 @@ internal sealed partial class MailSearchViewModel(MailController mail, IMailSear
         }
 
         var query = new MailSearchQuery(Clean(SearchFrom), Clean(SearchSubject), Clean(SearchBody));
-        return SearchAsync(query, scope.Folders(SearchSubfolders), scope.Describe(SearchSubfolders));
+        CanSearchEverywhere = false;
+        return SearchAsync(query, scope.Folders(SearchSubfolders), scope.Describe(SearchSubfolders), server: true);
     }
 
-    /// <summary>The quick search term in the whole open folder on the server (also the text of messages).</summary>
+    /// <summary>Enter or "Auch auf dem Server suchen": the quick search term also on the server (the text of mail not here).</summary>
     [RelayCommand(CanExecute = nameof(CanSearch))]
     private Task SearchServerAsync() =>
-        host.CurrentFolder is { } folder && host.SearchText.Trim() is { Length: > 0 } term
-            ? SearchAsync(new MailSearchQuery(Anywhere: term), [folder], folder.Name, keepTerm: term)
-            : Task.CompletedTask;
+        host.SearchText.Trim() is { Length: > 0 } term ? QuickAsync(term, server: true) : Task.CompletedTask;
 
     /// <summary>Back to the folder: the search box keeps a term only if the user changed it since.</summary>
     /// <returns>Whether the search box should be emptied (it still holds the term the server searched for).</returns>
@@ -107,6 +173,9 @@ internal sealed partial class MailSearchViewModel(MailController mail, IMailSear
     {
         IsAdvancedSearchOpen = false;
         SearchInfo = null;
+        _everywhere = false;
+        CanAskServer = false;
+        CanSearchEverywhere = false;
         var clearBox = ServerTerm is not null && host.SearchText.Trim() == ServerTerm;
         ServerTerm = null;
         return clearBox;
@@ -116,7 +185,7 @@ internal sealed partial class MailSearchViewModel(MailController mail, IMailSear
 
     private static string? Clean(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private async Task SearchAsync(MailSearchQuery query, IReadOnlyList<MailFolderNode> folders, string where, string? keepTerm = null)
+    private async Task SearchAsync(MailSearchQuery query, IReadOnlyList<MailFolderNode> folders, string where, string? keepTerm = null, bool server = false)
     {
         if (query.IsEmpty)
         {
@@ -125,27 +194,45 @@ internal sealed partial class MailSearchViewModel(MailController mail, IMailSear
         }
 
         IsSearching = true;
-        SearchInfo = T("Suche läuft …");
         try
         {
             var nodes = folders.ToDictionary(f => (f.Folder.ConnectionId, f.Folder.RemoteId));
             var searched = folders.Select(f => f.Folder).ToList();
-            var result = await Task.Run(() => mail.SearchAsync(searched, query));
             var several = folders.Select(f => f.Folder.ConnectionId).Distinct().Count() > 1;
-            var hits = result.Hits.Select(hit =>
+            MessageItemViewModel Item(MailSearchHit hit)
             {
                 var node = nodes[(hit.Folder.ConnectionId, hit.Folder.RemoteId)];
                 return new MessageItemViewModel(hit.Message, node)
                 {
                     FolderText = folders.Count > 1 ? (several ? $"{node.Name} · {node.Account.Title}" : node.Name) : null,
                 };
-            }).ToList();
+            }
 
-            ServerTerm = keepTerm;
-            host.ShowSearchResults(hits, F("Suche in {0}", where), keepTerm);
-            SearchInfo = (hits.Count == 1 ? T("1 Treffer") : F("{0} Treffer", hits.Count))
-                         + (result.IsTruncated ? T(" – nur die neuesten pro Ordner, bitte genauer suchen") : string.Empty)
-                         + (result.FailedFolders.Count > 0 ? F(" – {0} Ordner konnten nicht durchsucht werden", result.FailedFolders.Count) : string.Empty);
+            void Show(IReadOnlyList<MailSearchHit> hits, bool truncated, int failed, bool more)
+            {
+                ServerTerm = keepTerm;
+                host.ShowSearchResults([.. hits.Select(Item)], F("Suche in {0}", where), keepTerm);
+                SearchInfo = (hits.Count == 1 ? T("1 Treffer") : F("{0} Treffer", hits.Count))
+                             + (truncated ? T(" – nur die neuesten, bitte genauer suchen") : string.Empty)
+                             + (failed > 0 ? F(" – {0} Ordner konnten nicht durchsucht werden", failed) : string.Empty)
+                             + (more ? T(" – Server wird durchsucht …") : string.Empty);
+            }
+
+            // On this device first: at once.
+            var local = await Task.Run(() => index.SearchAsync(searched, query));
+            CanAskServer = !server && folders.Any(f => !f.Account.IsReadOnly); // an Outlook file has no server
+            Show(local.Hits, local.IsTruncated, 0, server);
+            if (!server)
+            {
+                return;
+            }
+
+            // Then the server: hits only it knows join in (the same message is not shown twice).
+            var remote = await Task.Run(() => mail.SearchAsync(searched, query));
+            var seen = local.Hits.Select(h => (h.Folder.ConnectionId, h.Folder.RemoteId, h.Message.RemoteId)).ToHashSet();
+            var merged = local.Hits.Concat(remote.Hits.Where(h => seen.Add((h.Folder.ConnectionId, h.Folder.RemoteId, h.Message.RemoteId))))
+                .OrderByDescending(h => h.Message.Date).ToList();
+            Show(merged, local.IsTruncated || remote.IsTruncated, remote.FailedFolders.Count, false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

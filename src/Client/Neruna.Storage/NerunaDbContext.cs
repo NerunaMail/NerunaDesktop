@@ -60,6 +60,7 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
         {
             e.HasIndex(m => new { m.FolderId, m.RemoteId }).IsUnique();
             e.HasIndex(m => new { m.FolderId, m.DateUnixMs });
+            e.HasIndex(m => new { m.SearchLevel, m.DateUnixMs });
             e.HasOne<MailFolderEntity>().WithMany().HasForeignKey(m => m.FolderId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -192,6 +193,12 @@ internal sealed class MessageEntity
     public string? Preview { get; set; }
 
     public MessageSecurity Security { get; set; }
+
+    /// <summary>
+    /// In the search index (table MessageSearch, rowid = <see cref="Id"/>): 0 not yet, 1 sender/subject/recipients
+    /// (the text is not on this device), 2 the text is there and waits, 3 with the text.
+    /// </summary>
+    public int SearchLevel { get; set; }
 }
 
 internal sealed class CalendarEntity

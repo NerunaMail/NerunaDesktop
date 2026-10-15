@@ -166,11 +166,6 @@
               </ToggleButton>
             </Grid>
 
-            <!-- Quick search filters what is loaded; Enter or this link searches the whole folder on the server -->
-            <Button Classes="command" Command="{Binding Search.SearchServerCommand}" IsVisible="{Binding ShowServerSearchHint}" Padding="4,2" FontSize="12"
-                    HorizontalAlignment="Left" ToolTip.Tip="{l:T 'Auch ältere, noch nicht geladene Nachrichten und den Nachrichtentext durchsuchen (Enter)'}">
-              <TextBlock Text="{l:T 'Im ganzen Ordner auf dem Server suchen'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
-            </Button>
 
             <!-- Advanced search -->
             <Border IsVisible="{Binding Search.IsAdvancedSearchOpen}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,8">
@@ -201,9 +196,19 @@
             </Border>
 
             <!-- Results: what was searched, and the way back -->
-            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsSearchMode}">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" IsVisible="{Binding IsSearchMode}">
               <TextBlock Text="{Binding Search.SearchInfo}" Classes="subtle" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
               <Button Grid.Column="1" Classes="command" Content="{l:T 'Suche schliessen'}" Command="{Binding CloseSearchCommand}" FontSize="12" Padding="6,2" />
+              <!-- The quick search answers from this device: widen it, or ask the server too (Enter) -->
+              <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="12">
+                <Button Classes="command" Command="{Binding Search.SearchEverywhereCommand}" IsVisible="{Binding Search.CanSearchEverywhere}" Padding="0,2" FontSize="12">
+                  <TextBlock Text="{l:T 'In allen Ordnern suchen'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+                </Button>
+                <Button Classes="command" Command="{Binding Search.SearchServerCommand}" IsVisible="{Binding ShowServerSearchHint}" Padding="0,2" FontSize="12"
+                        ToolTip.Tip="{l:T 'Auch den Text von Nachrichten durchsuchen, die nur auf dem Server liegen (Enter)'}">
+                  <TextBlock Text="{l:T 'Auch auf dem Server suchen'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+                </Button>
+              </StackPanel>
             </Grid>
           </StackPanel>
 

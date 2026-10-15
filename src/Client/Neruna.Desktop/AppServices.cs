@@ -158,6 +158,8 @@ internal static class AppServices
         services.AddSingleton<QuickActionsViewModel>();
         services.AddSingleton(sp => new AiOptionsViewModel(sp.GetRequiredService<Neruna.Core.Ai.AiController>()) { Browser = sp.GetRequiredService<Neruna.Core.Auth.IBrowserLauncher>() });
         services.AddSingleton<TextTemplateService>();
+        services.AddSingleton<MailSearchIndexer>();
+        services.AddSingleton<SearchIndexViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
 
@@ -166,6 +168,9 @@ internal static class AppServices
 
         // Remote wipe when an organisation blocks this device: listens from the start.
         provider.GetRequiredService<Neruna.Core.Cloud.CloudRevocation>();
+
+        // The search index is built in the background from the start.
+        provider.GetRequiredService<MailSearchIndexer>().Start();
 
         var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("Neruna");
         logger.LogInformation("Neruna Desktop {Version} started (data: {DataDirectory}, demo: {Demo}, protocol log: {ProtocolLog})",

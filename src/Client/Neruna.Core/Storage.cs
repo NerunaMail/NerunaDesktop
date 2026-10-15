@@ -56,6 +56,35 @@ public interface IMailStore
     Task<int> RemoveMessageContentBeforeAsync(Guid connectionId, string folderRemoteId, DateTimeOffset before, CancellationToken cancellationToken = default);
 }
 
+/// <summary>What the search index keeps of a message (a text not on this device: null).</summary>
+public sealed record SearchDocument(string Sender, string Recipients, string Subject, string? Body, string? Attachments);
+
+/// <summary>A message the indexer still has to do; <paramref name="HasContent"/>: its MIME is on this device.</summary>
+public sealed record SearchWork(long Id, MailFolder Folder, MessageSummary Summary, bool HasContent);
+
+/// <param name="Messages">All messages of the connection.</param>
+/// <param name="Indexed">In the index (at least sender, subject, recipients).</param>
+/// <param name="WithText">In the index with their text.</param>
+public sealed record SearchIndexStatus(int Messages, int Indexed, int WithText);
+
+/// <summary>The local full-text index of the mail (built in the background by <see cref="Mail.MailSearchIndexer"/>).</summary>
+public interface IMailSearchIndex
+{
+    /// <summary>Messages of the given connections at <paramref name="level"/> (see <c>SearchLevel</c>), newest first.</summary>
+    Task<IReadOnlyList<SearchWork>> GetSearchWorkAsync(IReadOnlyCollection<Guid> connections, int level, int take, CancellationToken cancellationToken = default);
+
+    /// <summary>Puts the messages into the index (replacing what was there) at their new level.</summary>
+    Task SaveSearchEntriesAsync(IReadOnlyList<(long Id, SearchDocument Document, int Level)> entries, CancellationToken cancellationToken = default);
+
+    /// <summary>The newest messages matching <paramref name="match"/> (FTS5 syntax) in the given folders.</summary>
+    Task<IReadOnlyList<MailSearchHit>> SearchIndexAsync(string match, IReadOnlyCollection<MailFolder> folders, int limit, CancellationToken cancellationToken = default);
+
+    Task<SearchIndexStatus> GetSearchStatusAsync(Guid connectionId, CancellationToken cancellationToken = default);
+
+    /// <summary>Removes the connection's messages from the index (indexing switched off for its account).</summary>
+    Task ClearSearchIndexAsync(Guid connectionId, CancellationToken cancellationToken = default);
+}
+
 public interface ICalendarStore
 {
     Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(Guid? connectionId = null, CancellationToken cancellationToken = default);

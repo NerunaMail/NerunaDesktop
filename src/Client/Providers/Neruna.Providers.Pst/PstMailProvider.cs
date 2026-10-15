@@ -16,7 +16,7 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
     /// <summary>The file's full path.</summary>
     public const string PathSetting = "pst.path";
 
-    public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags;
+    public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags | MailProviderCapabilities.LocalContent;
 
     private string FilePath => connection.Settings.GetValueOrDefault(PathSetting) is { Length: > 0 } path
         ? path

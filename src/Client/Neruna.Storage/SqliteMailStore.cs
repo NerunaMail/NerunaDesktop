@@ -1,11 +1,12 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Neruna.Core;
 using Neruna.Core.Mail;
 
 namespace Neruna.Storage;
 
-public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts, MessageContentFiles files) : IMailStore
+public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts, MessageContentFiles files) : IMailStore, IMailSearchIndex
 {
     public async Task<IReadOnlyList<MailFolder>> GetFoldersAsync(Guid connectionId, CancellationToken cancellationToken = default)
     {
@@ -209,6 +210,130 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         }
 
         File.Move(temp, path, overwrite: true);
+        await MarkContentAvailableAsync(connectionId, folderRemoteId, remoteId, cancellationToken);
+    }
+
+    // The text is here now: the indexer adds it (it had only sender, subject and recipients).
+    private async Task MarkContentAvailableAsync(Guid connectionId, string folderRemoteId, string remoteId, CancellationToken cancellationToken)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var folderId = await db.MailFolders.Where(f => f.ConnectionId == connectionId && f.RemoteId == folderRemoteId).Select(f => (long?)f.Id).SingleOrDefaultAsync(cancellationToken);
+        await db.Messages.Where(m => m.FolderId == folderId && m.RemoteId == remoteId && m.SearchLevel == 1)
+            .ExecuteUpdateAsync(u => u.SetProperty(m => m.SearchLevel, 2), cancellationToken);
+    }
+
+    // ── Search index (FTS5 table MessageSearch, rowid = Messages.Id) ──
+
+    private static readonly string[] SearchColumns = ["$id", "$sender", "$recipients", "$subject", "$body", "$attachments"];
+
+    public async Task<IReadOnlyList<SearchWork>> GetSearchWorkAsync(IReadOnlyCollection<Guid> connections, int level, int take, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connections);
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var ids = connections.ToList();
+        var rows = await db.Messages.AsNoTracking()
+            .Where(m => m.SearchLevel == level)
+            .Join(db.MailFolders.Where(f => ids.Contains(f.ConnectionId)), m => m.FolderId, f => f.Id, (m, f) => new { Message = m, Folder = f })
+            .OrderByDescending(r => r.Message.DateUnixMs)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+        return [.. rows.Select(r => new SearchWork(r.Message.Id, ToModel(r.Folder), ToModel(r.Message),
+            File.Exists(files.PathFor(r.Folder.ConnectionId, r.Folder.RemoteId, r.Message.RemoteId))))];
+    }
+
+    public async Task SaveSearchEntriesAsync(IReadOnlyList<(long Id, SearchDocument Document, int Level)> entries, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var connection = db.Database.GetDbConnection();
+        await using var delete = connection.CreateCommand();
+        delete.CommandText = "DELETE FROM MessageSearch WHERE rowid = $id";
+        var deleteId = delete.CreateParameter();
+        deleteId.ParameterName = "$id";
+        delete.Parameters.Add(deleteId);
+        await using var insert = connection.CreateCommand();
+        insert.CommandText = "INSERT INTO MessageSearch (rowid, Sender, Recipients, Subject, Body, Attachments) VALUES ($id, $sender, $recipients, $subject, $body, $attachments)";
+        var values = SearchColumns.Select(name =>
+        {
+            var parameter = insert.CreateParameter();
+            parameter.ParameterName = name;
+            insert.Parameters.Add(parameter);
+            return parameter;
+        }).ToArray();
+        await using var update = connection.CreateCommand();
+        update.CommandText = "UPDATE Messages SET SearchLevel = $level WHERE Id = $id";
+        var updateLevel = update.CreateParameter();
+        updateLevel.ParameterName = "$level";
+        var updateId = update.CreateParameter();
+        updateId.ParameterName = "$id";
+        update.Parameters.Add(updateLevel);
+        update.Parameters.Add(updateId);
+        delete.Transaction = insert.Transaction = update.Transaction = transaction.GetDbTransaction();
+
+        foreach (var (id, document, level) in entries)
+        {
+            deleteId.Value = id;
+            await delete.ExecuteNonQueryAsync(cancellationToken);
+            values[0].Value = id;
+            values[1].Value = document.Sender;
+            values[2].Value = document.Recipients;
+            values[3].Value = document.Subject;
+            values[4].Value = (object?)document.Body ?? DBNull.Value;
+            values[5].Value = (object?)document.Attachments ?? DBNull.Value;
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+            updateLevel.Value = level;
+            updateId.Value = id;
+            await update.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MailSearchHit>> SearchIndexAsync(string match, IReadOnlyCollection<MailFolder> folders, int limit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folders);
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var connectionIds = folders.Select(f => f.ConnectionId).Distinct().ToList();
+        var wanted = folders.Select(f => (f.ConnectionId, f.RemoteId)).ToHashSet();
+        var folderEntities = (await db.MailFolders.AsNoTracking().Where(f => connectionIds.Contains(f.ConnectionId)).ToListAsync(cancellationToken))
+            .Where(f => wanted.Contains((f.ConnectionId, f.RemoteId)))
+            .ToDictionary(f => f.Id);
+        var folderIds = folderEntities.Keys.ToList();
+        var messages = await db.Messages
+            .FromSqlRaw("SELECT * FROM Messages WHERE Id IN (SELECT rowid FROM MessageSearch WHERE MessageSearch MATCH {0})", match)
+            .AsNoTracking()
+            .Where(m => folderIds.Contains(m.FolderId))
+            .OrderByDescending(m => m.DateUnixMs)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+        return [.. messages.Select(m => new MailSearchHit(ToModel(folderEntities[m.FolderId]), ToModel(m)))];
+    }
+
+    public async Task<SearchIndexStatus> GetSearchStatusAsync(Guid connectionId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var levels = await db.Messages
+            .Join(db.MailFolders.Where(f => f.ConnectionId == connectionId), m => m.FolderId, f => f.Id, (m, _) => m.SearchLevel)
+            .GroupBy(level => level)
+            .Select(g => new { Level = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        return new SearchIndexStatus(levels.Sum(l => l.Count), levels.Where(l => l.Level > 0).Sum(l => l.Count), levels.Where(l => l.Level == 3).Sum(l => l.Count));
+    }
+
+    public async Task ClearSearchIndexAsync(Guid connectionId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "DELETE FROM MessageSearch WHERE rowid IN (SELECT m.Id FROM Messages m JOIN MailFolders f ON f.Id = m.FolderId WHERE f.ConnectionId = {0})", [connectionId], cancellationToken);
+        var folderIds = db.MailFolders.Where(f => f.ConnectionId == connectionId).Select(f => f.Id);
+        await db.Messages.Where(m => folderIds.Contains(m.FolderId) && m.SearchLevel != 0)
+            .ExecuteUpdateAsync(u => u.SetProperty(m => m.SearchLevel, 0), cancellationToken);
     }
 
     public async Task<IReadOnlyList<(string RemoteId, long Size)>> GetMessagesWithoutContentAsync(Guid connectionId, string folderRemoteId, DateTimeOffset? since, int take, CancellationToken cancellationToken = default)
