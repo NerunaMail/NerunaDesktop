@@ -75,6 +75,7 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
         modelBuilder.Entity<CalendarObjectEntity>(e =>
         {
             e.HasIndex(o => new { o.CalendarId, o.RemoteId }).IsUnique();
+            e.HasIndex(o => new { o.CalendarId, o.SpanStart });
             e.HasOne<CalendarEntity>().WithMany().HasForeignKey(o => o.CalendarId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -233,6 +234,12 @@ internal sealed class CalendarObjectEntity
     public string? ETag { get; set; }
 
     public required string Data { get; set; }
+
+    /// <summary>First start (Unix ms) – null: not worked out yet (stored before 0.8.8). See CalendarSpan.</summary>
+    public long? SpanStart { get; set; }
+
+    /// <summary>End of the last occurrence (Unix ms); null with a start: a series without end.</summary>
+    public long? SpanEnd { get; set; }
 }
 
 internal sealed class AddressBookEntity

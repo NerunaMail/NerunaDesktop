@@ -207,7 +207,7 @@ public sealed class CalendarController(
     public async Task<CalendarObject?> GetObjectAsync(CalendarInfo calendar, string remoteId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(calendar);
-        return (await store.GetObjectsAsync(calendar.ConnectionId, calendar.RemoteId, cancellationToken)).FirstOrDefault(o => o.RemoteId == remoteId);
+        return await store.GetObjectAsync(calendar.ConnectionId, calendar.RemoteId, remoteId, cancellationToken);
     }
 
     /// <summary>
@@ -362,7 +362,8 @@ public sealed class CalendarController(
         var result = new List<CalendarOccurrence>();
         foreach (var calendar in calendars)
         {
-            foreach (var item in await store.GetObjectsAsync(calendar.ConnectionId, calendar.RemoteId, cancellationToken))
+            // Only the events that can show up in this time (see CalendarSpan) are parsed.
+            foreach (var item in await store.GetObjectsAsync(calendar.ConnectionId, calendar.RemoteId, from - MaxEventLength, to, cancellationToken))
             {
                 try
                 {
@@ -422,7 +423,7 @@ public sealed class CalendarController(
             evt.RecurrenceRule is not null || evt.RecurrenceIdentifier is not null);
     }
 
-    private static DateTimeOffset ToDateTimeOffset(CalDateTime value)
+    internal static DateTimeOffset ToDateTimeOffset(CalDateTime value)
     {
         if (!value.HasTime || value.IsFloating)
         {

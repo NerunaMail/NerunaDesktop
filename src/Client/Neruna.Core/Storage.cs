@@ -115,6 +115,14 @@ public interface ICalendarStore
     Task DeleteObjectAsync(CalendarInfo calendar, string remoteId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<CalendarObject>> GetObjectsAsync(Guid connectionId, string calendarRemoteId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The objects that can have an occurrence in [<paramref name="from"/>, <paramref name="until"/>) – by their stored
+    /// <see cref="Calendar.CalendarSpan"/>; objects stored before it was kept are included (and get it now).
+    /// </summary>
+    Task<IReadOnlyList<CalendarObject>> GetObjectsAsync(Guid connectionId, string calendarRemoteId, DateTimeOffset from, DateTimeOffset until, CancellationToken cancellationToken = default);
+
+    Task<CalendarObject?> GetObjectAsync(Guid connectionId, string calendarRemoteId, string remoteId, CancellationToken cancellationToken = default);
 }
 
 public interface IContactStore

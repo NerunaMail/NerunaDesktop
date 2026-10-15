@@ -69,7 +69,7 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
         }
 
         row.ETag = item.ETag;
-        row.Data = item.ICalendarData;
+        SetData(row, item.ICalendarData);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -115,7 +115,7 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
             }
 
             obj.ETag = item.ETag;
-            obj.Data = item.ICalendarData;
+            SetData(obj, item.ICalendarData);
         }
 
         entity.SyncState = result.NewSyncState;
@@ -131,6 +131,50 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
             .Where(o => o.CalendarId == calendarId)
             .Select(o => new CalendarObject(o.RemoteId, o.ETag, o.Data))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CalendarObject>> GetObjectsAsync(Guid connectionId, string calendarRemoteId, DateTimeOffset from, DateTimeOffset until, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var calendarId = await CalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken);
+        await FillSpansAsync(db, calendarId, cancellationToken);
+        long start = from.ToUnixTimeMilliseconds(), end = until.ToUnixTimeMilliseconds();
+        return await db.CalendarObjects.AsNoTracking()
+            .Where(o => o.CalendarId == calendarId && o.SpanStart < end && (o.SpanEnd == null || o.SpanEnd > start))
+            .Select(o => new CalendarObject(o.RemoteId, o.ETag, o.Data))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<CalendarObject?> GetObjectAsync(Guid connectionId, string calendarRemoteId, string remoteId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var calendarId = await CalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken);
+        return await db.CalendarObjects.AsNoTracking()
+            .Where(o => o.CalendarId == calendarId && o.RemoteId == remoteId)
+            .Select(o => new CalendarObject(o.RemoteId, o.ETag, o.Data))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static void SetData(CalendarObjectEntity row, string data)
+    {
+        row.Data = data;
+        (row.SpanStart, row.SpanEnd) = CalendarSpan.Of(data);
+    }
+
+    // Objects stored before the span was kept get it on the first look (once, a few hundred at a time).
+    private static async Task FillSpansAsync(NerunaDbContext db, long calendarId, CancellationToken cancellationToken)
+    {
+        List<CalendarObjectEntity> missing;
+        while ((missing = await db.CalendarObjects.Where(o => o.CalendarId == calendarId && o.SpanStart == null).Take(500).ToListAsync(cancellationToken)).Count > 0)
+        {
+            foreach (var row in missing)
+            {
+                (row.SpanStart, row.SpanEnd) = CalendarSpan.Of(row.Data);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+        }
     }
 
     private static async Task<long> CalendarIdAsync(NerunaDbContext db, Guid connectionId, string remoteId, CancellationToken cancellationToken) =>

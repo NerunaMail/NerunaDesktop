@@ -137,10 +137,18 @@ namespace Neruna.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("SpanEnd")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("SpanStart")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CalendarId", "RemoteId")
                         .IsUnique();
+
+                    b.HasIndex("CalendarId", "SpanStart");
 
                     b.ToTable("CalendarObjects");
                 });

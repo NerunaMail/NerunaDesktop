@@ -43,7 +43,8 @@ public sealed class ReminderService(ICalendarStore calendars, IReminderStore sta
 
         foreach (var calendar in await calendars.GetCalendarsAsync(null, cancellationToken))
         {
-            foreach (var item in await calendars.GetObjectsAsync(calendar.ConnectionId, calendar.RemoteId, cancellationToken))
+            // Only events around now (see CalendarSpan): checked every 30 seconds, ten years of events would be real work.
+            foreach (var item in await calendars.GetObjectsAsync(calendar.ConnectionId, calendar.RemoteId, now - TimeSpan.FromDays(1) - CalendarController.MaxEventLength, now + MaxLead, cancellationToken))
             {
                 try
                 {
