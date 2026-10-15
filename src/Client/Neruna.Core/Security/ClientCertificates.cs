@@ -160,12 +160,15 @@ public sealed class ClientCertificates(ICredentialStore credentials)
         }
     }
 
-    private static ClientCertificateInfo Describe(X509Certificate2 certificate, string reference, bool fromSystem) =>
-        new(reference, NameOf(certificate.SubjectName), NameOf(certificate.IssuerName), new DateTimeOffset(certificate.NotAfter.ToUniversalTime(), TimeSpan.Zero), fromSystem);
+    internal static ClientCertificateInfo Describe(X509Certificate2 certificate, string reference, bool fromSystem) =>
+        new(reference, NameOf(certificate, issuer: false), NameOf(certificate, issuer: true), new DateTimeOffset(certificate.NotAfter.ToUniversalTime(), TimeSpan.Zero), fromSystem);
 
-    private static string NameOf(X500DistinguishedName name) =>
-        name.EnumerateRelativeDistinguishedNames().FirstOrDefault(n => n.GetSingleElementType().Value == "2.5.4.3")?.GetSingleElementValue()
-        ?? name.Name;
+    /// <summary>The common name (also within a multi-valued part like "CN=Anna+OU=IT"), else the whole name.</summary>
+    private static string NameOf(X509Certificate2 certificate, bool issuer)
+    {
+        var simple = certificate.GetNameInfo(X509NameType.SimpleName, issuer);
+        return string.IsNullOrWhiteSpace(simple) ? (issuer ? certificate.Issuer : certificate.Subject) : simple;
+    }
 
     private static Guid SecretId(string thumbprint) =>
         new(SHA256.HashData(Encoding.UTF8.GetBytes("neruna-client-cert:" + thumbprint.ToUpperInvariant())).AsSpan(0, 16));

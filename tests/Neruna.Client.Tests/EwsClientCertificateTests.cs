@@ -1,3 +1,4 @@
+using System.Formats.Asn1;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -80,6 +81,42 @@ public class EwsClientCertificateTests
         return connection;
     }
 
+    [Fact]
+    public void A_certificate_with_a_multi_valued_name_part_is_described_by_its_common_name()
+    {
+        using var ca = Certificates.Authority();
+        // "CN=Anna Muster+OU=IT, O=Firma AG" – the string parser makes no multi-valued part, so built by hand.
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            using (writer.PushSetOf())
+            {
+                foreach (var (oid, value) in new[] { ("2.5.4.3", "Anna Muster"), ("2.5.4.11", "IT") })
+                {
+                    using (writer.PushSequence())
+                    {
+                        writer.WriteObjectIdentifier(oid);
+                        writer.WriteCharacterString(UniversalTagNumber.UTF8String, value);
+                    }
+                }
+            }
+
+            using (writer.PushSetOf())
+            using (writer.PushSequence())
+            {
+                writer.WriteObjectIdentifier("2.5.4.10");
+                writer.WriteCharacterString(UniversalTagNumber.UTF8String, "Firma AG");
+            }
+        }
+
+        using var certificate = Certificates.Issue(ca, new X500DistinguishedName(writer.Encode()), server: false);
+        Assert.Contains(certificate.SubjectName.EnumerateRelativeDistinguishedNames(), n => n.HasMultipleElements);
+
+        var info = ClientCertificates.Describe(certificate, "system:x", fromSystem: true);
+
+        Assert.Equal(("Anna Muster", "Neruna Test Proxy CA"), (info.Subject, info.Issuer));
+    }
+
     private static class Certificates
     {
         public static X509Certificate2 Authority()
@@ -91,7 +128,9 @@ public class EwsClientCertificateTests
             return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(1));
         }
 
-        public static X509Certificate2 Issue(X509Certificate2 ca, string subject, bool server)
+        public static X509Certificate2 Issue(X509Certificate2 ca, string subject, bool server) => Issue(ca, new X500DistinguishedName(subject), server);
+
+        public static X509Certificate2 Issue(X509Certificate2 ca, X500DistinguishedName subject, bool server)
         {
             using var key = RSA.Create(2048);
             var request = new CertificateRequest(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
