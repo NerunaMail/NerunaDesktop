@@ -50,6 +50,12 @@ public sealed record OAuthEndpoints(Uri Authorize, Uri Token, string ClientId, I
 
     /// <summary>Whether token requests name the scopes (some providers keep the grant and refuse them on refresh).</summary>
     public bool ScopeOnTokenRequests { get; init; } = true;
+
+    /// <summary>
+    /// The app's own redirect address registered with the provider (a custom scheme, e.g. "msal…://auth"), for an
+    /// <see cref="IAppRedirectBrowser"/> on a phone. Null: only the loopback listener.
+    /// </summary>
+    public Uri? AppRedirect { get; init; }
 }
 
 /// <summary>What the sign-in yields; kept only in the system keychain (never in the database or logs).</summary>
@@ -80,6 +86,18 @@ public interface IBrowserLauncher
 }
 
 /// <summary>
+/// A browser that brings the provider's answer back to the app itself (a phone: the redirect to the app's own scheme
+/// opens the app again). Used instead of the loopback listener where the provider has an <see cref="OAuthEndpoints.AppRedirect"/>
+/// – a phone may freeze the app while the browser is in front, so a listener in it would not answer.
+/// </summary>
+public interface IAppRedirectBrowser : IBrowserLauncher
+{
+    /// <summary>Opens <paramref name="authorize"/>; returns the parameters the redirect to <paramref name="redirect"/> carried.</summary>
+    /// <exception cref="OperationCanceledException">The user closed the browser.</exception>
+    Task<IReadOnlyDictionary<string, string>> AuthenticateAsync(Uri authorize, Uri redirect, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
 /// The sign-in itself: authorization code with PKCE in the system browser, redirect to a short-lived listener on this
 /// computer (<c>http://localhost:{port}/</c> or as the provider requires), then code for tokens. Refreshing uses the
 /// refresh token.
@@ -100,8 +118,9 @@ public sealed class OAuthClient(HttpClient http)
         var challenge = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
         var state = Base64Url(RandomNumberGenerator.GetBytes(16));
         var nonce = endpoints.Issuer is null ? null : Base64Url(RandomNumberGenerator.GetBytes(16));
-        using var listener = LoopbackListener.Start(endpoints.RedirectHost);
-        var redirect = $"http://{endpoints.RedirectHost}:{listener.Port}{endpoints.RedirectPath}";
+        var app = browser is IAppRedirectBrowser appBrowser && endpoints.AppRedirect is { } appRedirect ? (appBrowser, appRedirect) : default;
+        using var listener = app.appBrowser is null ? LoopbackListener.Start(endpoints.RedirectHost) : null;
+        var redirect = listener is null ? app.appRedirect.OriginalString : $"http://{endpoints.RedirectHost}:{listener.Port}{endpoints.RedirectPath}";
 
         var query = new Dictionary<string, string?>
         {
@@ -122,7 +141,28 @@ public sealed class OAuthClient(HttpClient http)
             query[key] = value;
         }
 
-        await browser.OpenAsync(new Uri(endpoints.Authorize + "?" + Form(query)), cancellationToken);
+        var authorize = new Uri(endpoints.Authorize + "?" + Form(query));
+        if (listener is null)
+        {
+            // The app gets the answer through its own scheme: no listener, no page to answer.
+            System.Collections.Specialized.NameValueCollection answer = [];
+            try
+            {
+                foreach (var (key, value) in await app.appBrowser!.AuthenticateAsync(authorize, app.appRedirect, cancellationToken))
+                {
+                    answer[key] = value;
+                }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new OAuthException(T("Die Anmeldung wurde abgebrochen."));
+            }
+
+            var (appOk, appClient) = Check(answer);
+            return await FinishAsync(answer, appOk, appClient);
+        }
+
+        await browser.OpenAsync(authorize, cancellationToken);
 
         // The browser comes back here once the user signed in (or cancelled); give up after 5 minutes.
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -152,7 +192,14 @@ public sealed class OAuthClient(HttpClient http)
 
         using (request)
         {
-            var result = request.Query;
+            var (ok, clientId) = Check(request.Query);
+            await RespondAsync(request, ok);
+            return await FinishAsync(request.Query, ok, clientId);
+        }
+
+        // The answer: code and state, and – with dynamic registration – the client id.
+        (bool Ok, string ClientId) Check(System.Collections.Specialized.NameValueCollection result)
+        {
             var ok = result["code"] is { Length: > 0 } && result["state"] == state;
             // A registering sign-in gets the app's own client id back; a later one must not get another.
             var clientId = endpoints.ClientId;
@@ -170,13 +217,17 @@ public sealed class OAuthClient(HttpClient http)
                 }
             }
 
-            await RespondAsync(request, ok);
+            return (ok, clientId);
+        }
+
+        Task<OAuthTokens> FinishAsync(System.Collections.Specialized.NameValueCollection result, bool ok, string clientId)
+        {
             if (!ok)
             {
                 throw new OAuthException(result["error_description"] ?? result["error"] ?? T("Die Anmeldung wurde abgebrochen."));
             }
 
-            return await RequestTokensAsync(endpoints, clientId, new Dictionary<string, string?>
+            return RequestTokensAsync(endpoints, clientId, new Dictionary<string, string?>
             {
                 ["grant_type"] = "authorization_code",
                 ["code"] = result["code"],

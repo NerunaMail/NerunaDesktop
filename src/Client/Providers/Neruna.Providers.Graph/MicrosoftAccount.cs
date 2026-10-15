@@ -19,7 +19,11 @@ public static class MicrosoftAccount
         new Uri("https://login.microsoftonline.com/common/oauth2/v2.0/token"),
         ClientId,
         ["offline_access", "openid", "email", "User.Read", "Mail.ReadWrite", "Mail.Send", "MailboxSettings.Read", "Calendars.ReadWrite", "Contacts.ReadWrite", TasksScope, MailboxSettingsScope],
-        [TasksScope, MailboxSettingsScope]);
+        [TasksScope, MailboxSettingsScope])
+    {
+        // The Android app: "msal{ClientId}://auth", registered as a redirect of "Mobile and desktop applications".
+        AppRedirect = new Uri($"msal{ClientId}://auth"),
+    };
 
     /// <summary>Microsoft To Do; added in 0.1.14 – accounts signed in before get tasks after signing in again.</summary>
     public const string TasksScope = "Tasks.ReadWrite";

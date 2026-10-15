@@ -52,6 +52,44 @@ public class OAuthSignInTests
         });
         await Assert.ThrowsAsync<OAuthException>(() => new OAuthClient(tokenHttp).SignInAsync(endpoints, null, forged, ct));
     }
+
+    // A phone: the provider's redirect goes to the app's own scheme, which hands its parameters back.
+    private sealed class AppBrowser(Func<Uri, Uri, IReadOnlyDictionary<string, string>> answer) : IAppRedirectBrowser
+    {
+        public Task OpenAsync(Uri uri, CancellationToken cancellationToken = default) => throw new InvalidOperationException("no plain browser on the phone");
+
+        public Task<IReadOnlyDictionary<string, string>> AuthenticateAsync(Uri authorize, Uri redirect, CancellationToken cancellationToken = default) =>
+            Task.FromResult(answer(authorize, redirect));
+    }
+
+    [Fact]
+    public async Task On_a_phone_the_answer_comes_through_the_apps_own_redirect()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var endpoints = new OAuthEndpoints(new Uri("https://login.example/authorize"), new Uri("https://login.example/token"), "client-1", ["Mail.ReadWrite"])
+        {
+            AppRedirect = new Uri("msalclient-1://auth"),
+        };
+        var stub = new StubHttpHandler();
+        stub.Responses["https://login.example/token"] = (HttpStatusCode.OK, """{"access_token":"A","refresh_token":"R","expires_in":3600}""");
+        using var tokenHttp = new HttpClient(stub);
+
+        var browser = new AppBrowser((authorize, redirect) =>
+        {
+            var query = HttpUtility.ParseQueryString(authorize.Query);
+            Assert.Equal("msalclient-1://auth", query["redirect_uri"]);
+            Assert.Equal(new Uri("msalclient-1://auth"), redirect);
+            return new Dictionary<string, string> { ["code"] = "C0DE", ["state"] = query["state"]! };
+        });
+
+        var tokens = await new OAuthClient(tokenHttp).SignInAsync(endpoints, null, browser, ct);
+        Assert.Equal("A", tokens.AccessToken);
+        Assert.Contains("redirect_uri=msalclient-1%3A%2F%2Fauth", Assert.Single(stub.Sent).Body, StringComparison.Ordinal);
+
+        // A wrong state is refused here as well.
+        var forged = new AppBrowser((_, _) => new Dictionary<string, string> { ["code"] = "C0DE", ["state"] = "forged" });
+        await Assert.ThrowsAsync<OAuthException>(() => new OAuthClient(tokenHttp).SignInAsync(endpoints, null, forged, ct));
+    }
 }
 
 /// <summary>A provider with dynamic registration and OpenID Connect (like "Sign in with ChatGPT").</summary>
