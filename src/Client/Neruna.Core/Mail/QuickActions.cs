@@ -100,6 +100,12 @@ public sealed record QuickActionStep(QuickActionStepKind Kind)
     /// <summary>A text template above the signature (answer and forward).</summary>
     public Guid? TemplateId { get; init; }
 
+    /// <summary>Answer, forward and new mail: sent from this account (null: the mail's own account) …</summary>
+    public Guid? FromAccountId { get; init; }
+
+    /// <summary>… with this of its addresses (the account's own or an alias).</summary>
+    public string? From { get; init; }
+
     /// <summary>Forward and new mail: to this address (several with ";").</summary>
     public string? To { get; init; }
 
@@ -228,7 +234,7 @@ public sealed class QuickActionService(ISettingsStore settings)
         ArgumentNullException.ThrowIfNull(accounts);
         ArgumentNullException.ThrowIfNull(templates);
         var usedStamps = actions.SelectMany(a => a.Steps).Select(s => s.StampId).OfType<Guid>().ToHashSet();
-        var usedAccounts = actions.Select(a => a.When.AccountId).OfType<Guid>().ToHashSet();
+        var usedAccounts = actions.Select(a => a.When.AccountId).Concat(actions.SelectMany(a => a.Steps).Select(s => s.FromAccountId)).OfType<Guid>().ToHashSet();
         var usedTemplates = actions.SelectMany(a => a.Steps).Select(s => s.TemplateId).OfType<Guid>().ToHashSet();
         var file = new ExportFile(FileFormat, 1, actions,
             [.. stamps.Where(s => usedStamps.Contains(s.Id))],
@@ -283,7 +289,9 @@ public sealed class QuickActionService(ISettingsStore settings)
                     FolderRemoteId = account is null ? null : action.When.FolderRemoteId,
                     FolderName = account is null ? null : action.When.FolderName,
                 },
-                Steps = [.. action.Steps.Select(s => s with { TemplateId = Template(s.TemplateId) })],
+                Steps = [.. action.Steps.Select(s => Account(s.FromAccountId) is { } from
+                    ? s with { TemplateId = Template(s.TemplateId), FromAccountId = from }
+                    : s with { TemplateId = Template(s.TemplateId), FromAccountId = null, From = null })],
             };
         }).ToList();
         return (actions, file.Stamps ?? []);

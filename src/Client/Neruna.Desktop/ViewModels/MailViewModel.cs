@@ -599,7 +599,8 @@ internal sealed partial class MailViewModel(
 
     private async Task StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false, Func<Task>? afterSent = null)
     {
-        if (CurrentAccount is not { Account.EmailAddress: not null } account)
+        var chosen = draft.FromAccountId is { } fromId ? Accounts.FirstOrDefault(a => a.Account.Id == fromId) : null;
+        if ((chosen ?? CurrentAccount) is not { Account.EmailAddress: not null } account)
         {
             StatusMessage?.Invoke(this, T("Kein E-Mail-Konto vorhanden."));
             return;
@@ -621,7 +622,8 @@ internal sealed partial class MailViewModel(
 
     private ComposeViewModel CreateCompose(Account account, ServiceConnection connection, ComposeDraft draft, ComposeKind kind, bool encrypt, bool inWindow)
     {
-        var compose = new ComposeViewModel(mail, account, connection, draft, files, secureMime, settings, signatures, kind, encrypt, inWindow)
+        var compose = new ComposeViewModel(mail, account, connection, draft, files, secureMime, settings, signatures, kind, encrypt, inWindow,
+            [.. Accounts.Select(a => (a.Account, a.Connection))])
         {
             Recipients = recipients,
             Preferences = preferences,

@@ -300,6 +300,7 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
     private async Task<EditorOptions> LoadOptionsAsync()
     {
         var accountChoices = new List<Choice<Guid?>> { new(null, T("Alle Konten")) };
+        var senderChoices = new List<Choice<SenderRef?>> { new(null, T("Konto der E-Mail")) };
         var folders = new Dictionary<Guid, IReadOnlyList<FolderChoice>>();
         var allFolders = new List<FolderChoice>();
         foreach (var account in await accounts.GetAccountsAsync())
@@ -310,6 +311,8 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
             }
 
             accountChoices.Add(new Choice<Guid?>(account.Id, account.Title));
+            senderChoices.AddRange(account.Identities.Select(i => new Choice<SenderRef?>(new SenderRef(account.Id, i.Email),
+                string.Equals(i.Email, account.Title, StringComparison.OrdinalIgnoreCase) ? i.ToString() : $"{i} – {account.Title}")));
             var tree = FolderTree(await mail.GetFoldersAsync(connection.Id), account.Title);
             folders[account.Id] = tree;
             allFolders.Add(new FolderChoice(null, account.Title, account.Title, 0, IsAccount: true));
@@ -319,7 +322,7 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         var templateChoices = new List<Choice<Guid?>> { new(null, T("Keine")) };
         templateChoices.AddRange((await templates.GetAllAsync()).Select(t => new Choice<Guid?>(t.Id, t.Name)));
         var stampChoices = Stamps.Select(s => new Choice<Guid?>(s.Id, s.Text)).ToList();
-        return new EditorOptions(accountChoices, folders, allFolders, templateChoices, stampChoices);
+        return new EditorOptions(accountChoices, folders, allFolders, templateChoices, stampChoices, senderChoices);
     }
 
     // As in the folder tree: special folders first, each with its subfolders, then the others by name.
@@ -408,7 +411,11 @@ internal sealed record EditorOptions(
     IReadOnlyDictionary<Guid, IReadOnlyList<FolderChoice>> Folders,
     IReadOnlyList<FolderChoice> AllFolders,
     IReadOnlyList<Choice<Guid?>> Templates,
-    IReadOnlyList<Choice<Guid?>> Stamps);
+    IReadOnlyList<Choice<Guid?>> Stamps,
+    IReadOnlyList<Choice<SenderRef?>> Senders);
+
+/// <summary>A quick action's sender: an address of an account.</summary>
+internal sealed record SenderRef(Guid AccountId, string Email);
 
 /// <summary>One stamp in the list: text, colour, with name and date.</summary>
 internal sealed partial class StampEditor(PdfStamp stamp, Func<StampEditor, Task> remove) : ObservableObject
@@ -596,6 +603,10 @@ internal sealed partial class StepEditor : ObservableObject
         MoveFolders = options.AllFolders;
         Stamp = Stamps.FirstOrDefault(s => s.Value == step.StampId) ?? Stamps.FirstOrDefault();
         Template = Templates.FirstOrDefault(t => t.Value == step.TemplateId) ?? Templates[0];
+        Senders = options.Senders;
+        Sender = Senders.FirstOrDefault(s => s.Value is { } v && v.AccountId == step.FromAccountId && string.Equals(v.Email, step.From, StringComparison.OrdinalIgnoreCase))
+                 ?? Senders.FirstOrDefault(s => s.Value is { } v && v.AccountId == step.FromAccountId)
+                 ?? Senders[0];
         MoveFolder = MoveFolders.FirstOrDefault(f => f.IsFolder && f.RemoteId == step.FolderRemoteId) ?? MoveFolders.FirstOrDefault(f => f.IsFolder && f.Name == step.FolderName);
         Folder = step.Folder ?? string.Empty;
         FileName = step.FileName ?? string.Empty;
@@ -652,6 +663,12 @@ internal sealed partial class StepEditor : ObservableObject
 
     public IReadOnlyList<Choice<Guid?>> Templates { get; }
 
+    /// <summary>"Konto der E-Mail" or an address of an account – e.g. "Weiterleiten als ich".</summary>
+    public IReadOnlyList<Choice<SenderRef?>> Senders { get; }
+
+    [ObservableProperty]
+    public partial Choice<SenderRef?>? Sender { get; set; }
+
     [ObservableProperty]
     public partial Choice<Guid?>? Template { get; set; }
 
@@ -705,6 +722,8 @@ internal sealed partial class StepEditor : ObservableObject
         Folder = ShowsSave && !string.IsNullOrWhiteSpace(Folder) ? Folder.Trim() : null,
         FileName = ShowsSave && !string.IsNullOrWhiteSpace(FileName) ? FileName.Trim() : null,
         TemplateId = ShowsTemplate ? Template?.Value : null,
+        FromAccountId = ShowsTemplate ? Sender?.Value?.AccountId : null,
+        From = ShowsTemplate ? Sender?.Value?.Email : null,
         To = ShowsTo && !string.IsNullOrWhiteSpace(To) ? To.Trim() : null,
         Subject = ShowsSubject && !string.IsNullOrWhiteSpace(Subject) ? Subject.Trim() : null,
         FolderRemoteId = ShowsMoveFolder ? MoveFolder?.RemoteId : null,

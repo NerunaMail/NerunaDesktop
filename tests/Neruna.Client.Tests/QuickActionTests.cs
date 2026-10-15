@@ -70,7 +70,8 @@ public class QuickActionTests
         var stamp = (await service.GetStampsAsync(Ct))[0];
         var action = new QuickAction(Guid.NewGuid(), "Offerte genehmigen", "#107C10",
             new QuickActionCondition { Attachment = QuickActionAttachmentKind.Pdf, SubjectContains = "Offerte" },
-            [new QuickActionStep(QuickActionStepKind.StampPdf) { StampId = stamp.Id }, new QuickActionStep(QuickActionStepKind.SaveAttachment) { Folder = "/tmp/offerten", FileName = "{Dateiname}_genehmigt" }]);
+            [new QuickActionStep(QuickActionStepKind.StampPdf) { StampId = stamp.Id }, new QuickActionStep(QuickActionStepKind.SaveAttachment) { Folder = "/tmp/offerten", FileName = "{Dateiname}_genehmigt" },
+             new QuickActionStep(QuickActionStepKind.Forward) { FromAccountId = Guid.NewGuid(), From = "anna@firma.ch" }]);
         await service.SaveActionsAsync([action], Ct);
         await service.SaveStampsAsync([stamp with { Text = "Freigegeben" }], Ct);
 
@@ -92,6 +93,7 @@ public class QuickActionTests
                 new QuickActionStep(QuickActionStepKind.StampPdf) { StampId = stamp.Id },
                 new QuickActionStep(QuickActionStepKind.SaveAttachment) { Folder = @"\\server\buchhaltung" },
                 new QuickActionStep(QuickActionStepKind.Reply) { TemplateId = templateHere },
+                new QuickActionStep(QuickActionStepKind.Forward) { FromAccountId = accountHere, From = "rechnungen@firma.ch" },
             ]);
         var file = QuickActionService.Export([action], [stamp, new PdfStamp(Guid.NewGuid(), "Unbenutzt", "#000000")],
             new Dictionary<Guid, string> { [accountHere] = "info@firma.ch" }, new Dictionary<Guid, string> { [templateHere] = "Rechnung erhalten" });
@@ -103,6 +105,7 @@ public class QuickActionTests
         Assert.Equal(accountThere, imported.When.AccountId);
         Assert.Equal("INBOX/Rechnungen", imported.When.FolderRemoteId);
         Assert.Equal(templateThere, imported.Steps[2].TemplateId);
+        Assert.Equal((accountThere, "rechnungen@firma.ch"), (imported.Steps[3].FromAccountId, imported.Steps[3].From));
         Assert.Equal(@"\\server\buchhaltung", imported.Steps[1].Folder);
         Assert.Equal("Visiert", Assert.Single(stamps).Text); // only the stamps it uses
 
@@ -111,6 +114,7 @@ public class QuickActionTests
         Assert.Null(elsewhere[0].When.AccountId);
         Assert.Null(elsewhere[0].When.FolderRemoteId);
         Assert.Null(elsewhere[0].Steps[2].TemplateId);
+        Assert.Equal(((Guid?)null, (string?)null), (elsewhere[0].Steps[3].FromAccountId, elsewhere[0].Steps[3].From)); // from the mail's own account
 
         Assert.Throws<FormatException>(() => QuickActionService.Import("{\"format\":\"other\"}", new Dictionary<Guid, string>(), new Dictionary<Guid, string>()));
         Assert.Throws<FormatException>(() => QuickActionService.Import("kein json", new Dictionary<Guid, string>(), new Dictionary<Guid, string>()));

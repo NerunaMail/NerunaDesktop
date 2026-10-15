@@ -227,6 +227,16 @@ internal sealed partial class MailViewModel
             draft = draft with { To = step.To.Trim() };
         }
 
+        // "Weiterleiten als …": a sender of its own, if the account still exists.
+        if (step?.FromAccountId is { } fromAccount && Accounts.FirstOrDefault(a => a.Account.Id == fromAccount) is { } sending)
+        {
+            draft = draft with
+            {
+                FromAccountId = fromAccount,
+                From = sending.Account.Owns(step.From) ? step.From : sending.Account.EmailAddress,
+            };
+        }
+
         if (step?.TemplateId is { } templateId && (await textTemplates.GetAllAsync()).FirstOrDefault(t => t.Id == templateId) is { } template)
         {
             draft = draft with { LeadHtml = template.Html };

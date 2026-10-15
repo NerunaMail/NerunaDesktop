@@ -34,6 +34,9 @@ public sealed record ComposeDraft(
 
     /// <summary>Text above the signature (a text template from a quick action), where one would start typing.</summary>
     public string? LeadHtml { get; init; }
+
+    /// <summary>Send from this account instead of the current one (a quick action's sender); <see cref="From"/> is its address.</summary>
+    public Guid? FromAccountId { get; init; }
 }
 
 /// <summary>Builds replies and forwards the way business users expect (AW:/WG:, header block above the original).</summary>

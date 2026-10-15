@@ -26,8 +26,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     private static readonly TimeSpan AutosaveInterval = TimeSpan.FromSeconds(30);
 
     private readonly MailController _mail;
-    private readonly Account _account;
-    private readonly ServiceConnection _connection;
+    private Account _account;
+    private ServiceConnection _connection;
     private readonly IFileService _files;
     private readonly ComposeDraft _draft;
     private readonly SecureMimeService _secureMime;
@@ -63,7 +63,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         SignatureService signatures,
         ComposeKind kind,
         bool encrypt,
-        bool isWindow = false)
+        bool isWindow = false,
+        IReadOnlyList<(Account Account, ServiceConnection Connection)>? accounts = null)
     {
         _signatures = signatures;
         _kind = kind;
@@ -78,10 +79,17 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         _settings = settings;
         Encrypt = encrypt;
         IsWindow = isWindow;
-        Senders = account.Identities;
-        From = Senders.FirstOrDefault(i => string.Equals(i.Email, draft.From, StringComparison.OrdinalIgnoreCase))
-               ?? Senders.FirstOrDefault()
-               ?? new MailIdentity(account.EmailAddress ?? string.Empty, account.DisplayName);
+        // Every address of every mail account; this account's first (its own, then its aliases).
+        var others = (accounts ?? []).Where(a => a.Account.Id != account.Id);
+        Senders = [.. new[] { (Account: account, Connection: connection) }.Concat(others)
+            .SelectMany(a => a.Account.Identities.Select(i => new SenderChoice(a.Account, a.Connection, i)))];
+        _sender = Senders.FirstOrDefault(c => c.Account.Id == account.Id && string.Equals(c.Identity.Email, draft.From, StringComparison.OrdinalIgnoreCase))
+                  ?? Senders.FirstOrDefault(c => c.Account.Id == account.Id)
+                  ?? new SenderChoice(account, connection, new MailIdentity(account.EmailAddress ?? string.Empty, account.DisplayName));
+        foreach (var choice in Senders)
+        {
+            choice.ShowAccount = Senders.Any(c => c.Account.Id != choice.Account.Id) && !string.Equals(choice.Identity.Email, choice.Account.Title, StringComparison.OrdinalIgnoreCase);
+        }
         To = draft.To;
         Cc = draft.Cc;
         Bcc = draft.Bcc;
@@ -197,16 +205,81 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>The user wants this draft in its own window (state is captured with <see cref="CaptureAsync"/>).</summary>
     public event EventHandler? PopOutRequested;
 
-    /// <summary>The account's address and its aliases; a choice only appears when there is more than one.</summary>
-    public IReadOnlyList<MailIdentity> Senders { get; }
+    /// <summary>The addresses of all mail accounts with their aliases; a choice only appears when there is more than one.</summary>
+    public IReadOnlyList<SenderChoice> Senders { get; }
 
     public bool HasSenderChoice => Senders.Count > 1;
 
-    /// <summary>Sender of this message; a reply starts with the address it was sent to.</summary>
-    [ObservableProperty]
-    public partial MailIdentity From { get; set; }
+    private SenderChoice _sender;
 
-    partial void OnFromChanged(MailIdentity value) => _ = RefreshSignAsync();
+    /// <summary>
+    /// Who sends: an address of this or another account (a reply starts with the address it was sent to). Another
+    /// account sends through its own server; the saved draft moves to its "Entwürfe", its signature replaces the one here.
+    /// </summary>
+    public SenderChoice Sender
+    {
+        get => _sender;
+        set
+        {
+            if (value is null || value == _sender)
+            {
+                return;
+            }
+
+            var previous = _sender;
+            _sender = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(From));
+            OnPropertyChanged(nameof(FromText));
+            MarkChanged();
+            _ = RefreshSignAsync();
+            if (value.Account.Id != previous.Account.Id)
+            {
+                _account = value.Account;
+                _connection = value.Connection;
+                OnPropertyChanged(nameof(Account));
+                OnPropertyChanged(nameof(Connection));
+                _ = SwitchAccountAsync(previous.Connection);
+            }
+        }
+    }
+
+    /// <summary>The sender's address and name.</summary>
+    public MailIdentity From => _sender.Identity;
+
+    // The draft saved so far lies in the other account's "Entwürfe": removed there, saved anew with this account.
+    private async Task SwitchAccountAsync(ServiceConnection previous)
+    {
+        while (_saving)
+        {
+            await Task.Delay(50);
+        }
+
+        if (_draftRemoteId is { } id)
+        {
+            _draftRemoteId = null;
+            try
+            {
+                await _mail.DeleteDraftAsync(previous, id);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Notice?.Invoke(this, T("Der Entwurf konnte nicht aus «Entwürfe» entfernt werden: ") + ex.Message);
+            }
+        }
+
+        if (_editor is not null)
+        {
+            try
+            {
+                await ChooseSignature(await _signatures.ResolveAsync(_account.Id, _kind));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Notice?.Invoke(this, ex.Message);
+            }
+        }
+    }
 
     private async Task RefreshSignAsync()
     {
@@ -523,7 +596,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     // Drafts are stored as plain MIME without S/MIME; signing and encryption happen only when sending.
     private async Task StoreDraftAsync(ComposeDraft draft, int version)
     {
-        var message = MessageComposer.Build(Sender, draft, [], forDraft: true);
+        var message = MessageComposer.Build(SenderAddress, draft, [], forDraft: true);
         _draftRemoteId = await _mail.SaveDraftAsync(_connection, message, _draftRemoteId);
         _savedChanges = version;
         DraftChanged?.Invoke(this, EventArgs.Empty);
@@ -641,7 +714,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
     }
 
-    private MailboxAddress Sender =>
+    private MailboxAddress SenderAddress =>
         new(From.DisplayName, string.IsNullOrEmpty(From.Email) ? throw new InvalidOperationException("Account has no email address.") : From.Email);
 
     [RelayCommand(CanExecute = nameof(CanSend))]
@@ -658,7 +731,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         IsSending = true;
         try
         {
-            var message = MessageComposer.Build(Sender, await SnapshotAsync(), []);
+            var message = MessageComposer.Build(SenderAddress, await SnapshotAsync(), []);
             await _secureMime.ProtectAsync(message, Sign, Encrypt);
             await _mail.SendAsync(_connection, message);
             if (AfterSent is { } afterSent)
@@ -769,6 +842,21 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 }
 
 internal sealed record ComposeAttachment(string FileName, MimeEntity Entity);
+
+/// <summary>An address to send from: of which account (through its server), with which name.</summary>
+internal sealed class SenderChoice(Account account, ServiceConnection connection, MailIdentity identity)
+{
+    public Account Account { get; } = account;
+
+    public ServiceConnection Connection { get; } = connection;
+
+    public MailIdentity Identity { get; } = identity;
+
+    /// <summary>With several accounts, the account's name too where the address alone does not say it.</summary>
+    public bool ShowAccount { get; set; }
+
+    public override string ToString() => ShowAccount ? $"{Identity} – {Account.Title}" : Identity.ToString();
+}
 
 internal sealed record SignatureMenuItem(string Title, Signature? Signature, System.Windows.Input.ICommand Command);
 
