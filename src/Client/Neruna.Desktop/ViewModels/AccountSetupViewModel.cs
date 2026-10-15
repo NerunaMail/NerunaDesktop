@@ -633,11 +633,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             return;
         }
 
-        var name = string.IsNullOrWhiteSpace(DisplayName) ? email : DisplayName.Trim();
+        // Exchange sends with the mailbox's primary address and the name from its directory: no name, no aliases here.
+        var name = IsExchange ? (Editing?.DisplayName ?? email) : string.IsNullOrWhiteSpace(DisplayName) ? email : DisplayName.Trim();
         var config = new MailProviderConfig(domain, null, incoming, outgoing, dav);
         var label = string.IsNullOrWhiteSpace(Label) ? null : Label.Trim();
         var aliases = new List<MailIdentity>();
-        foreach (var row in Aliases.Where(r => !string.IsNullOrWhiteSpace(r.Email)))
+        foreach (var row in Aliases.Where(r => !IsExchange && !string.IsNullOrWhiteSpace(r.Email)))
         {
             var address = row.Email.Trim();
             if (!MimeKit.MailboxAddress.TryParse(address, out var parsed) || parsed.Address != address || !address.Contains('@', StringComparison.Ordinal))

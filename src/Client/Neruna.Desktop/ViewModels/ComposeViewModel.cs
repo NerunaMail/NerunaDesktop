@@ -82,7 +82,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         // Every address of every mail account; this account's first (its own, then its aliases).
         var others = (accounts ?? []).Where(a => a.Account.Id != account.Id);
         Senders = [.. new[] { (Account: account, Connection: connection) }.Concat(others)
-            .SelectMany(a => a.Account.Identities.Select(i => new SenderChoice(a.Account, a.Connection, i)))];
+            .SelectMany(a => SendersOf(a.Account, a.Connection).Select(i => new SenderChoice(a.Account, a.Connection, i)))];
         _sender = Senders.FirstOrDefault(c => c.Account.Id == account.Id && string.Equals(c.Identity.Email, draft.From, StringComparison.OrdinalIgnoreCase))
                   ?? Senders.FirstOrDefault(c => c.Account.Id == account.Id)
                   ?? new SenderChoice(account, connection, new MailIdentity(account.EmailAddress ?? string.Empty, account.DisplayName));
@@ -204,6 +204,10 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     /// <summary>The user wants this draft in its own window (state is captured with <see cref="CaptureAsync"/>).</summary>
     public event EventHandler? PopOutRequested;
+
+    // Exchange (EWS) sends with the mailbox's primary address whatever is asked: its aliases are no choice.
+    private static IEnumerable<MailIdentity> SendersOf(Account account, ServiceConnection connection) =>
+        connection.ProviderId == Neruna.Core.Providers.ProviderIds.Ews ? account.Identities.Take(1) : account.Identities;
 
     /// <summary>The addresses of all mail accounts with their aliases; a choice only appears when there is more than one.</summary>
     public IReadOnlyList<SenderChoice> Senders { get; }

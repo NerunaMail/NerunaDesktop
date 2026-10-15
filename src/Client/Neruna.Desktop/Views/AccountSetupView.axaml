@@ -101,8 +101,9 @@
     <Border IsVisible="{Binding IsCloud}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
       <TextBlock TextWrapping="Wrap" Text="{l:T 'Von Ihrer Organisation verwaltet: Server, Absender und Aliase kommen aus Neruna Cloud. Hier lassen sich die Kontobezeichnung und – falls Sie es selbst eingegeben haben – das Passwort ändern.'}" />
     </Border>
-    <TextBlock Classes="label" Text="{l:T 'Ihr Name (Absender)'}" />
-    <TextBox Text="{Binding DisplayName}" PlaceholderText="{l:T 'Anna Muster'}" IsEnabled="{Binding !IsCloud}" />
+    <!-- Exchange takes the sender name from its directory and always the primary address: neither asked for -->
+    <TextBlock Classes="label" Text="{l:T 'Ihr Name (Absender)'}" IsVisible="{Binding !IsExchange}" />
+    <TextBox Text="{Binding DisplayName}" PlaceholderText="{l:T 'Anna Muster'}" IsEnabled="{Binding !IsCloud}" IsVisible="{Binding !IsExchange}" />
 
     <TextBlock Classes="label" Text="{l:T 'Kontobezeichnung (optional)'}" />
     <TextBox Text="{Binding Label}" PlaceholderText="{l:T 'z. B. Privat oder Firma – sonst steht die E-Mail-Adresse in der Ordnerliste'}" />
@@ -110,7 +111,8 @@
     <TextBlock Classes="label" Text="{l:T 'E-Mail-Adresse'}" />
     <TextBox Text="{Binding Email}" PlaceholderText="{l:T 'anna.muster@example.com'}" IsEnabled="{Binding !IsCloud}" />
 
-    <!-- Aliases: more sender addresses of the same mailbox -->
+    <!-- Aliases: more sender addresses of the same mailbox (not with Exchange: it sends from the primary address) -->
+    <StackPanel IsVisible="{Binding !IsExchange}">
     <TextBlock Classes="label" Text="{l:T 'Weitere Absenderadressen (Aliase)'}" />
     <ItemsControl ItemsSource="{Binding Aliases}" IsEnabled="{Binding !IsCloud}">
       <ItemsControl.ItemTemplate>
@@ -125,6 +127,7 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
     <Button Classes="command" Content="{l:T '+ Alias hinzufügen'}" Command="{Binding AddAliasCommand}" HorizontalAlignment="Left" Padding="0,2" IsVisible="{Binding !IsCloud}" />
+    </StackPanel>
 
     <TextBlock Classes="label" Text="{Binding PasswordLabel}" IsVisible="{Binding NeedsPassword}" />
     <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="{Binding PasswordHint}" IsVisible="{Binding NeedsPassword}" />
