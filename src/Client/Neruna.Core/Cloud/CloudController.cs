@@ -461,7 +461,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         {
             issued = await SendAsync<TokenResponse>(() => new HttpRequestMessage(HttpMethod.Post, tokenUrl)
             {
-                Content = JsonContent.Create(new TokenRequest(assertion), options: NerunaJson.Options),
+                Content = JsonContent.Create(new TokenRequest(assertion, ThisDevice.Value.AppVersion, ThisDevice.Value.OsVersion), options: NerunaJson.Options),
             }, cancellationToken);
         }
         catch (CloudException ex) when (ex.Code == RevokedCode)
@@ -473,6 +473,9 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         _tokens[connection.Id] = (issued.AccessToken, DateTimeOffset.UtcNow.AddSeconds(Math.Max(30, issued.ExpiresIn - 60)));
         return issued.AccessToken;
     }
+
+    // Versions sent with every sign-in, so the portal shows the current ones (not those of the day it was connected).
+    private static readonly Lazy<DeviceInfo> ThisDevice = new(() => DeviceInfo.Current(), LazyThreadSafetyMode.PublicationOnly);
 
     /// <summary>The server's answer for a device blocked or deleted in the portal (or unknown to it).</summary>
     public const string RevokedCode = "device_revoked";

@@ -6,8 +6,16 @@ namespace Neruna.Core.Cloud;
 /// <summary>What the portal shows about this computer, so a person's devices can be told apart.</summary>
 public sealed record DeviceInfo(string Name, string AppVersion, string OsName, string OsVersion, string OsUser)
 {
+    /// <summary>Set by an app that knows better (Android: its version and Android's, not the Linux kernel's).</summary>
+    public static Func<DeviceInfo>? Override { get; set; }
+
     public static DeviceInfo Current(string? name = null)
     {
+        if (Override?.Invoke() is { } known)
+        {
+            return name is null ? known : known with { Name = name };
+        }
+
         var os = OperatingSystem.IsWindows() ? "Windows" : OperatingSystem.IsMacOS() ? "macOS" : OperatingSystem.IsLinux() ? "Linux" : RuntimeInformation.OSDescription;
         // macOS: "15.1" rather than the Darwin kernel version .NET reports; Linux: the distribution ("Debian GNU/Linux 12 …").
         var version = OperatingSystem.IsWindows() ? WindowsVersion()

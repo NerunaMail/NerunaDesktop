@@ -17,7 +17,9 @@ public sealed record EnrollmentRequest(
 public sealed record EnrollmentResponse(string DeviceId, string OrganizationName, string MemberName);
 
 /// <summary>Body of <c>POST /api/v1/token</c>: a JWT signed with the device key (ES256).</summary>
-public sealed record TokenRequest(string Assertion);
+/// <param name="AppVersion">The app's current version (the portal shows it; updated with every sign-in).</param>
+/// <param name="OsVersion">The operating system's current version.</param>
+public sealed record TokenRequest(string Assertion, string? AppVersion = null, string? OsVersion = null);
 
 /// <summary>Response of <c>POST /api/v1/token</c>.</summary>
 public sealed record TokenResponse(string AccessToken, string TokenType, int ExpiresIn);
