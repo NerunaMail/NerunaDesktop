@@ -33,13 +33,15 @@ public interface IContactProvider : IAsyncDisposable
     Task DeleteAsync(AddressBookInfo addressBook, ContactObject contact, CancellationToken cancellationToken = default);
 }
 
+/// <param name="SharedBy">Found through delegation in another person's (or group's) home: whose; only synchronized once chosen.</param>
 public sealed record AddressBookInfo(
     Guid ConnectionId,
     string RemoteId,
     string Name,
     bool IsReadOnly,
     string? SyncState = null,
-    string? ServerName = null);
+    string? ServerName = null,
+    string? SharedBy = null);
 
 /// <param name="VCardData">Complete vCard text; the source of truth.</param>
 public sealed record ContactObject(

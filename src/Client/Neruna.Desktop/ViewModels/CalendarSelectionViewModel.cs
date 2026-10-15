@@ -267,6 +267,9 @@ internal sealed partial class CalendarChoiceItem(CalendarCandidate candidate) : 
 
     public bool IsNew => Candidate.IsNew;
 
+    /// <summary>"geteilt von Lea Keller": another person's calendar, found through delegation.</summary>
+    public string? SharedByText => Candidate.Calendar.SharedBy is { } owner ? F("geteilt von {0}", owner) : null;
+
     public bool IsReadOnly => Candidate.Calendar.IsReadOnly;
 
     public bool IsAddedByUrl => Candidate.IsAddedByUrl;

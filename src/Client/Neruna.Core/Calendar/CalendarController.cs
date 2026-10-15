@@ -61,11 +61,13 @@ public sealed class CalendarController(
 
         var remote = await GetRemoteCalendarsAsync(provider, connection, cancellationToken);
 
-        // Without an explicit choice every calendar of the server is shown (and new ones appear automatically).
-        if (await GetIdsAsync(SelectedKey(connection.Id), cancellationToken) is { } selected)
-        {
-            remote = remote.Where(c => selected.Contains(c.RemoteId)).ToList();
-        }
+        // Without an explicit choice every calendar of the user is shown (and new ones appear automatically) – those of
+        // other people found through delegation only once chosen under "Kalender verwalten".
+        remote = await GetIdsAsync(SelectedKey(connection.Id), cancellationToken) is { } selected
+            ? remote.Where(c => selected.Contains(c.RemoteId)).ToList()
+            : await GetIdsAsync(ExtraKey(connection.Id), cancellationToken) is { } extra
+                ? remote.Where(c => c.SharedBy is null || extra.Contains(c.RemoteId)).ToList()
+                : remote.Where(c => c.SharedBy is null).ToList();
 
         foreach (var calendar in await store.MergeCalendarsAsync(connection.Id, remote, cancellationToken))
         {

@@ -782,6 +782,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             Browser = _browser,
             Certificates = _clientCertificates,
             Files = _files,
+            Web = _http.CreateClient("neruna"),
             AskRedirect = (title, message) => Views.ChoiceDialog.ShowInFrontAsync(title, message, (T("Erlauben"), true, false), (T("Nicht verwenden"), false, true)),
         };
         if (editing is not null)

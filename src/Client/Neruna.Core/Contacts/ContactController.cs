@@ -49,11 +49,11 @@ public sealed class ContactController(
 
         var remote = await provider.GetAddressBooksAsync(cancellationToken);
 
-        // Without an explicit choice every address book is shown (and new ones appear automatically).
-        if (await GetIdsAsync(SelectedKey(connection.Id), cancellationToken) is { } selected)
-        {
-            remote = remote.Where(b => selected.Contains(b.RemoteId)).ToList();
-        }
+        // Without an explicit choice every address book of the user is shown (and new ones appear automatically) – those
+        // of other people found through delegation only once chosen under "Adressbücher verwalten".
+        remote = await GetIdsAsync(SelectedKey(connection.Id), cancellationToken) is { } selected
+            ? [.. remote.Where(b => selected.Contains(b.RemoteId))]
+            : [.. remote.Where(b => b.SharedBy is null)];
 
         foreach (var book in await store.MergeAddressBooksAsync(connection.Id, remote, cancellationToken))
         {

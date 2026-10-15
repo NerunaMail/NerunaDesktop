@@ -30,9 +30,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     // ── Step 1 for a new account: which kind. Everything with IMAP/CalDAV/CardDAV is one choice (found automatically);
     //    only providers that need their own sign-in are listed separately. ──
 
-    /// <summary>"choose", "imap", "exchange", "proton" or "microsoft".</summary>
+    /// <summary>"choose", "imap", "exchange", "proton", "nextcloud" or "microsoft".</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsMailForm), nameof(IsMicrosoft), nameof(CanGoBack),
+    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsNextcloud), nameof(IsMailForm), nameof(IsMicrosoft), nameof(CanGoBack),
         nameof(Subtitle), nameof(NeedsPassword), nameof(PasswordLabel))]
     [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
     public partial string Step { get; set; } = "choose";
@@ -43,6 +43,70 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     /// <summary>Exchange on premises through EWS (also behind a reverse proxy with client certificate).</summary>
     public bool IsExchange => Step == "exchange";
+
+    /// <summary>Calendars and contacts of a Nextcloud, signed in in the browser (app password, two-factor sign-in works).</summary>
+    public bool IsNextcloud => Step == "nextcloud";
+
+    /// <summary>Set by the shell: a web client that follows redirects (Nextcloud's sign-in).</summary>
+    public HttpClient? Web { get; init; }
+
+    /// <summary>"cloud.example.com" or the full address of the Nextcloud.</summary>
+    [ObservableProperty]
+    public partial string NextcloudServer { get; set; } = string.Empty;
+
+    [RelayCommand]
+    private void ChooseNextcloud() => Step = "nextcloud";
+
+    /// <summary>
+    /// Nextcloud Login Flow v2: the browser opens, the user signs in and allows access; Nextcloud gives Neruna an app
+    /// password. Then calendars and contacts are set up as an account of their own (the mail stays where it is).
+    /// </summary>
+    [RelayCommand]
+    private async Task SignInNextcloudAsync()
+    {
+        if (Browser is null || Web is null)
+        {
+            return;
+        }
+
+        Error = null;
+        IsBusy = true;
+        BusyText = T("Anmeldung im Browser … (bitte dort den Zugriff erlauben)");
+        try
+        {
+            var login = await NextcloudLoginFlow.SignInAsync(Web, NextcloudServer, Browser);
+            BusyText = T("Verbindungen werden geprüft …");
+            var email = Email.Trim();
+            var config = new MailProviderConfig(login.Server.Host, null, [], [],
+                [new DavServerSettings(ServerProtocol.CalDav, login.DavUrl, login.LoginName), new DavServerSettings(ServerProtocol.CardDav, login.DavUrl, login.LoginName)]);
+            var name = string.IsNullOrWhiteSpace(DisplayName) ? login.LoginName : DisplayName.Trim();
+            var account = setup.BuildAccount(name, email, config) with
+            {
+                EmailAddress = email.Contains('@', StringComparison.Ordinal) ? email : null,
+                Label = string.IsNullOrWhiteSpace(Label) ? "Nextcloud" : Label.Trim(),
+            };
+            await setup.CreateAsync(account, login.AppPassword);
+            CreatedAccount = account;
+            Finished?.Invoke(this, true);
+        }
+        catch (NextcloudLoginException ex)
+        {
+            Error = ex.Message;
+        }
+        catch (AccountSetupException ex)
+        {
+            Error = T("Verbindung fehlgeschlagen – ") + ex.Message;
+        }
+        catch (Neruna.Core.Auth.OAuthException ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyText = null;
+        }
+    }
 
     /// <summary>Proton Mail through Proton Mail Bridge on this computer (IMAP/SMTP on 127.0.0.1).</summary>
     public bool IsProton => Step == "proton";
@@ -205,6 +269,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         ? T("Welche Art von Konto möchten Sie einrichten?")
         : IsMicrosoft
             ? T("Mail, Kalender und Kontakte Ihres Microsoft-Kontos – angemeldet wird im Browser.")
+            : IsNextcloud
+            ? T("Kalender und Kontakte Ihrer Nextcloud – angemeldet wird im Browser, auch mit Zwei-Faktor-Anmeldung. Die E-Mail richten Sie als eigenes Konto ein.")
             : IsProton
             ? T("Proton Mail über die Proton Mail Bridge auf diesem Computer. Die Bridge braucht ein kostenpflichtiges Proton-Abo; Kalender und Kontakte bietet sie nicht an.")
             : IsExchange && !IsCloud
@@ -409,8 +475,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             // Many SOGo/Nextcloud setups publish DAV only via /.well-known, not in autoconfig.
             BusyText = T("Suche Kalender- und Kontaktdienst …");
             string[] hosts = [domain, ImapHost.Trim()];
-            var caldav = CalDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "caldav") : null;
-            var carddav = CardDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "carddav") : null;
+            var caldav = CalDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "caldav", domain: domain) : null;
+            var carddav = CardDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "carddav", domain: domain) : null;
             if (await AllowedAsync(caldav, carddav) is { } allowed)
             {
                 CalDavUrl = allowed.Contains(caldav) ? caldav!.Url.AbsoluteUri : CalDavUrl;
@@ -618,6 +684,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         catch (AccountSetupException ex)
         {
             Error = T("Verbindung fehlgeschlagen – ") + ex.Message;
+
+            // Calendar or contacts refused the password while mail may take it: often an app password is needed.
+            if (ex.InnerException is System.Security.Authentication.AuthenticationException)
+            {
+                Error += " " + T("Ist es eine Nextcloud mit Zwei-Faktor-Anmeldung? Dann braucht es für Kalender und Kontakte ein App-Passwort – einfacher: CalDAV/CardDAV hier leer lassen und Kalender und Kontakte als Kontoart «Nextcloud» einrichten (Anmeldung im Browser).");
+            }
         }
         finally
         {

@@ -119,6 +119,9 @@ internal sealed partial class AddressBookChoiceItem(AddressBookCandidate candida
 
     public bool IsNew => Candidate.IsNew;
 
+    /// <summary>"geteilt von Lea Keller": another person's address book, found through delegation.</summary>
+    public string? SharedByText => Candidate.AddressBook.SharedBy is { } owner ? F("geteilt von {0}", owner) : null;
+
     public bool IsReadOnly => Candidate.AddressBook.IsReadOnly;
 
     [ObservableProperty]

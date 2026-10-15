@@ -146,7 +146,7 @@ internal sealed class CalDavCalendarProvider : DavProviderBase, ICalendarProvide
             : F("Nur die eingetragene Adresse {0} (kein Kalender-Ordner gefunden) · angemeldet als {1}", Settings.Url.AbsoluteUri, Settings.Username);
         return collections
             .Where(c => c.Content != CalendarContent.None)
-            .Select(c => new CalendarInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.Color, c.IsReadOnly, Content: c.Content))
+            .Select(c => new CalendarInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.Color, c.IsReadOnly, Content: c.Content, SharedBy: c.SharedBy))
             .ToList();
     }
 
@@ -185,7 +185,7 @@ internal sealed class CardDavContactProvider : DavProviderBase, IContactProvider
     public async Task<IReadOnlyList<AddressBookInfo>> GetAddressBooksAsync(CancellationToken cancellationToken = default)
     {
         var collections = await (await ServiceAsync(cancellationToken)).DiscoverAsync(cancellationToken);
-        return collections.Select(c => new AddressBookInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.IsReadOnly)).ToList();
+        return collections.Select(c => new AddressBookInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.IsReadOnly, SharedBy: c.SharedBy)).ToList();
     }
 
     public async Task<AddressBookSyncResult> SyncAddressBookAsync(AddressBookInfo addressBook, IReadOnlyDictionary<string, string?> knownVersions, CancellationToken cancellationToken = default)

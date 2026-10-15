@@ -27,6 +27,7 @@ project pages and in the NuGet packages.
 | bblanchon.PDFium.Win32 | 156.0.8076 | Apache-2.0 (PDFium: BSD-3-Clause, Apache-2.0) | Benoît Blanchon; PDFium: The PDFium Authors | https://github.com/bblanchon/pdfium-binaries |
 | BouncyCastle.Cryptography | 2.7.0 | MIT | Legion of the Bouncy Castle Inc. | https://www.bouncycastle.org/stable/nuget/csharp/website |
 | CommunityToolkit.Mvvm | 8.4.2 | MIT | Microsoft | https://github.com/CommunityToolkit/dotnet |
+| DnsClient | 1.8.0 | Apache-2.0 | MichaCo | https://dnsclient.michaco.net |
 | HarfBuzzSharp | 8.3.1.3 | MIT | Microsoft | https://go.microsoft.com/fwlink/?linkid=868515 |
 | HarfBuzzSharp.NativeAssets.Linux | 8.3.1.3 | MIT | Microsoft | https://go.microsoft.com/fwlink/?linkid=868515 |
 | HarfBuzzSharp.NativeAssets.macOS | 8.3.1.3 | MIT | Microsoft | https://go.microsoft.com/fwlink/?linkid=868515 |

@@ -11,7 +11,9 @@ public sealed record DavProbeResult(Uri Url, string ProbedHost)
 }
 
 /// <summary>
-/// Quick check whether a host offers CalDAV/CardDAV via /.well-known (RFC 6764), used to prefill account setup.
+/// Quick check whether a domain offers CalDAV/CardDAV (RFC 6764), used to prefill account setup: first its SRV record
+/// (<c>_caldavs._tcp</c> with TXT <c>path=</c>), then /.well-known on the given hosts. A server that answers but says
+/// in its DAV header (OPTIONS) that it does not offer the service is passed over.
 /// Redirects are followed here, without credentials, so that a redirect to another host can be shown to the user –
 /// the DAV client itself never sends the password to a host it was redirected to.
 /// </summary>
@@ -22,31 +24,79 @@ public static class DavProbe
 
     /// <param name="http">A client that does not follow redirects itself.</param>
     /// <param name="service">"caldav" or "carddav".</param>
+    /// <param name="domain">The mail domain whose SRV records are asked first; null: only /.well-known.</param>
+    /// <param name="dns">DNS lookups (tests pass their own); null: the system's.</param>
     /// <returns>Where the service is, or null if no host answered like a DAV server.</returns>
-    public static async Task<DavProbeResult?> FindAsync(HttpClient http, IEnumerable<string> hosts, string service, CancellationToken cancellationToken = default)
+    public static async Task<DavProbeResult?> FindAsync(HttpClient http, IEnumerable<string> hosts, string service, string? domain = null, IDavDns? dns = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(hosts);
 
-        foreach (var host in hosts.Where(h => !string.IsNullOrWhiteSpace(h)).Distinct(StringComparer.OrdinalIgnoreCase))
+        // Announced in the DNS by the domain's owner: trusted like the domain's own autoconfig (no question about
+        // "another host"), the found URL is used as it is.
+        if (!string.IsNullOrWhiteSpace(domain))
         {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(Timeout);
+            IReadOnlyList<Uri> announced = [];
             try
             {
-                if (await FollowAsync(http, new Uri($"https://{host}/.well-known/{service}"), timeout.Token) is { } found)
+                announced = await DavServiceRecords.CandidatesAsync(dns ?? SystemDavDns.Instance, domain, service, cancellationToken: cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // DNS too slow: /.well-known still
+            }
+
+            foreach (var candidate in announced)
+            {
+                if (await TryAsync(http, candidate, service, cancellationToken) is { } found)
                 {
-                    // On the same host the DAV client finds its way via /.well-known again; elsewhere it needs the target itself.
-                    return new DavProbeResult(found.Host.Equals(host, StringComparison.OrdinalIgnoreCase) ? new Uri($"https://{host}/") : found, host);
+                    return new DavProbeResult(found, found.Host);
                 }
             }
-            catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+        }
+
+        foreach (var host in hosts.Where(h => !string.IsNullOrWhiteSpace(h)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (await TryAsync(http, new Uri($"https://{host}/.well-known/{service}"), service, cancellationToken) is { } found)
             {
-                // Next candidate.
+                // On the same host the DAV client finds its way via /.well-known again; elsewhere it needs the target itself.
+                return new DavProbeResult(found.Host.Equals(host, StringComparison.OrdinalIgnoreCase) ? new Uri($"https://{host}/") : found, host);
             }
         }
 
         return null;
+    }
+
+    private static async Task<Uri?> TryAsync(HttpClient http, Uri url, string service, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+        try
+        {
+            return await FollowAsync(http, url, timeout.Token) is { } found && await OffersAsync(http, found, service, timeout.Token) ? found : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            return null; // next candidate
+        }
+    }
+
+    /// <summary>
+    /// Whether the server says it offers the service (DAV header of OPTIONS: <c>calendar-access</c> / <c>addressbook</c>).
+    /// No answer, a refusal or no DAV header: assumed yes – many servers answer OPTIONS only after signing in.
+    /// </summary>
+    internal static async Task<bool> OffersAsync(HttpClient http, Uri url, string service, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Options, url);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode || !response.Headers.TryGetValues("DAV", out var values))
+        {
+            return true;
+        }
+
+        var capabilities = values.SelectMany(v => v.Split(',')).Select(c => c.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return capabilities.Contains(service == "carddav" ? "addressbook" : "calendar-access");
     }
 
     /// <returns>The URL that answered like a DAV server (after redirects), or null.</returns>

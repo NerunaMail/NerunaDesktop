@@ -3,6 +3,10 @@
     <Description>CalDAV (RFC 4791) and CardDAV (RFC 6352) providers for Neruna Desktop, incl. WebDAV sync (RFC 6578).</Description>
   </PropertyGroup>
   <ItemGroup>
+    <!-- DNS SRV/TXT for CalDAV/CardDAV discovery (RFC 6764) -->
+    <PackageReference Include="DnsClient" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\Neruna.Core\Neruna.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

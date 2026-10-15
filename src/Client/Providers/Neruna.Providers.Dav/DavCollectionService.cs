@@ -39,7 +39,8 @@ internal sealed record DavFlavor(
         ".vcf");
 }
 
-internal sealed record DavCollection(Uri Url, string Name, string? Color, bool IsReadOnly, CalendarContent Content)
+/// <param name="SharedBy">Found in another principal's home (delegation, group): whose; null for the user's own.</param>
+internal sealed record DavCollection(Uri Url, string Name, string? Color, bool IsReadOnly, CalendarContent Content, string? SharedBy = null)
 {
     public bool SupportsEvents => Content.HasFlag(CalendarContent.Events);
 }
@@ -75,6 +76,18 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
     private static readonly XName Privileges = DavNames.Dav + "current-user-privilege-set";
     private static readonly XName CalendarColor = DavNames.Apple + "calendar-color";
     private static readonly XName SupportedComponents = DavNames.CalDav + "supported-calendar-component-set";
+    private static readonly XName Principal = DavNames.Dav + "principal";
+    private static readonly XName GroupMembership = DavNames.Dav + "group-membership";
+    private static readonly XName ProxyReadFor = DavNames.CalendarServer + "calendar-proxy-read-for";
+    private static readonly XName ProxyWriteFor = DavNames.CalendarServer + "calendar-proxy-write-for";
+    private static readonly XName ProxyRead = DavNames.CalendarServer + "calendar-proxy-read";
+    private static readonly XName ProxyWrite = DavNames.CalendarServer + "calendar-proxy-write";
+
+    /// <summary>Other principals asked for delegated home sets, at most (groups can be large).</summary>
+    private const int MaxRelatedPrincipals = 25;
+
+    /// <summary>A collection home: the user's own (<paramref name="SharedBy"/> null) or another principal's.</summary>
+    private sealed record HomeSet(Uri Url, string? SharedBy);
 
     /// <summary>
     /// Finds the user's collections from whatever URL was configured: server root, /.well-known/…, principal,
@@ -131,34 +144,28 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
             if (resource.HasResourceType(flavor.CollectionType))
             {
                 var configured = await ListAsync(resource.Href, depth: 0, cancellationToken);
-                if (await FindHomeAsync(resource, cancellationToken) is { } userHome)
+                var userHomes = await HomesAsync(resource, cancellationToken);
+                var all = await ListHomesAsync(userHomes, cancellationToken);
+                if (all.Count == 0)
                 {
-                    try
-                    {
-                        var all = await ListAsync(userHome, depth: 1, cancellationToken);
-                        Home = userHome;
-                        return all.Any(c => c.Url == configured.FirstOrDefault()?.Url) ? all : [.. configured, .. all];
-                    }
-                    catch (DavException ex)
-                    {
-                        logger.LogDebug("DAV discovery: home {Url} not listable ({Status}); using the configured collection only", userHome, (int)ex.Status);
-                    }
+                    return configured;
                 }
 
-                return configured;
-            }
-
-            var home = HrefOf(resource, flavor.HomeSet);
-            if (home is null && HrefOf(resource, CurrentUserPrincipal) is { } principal)
-            {
-                var principalProps = await client.PropfindAsync(principal, 0, [flavor.HomeSet], cancellationToken);
-                home = principalProps.Resources.Select(r => HrefOf(r, flavor.HomeSet)).FirstOrDefault(h => h is not null);
+                Home = userHomes.FirstOrDefault(h => h.SharedBy is null)?.Url;
+                return all.Any(c => c.Url == configured.FirstOrDefault()?.Url) ? all : [.. configured, .. all];
             }
 
             // Some servers are configured with the home URL directly and expose no principal.
-            var collections = await ListAsync(home ?? resource.Href, depth: 1, cancellationToken);
-            Home = home ?? resource.Href;
-            if (collections.Count > 0 || home is not null)
+            var homes = await HomesAsync(resource, cancellationToken);
+            var foundHome = homes.Any(h => h.SharedBy is null);
+            if (!foundHome)
+            {
+                homes.Insert(0, new HomeSet(resource.Href, null));
+            }
+
+            var collections = await ListHomesAsync(homes, cancellationToken);
+            Home = homes[0].Url;
+            if (collections.Count > 0 || foundHome)
             {
                 return collections;
             }
@@ -260,27 +267,104 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
         }
     }
 
-    private async Task<Uri?> FindHomeAsync(DavResource resource, CancellationToken cancellationToken)
+    /// <summary>
+    /// The collection homes of the user – all home sets of the principal, not only the first – and those the user may
+    /// use through delegation (RFC 3744 group membership, CalendarServer calendar-proxy-read/write-for): another
+    /// principal's home sets, marked with whose they are. At most two steps away, each principal asked once.
+    /// </summary>
+    private async Task<List<HomeSet>> HomesAsync(DavResource resource, CancellationToken cancellationToken)
     {
-        if (HrefOf(resource, flavor.HomeSet) is { } home)
+        var homes = HrefsOf(resource, flavor.HomeSet).Select(h => new HomeSet(EnsureTrailingSlash(h), null)).ToList();
+        var principal = HrefOf(resource, CurrentUserPrincipal) ?? (resource.HasResourceType(Principal) ? resource.Href : null);
+        if (principal is null)
         {
-            return home;
+            return homes;
         }
 
-        if (HrefOf(resource, CurrentUserPrincipal) is not { } principal)
+        XName[] properties = flavor == DavFlavor.CalDav
+            ? [flavor.HomeSet, DisplayName, ResourceType, GroupMembership, ProxyReadFor, ProxyWriteFor]
+            : [flavor.HomeSet, DisplayName, ResourceType, GroupMembership];
+        var me = await PrincipalAsync(principal, properties, cancellationToken);
+        if (me is null)
         {
-            return null;
+            return homes;
         }
 
+        Add(homes, me, null);
+        var queried = new HashSet<string>(StringComparer.Ordinal) { principal.AbsolutePath.TrimEnd('/') };
+        var pending = new Queue<(Uri Url, int Level)>(Related(me).Select(u => (u, 1)));
+        while (pending.TryDequeue(out var next) && queried.Count <= MaxRelatedPrincipals)
+        {
+            if (!queried.Add(next.Url.AbsolutePath.TrimEnd('/')))
+            {
+                continue;
+            }
+
+            if (await PrincipalAsync(next.Url, [flavor.HomeSet, DisplayName, ResourceType], cancellationToken) is not { } other)
+            {
+                continue;
+            }
+
+            Add(homes, other, other.Text(DisplayName) ?? Uri.UnescapeDataString(next.Url.Segments.Last().TrimEnd('/')));
+
+            // Membership in another user's proxy group ("…/lea/calendar-proxy-read/"): the user behind it is its parent.
+            if (next.Level < 2 && (other.HasResourceType(ProxyRead) || other.HasResourceType(ProxyWrite)))
+            {
+                pending.Enqueue((new Uri(next.Url, ".."), next.Level + 1));
+            }
+        }
+
+        return homes;
+
+        void Add(List<HomeSet> list, DavResource from, string? sharedBy)
+        {
+            foreach (var href in HrefsOf(from, flavor.HomeSet).Select(EnsureTrailingSlash))
+            {
+                if (list.All(h => h.Url != href))
+                {
+                    list.Add(new HomeSet(href, sharedBy));
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<Uri> Related(DavResource principal) =>
+        HrefsOf(principal, GroupMembership).Concat(HrefsOf(principal, ProxyReadFor)).Concat(HrefsOf(principal, ProxyWriteFor));
+
+    private async Task<DavResource?> PrincipalAsync(Uri url, XName[] properties, CancellationToken cancellationToken)
+    {
         try
         {
-            var principalProps = await client.PropfindAsync(principal, 0, [flavor.HomeSet], cancellationToken);
-            return principalProps.Resources.Select(r => HrefOf(r, flavor.HomeSet)).FirstOrDefault(h => h is not null);
+            return (await client.PropfindAsync(url, 0, properties, cancellationToken)).Resources.FirstOrDefault();
         }
-        catch (DavException)
+        catch (DavException ex)
         {
+            logger.LogDebug("DAV discovery: principal {Url} not readable ({Status})", url, (int)ex.Status);
             return null;
         }
+    }
+
+    /// <summary>The collections of all homes, the user's own first; a collection is listed once. Another principal's home that cannot be listed is skipped.</summary>
+    private async Task<List<DavCollection>> ListHomesAsync(IReadOnlyList<HomeSet> homes, CancellationToken cancellationToken)
+    {
+        var result = new List<DavCollection>();
+        foreach (var home in homes.OrderBy(h => h.SharedBy is not null))
+        {
+            IReadOnlyList<DavCollection> listed;
+            try
+            {
+                listed = await ListAsync(home.Url, depth: 1, cancellationToken);
+            }
+            catch (DavException ex) when (home.SharedBy is not null || result.Count > 0)
+            {
+                logger.LogDebug("DAV discovery: home {Url} not listable ({Status})", home.Url, (int)ex.Status);
+                continue;
+            }
+
+            result.AddRange(listed.Where(c => result.All(r => r.Url != c.Url)).Select(c => c with { SharedBy = home.SharedBy }));
+        }
+
+        return result;
     }
 
     private async Task<IReadOnlyList<DavCollection>> ListAsync(Uri url, int depth, CancellationToken cancellationToken)
@@ -422,8 +506,11 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
         return items;
     }
 
-    private static Uri? HrefOf(DavResource resource, XName property) =>
-        resource[property]?.Element(DavNames.Dav + "href")?.Value.Trim() is { Length: > 0 } href ? new Uri(resource.Href, href) : null;
+    private static Uri? HrefOf(DavResource resource, XName property) => HrefsOf(resource, property).FirstOrDefault();
+
+    // A property may hold several hrefs (home sets, group memberships …).
+    private static IEnumerable<Uri> HrefsOf(DavResource resource, XName property) =>
+        resource[property]?.Elements(DavNames.Dav + "href").Select(h => h.Value.Trim()).Where(h => h.Length > 0).Select(h => new Uri(resource.Href, h)) ?? [];
 
     private static bool IsReadOnly(DavResource resource)
     {

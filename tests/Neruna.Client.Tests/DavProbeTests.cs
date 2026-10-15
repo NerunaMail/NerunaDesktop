@@ -25,7 +25,7 @@ public sealed class DavProbeTests
     {
         var server = new FakeServer(routes);
         using var http = new HttpClient(server);
-        return (await DavProbe.FindAsync(http, hosts, "caldav", TestContext.Current.CancellationToken), server.SawCredentials);
+        return (await DavProbe.FindAsync(http, hosts, "caldav", cancellationToken: TestContext.Current.CancellationToken), server.SawCredentials);
     }
 
     [Fact]

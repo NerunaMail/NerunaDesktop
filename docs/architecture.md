@@ -404,7 +404,18 @@ Logdateien pro Tag unter `<Datenordner>/logs`. `--protocol-log` schreibt zusätz
 - Sync per `sync-collection` (RFC 6578) mit Multiget in 50er-Blöcken; Fallback CTag + ETag-Vergleich für ältere Server.
 - Redirects folgt der Client selbst (Anmeldedaten nur an denselben Host), lesende Anfragen werden bei abgebrochenen
   Verbindungen bis zu 3× wiederholt (PUT bewusst nicht).
-- Getestet gegen Radicale (Integrationstests). SOGo und Nextcloud: manuell zu testen.
+- Alle Home-Sets des Principals (nicht nur das erste) und Delegationen: `group-membership`,
+  `calendar-proxy-read-for`/`-write-for`; Mitgliedschaft in einer Proxy-Gruppe (`…/lea/calendar-proxy-write/`) führt
+  zum Principal darüber. Höchstens zwei Schritte, je Principal eine Abfrage, höchstens 25. Sammlungen fremder Home-Sets
+  tragen `SharedBy` (Anzeigename des Principals): «Kalender/Adressbücher verwalten» zeigt «geteilt von …»; ohne eigene
+  Auswahl werden sie nicht synchronisiert (nur die eigenen). Nicht gespeichert, kommt bei jeder Erkennung neu.
+- 401 des DAV-Servers: eigene Meldung; im Kontodialog mit dem Hinweis auf App-Passwörter bzw. die Kontoart «Nextcloud».
+- Nextcloud: eigene Kontoart «Nextcloud (Kalender und Kontakte)» mit Login Flow v2 (`/index.php/login/v2`, Browser,
+  Abfrage alle 2 s, 20 min): Nextcloud liefert Server, Login-Name und ein App-Passwort für Neruna; daraus CalDAV und
+  CardDAV auf `remote.php/dav/`. Mit Zwei-Faktor-Anmeldung der einfache Weg.
+- Für später notiert: `calendar-user-address-set` (eigene Adressen), `CS:source` (abonnierte Kalender als ICS),
+  WebDAV-Push.
+- Getestet gegen Radicale (Integrationstests) und nachgebaute Server (Delegation, SRV, Login Flow). SOGo und Nextcloud: manuell zu testen.
 
 ### Konto-Erkennung
 
@@ -415,8 +426,11 @@ Logdateien pro Tag unter `<Datenordner>/logs`. `--protocol-log` schreibt zusätz
    Im Format: `<calendar>`/`<addressBook>` wie bei Mozilla vorgesehen, Exchange als `<incomingServer type="exchange">`
    mit `<ewsURL>` (→ `ServerProtocol.Ews`). Vertrag: `contract/fixtures/autoconfig-directory-example.xml`.
 4. Mozilla ISPDB direkt, falls das Verzeichnis nicht erreichbar ist
-5. CalDAV/CardDAV zusätzlich über `/.well-known` auf Mail-Domain und IMAP-Host
-6. DNS-SRV (RFC 6186/6764) *(folgt)*
+5. CalDAV/CardDAV zusätzlich: DNS-SRV `_caldavs._tcp`/`_carddavs._tcp` der Domain (RFC 6764, Auswahl nach RFC 2782,
+   TXT `path=` als Startpfad; nur die TLS-Varianten; DnsClient), dann `/.well-known` auf Mail-Domain und IMAP-Host.
+   Ein Server, dessen `DAV`-Header (OPTIONS) den Dienst nicht nennt (`calendar-access`/`addressbook`), wird übergangen.
+   Per SRV Gefundenes gilt als vom Domaininhaber angekündigt (keine Rückfrage «anderer Server»).
+6. DNS-SRV für IMAP/SMTP (RFC 6186) *(folgt)*
 7. Raten + Verbindungstest (heute: Vorschlag `mail.<domain>`, Benutzer kann alles anpassen)
 
 ### UI

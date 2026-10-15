@@ -64,6 +64,8 @@
                         <Border IsVisible="{Binding IsNew}" Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="3" Padding="5,0" VerticalAlignment="Center">
                           <TextBlock Text="{l:T 'neu'}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
                         </Border>
+                        <TextBlock Classes="subtle" Text="{Binding SharedByText}" FontSize="12" VerticalAlignment="Center"
+                                   IsVisible="{Binding SharedByText, Converter={x:Static ObjectConverters.IsNotNull}}" />
                         <TextBlock IsVisible="{Binding IsReadOnly}" Classes="subtle" Text="{l:T 'schreibgeschützt'}" FontSize="12" VerticalAlignment="Center" />
                         <TextBlock IsVisible="{Binding IsAddedByUrl}" Classes="subtle" Text="{l:T 'per Adresse'}" FontSize="12" VerticalAlignment="Center" />
                       </StackPanel>
