@@ -246,21 +246,32 @@ internal sealed partial class CloudViewModel(
 
     public string BackupCountText => BackupState is { } state ? F("{0} von {1} Sicherungen – bei einer weiteren wird die älteste gelöscht.", state.Backups.Count, state.MaxBackups) : string.Empty;
 
-    /// <summary>Loads the vault state from the cloud (when connected).</summary>
+    /// <summary>Loads the vault state of the selected organisation from the cloud (when connected).</summary>
     public async Task LoadBackupsAsync()
     {
-        if (BackupConnection is null)
+        if (Connection is null)
         {
             BackupState = null;
             Backups.Clear();
             return;
         }
 
-        await RunBackupAsync(async () => ShowOverview(await backup.GetOverviewAsync()));
+        await RunBackupAsync(async () => ShowOverview(await backup.GetOverviewAsync(Connection)));
     }
 
-    /// <summary>From the hint "Neue Sicherung erstellen?": opens the note field.</summary>
-    public void StartBackup()
+    /// <summary>From the hint "Neue Sicherung erstellen?": the default organisation for backups, the note field open.</summary>
+    public async Task StartBackupAsync()
+    {
+        if (BackupConnection is { } preferred && Connection?.Id != preferred.Id)
+        {
+            Connection = Connections.FirstOrDefault(c => c.Id == preferred.Id) ?? Connection;
+            await LoadBackupsAsync();
+        }
+
+        StartBackup();
+    }
+
+    private void StartBackup()
     {
         BackupMessage = null;
         IsWritingNote = true;
@@ -279,10 +290,10 @@ internal sealed partial class CloudViewModel(
             throw new BackupException(T("Die beiden Passwörter stimmen nicht überein."));
         }
 
-        RecoveryCode = await backup.SetUpAsync(VaultPassword);
+        RecoveryCode = await backup.SetUpAsync(VaultPassword, Connection);
         VaultPassword = VaultPasswordRepeat = string.Empty;
         RecoveryStored = false;
-        ShowOverview(await backup.GetOverviewAsync());
+        ShowOverview(await backup.GetOverviewAsync(Connection));
     });
 
     [RelayCommand]
@@ -298,9 +309,9 @@ internal sealed partial class CloudViewModel(
     [RelayCommand]
     private Task UnlockVaultAsync() => RunBackupAsync(async () =>
     {
-        await backup.UnlockAsync(UnlockSecret.Trim());
+        await backup.UnlockAsync(UnlockSecret.Trim(), Connection);
         UnlockSecret = string.Empty;
-        ShowOverview(await backup.GetOverviewAsync());
+        ShowOverview(await backup.GetOverviewAsync(Connection));
     });
 
     [RelayCommand]
@@ -316,10 +327,10 @@ internal sealed partial class CloudViewModel(
     [RelayCommand]
     private Task CreateBackupAsync() => RunBackupAsync(async () =>
     {
-        var created = await backup.CreateBackupAsync(BackupNote);
+        var created = await backup.CreateBackupAsync(BackupNote, Connection);
         IsWritingNote = false;
         BackupNote = string.Empty;
-        ShowOverview(await backup.GetOverviewAsync());
+        ShowOverview(await backup.GetOverviewAsync(Connection));
         BackupMessage = F("Sicherung erstellt ({0:0.#} KB).", created.Size / 1024.0);
         BackedUp?.Invoke(this, EventArgs.Empty);
     });
@@ -327,7 +338,7 @@ internal sealed partial class CloudViewModel(
     [RelayCommand]
     private Task PrepareRestoreAsync(BackupItem item) => RunBackupAsync(async () =>
     {
-        var plan = await backup.PrepareRestoreAsync(item.Entry.Id);
+        var plan = await backup.PrepareRestoreAsync(item.Entry.Id, Connection);
         RestoreGroups.Clear();
         foreach (var kind in new[] { BackupChangeKind.Added, BackupChangeKind.Changed, BackupChangeKind.Removed })
         {
@@ -367,8 +378,8 @@ internal sealed partial class CloudViewModel(
             return;
         }
 
-        await backup.DeleteBackupAsync(item.Entry.Id);
-        ShowOverview(await backup.GetOverviewAsync());
+        await backup.DeleteBackupAsync(item.Entry.Id, Connection);
+        ShowOverview(await backup.GetOverviewAsync(Connection));
     });
 
     /// <summary>Password and recovery code lost: delete the vault with every backup and start over (asked twice).</summary>
@@ -382,8 +393,8 @@ internal sealed partial class CloudViewModel(
         }
 
         ConfirmReset = false;
-        await backup.ResetAsync();
-        ShowOverview(await backup.GetOverviewAsync());
+        await backup.ResetAsync(Connection);
+        ShowOverview(await backup.GetOverviewAsync(Connection));
     });
 
     private void ShowOverview(BackupOverview overview)
@@ -487,13 +498,13 @@ internal sealed partial class CloudViewModel(
     [ObservableProperty]
     public partial CloudConnection? ChatConnection { get; set; }
 
-    /// <summary>Where the backups go (only offered with several connections).</summary>
+    /// <summary>Whose vault a backup goes to by default – the hint "Neue Sicherung erstellen?" (only offered with several connections).</summary>
     [ObservableProperty]
     public partial CloudConnection? BackupConnection { get; set; }
 
     public string? PairingOrganizationText => HasSeveral && Connection is { } c ? F("Das Handy wird mit {0} verbunden.", c.OrganizationName) : null;
 
-    public string? BackupOrganizationText => HasSeveral && BackupConnection is { } c ? F("Die Sicherungen liegen bei {0}.", c.OrganizationName) : null;
+    public string? BackupOrganizationText => HasSeveral && Connection is { } c ? F("Die Sicherungen liegen bei {0}.", c.OrganizationName) : null;
 
     private bool _loadingConnections;
 
@@ -539,21 +550,16 @@ internal sealed partial class CloudViewModel(
 
     partial void OnBackupConnectionChanged(CloudConnection? oldValue, CloudConnection? newValue)
     {
-        OnPropertyChanged(nameof(BackupOrganizationText));
         if (!_loadingConnections && newValue is not null && newValue.Id != oldValue?.Id)
         {
-            _ = SwitchBackupAsync(newValue);
+            _ = ChooseBackupDefaultAsync(newValue);
         }
     }
 
-    // The vault key of the other organisation's vault does not open this one: forget it, unlock (or set up) anew.
-    private async Task SwitchBackupAsync(CloudConnection chosen)
+    // Each organisation keeps its own vault (and this device its key): only the hint follows the default.
+    private async Task ChooseBackupDefaultAsync(CloudConnection chosen)
     {
         await cloud.SetBackupConnectionAsync(chosen.Id);
-        await backup.ForgetAsync();
-        RestorePlan = null;
-        IsWritingNote = false;
-        await LoadBackupsAsync();
         BackedUp?.Invoke(this, EventArgs.Empty);
     }
 
@@ -656,12 +662,16 @@ internal sealed partial class CloudViewModel(
     partial void OnConnectionChanged(CloudConnection? oldValue, CloudConnection? newValue)
     {
         OnPropertyChanged(nameof(PairingOrganizationText));
+        OnPropertyChanged(nameof(BackupOrganizationText));
         OnPropertyChanged(nameof(PersonName));
         OnPropertyChanged(nameof(ConnectedText));
         if (newValue?.Id != oldValue?.Id)
         {
             Profile = null;
             Photo = null;
+            RestorePlan = null;
+            IsWritingNote = false;
+            BackupMessage = null;
             UpdateCertificateStatus();
             if (!_loadingConnections && newValue is not null)
             {
@@ -683,6 +693,8 @@ internal sealed partial class CloudViewModel(
         {
             Error = ex.Message;
         }
+
+        await LoadBackupsAsync();
     }
 
     public async Task ReloadAsync()
@@ -753,8 +765,8 @@ internal sealed partial class CloudViewModel(
         IsBusy = true;
         try
         {
-            var keptBackups = BackupConnection?.Id == connection.Id;
             await cloud.DisconnectAsync(connection);
+            await backup.ForgetAsync(connection);
             await signatures.RemoveDisconnectedAsync();
             await textTemplates.RemoveDisconnectedAsync();
             await certificates.RemoveDisconnectedAsync();
@@ -763,13 +775,9 @@ internal sealed partial class CloudViewModel(
                 AccountsArrived?.Invoke(this, EventArgs.Empty);
             }
 
-            if (keptBackups)
-            {
-                await backup.ForgetAsync();
-                BackupState = null;
-                Backups.Clear();
-                RestorePlan = null;
-            }
+            BackupState = null;
+            Backups.Clear();
+            RestorePlan = null;
 
             Profile = null;
             Photo = null;
@@ -779,10 +787,6 @@ internal sealed partial class CloudViewModel(
             if (Connection is not null)
             {
                 await ShowSelectedAsync();
-                if (keptBackups)
-                {
-                    await LoadBackupsAsync();
-                }
             }
 
             ChatChanged?.Invoke(this, EventArgs.Empty);

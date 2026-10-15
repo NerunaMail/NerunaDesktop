@@ -1128,12 +1128,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void BackupNow()
+    private async Task BackupNowAsync()
     {
         ShowBackupHint = false;
         CurrentPage = SettingsPage;
         SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
-        SettingsPage.Cloud.StartBackup();
+        await SettingsPage.Cloud.StartBackupAsync();
     }
 
     [RelayCommand]

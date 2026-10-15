@@ -28,6 +28,9 @@ public sealed record CloudConnection(Uri Server, string DeviceId, string Organiz
     /// <summary>This device's encryption key for the organisation's certificates and accounts.</summary>
     public Guid EncryptionKeyId => IsFirst ? CloudController.EncryptionKeyId : Derived("encryption-key");
 
+    /// <summary>This device's key of the organisation's backup vault ("vaultId:Base64").</summary>
+    public Guid VaultKeyId => IsFirst ? SettingsBackupService.VaultKeyId : Derived("vault-key");
+
     /// <summary>A setting of this connection ("cloud.accounts" → "cloud.accounts.&lt;id&gt;").</summary>
     public string SettingKey(string key) => IsFirst ? key : $"{key}.{Id}";
 

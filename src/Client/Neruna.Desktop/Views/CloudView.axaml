@@ -48,7 +48,7 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBlock Grid.Row="1" Text="{l:T 'Sicherungen bei'}" VerticalAlignment="Center" />
+        <TextBlock Grid.Row="1" Text="{l:T 'Sicherungen standardmässig bei'}" VerticalAlignment="Center" />
         <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Connections}" SelectedItem="{Binding BackupConnection}" MinWidth="260">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="cloud:CloudConnection">
@@ -193,7 +193,7 @@
       <StackPanel Spacing="10" Margin="0,18,0,0">
         <StackPanel.IsVisible>
           <MultiBinding Converter="{x:Static BoolConverters.And}">
-            <Binding Path="BackupConnection" Converter="{x:Static ObjectConverters.IsNotNull}" />
+            <Binding Path="Connection" Converter="{x:Static ObjectConverters.IsNotNull}" />
             <Binding Path="!IsAdding" />
           </MultiBinding>
         </StackPanel.IsVisible>

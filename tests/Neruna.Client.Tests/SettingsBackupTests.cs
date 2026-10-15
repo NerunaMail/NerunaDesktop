@@ -59,9 +59,9 @@ public class SettingsBackupTests
 
         // No vault yet: nothing to suggest; set up with password, then a backup with a note.
         Assert.False(await officeBackup.ShouldSuggestBackupAsync(ct));
-        var recoveryCode = await officeBackup.SetUpAsync("Tresor-Passwort 2026", ct);
+        var recoveryCode = await officeBackup.SetUpAsync("Tresor-Passwort 2026", cancellationToken: ct);
         Assert.True(await officeBackup.ShouldSuggestBackupAsync(ct));
-        await officeBackup.CreateBackupAsync("Erste Sicherung", ct);
+        await officeBackup.CreateBackupAsync("Erste Sicherung", cancellationToken: ct);
         Assert.False(await officeBackup.ShouldSuggestBackupAsync(ct));
 
         // The server only ever saw ciphertext: no password, no note, no name.
@@ -80,13 +80,13 @@ public class SettingsBackupTests
         Assert.False(await officeBackup.ShouldSuggestBackupAsync(ct));
 
         // The new laptop: the backups are listed, notes only once unlocked; a wrong password changes nothing.
-        var locked = await laptopBackup.GetOverviewAsync(ct);
+        var locked = await laptopBackup.GetOverviewAsync(cancellationToken: ct);
         Assert.True(locked.HasVault);
         Assert.False(locked.IsUnlocked);
         Assert.Null(Assert.Single(locked.Backups).Note);
-        await Assert.ThrowsAsync<BackupException>(() => laptopBackup.UnlockAsync("falsch", ct));
-        await laptopBackup.UnlockAsync(recoveryCode, ct);
-        var overview = await laptopBackup.GetOverviewAsync(ct);
+        await Assert.ThrowsAsync<BackupException>(() => laptopBackup.UnlockAsync("falsch", cancellationToken: ct));
+        await laptopBackup.UnlockAsync(recoveryCode, cancellationToken: ct);
+        var overview = await laptopBackup.GetOverviewAsync(cancellationToken: ct);
         Assert.True(overview.IsUnlocked);
         var entry = Assert.Single(overview.Backups);
         Assert.Equal(("Erste Sicherung", "Büro-PC"), (entry.Note, entry.DeviceName));
@@ -95,7 +95,7 @@ public class SettingsBackupTests
         var old = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, FakeMailProviderFactory.Id, new Dictionary<string, string>());
         await laptop.Accounts.SaveAccountAsync(new Account(Guid.NewGuid(), "Alt", "alt@example.com", [old]), ct);
         await laptop.Get<ICredentialStore>().SetSecretAsync(old.Id, "alt", ct);
-        var plan = await laptopBackup.PrepareRestoreAsync(entry.Id, ct);
+        var plan = await laptopBackup.PrepareRestoreAsync(entry.Id, cancellationToken: ct);
         Assert.Contains(new BackupChange("Konten", "Privat", BackupChangeKind.Added), plan.Changes);
         Assert.Contains(new BackupChange("Konten", "alt@example.com", BackupChangeKind.Removed), plan.Changes);
         Assert.Contains(new BackupChange("Signaturen", "Kurz", BackupChangeKind.Added), plan.Changes);
@@ -135,22 +135,74 @@ public class SettingsBackupTests
         var server = new FakeVaultServer();
         await using var env = await TestEnvironment.CreateAsync();
         var backup = await ConnectAsync(env, server, "Büro-PC");
-        await backup.SetUpAsync("Passwort 1", ct);
+        await backup.SetUpAsync("Passwort 1", cancellationToken: ct);
         for (var i = 1; i <= 21; i++)
         {
-            await backup.CreateBackupAsync($"Nr. {i}", ct);
+            await backup.CreateBackupAsync($"Nr. {i}", cancellationToken: ct);
         }
 
-        var overview = await backup.GetOverviewAsync(ct);
+        var overview = await backup.GetOverviewAsync(cancellationToken: ct);
         Assert.Equal(20, overview.Backups.Count);
         Assert.Equal("Nr. 21", overview.Backups[0].Note);
         Assert.DoesNotContain(overview.Backups, b => b.Note == "Nr. 1");
 
-        await Assert.ThrowsAsync<BackupException>(() => backup.SetUpAsync("Passwort 2", ct));
-        await backup.ResetAsync(ct);
-        Assert.False((await backup.GetOverviewAsync(ct)).HasVault);
-        await backup.SetUpAsync("Passwort 2", ct);
-        Assert.Empty((await backup.GetOverviewAsync(ct)).Backups);
+        await Assert.ThrowsAsync<BackupException>(() => backup.SetUpAsync("Passwort 2", cancellationToken: ct));
+        await backup.ResetAsync(cancellationToken: ct);
+        Assert.False((await backup.GetOverviewAsync(cancellationToken: ct)).HasVault);
+        await backup.SetUpAsync("Passwort 2", cancellationToken: ct);
+        Assert.Empty((await backup.GetOverviewAsync(cancellationToken: ct)).Backups);
+    }
+
+    [Fact]
+    public async Task Each_organisation_keeps_its_own_vault_and_the_hint_follows_the_default()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var example = new FakeVaultServer();
+        var partner = new FakeVaultServer();
+        await using var env = await TestEnvironment.CreateAsync();
+        var settings = env.Get<ISettingsStore>();
+        var credentials = env.Get<ICredentialStore>();
+        using var key = DeviceKey.Create();
+        await credentials.SetSecretAsync(CloudController.KeyId, key.ExportPrivateKey(), ct);
+        var first = new CloudConnection(new Uri(Server), "Büro-PC", "Example AG", "Anna Muster", DateTimeOffset.Now);
+        var second = new CloudConnection(new Uri("https://neruna.partner.example/"), "Büro-PC", "Partner GmbH", "Anna Muster", DateTimeOffset.Now, "p1");
+        using var otherKey = DeviceKey.Create();
+        await credentials.SetSecretAsync(second.DeviceKeyId, otherKey.ExportPrivateKey(), ct);
+        await settings.SetAsync(SettingKeys.CloudConnection, JsonSerializer.Serialize(first, NerunaJson.Options), ct);
+        await settings.SetAsync(SettingKeys.CloudConnections, JsonSerializer.Serialize(new[] { second }, NerunaJson.Options), ct);
+        var cloud = new CloudController(new HttpClient(new ByHost(new() { ["cloud.example"] = example, ["neruna.partner.example"] = partner })), settings, credentials, NullLogger<CloudController>.Instance);
+        var backup = new SettingsBackupService(cloud, env.Accounts, credentials, settings, env.Get<ISignatureStore>(), env.Get<ITextTemplateStore>(),
+            env.Get<CertificateManager>(), TimeProvider.System, NullLogger<SettingsBackupService>.Instance);
+
+        // A vault at each, with its own password; a backup into either.
+        await backup.SetUpAsync("Passwort Example", first, ct);
+        await backup.SetUpAsync("Passwort Partner", second, ct);
+        await backup.CreateBackupAsync("Bei Example", first, ct);
+        await backup.CreateBackupAsync("Bei Partner", second, ct);
+        Assert.Equal(["Bei Example"], (await backup.GetOverviewAsync(first, ct)).Backups.Select(b => b.Note));
+        Assert.Equal(["Bei Partner"], (await backup.GetOverviewAsync(second, ct)).Backups.Select(b => b.Note));
+        Assert.NotEqual(first.VaultKeyId, second.VaultKeyId);
+        Assert.Equal(SettingsBackupService.VaultKeyId, first.VaultKeyId);
+
+        // The hint compares with the default organisation's last backup; changing the default keeps both vaults open.
+        await env.Get<ISignatureStore>().SaveAsync(new Signature(Guid.NewGuid(), "Neu", "<p>Neu</p>", DateTimeOffset.UnixEpoch), ct);
+        Assert.True(await backup.ShouldSuggestBackupAsync(ct));
+        await backup.CreateBackupAsync(null, second, ct);
+        Assert.True(await backup.ShouldSuggestBackupAsync(ct));
+        await cloud.SetBackupConnectionAsync(second.Id, ct);
+        Assert.False(await backup.ShouldSuggestBackupAsync(ct));
+        Assert.True((await backup.GetOverviewAsync(first, ct)).IsUnlocked);
+
+        // Forgetting one organisation's vault leaves the other's.
+        await backup.ForgetAsync(second, ct);
+        Assert.False((await backup.GetOverviewAsync(second, ct)).IsUnlocked);
+        Assert.True((await backup.GetOverviewAsync(first, ct)).IsUnlocked);
+    }
+
+    private sealed class ByHost(Dictionary<string, HttpMessageHandler> servers) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            new HttpMessageInvoker(servers[request.RequestUri!.Host], disposeHandler: false).SendAsync(request, cancellationToken);
     }
 
     private static async Task<SettingsBackupService> ConnectAsync(TestEnvironment env, FakeVaultServer server, string device)

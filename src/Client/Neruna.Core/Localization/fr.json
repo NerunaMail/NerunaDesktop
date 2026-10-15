@@ -1173,7 +1173,7 @@
  "Sicherung vom {0}{1}. Beim Wiederherstellen werden die persönlichen Einstellungen dieses Computers durch die der Sicherung ersetzt:": "Sauvegarde du {0}{1}. La restauration remplace les paramètres personnels de cet ordinateur par ceux de la sauvegarde :",
  "Sicherung wiederhergestellt. Die Konten werden jetzt neu synchronisiert.": "Sauvegarde restaurée. Les comptes sont maintenant resynchronisés.",
  "Sicherung wiederherstellen": "Restaurer la sauvegarde",
- "Sicherungen bei": "Sauvegardes chez",
+ "Sicherungen standardmässig bei": "Sauvegardes par défaut chez",
  "Sicherungsdatei wählen": "Choisir le fichier de sauvegarde",
  "Sicherungsdatei wählen …": "Choisir le fichier de sauvegarde …",
  "Sichtbereich im Zeitraster": "Plage visible dans la grille horaire",

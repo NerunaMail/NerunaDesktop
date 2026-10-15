@@ -1173,7 +1173,7 @@
  "Sicherung vom {0}{1}. Beim Wiederherstellen werden die persönlichen Einstellungen dieses Computers durch die der Sicherung ersetzt:": "Backup of {0}{1}. Restoring replaces the personal settings of this computer with those of the backup:",
  "Sicherung wiederhergestellt. Die Konten werden jetzt neu synchronisiert.": "Backup restored. The accounts are now being synchronised again.",
  "Sicherung wiederherstellen": "Restore backup",
- "Sicherungen bei": "Backups with",
+ "Sicherungen standardmässig bei": "Backups by default with",
  "Sicherungsdatei wählen": "Choose backup file",
  "Sicherungsdatei wählen …": "Choose backup file …",
  "Sichtbereich im Zeitraster": "Visible hours in the time grid",

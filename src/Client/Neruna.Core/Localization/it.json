@@ -1173,7 +1173,7 @@
  "Sicherung vom {0}{1}. Beim Wiederherstellen werden die persönlichen Einstellungen dieses Computers durch die der Sicherung ersetzt:": "Backup del {0}{1}. Il ripristino sostituisce le impostazioni personali di questo computer con quelle del backup:",
  "Sicherung wiederhergestellt. Die Konten werden jetzt neu synchronisiert.": "Backup ripristinato. Ora gli account vengono risincronizzati.",
  "Sicherung wiederherstellen": "Ripristina backup",
- "Sicherungen bei": "Backup presso",
+ "Sicherungen standardmässig bei": "Backup predefiniti presso",
  "Sicherungsdatei wählen": "Scegli file di backup",
  "Sicherungsdatei wählen …": "Scegli file di backup …",
  "Sichtbereich im Zeitraster": "Fascia visibile nella griglia oraria",
