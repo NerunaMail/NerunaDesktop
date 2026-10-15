@@ -256,8 +256,24 @@ internal sealed partial class CloudViewModel(
             return;
         }
 
-        await RunBackupAsync(async () => ShowOverview(await backup.GetOverviewAsync(Connection)));
+        // Switched again while loading: only the latest organisation's backups are shown, and the bar stays until they are.
+        var connection = Connection;
+        var version = ++_backupLoad;
+        await RunBackupAsync(async () =>
+        {
+            var overview = await backup.GetOverviewAsync(connection);
+            if (version == _backupLoad)
+            {
+                ShowOverview(overview);
+            }
+        });
+        if (version != _backupLoad)
+        {
+            BackupBusy = true;
+        }
     }
+
+    private int _backupLoad;
 
     /// <summary>From the hint "Neue Sicherung erstellen?": the default organisation for backups, the note field open.</summary>
     public async Task StartBackupAsync()
@@ -669,9 +685,14 @@ internal sealed partial class CloudViewModel(
         {
             Profile = null;
             Photo = null;
+            // The other organisation's backups go at once; only the bar until this one's are there.
             RestorePlan = null;
             IsWritingNote = false;
             BackupMessage = null;
+            BackupError = null;
+            BackupState = null;
+            Backups.Clear();
+            BackupBusy = !_loadingConnections && newValue is not null;
             UpdateCertificateStatus();
             if (!_loadingConnections && newValue is not null)
             {
@@ -684,6 +705,7 @@ internal sealed partial class CloudViewModel(
     private async Task ShowSelectedAsync()
     {
         Error = null;
+        var backups = LoadBackupsAsync(); // alongside, not after the profile and phones
         try
         {
             await LoadPersonAsync();
@@ -694,7 +716,7 @@ internal sealed partial class CloudViewModel(
             Error = ex.Message;
         }
 
-        await LoadBackupsAsync();
+        await backups;
     }
 
     public async Task ReloadAsync()

@@ -62,11 +62,27 @@ internal static class LiveScenario
         await Task.Delay(500);
         await Snapshots.SaveAsync(window, output, "cloud-two-2-second.png");
 
+        // Switching: the other organisation's backups go at once, the bar shows until this one's are there.
+        for (var i = 0; i < 50 && cloud.BackupState is null; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
         cloud.Connection = cloud.Connections[0];
+        Console.WriteLine($"Switched: backups shown {cloud.BackupState is not null}, busy {cloud.BackupBusy}");
+        while (cloud.BackupState is null && watch.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            await Task.Delay(20);
+        }
+
+        Console.WriteLine($"Backups of {cloud.Connection?.OrganizationName} after {watch.ElapsedMilliseconds} ms (vault: {cloud.BackupState?.HasVault})");
         for (var i = 0; i < 30 && cloud.Profile?.Organization.Name != cloud.Connections[0].OrganizationName; i++)
         {
             await Task.Delay(200);
         }
+
+        Console.WriteLine($"Profile after {watch.ElapsedMilliseconds} ms");
 
         cloud.ChatConnection = cloud.Connections[1];
         await Task.Delay(1500);
