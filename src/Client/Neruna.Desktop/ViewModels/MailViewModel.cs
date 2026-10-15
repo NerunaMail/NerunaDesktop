@@ -182,8 +182,50 @@ internal sealed partial class MailViewModel(
         _search?.Dispose();
     }
 
+    /// <summary>Cards or table, the table's columns and the sorting (the "⋮" menu beside the folder name).</summary>
+    public MailListLayout ListLayout => _listLayout ??= CreateListLayout();
+
+    private MailListLayout? _listLayout;
+    private bool _listLayoutLoaded;
+
+    private MailListLayout CreateListLayout()
+    {
+        var layout = new MailListLayout(settings);
+        // Sorted anew: the open message stays open (no reload of the reading pane).
+        layout.SortChanged += (_, _) =>
+        {
+            var open = SelectedEntry;
+            _refreshing = true;
+            try
+            {
+                RebuildEntries();
+                SelectedEntry = open is not null && Entries.Contains(open) ? open : null;
+            }
+            finally
+            {
+                _refreshing = false;
+            }
+        };
+        return layout;
+    }
+
+    [RelayCommand]
+    private void ShowAsCards() => ListLayout.IsTable = false;
+
+    [RelayCommand]
+    private void ShowAsTable() => ListLayout.IsTable = true;
+
+    [RelayCommand]
+    private void SortBy(MailSort sort) => ListLayout.SortBy(sort);
+
     public async Task ReloadAsync()
     {
+        if (!_listLayoutLoaded)
+        {
+            _listLayoutLoaded = true;
+            await ListLayout.LoadAsync();
+        }
+
         var selectedFolder = CurrentFolder?.Folder;
         // At the start: the folder open last time.
         var lastFolder = selectedFolder is null ? await settings.GetAsync(SettingKeys.LastMailFolder) : null;
@@ -1509,10 +1551,30 @@ internal sealed partial class MailViewModel(
             messages = [.. messages.Where(m => m.IsUnread || m == open)];
         }
 
-        foreach (var group in messages.GroupBy(m => DateGroup.Of(m.Summary.Date)))
+        // By date: grouped ("Heute", "Gestern" …); by sender, subject or size: one sorted list.
+        var layout = ListLayout;
+        if (layout.Sort == MailSort.Date)
         {
-            Entries.Add(new MessageGroupHeader(group.Key));
-            foreach (var message in group)
+            var byDate = layout.Descending ? messages.OrderByDescending(m => m.Summary.Date) : messages.OrderBy(m => m.Summary.Date);
+            foreach (var group in byDate.GroupBy(m => DateGroup.Of(m.Summary.Date)))
+            {
+                Entries.Add(new MessageGroupHeader(group.Key));
+                foreach (var message in group)
+                {
+                    Entries.Add(message);
+                }
+            }
+        }
+        else
+        {
+            var comparer = StringComparer.Create(CultureInfo.CurrentCulture, ignoreCase: true);
+            IOrderedEnumerable<MessageItemViewModel> sorted = layout.Sort switch
+            {
+                MailSort.From => layout.Descending ? messages.OrderByDescending(m => m.Sender, comparer) : messages.OrderBy(m => m.Sender, comparer),
+                MailSort.Subject => layout.Descending ? messages.OrderByDescending(m => m.Subject, comparer) : messages.OrderBy(m => m.Subject, comparer),
+                _ => layout.Descending ? messages.OrderByDescending(m => m.Summary.Size) : messages.OrderBy(m => m.Summary.Size),
+            };
+            foreach (var message in sorted.ThenByDescending(m => m.Summary.Date))
             {
                 Entries.Add(message);
             }
@@ -1707,6 +1769,17 @@ internal sealed partial class MessageItemViewModel(MessageSummary summary, MailF
     public bool IsEncrypted => Summary.Security.HasFlag(MessageSecurity.Encrypted);
 
     public string TimeText => DateGroup.ShortTime(Summary.Date);
+
+    /// <summary>In the table: date and time in full ("15.10.2026 17:12").</summary>
+    public string DateText => Summary.Date.LocalDateTime.ToString("g", CultureInfo.CurrentCulture);
+
+    /// <summary>In the table: "12 KB", "1.4 MB".</summary>
+    public string SizeText => Summary.Size switch
+    {
+        <= 0 => string.Empty,
+        < 1024 * 1024 => $"{Math.Max(1, Summary.Size / 1024)} KB",
+        _ => (Summary.Size / 1024.0 / 1024.0).ToString("0.0", CultureInfo.CurrentCulture) + " MB",
+    };
 
     [ObservableProperty]
     public partial bool IsUnread { get; set; } = !summary.Flags.HasFlag(MessageFlags.Seen);

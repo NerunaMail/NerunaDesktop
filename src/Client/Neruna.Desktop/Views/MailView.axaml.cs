@@ -88,6 +88,53 @@ internal sealed partial class MailView : UserControl
             Avalonia.Threading.Dispatcher.UIThread.Post(() => KeepListFocus(list), Avalonia.Threading.DispatcherPriority.Background);
         };
 
+        // Table: the column heads take the kept widths; after a border was dragged, the new ones are kept.
+        var header = this.FindControl<Grid>("TableHeader")!;
+        MailListLayout? layout = null;
+        void ApplyWidths()
+        {
+            if (layout is not null)
+            {
+                header.ColumnDefinitions[1].Width = new GridLength(layout.FromWidth);
+                header.ColumnDefinitions[5].Width = new GridLength(layout.DateWidth);
+                header.ColumnDefinitions[7].Width = new GridLength(layout.SizeWidth);
+            }
+        }
+
+        DataContextChanged += (_, _) =>
+        {
+            layout = ViewModel?.ListLayout;
+            if (layout is not null)
+            {
+                layout.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName is nameof(MailListLayout.FromWidth) or nameof(MailListLayout.DateWidth) or nameof(MailListLayout.SizeWidth))
+                    {
+                        ApplyWidths();
+                    }
+                    else if (e.PropertyName == nameof(MailListLayout.IsTable) && layout.IsTable)
+                    {
+                        WidenListForTable();
+                    }
+                };
+                ApplyWidths();
+            }
+        };
+        // The table needs room for its columns: the list becomes wider (kept like any width the user drags).
+        void WidenListForTable()
+        {
+            if (this.FindControl<Grid>("Columns") is { } columns && columns.ColumnDefinitions[2].Width is { IsAbsolute: true, Value: < 640 })
+            {
+                columns.ColumnDefinitions[2].Width = new GridLength(680);
+            }
+        }
+
+        foreach (var splitter in header.Children.OfType<GridSplitter>())
+        {
+            splitter.DragCompleted += (_, _) => layout?.SetWidths(
+                header.ColumnDefinitions[1].ActualWidth, header.ColumnDefinitions[5].ActualWidth, header.ColumnDefinitions[7].ActualWidth);
+        }
+
         foreach (var tree in new[] { this.FindControl<TreeView>("FolderTree")!, this.FindControl<TreeView>("FavoritesTree")! })
         {
             DragDrop.AddDragOverHandler(tree, OnTreeDragOver);

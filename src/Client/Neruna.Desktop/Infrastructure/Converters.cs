@@ -31,6 +31,9 @@ internal static class Converters
 
     public static FuncValueConverter<bool, FontWeight> BoldIf { get; } = new(bold => bold ? FontWeight.SemiBold : FontWeight.Normal);
 
+    /// <summary>Shown or only taking its place (a table column keeps its icons aligned).</summary>
+    public static FuncValueConverter<bool, double> OpaqueIf { get; } = new(shown => shown ? 1 : 0);
+
     /// <summary>The editor joins the formatting toolbar above it; alone it gets all corners rounded.</summary>
     public static FuncValueConverter<bool, CornerRadius> EditorCorners { get; } = new(withToolbar => withToolbar ? new CornerRadius(0, 0, 4, 4) : new CornerRadius(4));
 

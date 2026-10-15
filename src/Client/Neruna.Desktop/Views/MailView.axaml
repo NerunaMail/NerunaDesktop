@@ -143,8 +143,24 @@
       <Border Classes="pane" Grid.Column="2">
         <Grid RowDefinitions="Auto,*,Auto">
           <StackPanel Margin="12,10,12,6" Spacing="8">
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Text="{Binding ListTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBlock Text="{Binding ListTitle}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <!-- "⋮": how the list looks (cards or table) and what it is sorted by -->
+              <Button Grid.Column="2" Classes="command" Padding="8,2" Margin="6,0,0,0" ToolTip.Tip="{l:T 'Ansicht und Sortierung'}">
+                <TextBlock Text="⋮" FontSize="16" FontWeight="Bold" />
+                <Button.Flyout>
+                  <MenuFlyout Placement="BottomEdgeAlignedRight">
+                    <MenuItem Header="{l:T 'Karten'}" ToggleType="Radio" IsChecked="{Binding !ListLayout.IsTable, Mode=OneWay}" Command="{Binding ShowAsCardsCommand}" />
+                    <MenuItem Header="{l:T 'Tabelle'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsTable, Mode=OneWay}" Command="{Binding ShowAsTableCommand}" />
+                    <Separator />
+                    <MenuItem Header="{l:T 'Nach Datum'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsByDate, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Date}" />
+                    <MenuItem Header="{l:T 'Nach Absender'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsByFrom, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.From}" />
+                    <MenuItem Header="{l:T 'Nach Betreff'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsBySubject, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Subject}" />
+                    <MenuItem Header="{l:T 'Nach Grösse'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsBySize, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Size}" />
+                    <MenuItem Header="{l:T 'Absteigend'}" ToggleType="CheckBox" IsChecked="{Binding ListLayout.Descending}" />
+                  </MenuFlyout>
+                </Button.Flyout>
+              </Button>
               <!-- Multi-selection (Ctrl/Shift-click): actions and drag & drop apply to all selected messages -->
               <TextBlock Grid.Column="1" Text="{Binding SelectionText}" Classes="subtle" FontSize="12" VerticalAlignment="Center"
                          IsVisible="{Binding SelectionText, Converter={x:Static ObjectConverters.IsNotNull}}" />
@@ -225,7 +241,47 @@
           <TextBlock Grid.Row="1" Classes="subtle" Text="{l:T 'Keine Nachrichten'}" IsVisible="{Binding !HasMessages}"
                      HorizontalAlignment="Center" Margin="0,40,0,0" />
 
-          <ListBox x:Name="MessageList" Grid.Row="1" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}" Background="Transparent"
+          <DockPanel Grid.Row="1">
+          <!-- Table: the column heads – a click sorts, the borders can be dragged (the widths are kept) -->
+          <Grid x:Name="TableHeader" DockPanel.Dock="Top" Margin="4,0,4,2" IsVisible="{Binding ListLayout.IsTable}"
+                ColumnDefinitions="52,160,5,*,5,115,5,60">
+            <Grid.Styles>
+              <Style Selector="Button.head">
+                <Setter Property="Padding" Value="4,3" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+              </Style>
+              <!-- A thin line to grab between the heads -->
+              <Style Selector="GridSplitter">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="MinWidth" Value="5" />
+                <Setter Property="Template">
+                  <ControlTemplate>
+                    <Border Background="Transparent">
+                      <Border Width="1" Margin="0,4" Background="{DynamicResource DividerBrush}" HorizontalAlignment="Center" />
+                    </Border>
+                  </ControlTemplate>
+                </Setter>
+              </Style>
+            </Grid.Styles>
+            <Button Grid.Column="1" Classes="command head" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.From}">
+              <TextBlock><Run Text="{l:T 'Von'}" /><Run Text="{Binding ListLayout.FromArrow}" /></TextBlock>
+            </Button>
+            <GridSplitter Grid.Column="2" ResizeDirection="Columns" />
+            <Button Grid.Column="3" Classes="command head" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Subject}">
+              <TextBlock><Run Text="{l:T 'Betreff'}" /><Run Text="{Binding ListLayout.SubjectArrow}" /></TextBlock>
+            </Button>
+            <GridSplitter Grid.Column="4" ResizeDirection="Columns" />
+            <Button Grid.Column="5" Classes="command head" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Date}">
+              <TextBlock><Run Text="{l:T 'Datum'}" /><Run Text="{Binding ListLayout.DateArrow}" /></TextBlock>
+            </Button>
+            <GridSplitter Grid.Column="6" ResizeDirection="Columns" />
+            <Button Grid.Column="7" Classes="command head" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Size}">
+              <TextBlock><Run Text="{l:T 'Grösse'}" /><Run Text="{Binding ListLayout.SizeArrow}" /></TextBlock>
+            </Button>
+          </Grid>
+          <ListBox x:Name="MessageList" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}" Background="Transparent"
                    SelectionMode="Multiple">
             <ListBox.Styles>
               <Style Selector="ListBoxItem" x:DataType="vm:MessageListEntry">
@@ -250,7 +306,27 @@
                 </Border>
               </DataTemplate>
               <DataTemplate DataType="vm:MessageItemViewModel">
-                <Grid ColumnDefinitions="3,*" RowDefinitions="*,Auto" Classes.unread="{Binding IsUnread}">
+                <Panel>
+                <!-- Table: one line, the columns as wide as the heads above -->
+                <Grid Classes.unread="{Binding IsUnread}" IsVisible="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ListLayout.IsTable}" RowDefinitions="Auto,Auto">
+                  <DockPanel Margin="0,4">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="5" Width="52" Margin="6,0,0,0" VerticalAlignment="Center">
+                      <Border Width="7" Height="7" CornerRadius="4" Background="{DynamicResource UnreadBarBrush}" Opacity="{Binding IsUnread, Converter={x:Static app:Converters.OpaqueIf}}"
+                              VerticalAlignment="Center" />
+                      <PathIcon Data="{StaticResource IconAttach}" Width="11" Height="11" Opacity="{Binding HasAttachments, Converter={x:Static app:Converters.OpaqueIf}}" />
+                      <PathIcon Data="{StaticResource IconFlag}" Width="11" Height="11" Foreground="#C50F1F" IsVisible="{Binding IsFlagged}" />
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Left" Classes="sender" Text="{Binding Sender}" TextTrimming="CharacterEllipsis" FontSize="13" Margin="4,0,0,0"
+                               Width="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ListLayout.FromWidth}" VerticalAlignment="Center" />
+                    <TextBlock DockPanel.Dock="Right" Classes="subtle" Text="{Binding SizeText}" FontSize="12" TextAlignment="Right" Margin="0,0,6,0"
+                               Width="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ListLayout.SizeWidth}" VerticalAlignment="Center" />
+                    <TextBlock DockPanel.Dock="Right" Classes="subtle" Text="{Binding DateText}" FontSize="12" Margin="5,0,5,0"
+                               Width="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ListLayout.DateWidth}" VerticalAlignment="Center" />
+                    <TextBlock Classes="subject" Text="{Binding Subject}" TextTrimming="CharacterEllipsis" FontSize="13" Margin="9,0,5,0" VerticalAlignment="Center" />
+                  </DockPanel>
+                  <Border Grid.Row="1" Height="1" Margin="6,0" Background="{DynamicResource DividerBrush}" />
+                </Grid>
+                <Grid ColumnDefinitions="3,*" RowDefinitions="*,Auto" Classes.unread="{Binding IsUnread}" IsVisible="{Binding !$parent[UserControl].((vm:MailViewModel)DataContext).ListLayout.IsTable}">
                   <!-- A fine line under each message, indented like the text -->
                   <Border Grid.Row="1" Grid.ColumnSpan="2" Height="1" Margin="13,0,10,0" Background="{DynamicResource DividerBrush}" />
                   <Border Background="{DynamicResource UnreadBarBrush}" IsVisible="{Binding IsUnread}" CornerRadius="2" Margin="0,6" />
@@ -278,9 +354,11 @@
                     </StackPanel>
                   </Grid>
                 </Grid>
+                </Panel>
               </DataTemplate>
             </ListBox.DataTemplates>
           </ListBox>
+          </DockPanel>
 
           <!-- "1500 von 8200 Nachrichten · Weitere laden" – also loads by itself at the end of the list -->
           <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="12,4,12,8" IsVisible="{Binding LoadedText, Converter={x:Static ObjectConverters.IsNotNull}}">

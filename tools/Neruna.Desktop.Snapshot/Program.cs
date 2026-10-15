@@ -136,6 +136,19 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
 
+        // The list as a table (one line per mail, in columns), sorted by sender; back to cards afterwards.
+        vm.MailPage.ListLayout.IsTable = true;
+        vm.MailPage.ListLayout.SetWidths(170, 115, 60);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-table.png");
+        vm.MailPage.SortByCommand.Execute(Neruna.Desktop.ViewModels.MailSort.From);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-table-by-sender.png");
+        Console.WriteLine($"Table: sort {vm.MailPage.ListLayout.Sort} desc={vm.MailPage.ListLayout.Descending}, first {vm.MailPage.Entries.OfType<MessageItemViewModel>().First().Sender}");
+        vm.MailPage.SortByCommand.Execute(Neruna.Desktop.ViewModels.MailSort.Date);
+        vm.MailPage.ListLayout.IsTable = false;
+        await Task.Delay(200);
+
         // A PDF attachment in the reading pane instead of the message; a second click shows the message again.
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.HasAttachments);
         for (var i = 0; i < 50 && vm.MailPage.ReadingPane?.Message is null; i++)
