@@ -179,7 +179,14 @@ internal sealed class PstArchive : IDisposable
 
     /// <summary>The mail of a folder (not appointments or contacts filed there), with its position.</summary>
     public static IEnumerable<(int Index, XstMessage Message)> Messages(XstFolder folder) =>
-        All(folder).Select((m, i) => (Index: i, Message: m)).Where(m => IsMail(m.Message));
+        All(folder).Select((m, i) => (Index: i, Message: m)).Where(m => IsMail(m.Message) || Forget(m.Message));
+
+    // Appointments and contacts in a mail folder: what was read to tell is not kept.
+    private static bool Forget(XstMessage message)
+    {
+        message.ClearContents();
+        return false;
+    }
 
     // The folder's contents table – read here, not with XstFolder.Messages: that one also tries to decrypt S/MIME mail
     // itself (with the certificates of Windows) and on the first it cannot, ends the whole list ("ASN1 bad tag value").
@@ -227,6 +234,22 @@ internal sealed class PstArchive : IDisposable
         }
     }
 
+    /// <summary>
+    /// Reads from a message and lets XstReader forget what it loaded for it (properties, body, attachments): it keeps
+    /// all of that otherwise, and the search index reading every message of a 20 GB file would fill the memory.
+    /// </summary>
+    public static T Read<T>(XstMessage message, Func<XstMessage, T> read)
+    {
+        try
+        {
+            return read(message);
+        }
+        finally
+        {
+            message.ClearContents();
+        }
+    }
+
     public static string RemoteIdOf(int index, XstMessage message) => $"{index.ToString(CultureInfo.InvariantCulture)}.{Fingerprint(message)}";
 
     /// <exception cref="PstException">The message is not (or no longer) in the folder.</exception>
@@ -242,7 +265,7 @@ internal sealed class PstArchive : IDisposable
 
         // The file was replaced by a newer copy: found by its fingerprint where it is now.
         var print = dot > 0 ? remoteId[(dot + 1)..] : remoteId;
-        return all.FirstOrDefault(m => Fingerprint(m) == print)
+        return all.FirstOrDefault(m => Read(m, Fingerprint) == print)
                ?? throw new PstException(Neruna.Core.Localization.Texts.T("Die Nachricht ist in der Outlook-Datendatei nicht mehr vorhanden."));
     }
 

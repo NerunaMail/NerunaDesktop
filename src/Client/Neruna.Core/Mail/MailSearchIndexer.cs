@@ -120,12 +120,13 @@ public sealed class MailSearchIndexer : IDisposable
 
             // Sender, recipients and subject of every message: from the stored list, thousands per second.
             IReadOnlyList<SearchWork> work;
+            var batch = System.Diagnostics.Stopwatch.StartNew();
             while ((work = await _index.GetSearchWorkAsync(ids, 0, HeaderBatch, cancellationToken)).Count > 0)
             {
                 await _index.SaveSearchEntriesAsync(
                     [.. work.Select(w => (w.Id, Document(w.Summary, null, null), w.HasContent || local.Contains(w.Folder.ConnectionId) ? 2 : 1))], cancellationToken);
                 Progress?.Invoke(this, EventArgs.Empty);
-                await Task.Delay(10, cancellationToken);
+                await RestAsync(batch, 10, cancellationToken);
             }
 
             // The text where it is on this device; a few at a time, so the app stays responsive.
@@ -143,7 +144,7 @@ public sealed class MailSearchIndexer : IDisposable
 
                 await _index.SaveSearchEntriesAsync(entries, cancellationToken);
                 Progress?.Invoke(this, EventArgs.Empty);
-                await Task.Delay(20, cancellationToken);
+                await RestAsync(batch, 20, cancellationToken);
             }
 
             await IndexServerTextAsync(all, cancellationToken);
@@ -154,6 +155,16 @@ public sealed class MailSearchIndexer : IDisposable
             _running.Release();
             Progress?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    /// <summary>
+    /// A pause as long as the batch took (at least <paramref name="minimum"/> ms): a first index of large mailboxes or
+    /// data files takes longer, but uses at most about half of one processor core – the computer stays usable.
+    /// </summary>
+    private static async Task RestAsync(System.Diagnostics.Stopwatch batch, int minimum, CancellationToken cancellationToken)
+    {
+        await Task.Delay(TimeSpan.FromMilliseconds(Math.Clamp(batch.ElapsedMilliseconds, minimum, 2000)), cancellationToken);
+        batch.Restart();
     }
 
     // The text of mail only on the server (IMAP): text parts only, a batch per folder, with pauses – the server

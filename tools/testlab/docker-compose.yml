@@ -20,11 +20,12 @@ services:
       - "3025:3025"
       - "3143:3143"
 
-  # ManageSieve (Abwesenheitsnotiz): Dovecot/Pigeonhole, jedes Konto mit Passwort "pass", ohne TLS
+  # ManageSieve (Abwesenheitsnotiz) und IMAP mit CONDSTORE (Port 3144): Dovecot/Pigeonhole, jedes Konto mit Passwort "pass", ohne TLS
   sieve:
     image: dovecot/dovecot:2.3.21
     ports:
       - "4190:4190"
+      - "3144:143"
     volumes:
       - ./dovecot-sieve.conf:/etc/dovecot/conf.d/99-neruna.conf:ro
 

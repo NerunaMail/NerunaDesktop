@@ -50,7 +50,7 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
             {
                 try
                 {
-                    list.Add(PstArchive.Summary(index, message));
+                    list.Add(PstArchive.Read(message, m => PstArchive.Summary(index, m)));
                 }
                 catch (Exception ex) when (ex is not OutOfMemoryException and not OperationCanceledException)
                 {
@@ -71,7 +71,7 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
     public async Task<MimeMessage> GetMessageAsync(MailFolder folder, string remoteId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(folder);
-        var item = await PstArchive.For(FilePath).ReadAsync(a => PstArchive.Item(PstArchive.Message(a.Folder(folder.RemoteId), remoteId)), cancellationToken);
+        var item = await PstArchive.For(FilePath).ReadAsync(a => PstArchive.Read(PstArchive.Message(a.Folder(folder.RemoteId), remoteId), m => PstArchive.Item(m)), cancellationToken);
         return PstMime.Build(item);
     }
 

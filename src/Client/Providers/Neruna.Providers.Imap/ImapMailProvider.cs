@@ -178,6 +178,20 @@ public sealed partial class ImapMailProvider(
         var previous = SyncState.Parse(folder.SyncState);
         var isFull = previous is null || previous.Value.UidValidity != imapFolder.UidValidity;
 
+        // CONDSTORE (RFC 7162): the folder's change counter. Same counter, same number of messages and no new UID –
+        // nothing happened: a large folder costs one EXAMINE every few minutes instead of the flags of every message.
+        if (!isFull && previous!.Value.ModSeq is not null)
+        {
+            await (await GetImapAsync(cancellationToken)).NoOpAsync(cancellationToken); // a folder already open: its counters up to date
+        }
+
+        var modSeq = imapFolder.HighestModSeq;
+        if (!isFull && modSeq > 0 && previous!.Value.ModSeq == modSeq && previous.Value.Exists == imapFolder.Count
+            && imapFolder.UidNext?.Id == previous.Value.UidNext && folder.SyncState is { } unchanged)
+        {
+            return new FolderSyncResult(unchanged, false, [], new Dictionary<string, CoreFlags>(), [], folder.TotalCount, folder.UnreadCount);
+        }
+
         // Messages marked \Deleted but not yet expunged count as gone: some mail programs delete that way and purge
         // the folder only later (or on exit). They hide such messages, so do we.
         var allUids = await imapFolder.SearchAsync(SearchQuery.NotDeleted, cancellationToken);
@@ -208,10 +222,13 @@ public sealed partial class ImapMailProvider(
                 .Where(u => u.Id >= previous.Value.UidNext || (u.Id >= floor && !known.Contains(u.Id.ToString(CultureInfo.InvariantCulture))))
                 .ToList();
 
+            // With CONDSTORE only the flags changed since the last sync, otherwise those of every known message.
             var knownUids = knownRemoteIds.Where(present.Contains).Select(id => new UniqueId(uint.Parse(id, CultureInfo.InvariantCulture))).ToList();
+            var since = modSeq > 0 && previous.Value.ModSeq is { } lastSeq && lastSeq <= modSeq ? lastSeq : (ulong?)null;
             foreach (var batch in knownUids.Chunk(FetchBatchSize * 4))
             {
-                foreach (var summary in await imapFolder.FetchAsync(batch, MessageSummaryItems.UniqueId | MessageSummaryItems.Flags, cancellationToken))
+                var request = new FetchRequest(MessageSummaryItems.UniqueId | MessageSummaryItems.Flags) { ChangedSince = since };
+                foreach (var summary in await imapFolder.FetchAsync(batch, request, cancellationToken))
                 {
                     flagUpdates[summary.UniqueId.Id.ToString(CultureInfo.InvariantCulture)] = MapFlags(summary.Flags, summary.Keywords);
                 }
@@ -228,7 +245,7 @@ public sealed partial class ImapMailProvider(
         }
 
         var uidNext = imapFolder.UidNext?.Id ?? (allUids.Count > 0 ? allUids[^1].Id + 1 : 1);
-        var newState = new SyncState(imapFolder.UidValidity, uidNext, floor).ToString();
+        var newState = new SyncState(imapFolder.UidValidity, uidNext, floor, modSeq > 0 ? modSeq : null, modSeq > 0 ? imapFolder.Count : null).ToString();
 
         logger.LogDebug("IMAP {Folder}: full={Full}, fetched={Fetched}, removed={Removed}", folder.RemoteId, isFull, added.Count, removed.Count);
         return new FolderSyncResult(newState, isFull, added, flagUpdates, removed, allUids.Count, unread);
@@ -829,26 +846,35 @@ public sealed partial class ImapMailProvider(
 
     private static UniqueId ParseUid(string remoteId) => new(uint.Parse(remoteId, CultureInfo.InvariantCulture));
 
-    /// <summary>"UIDVALIDITY:UIDNEXT:FLOOR" – floor: the oldest UID of the synced range (missing in states before 0.1.16).</summary>
-    internal readonly record struct SyncState(uint UidValidity, uint UidNext, uint? Floor = null)
+    /// <summary>
+    /// "UIDVALIDITY:UIDNEXT:FLOOR[:MODSEQ:EXISTS]" – floor: the oldest UID of the synced range (missing in states before
+    /// 0.1.16); MODSEQ and EXISTS (CONDSTORE servers, since 0.8.8): the change counter and the message count at the sync.
+    /// </summary>
+    internal readonly record struct SyncState(uint UidValidity, uint UidNext, uint? Floor = null, ulong? ModSeq = null, int? Exists = null)
     {
-        public override string ToString() => Floor is { } floor
-            ? string.Create(CultureInfo.InvariantCulture, $"{UidValidity}:{UidNext}:{floor}")
-            : string.Create(CultureInfo.InvariantCulture, $"{UidValidity}:{UidNext}");
+        public override string ToString() => (Floor, ModSeq, Exists) switch
+        {
+            ({ } floor, { } modSeq, { } exists) => string.Create(CultureInfo.InvariantCulture, $"{UidValidity}:{UidNext}:{floor}:{modSeq}:{exists}"),
+            ({ } floor, _, _) => string.Create(CultureInfo.InvariantCulture, $"{UidValidity}:{UidNext}:{floor}"),
+            _ => string.Create(CultureInfo.InvariantCulture, $"{UidValidity}:{UidNext}"),
+        };
 
         public static SyncState? Parse(string? value)
         {
             var parts = value?.Split(':');
-            if (parts is not ([_, _] or [_, _, _])
+            if (parts is not ([_, _] or [_, _, _] or [_, _, _, _, _])
                 || !uint.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var v)
                 || !uint.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var n))
             {
                 return null;
             }
 
-            return parts.Length == 3 && uint.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var f)
-                ? new SyncState(v, n, f)
-                : new SyncState(v, n);
+            uint? floor = parts.Length >= 3 && uint.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var f) ? f : null;
+            return parts.Length == 5 && floor is not null
+                && ulong.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out var m)
+                && int.TryParse(parts[4], NumberStyles.None, CultureInfo.InvariantCulture, out var e)
+                    ? new SyncState(v, n, floor, m, e)
+                    : new SyncState(v, n, floor);
         }
     }
 }
