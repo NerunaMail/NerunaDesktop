@@ -88,7 +88,7 @@ internal sealed partial class MailViewModel
         void Cancelled() => StatusMessage?.Invoke(this, F("Schnellaktion «{0}» abgebrochen.", action.Label));
         try
         {
-            foreach (var step in action.Steps)
+            foreach (var (step, index) in action.Steps.Select((s, i) => (s, i)))
             {
                 if (ReadingPane != pane)
                 {
@@ -159,7 +159,18 @@ internal sealed partial class MailViewModel
                         break;
 
                     case QuickActionStepKind.Reply or QuickActionStepKind.ReplyAll or QuickActionStepKind.Forward or QuickActionStepKind.NewMail:
-                        await RespondWithAttachmentsAsync(message, step.Kind, targets, changed, step, sender, subject);
+                        var compose = await RespondWithAttachmentsAsync(message, step.Kind, targets, changed, step, sender, subject);
+
+                        // The steps after it (mark read, move …) wait until the mail was sent; discarded, they do not run.
+                        if (index < action.Steps.Count - 1)
+                        {
+                            if (compose is null || !await SentAsync(compose))
+                            {
+                                StatusMessage?.Invoke(this, F("Schnellaktion «{0}» angehalten – die E-Mail wurde nicht gesendet.", action.Label));
+                                return;
+                            }
+                        }
+
                         break;
 
                     case QuickActionStepKind.MoveToFolder:
@@ -195,13 +206,21 @@ internal sealed partial class MailViewModel
         }
     }
 
+    // Completes when the compose form closes: true when it was sent.
+    private static Task<bool> SentAsync(ComposeViewModel compose)
+    {
+        var done = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        compose.Closed += (_, sent) => done.TrySetResult(sent);
+        return done.Task;
+    }
+
     // Answer, forward or a new mail with the attachments – stamped ones as stamped; a text template above the signature.
-    private async Task RespondWithAttachmentsAsync(MimeMessage message, QuickActionStepKind kind, IReadOnlyList<AttachmentViewModel> attachments,
+    private async Task<ComposeViewModel?> RespondWithAttachmentsAsync(MimeMessage message, QuickActionStepKind kind, IReadOnlyList<AttachmentViewModel> attachments,
         Dictionary<AttachmentViewModel, byte[]> changed, QuickActionStep? step, string sender = "", string subject = "")
     {
         if (OpenAccount is not { } account)
         {
-            return;
+            return null;
         }
 
         MimeEntity PartOf(AttachmentViewModel a) => changed.TryGetValue(a, out var content) ? a.WithContent(content) : a.Entity;
@@ -242,14 +261,9 @@ internal sealed partial class MailViewModel
             draft = draft with { LeadHtml = template.Html };
         }
 
-        if (kind == QuickActionStepKind.NewMail)
-        {
-            await StartComposeAsync(draft, ComposeKind.New);
-        }
-        else
-        {
-            await RespondAsync(draft, kind == QuickActionStepKind.Forward ? ComposeKind.Forward : ComposeKind.Reply);
-        }
+        return kind == QuickActionStepKind.NewMail
+            ? await StartComposeAsync(draft, ComposeKind.New)
+            : await RespondAsync(draft, kind == QuickActionStepKind.Forward ? ComposeKind.Forward : ComposeKind.Reply);
     }
 
     // All attachments of the mail go along, the changed ones in their new version.

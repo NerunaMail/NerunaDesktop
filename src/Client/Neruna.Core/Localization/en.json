@@ -1173,6 +1173,7 @@
  "Schnellaktion": "Quick action",
  "Schnellaktion exportieren": "Export quick action",
  "Schnellaktion «{0}» abgebrochen.": "Quick action “{0}” cancelled.",
+ "Schnellaktion «{0}» angehalten – die E-Mail wurde nicht gesendet.": "Quick action “{0}” stopped – the email was not sent.",
  "Schnellaktion «{0}» exportiert.": "Quick action “{0}” exported.",
  "Schnellaktion «{0}» fehlgeschlagen": "Quick action “{0}” failed",
  "Schnellaktionen": "Quick actions",

@@ -427,23 +427,23 @@ internal sealed partial class MailViewModel(
     partial void OnCurrentFolderChanged(MailFolderNode? value) => OnPropertyChanged(nameof(ListTitle));
 
     [RelayCommand]
-    private Task NewMailAsync() => StartComposeAsync(ComposeDraft.Empty, ComposeKind.New);
+    private async Task NewMailAsync() => await StartComposeAsync(ComposeDraft.Empty, ComposeKind.New);
 
     // Replies to encrypted mail are encrypted again by default.
     [RelayCommand(CanExecute = nameof(CanRespond))]
-    private Task ReplyAsync() => RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, OwnAddresses(CurrentAccount!.Account), replyAll: false), ComposeKind.Reply);
+    private async Task ReplyAsync() => await RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, OwnAddresses(CurrentAccount!.Account), replyAll: false), ComposeKind.Reply);
 
     [RelayCommand(CanExecute = nameof(CanRespond))]
-    private Task ReplyAllAsync() => RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, OwnAddresses(CurrentAccount!.Account), replyAll: true), ComposeKind.Reply);
+    private async Task ReplyAllAsync() => await RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, OwnAddresses(CurrentAccount!.Account), replyAll: true), ComposeKind.Reply);
 
     [RelayCommand(CanExecute = nameof(CanRespond))]
-    private Task ForwardAsync() => RespondAsync(MessageComposer.Forward(ReadingPane!.Message!), ComposeKind.Forward);
+    private async Task ForwardAsync() => await RespondAsync(MessageComposer.Forward(ReadingPane!.Message!), ComposeKind.Forward);
 
-    private async Task RespondAsync(ComposeDraft draft, ComposeKind kind)
+    private async Task<ComposeViewModel?> RespondAsync(ComposeDraft draft, ComposeKind kind)
     {
         var message = SelectedMessage;
         var folder = message is null ? null : FolderOf(message);
-        await StartComposeAsync(draft, kind, _opened?.Security.WasEncrypted == true,
+        var compose = await StartComposeAsync(draft, kind, _opened?.Security.WasEncrypted == true,
             message is null || folder is null ? null : () => MarkRespondedAsync(message, folder, kind));
 
         // Replying or forwarding always means the message was read (except when the user wants to mark manually).
@@ -451,6 +451,8 @@ internal sealed partial class MailViewModel(
         {
             await SetReadAsync(message, read: true);
         }
+
+        return compose;
     }
 
     private async Task<MarkAsReadMode> GetMarkAsReadModeAsync() =>
@@ -627,13 +629,14 @@ internal sealed partial class MailViewModel(
 
     private static string[] OwnAddresses(Account account) => [.. account.Identities.Select(i => i.Email)];
 
-    private async Task StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false, Func<Task>? afterSent = null)
+    /// <returns>The compose form shown, or null when none could be opened.</returns>
+    private async Task<ComposeViewModel?> StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false, Func<Task>? afterSent = null)
     {
         var chosen = draft.FromAccountId is { } fromId ? Accounts.FirstOrDefault(a => a.Account.Id == fromId) : null;
         if ((chosen ?? CurrentAccount) is not { Account.EmailAddress: not null } account)
         {
             StatusMessage?.Invoke(this, T("Kein E-Mail-Konto vorhanden."));
-            return;
+            return null;
         }
 
         try
@@ -643,10 +646,12 @@ internal sealed partial class MailViewModel(
             compose.AfterSent = afterSent;
             await compose.InitializeAsync();
             await ShowComposeAsync(compose);
+            return compose;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Report(T("Verfassen konnte nicht geöffnet werden"), ex);
+            return null;
         }
     }
 
