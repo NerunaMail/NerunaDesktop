@@ -12,6 +12,16 @@
       <TextBlock Classes="subtle" TextWrapping="Wrap"
                  Text="{l:T 'Verbindet Neruna mit dem Portal deiner Organisation – für zentral verwaltete Signaturen, Textvorlagen, S/MIME-Zertifikate und den Chat. Deine Mails, Termine und Kontakte bleiben auf deinem Mailserver.'}" />
 
+      <!-- Connected: one more organisation, on its own above the organisations -->
+      <Button Content="{l:T 'Weitere Organisation verbinden …'}" Command="{Binding AddConnectionCommand}" Margin="0,4,0,0">
+        <Button.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="Connection" Converter="{x:Static ObjectConverters.IsNotNull}" />
+            <Binding Path="!IsAdding" />
+          </MultiBinding>
+        </Button.IsVisible>
+      </Button>
+
       <!-- Several organisations: pick the one shown below -->
       <ListBox ItemsSource="{Binding Connections}" SelectedItem="{Binding Connection}" IsVisible="{Binding HasSeveral}" Margin="0,8,0,0"
                Background="Transparent">
@@ -121,7 +131,6 @@
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="{l:T 'Aktualisieren'}" Command="{Binding RefreshCommand}" />
             <Button Content="{l:T 'Trennen'}" Click="OnDisconnect" />
-            <Button Content="{l:T 'Weitere Organisation verbinden …'}" Command="{Binding AddConnectionCommand}" />
             <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
           </StackPanel>
         </StackPanel>
