@@ -156,6 +156,30 @@ public sealed class MailController(
         await replies.SetAutoReplyAsync(reply, [.. account.Identities.Select(i => i.Email).Distinct(StringComparer.OrdinalIgnoreCase)], cancellationToken);
     }
 
+    /// <summary>The account's server rules for incoming mail ("Serverregeln").</summary>
+    /// <exception cref="ServerRulesUnavailableException">Not offered by this account's server (the message says why).</exception>
+    public async Task<ServerRuleSet> GetServerRulesAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
+    {
+        await using var provider = providers.CreateMail(connection);
+        return provider is IServerRulesProvider rules
+            ? await rules.GetRulesAsync(cancellationToken)
+            : throw new ServerRulesUnavailableException(T("Für dieses Konto kann Neruna keine Serverregeln verwalten."));
+    }
+
+    /// <summary>Stores the rules on the server, in this order (rules made elsewhere that Neruna cannot show stay).</summary>
+    /// <exception cref="ServerRulesUnavailableException">Refused or not offered (the message says why).</exception>
+    public async Task SaveServerRulesAsync(ServiceConnection connection, IReadOnlyList<ServerRule> rules, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        await using var provider = providers.CreateMail(connection);
+        if (provider is not IServerRulesProvider server)
+        {
+            throw new ServerRulesUnavailableException(T("Für dieses Konto kann Neruna keine Serverregeln verwalten."));
+        }
+
+        await server.SaveRulesAsync(rules, cancellationToken);
+    }
+
     /// <summary>"Ordner abonnieren": every folder of the connection's server and whether it is shown.</summary>
     /// <exception cref="NotSupportedException">The provider has no subscriptions.</exception>
     public async Task<IReadOnlyList<FolderSubscription>> GetSubscriptionsAsync(ServiceConnection connection, CancellationToken cancellationToken = default)

@@ -12,7 +12,7 @@ namespace Neruna.Providers.Graph;
 /// fetches the last <see cref="InitialDays"/> days (older mail comes with "load more"); messages travel as MIME.
 /// Graph files sent mail in "Gesendete Elemente" itself. No server push for desktop apps: changes are polled.
 /// </summary>
-internal sealed class GraphMailProvider(Guid connectionId, GraphClient graph, ILogger<GraphMailProvider> logger) : IMailProvider, IAutoReplyProvider
+internal sealed partial class GraphMailProvider(Guid connectionId, GraphClient graph, ILogger<GraphMailProvider> logger) : IMailProvider, IAutoReplyProvider
 {
     public Task<(AutoReply Reply, AutoReplyFeatures Features)> GetAutoReplyAsync(CancellationToken cancellationToken = default) =>
         GraphAutoReply.GetAsync(graph, cancellationToken);

@@ -132,7 +132,7 @@ internal sealed class EwsClient(HttpClient http, EwsSettings settings, string? p
         ArgumentNullException.ThrowIfNull(operation);
         var body = await SendAsync(operation, cancellationToken);
         var response = body.Elements().FirstOrDefault() ?? throw new EwsException(null, "EWS: empty response");
-        if (response.Element(X.M + "ResponseMessage") is { } message && !message.IsSuccess())
+        if ((response.Element(X.M + "ResponseMessage") ?? response) is { } message && !message.IsSuccess())
         {
             var code = message.Code();
             throw new EwsException(code, message.Element(X.M + "MessageText")?.Value ?? code ?? "EWS error");

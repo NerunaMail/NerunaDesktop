@@ -143,7 +143,7 @@ internal static class SieveVacation
     }
 
     // Where the leading comments and "require" statements end.
-    private static int EndOfRequires(string script)
+    internal static int EndOfRequires(string script)
     {
         var i = 0;
         while (i < script.Length)
@@ -193,7 +193,7 @@ internal static class SieveVacation
         return newline < 0 ? text.Length : newline + 1;
     }
 
-    private static string Quote(string value) =>
+    internal static string Quote(string value) =>
         "\"" + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal).Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal) + "\"";
 
     private static string Zone(TimeSpan offset) =>
@@ -206,7 +206,7 @@ internal static class SieveVacation
             ? new DateTimeOffset(date, TimeZoneInfo.Local.GetUtcOffset(date))
             : null;
 
-    private static IEnumerable<string> Lines(string? script)
+    internal static IEnumerable<string> Lines(string? script)
     {
         var text = (script ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal);
         var lines = text.Split('\n');
@@ -214,5 +214,5 @@ internal static class SieveVacation
         return text.Length == 0 ? [] : lines.Take(count);
     }
 
-    private static string Normalize(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal);
+    internal static string Normalize(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal);
 }

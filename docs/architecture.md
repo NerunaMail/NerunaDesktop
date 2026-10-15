@@ -247,6 +247,15 @@ Verbindung (Server, Geräte-ID, Organisation) steht in den Einstellungen `cloud.
 zuerst die Server der verbundenen Organisationen (`AccountDiscovery.OrganizationServers`). Nur HTTPS, ausser
 `localhost` zum Entwickeln. Vertrag: `server/contract/openapi.yaml` (enrollment, token, me).
 
+**Serverregeln:** `IServerRulesProvider` (Core) mit einem gemeinsamen Modell: Bedingungen (Absender, Empfänger,
+Betreff, Text «enthält», alle müssen zutreffen) und Aktionen (verschieben, gelesen, kennzeichnen, weiterleiten,
+löschen, Stopp). IMAP über ManageSieve: Neruna schreibt einen markierten Block ans Ende des aktiven Skripts (nach der
+Abwesenheitsnotiz), die Regeln als JSON-Kommentar; fremde Filter bleiben und werden nur genannt. EWS über
+Get/UpdateInboxRules, Graph über `mailFolders/inbox/messageRules` – Regeln mit Bedingungen/Aktionen, die Neruna nicht
+kennt (Outlook), bleiben unverändert und werden nur genannt; beide haben keine Aktion «kennzeichnen». Exchange-Regeln
+werden nie mit `RemoveOutlookRuleBlob` gespeichert (das würde Outlooks Client-Regeln löschen). UI: Konten → ⋯ →
+«Serverregeln …».
+
 **Suchindex (Mail):** SQLite-FTS5-Tabelle `MessageSearch` (contentless, rowid = `Messages.Id`, Präfixe 2/3,
 `unicode61 remove_diacritics 2`), ein Trigger löscht Einträge mit der Nachricht. `Messages.SearchLevel`: 0 neu,
 1 Kopfdaten (Text nicht auf dem Gerät), 2 Text liegt vor, 3 mit Text. `MailSearchIndexer` (Core) arbeitet im

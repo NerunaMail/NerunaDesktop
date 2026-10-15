@@ -76,6 +76,8 @@
                         <MenuFlyout Placement="BottomEdgeAlignedRight">
                           <MenuItem Header="{Binding AutoReplyText}" IsVisible="{Binding HasServerMail}"
                                     Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).AutoReplyCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="{l:T 'Serverregeln …'}" IsVisible="{Binding HasServerMail}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).ServerRulesCommand}" CommandParameter="{Binding}" />
                           <MenuItem Header="{l:T 'Offline verfügbar'}" IsVisible="{Binding HasServerMail}" ItemsSource="{Binding OfflineChoices}">
                             <MenuItem.Styles>
                               <Style Selector="MenuItem > MenuItem" x:DataType="vm:OfflineChoice">

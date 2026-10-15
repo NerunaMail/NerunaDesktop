@@ -57,8 +57,15 @@ public sealed partial class ImapMailProvider
         AutoReplyFeatures.Subject
         | (sieve.Extensions.Contains("date") && sieve.Extensions.Contains("relational") ? AutoReplyFeatures.Schedule : AutoReplyFeatures.None);
 
-    private async Task<ManageSieveClient> OpenSieveAsync(CancellationToken cancellationToken)
+    private Task<ManageSieveClient> OpenSieveAsync(CancellationToken cancellationToken) =>
+        OpenSieveAsync(forRules: false, cancellationToken);
+
+    // ManageSieve for the out-of-office reply (needs "vacation") or the server rules; failures in the words of each.
+    private async Task<ManageSieveClient> OpenSieveAsync(bool forRules, CancellationToken cancellationToken)
     {
+        Exception Fail(string message, Exception? inner) =>
+            forRules ? new ServerRulesUnavailableException(message, inner) : new AutoReplyUnavailableException(message, inner);
+
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(20));
         ManageSieveClient? sieve = null;
@@ -66,7 +73,7 @@ public sealed partial class ImapMailProvider
         {
             // Plain text only where IMAP itself is unencrypted (a local test server); otherwise TLS or nothing.
             sieve = await ManageSieveClient.ConnectAsync(settings.ImapHost, SievePort, allowPlainText: settings.ImapSecurity == SocketSecurity.None, timeout.Token, settings.AcceptAnyCertificate);
-            if (!sieve.Extensions.Contains("vacation"))
+            if (!forRules && !sieve.Extensions.Contains("vacation"))
             {
                 throw new AutoReplyUnavailableException(T("Der Mailserver kann keine Abwesenheitsnotiz verschicken (Sieve ohne «vacation»)."));
             }
@@ -81,7 +88,9 @@ public sealed partial class ImapMailProvider
                 await sieve.DisposeAsync();
             }
 
-            throw new AutoReplyUnavailableException(F("Der Mailserver bietet keine Abwesenheitsnotiz an – ManageSieve (Port {0}) auf {1} ist nicht erreichbar.", SievePort, settings.ImapHost), ex);
+            throw Fail(forRules
+                ? F("Der Mailserver bietet keine Serverregeln an – ManageSieve (Port {0}) auf {1} ist nicht erreichbar.", SievePort, settings.ImapHost)
+                : F("Der Mailserver bietet keine Abwesenheitsnotiz an – ManageSieve (Port {0}) auf {1} ist nicht erreichbar.", SievePort, settings.ImapHost), ex);
         }
         catch (ManageSieveException ex)
         {
@@ -90,7 +99,9 @@ public sealed partial class ImapMailProvider
                 await sieve.DisposeAsync();
             }
 
-            throw new AutoReplyUnavailableException(F("Anmeldung für die Abwesenheitsnotiz fehlgeschlagen: {0}", ex.Message), ex);
+            throw Fail(forRules
+                ? F("Anmeldung für die Serverregeln fehlgeschlagen: {0}", ex.Message)
+                : F("Anmeldung für die Abwesenheitsnotiz fehlgeschlagen: {0}", ex.Message), ex);
         }
         catch
         {

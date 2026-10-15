@@ -41,6 +41,12 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
     public event EventHandler? SubscribeRequested;
 
+    /// <summary>"⋯ → Serverregeln …" of an account.</summary>
+    public event EventHandler<Account>? ServerRulesRequested;
+
+    [RelayCommand]
+    private void ServerRules(AccountItem item) => ServerRulesRequested?.Invoke(this, item.Account);
+
     /// <summary>"Outlook-Datendatei (.pst) einbinden …".</summary>
     public event EventHandler? PstRequested;
 

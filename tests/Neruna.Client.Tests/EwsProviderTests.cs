@@ -110,6 +110,46 @@ public class EwsProviderTests
     }
 
     [Fact]
+    public async Task Inbox_rules_are_read_and_changed_while_Outlooks_own_stay()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (connection, factory, server, _) = Connect();
+        server.On("GetInboxRules", _ => """
+            <m:GetInboxRulesResponse ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode><m:OutlookRuleBlobExists>false</m:OutlookRuleBlobExists>
+              <m:InboxRules>
+                <t:Rule><t:RuleId>R1</t:RuleId><t:DisplayName>Rechnungen</t:DisplayName><t:Priority>1</t:Priority><t:IsEnabled>true</t:IsEnabled>
+                  <t:Conditions><t:ContainsSenderStrings><t:String>rechnung@lieferant.ch</t:String></t:ContainsSenderStrings></t:Conditions><t:Exceptions/>
+                  <t:Actions><t:MarkAsRead>true</t:MarkAsRead><t:MoveToFolder><t:FolderId Id="F-RECH"/></t:MoveToFolder></t:Actions></t:Rule>
+                <t:Rule><t:RuleId>R2</t:RuleId><t:DisplayName>Wichtig</t:DisplayName><t:Priority>2</t:Priority><t:IsEnabled>true</t:IsEnabled>
+                  <t:Conditions><t:ImportanceIs>High</t:ImportanceIs></t:Conditions><t:Exceptions/>
+                  <t:Actions><t:AssignCategories><t:String>Rot</t:String></t:AssignCategories></t:Actions></t:Rule>
+              </m:InboxRules></m:GetInboxRulesResponse>
+            """);
+        server.On("UpdateInboxRules", _ => """<m:UpdateInboxRulesResponse ResponseClass="Success"><m:ResponseCode>NoError</m:ResponseCode></m:UpdateInboxRulesResponse>""");
+        await using var mail = new EwsMailProviderFactory(factory).Create(connection);
+        var rules = Assert.IsAssignableFrom<IServerRulesProvider>(mail);
+
+        var set = await rules.GetRulesAsync(ct);
+        var invoice = Assert.Single(set.Rules);
+        Assert.Equal(("R1", "Rechnungen", "F-RECH", true), (invoice.Id, invoice.Name, invoice.MoveTo, invoice.MarkRead));
+        Assert.Equal([new RuleCondition(RuleField.From, "rechnung@lieferant.ch")], invoice.Conditions);
+        Assert.Equal(["Wichtig"], set.Others); // categories and importance: Outlook's, kept
+        Assert.False(set.Features.HasFlag(ServerRuleFeatures.Flag));
+
+        // R1 changed, a new one added; Outlook's moves behind them.
+        await rules.SaveRulesAsync([invoice with { IsEnabled = false }, new ServerRule(null, "Chef", true, [new RuleCondition(RuleField.Recipient, "chef@firma.ch")], ForwardTo: "anna@privat.ch", Stop: true)], ct);
+        var update = server.Operations("UpdateInboxRules").Single();
+        Assert.Equal(["SetRuleOperation", "CreateRuleOperation", "SetRuleOperation"], update.Descendants(M + "Operations").Single().Elements().Select(e => e.Name.LocalName));
+        var created = update.Descendants(T + "CreateRuleOperation").Single().Element(T + "Rule")!;
+        Assert.Equal(["DisplayName", "Priority", "IsEnabled", "Conditions", "Exceptions", "Actions"], created.Elements().Select(e => e.Name.LocalName));
+        Assert.Equal(["ForwardToRecipients", "StopProcessingRules"], created.Element(T + "Actions")!.Elements().Select(e => e.Name.LocalName));
+        Assert.Equal("anna@privat.ch", created.Descendants(T + "EmailAddress").Single().Value);
+        Assert.Equal("false", update.Descendants(M + "RemoveOutlookRuleBlob").Single().Value); // Outlook's own rules are never thrown away
+        var moved = update.Descendants(T + "SetRuleOperation").Last().Element(T + "Rule")!;
+        Assert.Equal(("R2", "3"), (moved.Element(T + "RuleId")!.Value, moved.Element(T + "Priority")!.Value));
+    }
+
+    [Fact]
     public async Task Folders_have_their_roles_and_only_visible_mail_folders_are_listed()
     {
         var ct = TestContext.Current.CancellationToken;

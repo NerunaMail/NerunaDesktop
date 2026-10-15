@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.ServerRulesView"
+             x:DataType="vm:ServerRulesViewModel">
+  <UserControl.Styles>
+    <Style Selector="ComboBox.folders">
+      <Setter Property="MaxDropDownHeight" Value="380" />
+      <Setter Property="ItemTemplate">
+        <DataTemplate x:DataType="vm:FolderChoice">
+          <TextBlock Text="{Binding Name}" Margin="{Binding Indent}" TextTrimming="CharacterEllipsis" />
+        </DataTemplate>
+      </Setter>
+      <Setter Property="SelectionBoxItemTemplate">
+        <DataTemplate x:DataType="vm:FolderChoice">
+          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+        </DataTemplate>
+      </Setter>
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Spacing="8">
+    <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap"
+               Text="{l:T 'Diese Regeln wendet der Mailserver auf neue Mails an – auch wenn Neruna geschlossen ist und auf allen Geräten gleich. Alle Bedingungen einer Regel müssen zutreffen.'}" />
+
+    <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Height="4" MinWidth="0" />
+    <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="#107C10" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- The list -->
+    <StackPanel Spacing="6" IsVisible="{Binding !IsEditing}">
+      <TextBlock Classes="subtle" Text="{l:T 'Noch keine Regeln.'}" IsVisible="{Binding IsEmpty}" />
+      <ScrollViewer MaxHeight="380">
+        <ItemsControl ItemsSource="{Binding Rules}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ServerRuleItem">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,6">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Regel ein- oder ausschalten'}" />
+                  <StackPanel Grid.Column="1" Margin="4,0,8,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Summary}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <Button Classes="command" Content="↑" ToolTip.Tip="{l:T 'Nach oben'}" Command="{Binding $parent[UserControl].((vm:ServerRulesViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+                    <Button Classes="command" Content="↓" ToolTip.Tip="{l:T 'Nach unten'}" Command="{Binding $parent[UserControl].((vm:ServerRulesViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}" />
+                    <Button Classes="command" Content="{l:T 'Bearbeiten'}" Command="{Binding $parent[UserControl].((vm:ServerRulesViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
+                    <Button Classes="command" Content="✕" ToolTip.Tip="{l:T 'Regel entfernen'}" Command="{Binding $parent[UserControl].((vm:ServerRulesViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <!-- Rules made elsewhere (webmail, Outlook) that Neruna does not show completely -->
+      <Border IsVisible="{Binding HasOthers}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="10,8">
+        <StackPanel Spacing="2">
+          <TextBlock TextWrapping="Wrap" FontSize="12"
+                     Text="{l:T 'Weitere Regeln dieses Kontos wurden anderswo angelegt und bleiben unverändert:'}" />
+          <ItemsControl ItemsSource="{Binding Others}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding StringFormat='• {0}'}" FontSize="12" TextWrapping="Wrap" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,8,0,0">
+        <Button Content="{l:T '+ Neue Regel'}" Command="{Binding NewRuleCommand}" IsEnabled="{Binding IsReady}" />
+        <Button Grid.Column="2" Content="{l:T 'Schliessen'}" Command="{Binding CloseCommand}" Margin="0,0,8,0" />
+        <Button Grid.Column="3" Classes="accent" Content="{l:T 'Auf dem Server speichern'}" Command="{Binding SaveCommand}" />
+      </Grid>
+    </StackPanel>
+
+    <!-- The editor -->
+    <Border IsVisible="{Binding IsEditing}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+      <StackPanel Spacing="6" DataContext="{Binding Editor}" x:DataType="vm:ServerRuleEditor">
+        <TextBlock Text="{Binding Heading}" FontWeight="SemiBold" FontSize="15" />
+        <TextBlock Classes="label" Text="{l:T 'Name'}" />
+        <TextBox Text="{Binding Name}" PlaceholderText="{l:T 'z. B. Rechnungen ablegen'}" />
+
+        <TextBlock Classes="label" Text="{l:T 'Wenn'}" />
+        <ItemsControl ItemsSource="{Binding Conditions}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:RuleConditionRow">
+              <Grid ColumnDefinitions="220,*,Auto" Margin="0,0,0,4">
+                <ComboBox ItemsSource="{Binding Fields}" SelectedItem="{Binding Field}" HorizontalAlignment="Stretch" />
+                <TextBox Grid.Column="1" Text="{Binding Value}" Margin="6,0,0,0" PlaceholderText="{l:T 'z. B. rechnung@lieferant.ch'}" />
+                <Button Grid.Column="2" Classes="command" Content="✕" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Bedingung entfernen'}"
+                        Command="{Binding $parent[ItemsControl].((vm:ServerRuleEditor)DataContext).RemoveConditionCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Classes="command" Content="{l:T '+ Bedingung'}" Command="{Binding AddConditionCommand}" HorizontalAlignment="Left" Padding="0,2" />
+
+        <TextBlock Classes="label" Text="{l:T 'Dann'}" />
+        <Grid ColumnDefinitions="Auto,*">
+          <CheckBox Content="{l:T 'Verschieben nach'}" IsChecked="{Binding MoveTo}" IsEnabled="{Binding !Delete}" />
+          <ComboBox Grid.Column="1" Classes="folders" ItemsSource="{Binding Folders}" SelectedItem="{Binding Folder}" IsEnabled="{Binding MoveTo}"
+                    Margin="8,0,0,0" HorizontalAlignment="Stretch" />
+        </Grid>
+        <CheckBox Content="{l:T 'Als gelesen markieren'}" IsChecked="{Binding MarkRead}" />
+        <CheckBox Content="{l:T 'Kennzeichnen'}" IsChecked="{Binding Flag}" IsVisible="{Binding CanFlag}" />
+        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding CanForward}">
+          <CheckBox Content="{l:T 'Weiterleiten an'}" IsChecked="{Binding Forward}" />
+          <TextBox Grid.Column="1" Text="{Binding ForwardTo}" IsEnabled="{Binding Forward}" Margin="8,0,0,0" PlaceholderText="{l:T 'z. B. buchhaltung@firma.ch'}" />
+        </Grid>
+        <CheckBox Content="{l:T 'Löschen (in den Papierkorb)'}" IsChecked="{Binding Delete}" IsVisible="{Binding CanDelete}" />
+        <CheckBox Content="{l:T 'Danach keine weiteren Regeln anwenden'}" IsChecked="{Binding Stop}" IsVisible="{Binding CanStop}" />
+
+        <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,6,0,0">
+          <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
+          <Button Classes="accent" Content="{l:T 'Übernehmen'}" Command="{Binding ApplyCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

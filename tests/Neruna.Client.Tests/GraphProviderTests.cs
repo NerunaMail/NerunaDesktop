@@ -48,6 +48,35 @@ public class GraphProviderTests
     }
 
     [Fact]
+    public async Task Inbox_rules_are_read_and_changed_while_Outlooks_own_stay()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (graph, http) = await SignedInAsync("Mail.ReadWrite MailboxSettings.ReadWrite");
+        var mail = new GraphMailProvider(Guid.NewGuid(), graph, NullLogger<GraphMailProvider>.Instance);
+
+        // Microsoft's inbox rules; one with categories is Outlook's and stays.
+        http.Routes["GET /v1.0/me/mailFolders/inbox/messageRules"] = """
+            {"value":[
+              {"id":"R1","displayName":"Rechnungen","sequence":1,"isEnabled":true,"conditions":{"senderContains":["rechnung@lieferant.ch"]},
+               "actions":{"moveToFolder":"F-RECH","markAsRead":true,"stopProcessingRules":false}},
+              {"id":"R2","displayName":"Rot","sequence":2,"isEnabled":true,"conditions":{"importance":"high"},"actions":{"assignCategories":["Rot"]}}]}
+            """;
+        http.Routes["POST /v1.0/me/mailFolders/inbox/messageRules"] = """{"id":"R3"}""";
+        http.Routes["DELETE /v1.0/me/mailFolders/inbox/messageRules/R1"] = string.Empty;
+        http.Status["DELETE /v1.0/me/mailFolders/inbox/messageRules/R1"] = HttpStatusCode.NoContent;
+        var ruleSet = await mail.GetRulesAsync(ct);
+        var invoice = Assert.Single(ruleSet.Rules);
+        Assert.Equal(("R1", "F-RECH", true, false), (invoice.Id, invoice.MoveTo, invoice.MarkRead, invoice.Stop));
+        Assert.Equal(["Rot"], ruleSet.Others);
+        await mail.SaveRulesAsync([new ServerRule(null, "Chef", true, [new RuleCondition(RuleField.Subject, "Budget")], Delete: true)], ct);
+        Assert.Contains("DELETE /v1.0/me/mailFolders/inbox/messageRules/R1", http.Requests);
+        Assert.Contains("POST /v1.0/me/mailFolders/inbox/messageRules", http.Requests);
+        Assert.DoesNotContain(http.Requests, r => r.EndsWith("/R2", StringComparison.Ordinal)); // already behind Neruna's: untouched
+        Assert.Contains("\"delete\":true", http.Bodies.Last(), StringComparison.Ordinal);
+
+    }
+
+    [Fact]
     public async Task Mail_folders_have_their_roles_and_delta_brings_new_changed_and_removed_messages()
     {
         var ct = TestContext.Current.CancellationToken;

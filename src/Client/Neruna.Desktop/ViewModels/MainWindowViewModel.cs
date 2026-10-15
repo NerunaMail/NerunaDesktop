@@ -308,6 +308,18 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         };
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         accountsPage.PstRequested += (_, _) => ShowPstAccount();
+        accountsPage.ServerRulesRequested += async (_, account) =>
+        {
+            if (account.ConnectionsOf(Neruna.Core.Accounts.ServiceKind.Mail).FirstOrDefault() is not { } connection)
+            {
+                return;
+            }
+
+            var rules = new ServerRulesViewModel(_mail, account, connection);
+            rules.Finished += (_, _) => Overlay = null;
+            Overlay = rules;
+            await rules.LoadAsync();
+        };
         accountsPage.TransferRequested += async (_, dialog) =>
         {
             dialog.Finished += (_, _) => Overlay = null;

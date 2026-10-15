@@ -36,6 +36,43 @@ internal static class LiveScenario
     /// Mail accounts from the organisation, end to end: connect, then wait while an admin sets up an account in the portal
     /// and approves this device (a browser, run alongside) – one with password, one without (the user is asked).
     /// </summary>
+    /// <summary>"Serverregeln" of an IMAP account against the test lab (IMAP of GreenMail, ManageSieve of Dovecot).</summary>
+    public static async Task ServerRulesAsync(string output, string host)
+    {
+        var dataDir = Path.Combine(Path.GetTempPath(), "neruna-rules-" + Guid.NewGuid().ToString("N"));
+        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: false));
+        var user = $"anna-{Guid.NewGuid():N}@example.com";
+        var settings = new Neruna.Providers.Imap.ImapSettings(host, 3143, SocketSecurity.None, host, 3025, SocketSecurity.None, user);
+        var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, Neruna.Core.Providers.ProviderIds.Imap, settings.ToDictionary());
+        var account = new Account(Guid.NewGuid(), "Anna Muster", user, [connection]);
+        await services.GetRequiredService<ICredentialStore>().SetSecretAsync(connection.Id, "pass");
+        await services.GetRequiredService<IAccountStore>().SaveAccountAsync(account);
+        var mail = services.GetRequiredService<Neruna.Core.Mail.MailController>();
+        await mail.SyncAllAsync();
+        await mail.SaveServerRulesAsync(connection,
+        [
+            new Neruna.Core.Mail.ServerRule(null, "Rechnungen ablegen", true,
+                [new Neruna.Core.Mail.RuleCondition(Neruna.Core.Mail.RuleField.From, "rechnung@lieferant.ch")], MoveTo: "INBOX", MarkRead: true, Stop: true),
+            new Neruna.Core.Mail.ServerRule(null, "Chef weiterleiten", false,
+                [new Neruna.Core.Mail.RuleCondition(Neruna.Core.Mail.RuleField.Recipient, "chef@firma.ch"), new Neruna.Core.Mail.RuleCondition(Neruna.Core.Mail.RuleField.Subject, "Budget")], ForwardTo: "anna@privat.ch"),
+        ]);
+
+        var vm = services.GetRequiredService<MainWindowViewModel>();
+        var window = new MainWindow { DataContext = vm, Width = 1440, Height = 900 };
+        window.Show();
+        await vm.LoadLocalAsync();
+        vm.NavigateCommand.Execute(Section.Settings);
+        var rules = new ServerRulesViewModel(mail, account, connection);
+        vm.Overlay = rules;
+        await rules.LoadAsync();
+        await Task.Delay(400);
+        Console.WriteLine($"Rules: {string.Join(" | ", rules.Rules.Select(r => r.Name + ": " + r.Summary))} error={rules.Error}");
+        await Snapshots.SaveAsync(window, output, "rules-1-list.png");
+        rules.EditCommand.Execute(rules.Rules[1]);
+        await Task.Delay(400);
+        await Snapshots.SaveAsync(window, output, "rules-2-edit.png");
+    }
+
     /// <summary>An Outlook data file as an account: the dialog, then its folders and a message in the mail page.</summary>
     public static async Task PstAsync(string output, string file)
     {
