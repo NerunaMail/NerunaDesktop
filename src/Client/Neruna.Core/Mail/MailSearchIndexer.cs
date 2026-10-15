@@ -282,14 +282,25 @@ public sealed class MailSearchIndexer : IDisposable
 
     private static string ServerKey(Guid accountId) => $"search.server.{accountId:N}";
 
-    /// <summary>Whether the text of mail only on the server is fetched for the index (on unless switched off).</summary>
+    /// <summary>
+    /// Whether accounts fetch the text of mail only on the server unless set otherwise: yes on a computer, no on a
+    /// phone (battery and mobile data – there the server's search finds it when asked).
+    /// </summary>
+    public bool ServerTextByDefault { get; init; } = true;
+
+    /// <summary>Whether the text of mail only on the server is fetched for the index (<see cref="ServerTextByDefault"/> unless set).</summary>
     public async Task<bool> IsServerTextEnabledAsync(Guid accountId, CancellationToken cancellationToken = default) =>
-        await _settings.GetAsync(ServerKey(accountId), cancellationToken) != "off";
+        await _settings.GetAsync(ServerKey(accountId), cancellationToken) switch
+        {
+            "off" => false,
+            "on" => true,
+            _ => ServerTextByDefault,
+        };
 
     public async Task SetServerTextEnabledAsync(Account account, bool enabled, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(account);
-        await _settings.SetAsync(ServerKey(account.Id), enabled ? null : "off", cancellationToken);
+        await _settings.SetAsync(ServerKey(account.Id), enabled == ServerTextByDefault ? null : enabled ? "on" : "off", cancellationToken);
         Poke();
         Progress?.Invoke(this, EventArgs.Empty);
     }

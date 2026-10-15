@@ -95,4 +95,22 @@ public class MailSearchIndexTests
         Assert.Equal("(\"zürich\"*)", MailSearchIndexer.MatchFor(new MailSearchQuery(Anywhere: "\"zürich\"")));
         Assert.Null(MailSearchIndexer.MatchFor(new MailSearchQuery(Anywhere: " – ")));
     }
+
+    [Fact]
+    public async Task On_a_phone_the_server_text_is_off_unless_switched_on()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        await env.AddAccountAsync(ServiceKind.Mail, FakeMailProviderFactory.Id);
+        var account = (await env.Accounts.GetAccountsAsync(ct)).Single();
+        using var phone = new MailSearchIndexer(env.Get<IMailSearchIndex>(), env.MailStore, env.Accounts, env.Get<ProviderRegistry>(), env.Get<ISettingsStore>(),
+            env.Mail, NullLogger<MailSearchIndexer>.Instance) { ServerTextByDefault = false };
+
+        Assert.False(await phone.IsServerTextEnabledAsync(account.Id, ct));
+        await phone.SetServerTextEnabledAsync(account, true, ct);
+        Assert.True(await phone.IsServerTextEnabledAsync(account.Id, ct));
+        await phone.SetServerTextEnabledAsync(account, false, ct);
+        Assert.False(await phone.IsServerTextEnabledAsync(account.Id, ct));
+        Assert.Null(await env.Get<ISettingsStore>().GetAsync($"search.server.{account.Id:N}", ct)); // the default is not stored
+    }
 }
