@@ -251,9 +251,9 @@ zuerst die Server der verbundenen Organisationen (`AccountDiscovery.Organization
 `unicode61 remove_diacritics 2`), ein Trigger löscht Einträge mit der Nachricht. `Messages.SearchLevel`: 0 neu,
 1 Kopfdaten (Text nicht auf dem Gerät), 2 Text liegt vor, 3 mit Text. `MailSearchIndexer` (Core) arbeitet im
 Hintergrund: erst Absender/Empfänger/Betreff aller Nachrichten aus der gespeicherten Liste, dann den Text, wo er
-lokal ist (MIME-Cache oder Provider mit `LocalContent`, z. B. PST), zuletzt bei Providern mit `SearchText` (IMAP)
-den Text vom Server: nur die Textteile (`BODY.PEEK[n]`, roh geholt und selbst dekodiert), Anhangnamen aus der
-BODYSTRUCTURE, nichts wird als gelesen markiert; was der Server nicht liefert, bekommt Stufe 4. Gespeicherter Inhalt
+lokal ist (MIME-Cache oder Provider mit `LocalContent`, z. B. PST), zuletzt bei Providern mit `SearchText` den Text vom Server – IMAP: nur die Textteile (`BODY.PEEK[n]`, roh geholt und selbst dekodiert), Anhangnamen aus der
+BODYSTRUCTURE; EWS: GetItem mit BodyType Text und Anhangnamen; Graph: body als Text (Prefer-Header) und
+Anhangnamen; nichts wird als gelesen markiert; was der Server nicht liefert, bekommt Stufe 4. Gespeicherter Inhalt
 hebt 1/4 → 2. Pro Konto abschaltbar (`search.index.<id>` = off, Gerätesetting; der Index des Kontos wird gelöscht),
 der Servertext separat (`search.server.<id>`). «Datenbank verkleinern» (E-Mail → Allgemein) führt FTS-`optimize`,
 `VACUUM` und einen WAL-Checkpoint aus (`IStorageMaintenance`). Die Suche fragt zuerst den

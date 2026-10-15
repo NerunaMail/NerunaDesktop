@@ -146,6 +146,8 @@ public class EwsProviderTests
                   <t:From><t:Mailbox><t:Name>Marco</t:Name><t:EmailAddress>marco@example.com</t:EmailAddress><t:RoutingType>SMTP</t:RoutingType></t:Mailbox></t:From>
                   <t:InternetMessageId>&lt;1@example.com&gt;</t:InternetMessageId><t:IsRead>true</t:IsRead></t:Message></m:Items>
                 """),
+            "M2" when op.Descendants(T + "BodyType").Any(b => b.Value == "Text") => Message("GetItem",
+                "<m:Items><t:Message><t:ItemId Id=\"M2\" ChangeKey=\"b\"/><t:Body BodyType=\"Text\">Grüezi mitenand</t:Body><t:Attachments><t:FileAttachment><t:AttachmentId Id=\"A1\"/><t:Name>Plan.pdf</t:Name></t:FileAttachment></t:Attachments></t:Message></m:Items>"),
             "M2" when op.Descendants(T + "IncludeMimeContent").Any() => Message("GetItem",
                 $"<m:Items><t:Message><t:ItemId Id=\"M2\" ChangeKey=\"b\"/><t:MimeContent CharacterSet=\"UTF-8\">{Convert.ToBase64String(Encoding.UTF8.GetBytes("Subject: Hallo\r\nFrom: lea@example.com\r\n\r\nGrüezi"))}</t:MimeContent></t:Message></m:Items>"),
             "M2" => Message("GetItem", "<m:Items><t:Message><t:ItemId Id=\"M2\" ChangeKey=\"b\"/><t:Subject>Hallo</t:Subject><t:DateTimeReceived>2026-10-08T08:00:00Z</t:DateTimeReceived><t:IsRead>false</t:IsRead></t:Message></m:Items>"),
@@ -170,6 +172,11 @@ public class EwsProviderTests
         // The whole message as MIME (only the MIME content is asked for – no empty list of further properties).
         var opened = await mail.GetMessageAsync(inbox, "M2", ct);
         Assert.Equal(("Hallo", "Grüezi"), (opened.Subject, opened.TextBody?.Trim()));
+
+        // For the search index: the body as text (converted by Exchange) and the attachments' names, no content.
+        var texts = await mail.GetSearchTextsAsync(inbox, ["M2"], ct);
+        Assert.Equal(new MessageSearchText("Grüezi mitenand", "Plan.pdf"), Assert.Single(texts).Value);
+        Assert.True(mail.Capabilities.HasFlag(MailProviderCapabilities.SearchText));
 
         // The newest first, by received date.
         var find = server.Operations("FindItem").Single();

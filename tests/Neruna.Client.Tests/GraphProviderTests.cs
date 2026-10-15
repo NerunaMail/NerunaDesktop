@@ -91,6 +91,13 @@ public class GraphProviderTests
         Assert.Contains("$deltatoken=TWO", next.NewSyncState, StringComparison.Ordinal);
         Assert.Contains(http.Requested, r => r.Contains("deltatoken=ONE", StringComparison.Ordinal));
 
+        // For the search index: the body as text with the attachments' names; a message gone meanwhile is left out.
+        http.Routes["GET /v1.0/me/messages/M1"] = """{"body":{"contentType":"text","content":"Anbei die Offerte für 2027"},"attachments":[{"name":"Offerte.pdf"}]}""";
+        var texts = await mail.GetSearchTextsAsync(folders[0], ["M1", "GONE"], ct);
+        Assert.Equal(new MessageSearchText("Anbei die Offerte für 2027", "Offerte.pdf"), Assert.Single(texts).Value);
+        Assert.Contains(http.Requested, r => r.Contains("me/messages/M1?$select=body&$expand=attachments($select=name)", StringComparison.Ordinal));
+        Assert.Contains("outlook.body-content-type=\"text\"", http.Prefer);
+
         // Answered: Graph's "last verb" property, so other programs show the arrow as well.
         await mail.SetFlagsAsync(folders[0], ["M1"], MessageFlags.Answered, true, ct);
         Assert.Contains("0x1081", http.Bodies.Last(), StringComparison.Ordinal);
@@ -289,11 +296,14 @@ public class GraphProviderTests
 
         public List<string> Bodies { get; } = [];
 
+        public List<string> Prefer { get; } = [];
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var key = $"{request.Method.Method} {request.RequestUri!.AbsolutePath}";
             Requests.Add(key);
             Requested.Add(Uri.UnescapeDataString(request.RequestUri.AbsoluteUri));
+            Prefer.AddRange(request.Headers.TryGetValues("Prefer", out var prefer) ? prefer : []);
             if (request.Content is not null)
             {
                 Bodies.Add(Uri.UnescapeDataString(await request.Content.ReadAsStringAsync(cancellationToken)));

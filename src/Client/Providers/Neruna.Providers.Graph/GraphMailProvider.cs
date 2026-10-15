@@ -36,7 +36,37 @@ internal sealed class GraphMailProvider(Guid connectionId, GraphClient graph, IL
 
     public MailProviderCapabilities Capabilities =>
         MailProviderCapabilities.Send | MailProviderCapabilities.Flags | MailProviderCapabilities.Move | MailProviderCapabilities.Delete |
-        MailProviderCapabilities.ServerSearch | MailProviderCapabilities.Append;
+        MailProviderCapabilities.ServerSearch | MailProviderCapabilities.Append | MailProviderCapabilities.SearchText;
+
+    private const int MaxSearchTextLength = 200_000;
+
+    /// <summary>For the search index: the body as text (converted by Microsoft) and the attachments' names – no content, nothing marked read.</summary>
+    public async Task<IReadOnlyDictionary<string, MessageSearchText>> GetSearchTextsAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remoteIds);
+        var result = new Dictionary<string, MessageSearchText>(StringComparer.Ordinal);
+        foreach (var id in remoteIds)
+        {
+            JsonElement message;
+            try
+            {
+                message = await graph.GetAsync($"me/messages/{id}?$select=body&$expand=attachments($select=name)", cancellationToken,
+                    ("Prefer", "outlook.body-content-type=\"text\""));
+            }
+            catch (GraphException ex) when (ex.Status == System.Net.HttpStatusCode.NotFound)
+            {
+                continue; // gone meanwhile
+            }
+
+            var body = message.TryGetProperty("body", out var b) && b.TryGetProperty("content", out var content) ? content.GetString() : null;
+            var names = message.TryGetProperty("attachments", out var attachments) && attachments.ValueKind == JsonValueKind.Array
+                ? attachments.EnumerateArray().Select(a => a.TryGetProperty("name", out var n) ? n.GetString() : null).Where(n => !string.IsNullOrWhiteSpace(n)).ToList()
+                : [];
+            result[id] = new MessageSearchText(body is { Length: > MaxSearchTextLength } ? body[..MaxSearchTextLength] : body, names.Count == 0 ? null : string.Join(" ", names));
+        }
+
+        return result;
+    }
 
     public async Task TestConnectionAsync(CancellationToken cancellationToken = default) =>
         await graph.GetAsync("me/mailFolders/inbox?$select=id", cancellationToken);

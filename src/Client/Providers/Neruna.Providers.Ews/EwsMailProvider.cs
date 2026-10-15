@@ -32,7 +32,32 @@ internal sealed class EwsMailProvider(ServiceConnection connection, EwsConnectio
 
     public MailProviderCapabilities Capabilities =>
         MailProviderCapabilities.Send | MailProviderCapabilities.Flags | MailProviderCapabilities.Move | MailProviderCapabilities.Delete |
-        MailProviderCapabilities.ServerSearch | MailProviderCapabilities.Append;
+        MailProviderCapabilities.ServerSearch | MailProviderCapabilities.Append | MailProviderCapabilities.SearchText;
+
+    // A body longer than this is cut for the index.
+    private const int MaxSearchTextLength = 200_000;
+
+    /// <summary>For the search index: the body as text (Exchange converts HTML) and the attachments' names – no content, nothing marked read.</summary>
+    public async Task<IReadOnlyDictionary<string, MessageSearchText>> GetSearchTextsAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remoteIds);
+        var client = await ClientAsync(cancellationToken);
+        var items = await EwsOperations.GetItemsAsync(client, remoteIds, EwsOperations.Shape(["item:Body", "item:Attachments"], bodyType: "Text"), cancellationToken, batch: 50);
+        var result = new Dictionary<string, MessageSearchText>(StringComparer.Ordinal);
+        foreach (var item in items)
+        {
+            if (item.Element(X.T + "ItemId")?.Attribute("Id")?.Value is not { } id)
+            {
+                continue;
+            }
+
+            var body = item.Val("Body");
+            var names = item.Element(X.T + "Attachments")?.Elements().Select(a => a.Val("Name")).Where(n => !string.IsNullOrWhiteSpace(n)).ToList() ?? [];
+            result[id] = new MessageSearchText(body is { Length: > MaxSearchTextLength } ? body[..MaxSearchTextLength] : body, names.Count == 0 ? null : string.Join(" ", names));
+        }
+
+        return result;
+    }
 
     private async Task<EwsClient> ClientAsync(CancellationToken cancellationToken) =>
         _client ??= await connections.ClientForAsync(connection, cancellationToken);
