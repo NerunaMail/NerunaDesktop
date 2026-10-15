@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -96,6 +97,72 @@ public class CloudConnectionsTests
         Organisation(env, First, "Example AG", "DEV-C");
         var back = await cloud.ConnectAsync(new Uri(First), "CODE3", "111111", device, ct);
         Assert.False(back.IsFirst);
+    }
+
+    [Fact]
+    public async Task An_organisation_that_blocks_this_device_takes_everything_it_brought_along()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var http = new StubHttpHandler();
+        await using var env = await TestEnvironment.CreateAsync(services =>
+        {
+            services.AddSingleton(sp => new CloudController(new HttpClient(http), sp.GetRequiredService<ISettingsStore>(), sp.GetRequiredService<ICredentialStore>(), NullLogger<CloudController>.Instance));
+            services.AddSingleton<TextTemplateService>();
+            services.AddSingleton<CloudSignatureSync>();
+            services.AddSingleton<CloudTextTemplateSync>();
+            services.AddSingleton<CloudCertificateSync>();
+            services.AddSingleton<CloudAccountSync>();
+            services.AddSingleton<SettingsBackupService>();
+            services.AddSingleton<CloudRevocation>();
+        });
+        var settings = env.Get<ISettingsStore>();
+        var credentials = env.Get<ICredentialStore>();
+        var cloud = env.Get<CloudController>();
+        env.Get<CloudRevocation>();
+        var revoked = new List<string>();
+        cloud.Revoked += (_, c) => revoked.Add(c.OrganizationName);
+        foreach (var (server, organisation, deviceId) in new[] { (First, "Example AG", "DEV-A"), (Second, "Partner GmbH", "DEV-B") })
+        {
+            http.Responses[server + "api/v1/enrollment"] = (HttpStatusCode.OK, JsonSerializer.Serialize(new { deviceId, organizationName = organisation, memberName = "Anna Muster" }));
+            http.Responses[server + "api/v1/token"] = (HttpStatusCode.OK, """{"accessToken":"t","tokenType":"Bearer","expiresIn":900}""");
+            http.Responses[server + "api/v1/signatures"] = (HttpStatusCode.OK, JsonSerializer.Serialize(new
+            {
+                available = true,
+                signatures = new[] { new { id = "A", name = organisation, html = $"<p>{organisation}</p>", text = organisation, updatedAt = DateTimeOffset.Now } },
+            }));
+        }
+
+        var device = new DeviceInfo("Testgerät", "0.8.2", "Linux", "Debian 13", "anna");
+        var example = await cloud.ConnectAsync(new Uri(First), "CODE", "123456", device, ct);
+        var partner = await cloud.ConnectAsync(new Uri(Second), "CODE", "123456", device, ct);
+        await credentials.SetSecretAsync(partner.VaultKeyId, "vault:key", ct);
+        var signatures = env.Get<SignatureService>();
+        var sync = env.Get<CloudSignatureSync>();
+        await sync.SyncAsync(ct);
+        await env.Get<ISignatureStore>().SaveAsync(new Signature(Guid.NewGuid(), "Eigene", "<p>Anna</p>", DateTimeOffset.UnixEpoch), ct);
+        Assert.Equal(3, (await signatures.GetAllAsync(ct)).Count);
+
+        // Blocked in the partner's portal: its tokens are void, a new one is refused.
+        http.Responses[Second + "api/v1/signatures"] = (HttpStatusCode.Unauthorized, """{"error":"unauthenticated","message":"Token ungültig"}""");
+        http.Responses[Second + "api/v1/token"] = (HttpStatusCode.Unauthorized, """{"error":"device_revoked","message":"Gerät gesperrt"}""");
+        var refused = await Assert.ThrowsAsync<CloudException>(() => sync.SyncAsync(ct));
+        Assert.Equal(CloudController.RevokedCode, refused.Code);
+        Assert.Contains("Partner GmbH", refused.Message, StringComparison.Ordinal);
+
+        // Partner's connection, keys and vault key are gone, and its signature; the own one and Example's stay.
+        Assert.Equal(["Partner GmbH"], revoked);
+        Assert.Equal([example.Id], (await cloud.GetConnectionsAsync(ct)).Select(c => c.Id));
+        Assert.Null(await credentials.GetSecretAsync(partner.DeviceKeyId, ct));
+        Assert.Null(await credentials.GetSecretAsync(partner.EncryptionKeyId, ct));
+        Assert.Null(await credentials.GetSecretAsync(partner.VaultKeyId, ct));
+        Assert.Equal(["Eigene", "Example AG"], (await signatures.GetAllAsync(ct)).Select(s => s.Name).Order());
+
+        // Any other refusal (wrong key, server error) removes nothing.
+        http.Responses[First + "api/v1/signatures"] = (HttpStatusCode.Unauthorized, """{"error":"unauthenticated","message":"Token ungültig"}""");
+        http.Responses[First + "api/v1/token"] = (HttpStatusCode.Unauthorized, """{"error":"invalid_assertion","message":"Signatur ungültig"}""");
+        await Assert.ThrowsAsync<CloudException>(() => sync.SyncAsync(ct));
+        Assert.Single(await cloud.GetConnectionsAsync(ct));
+        Assert.Equal(["Partner GmbH"], revoked);
     }
 
     [Fact]

@@ -311,6 +311,34 @@ public sealed class ChatController(CloudController cloud, IChatStore store, ISet
         await RefreshAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// The organisation whose chat is kept here is gone (device blocked): its messages leave this device at once – also
+    /// those not loaded yet since the start.
+    /// </summary>
+    public async Task ForgetAsync(CloudConnection connection, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var keptFor = await settings.GetAsync(SettingKeys.ChatConnection, cancellationToken);
+            if (keptFor != connection.Id && !(keptFor is null && connection.IsFirst))
+            {
+                return;
+            }
+
+            await ClearAsync(cancellationToken);
+            await settings.SetAsync(SettingKeys.ChatConnection, null, cancellationToken);
+            Current = ChatSnapshot.Empty;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     private async Task ClearAsync(CancellationToken cancellationToken)
     {
         await store.ClearAsync(cancellationToken);

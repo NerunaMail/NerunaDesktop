@@ -83,6 +83,20 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     /// <summary>A connection was added or removed (or the chat's or backups' organisation changed).</summary>
     public event EventHandler? ConnectionsChanged;
 
+    /// <summary>
+    /// The organisation blocked or deleted this device in the portal: the connection is gone and everything it brought
+    /// was removed here (the shell says so). Raised after the <see cref="OnRevoked"/> cleanups ran.
+    /// </summary>
+    public event EventHandler<CloudConnection>? Revoked;
+
+    private readonly List<Func<CloudConnection, CancellationToken, Task>> _revokedCleanups = [];
+
+    /// <summary>
+    /// What has to go when a device is blocked (signatures, accounts, certificates, the vault key …): run, in order,
+    /// before the request that noticed it fails.
+    /// </summary>
+    public void OnRevoked(Func<CloudConnection, CancellationToken, Task> cleanup) => _revokedCleanups.Add(cleanup);
+
     /// <summary>All connections, the first one made first.</summary>
     public async Task<IReadOnlyList<CloudConnection>> GetConnectionsAsync(CancellationToken cancellationToken = default)
     {
@@ -361,6 +375,11 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     {
         ArgumentNullException.ThrowIfNull(connection);
         await EndOnServerAsync(connection, cancellationToken);
+        await ForgetAsync(connection, cancellationToken);
+    }
+
+    private async Task ForgetAsync(CloudConnection connection, CancellationToken cancellationToken)
+    {
         await credentials.DeleteSecretAsync(connection.DeviceKeyId, cancellationToken);
         await credentials.DeleteSecretAsync(connection.EncryptionKeyId, cancellationToken);
         foreach (var key in new[] { SettingKeys.CloudOrganizationSigningKey, SettingKeys.CloudCertificates, SettingKeys.CloudAccountsState })
@@ -437,13 +456,50 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         using var key = DeviceKey.Import(secret);
         var tokenUrl = new Uri(connection.Server, "api/v1/token");
         var assertion = key.CreateAssertion(connection.DeviceId, tokenUrl, DateTimeOffset.UtcNow);
-        var issued = await SendAsync<TokenResponse>(() => new HttpRequestMessage(HttpMethod.Post, tokenUrl)
+        TokenResponse issued;
+        try
         {
-            Content = JsonContent.Create(new TokenRequest(assertion), options: NerunaJson.Options),
-        }, cancellationToken);
+            issued = await SendAsync<TokenResponse>(() => new HttpRequestMessage(HttpMethod.Post, tokenUrl)
+            {
+                Content = JsonContent.Create(new TokenRequest(assertion), options: NerunaJson.Options),
+            }, cancellationToken);
+        }
+        catch (CloudException ex) when (ex.Code == RevokedCode)
+        {
+            await RevokeAsync(connection, cancellationToken);
+            throw new CloudException(RevokedCode, F("{0} hat dieses Gerät gesperrt oder entfernt. Was von der Organisation kam, wurde von diesem Computer gelöscht.", connection.OrganizationName), ex);
+        }
 
         _tokens[connection.Id] = (issued.AccessToken, DateTimeOffset.UtcNow.AddSeconds(Math.Max(30, issued.ExpiresIn - 60)));
         return issued.AccessToken;
+    }
+
+    /// <summary>The server's answer for a device blocked or deleted in the portal (or unknown to it).</summary>
+    public const string RevokedCode = "device_revoked";
+
+    // Blocked: like disconnecting, without telling the server (it refuses anyway) – and everything it brought goes.
+    private async Task RevokeAsync(CloudConnection connection, CancellationToken cancellationToken)
+    {
+        if (await GetConnectionAsync(connection.Id, cancellationToken) is null)
+        {
+            return; // already done by another request
+        }
+
+        logger.LogWarning("Device {Device} was blocked or removed by {Organization}: removing its connection and data", connection.DeviceId, connection.OrganizationName);
+        await ForgetAsync(connection, CancellationToken.None);
+        foreach (var cleanup in _revokedCleanups)
+        {
+            try
+            {
+                await cleanup(connection, CancellationToken.None);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                logger.LogError(ex, "Cleanup after the device was blocked failed");
+            }
+        }
+
+        Revoked?.Invoke(this, connection);
     }
 
     private async Task<T> SendAsync<T>(Func<HttpRequestMessage> request, CancellationToken cancellationToken)

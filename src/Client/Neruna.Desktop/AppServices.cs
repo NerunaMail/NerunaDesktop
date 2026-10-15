@@ -119,6 +119,7 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Cloud.CloudPairingService>();
         services.AddSingleton<Neruna.Core.Cloud.AccountTransferService>();
         services.AddSingleton<Neruna.Core.Cloud.SettingsBackupService>();
+        services.AddSingleton<Neruna.Core.Cloud.CloudRevocation>();
         services.AddSingleton<Neruna.Core.Cloud.CloudAccountSync>();
         services.AddSingleton<Neruna.Core.Chat.ChatController>();
         services.AddSingleton(_ => CrashHandler.Store);
@@ -162,6 +163,9 @@ internal static class AppServices
 
         var provider = services.BuildServiceProvider();
         await provider.InitializeNerunaStorageAsync();
+
+        // Remote wipe when an organisation blocks this device: listens from the start.
+        provider.GetRequiredService<Neruna.Core.Cloud.CloudRevocation>();
 
         var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("Neruna");
         logger.LogInformation("Neruna Desktop {Version} started (data: {DataDirectory}, demo: {Demo}, protocol log: {ProtocolLog})",

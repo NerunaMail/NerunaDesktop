@@ -85,6 +85,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Cloud.CloudPairingService cloudPairing,
         Neruna.Core.Cloud.SettingsBackupService backup,
         Neruna.Core.Cloud.CloudAccountSync cloudAccounts,
+        Neruna.Core.Cloud.CloudController cloudController,
         Neruna.Core.Auth.IBrowserLauncher browser,
         Neruna.Core.Diagnostics.CrashReportService crashReports,
         Neruna.Core.Security.ClientCertificates clientCertificates,
@@ -137,6 +138,16 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         WireChat();
         WireSettings();
         WireBackground();
+
+        // Blocked in the portal: what the organisation brought is already gone – the pages show it, the user learns why.
+        cloudController.Revoked += (_, connection) => Dispatcher.UIThread.Post(async () =>
+        {
+            var message = F("{0} hat dieses Gerät gesperrt oder entfernt. Konten, Zertifikate, Signaturen, Textvorlagen und der Chat der Organisation wurden von diesem Computer gelöscht.", connection.OrganizationName);
+            StatusText = message;
+            await CloudAccountsChangedAsync(sync: false);
+            await SettingsPage.Cloud.ReloadAsync();
+            await Views.ChoiceDialog.ShowInFrontAsync(T("Gerät gesperrt"), message, (T("OK"), true, true));
+        });
 
         _timer = new DispatcherTimer { Interval = SyncInterval };
         _timer.Tick += async (_, _) => await SyncAsync();

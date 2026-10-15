@@ -247,6 +247,14 @@ Verbindung (Server, Geräte-ID, Organisation) steht in den Einstellungen `cloud.
 zuerst die Server der verbundenen Organisationen (`AccountDiscovery.OrganizationServers`). Nur HTTPS, ausser
 `localhost` zum Entwickeln. Vertrag: `server/contract/openapi.yaml` (enrollment, token, me).
 
+**Gerät gesperrt (Fernlöschung):** Sperrt oder löscht ein Admin das Gerät im Portal, verweigert der Server jedes neue
+Token mit `device_revoked` (401). Der `CloudController` vergisst dann die Verbindung samt Schlüsseln und ruft die bei
+`OnRevoked` registrierten Aufräumer auf (`CloudRevocation`, beim Start aufgelöst – Desktop und App): Konten der
+Organisation (mit Passwörtern und heruntergeladener Mail), Zertifikate mit privaten Schlüsseln, Signaturen,
+Textvorlagen, der Tresor-Schlüssel und ihr Chat gehen; eigene Konten und andere Organisationen bleiben. Andere
+Fehler (`invalid_assertion`, Serverfehler, offline) löschen nichts. Wirksam, sobald sich das Gerät das nächste Mal
+meldet (Cloud-Abgleich alle 10 Minuten, Chat häufiger); ein entsperrtes Gerät muss neu verbunden werden.
+
 **Mehrere Organisationen:** Ein Computer kann mit mehreren Organisationen verbunden sein – jede Verbindung ist dort ein
 eigenes Gerät mit eigenen Schlüsseln; die Organisationen erfahren nichts voneinander. Die erste Verbindung behält die
 Plätze der Versionen mit nur einer Verbindung (`cloud.connection`, `CloudController.KeyId`/`EncryptionKeyId`,
