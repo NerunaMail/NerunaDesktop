@@ -176,7 +176,11 @@ internal sealed partial class MailViewModel(
     // The folder a message is in: its own (search results), otherwise the open folder.
     private MailFolderNode? FolderOf(MessageItemViewModel message) => message.Folder ?? CurrentFolder;
 
-    public void Dispose() => _readingCts?.Dispose();
+    public void Dispose()
+    {
+        _readingCts?.Dispose();
+        _search?.Dispose();
+    }
 
     public async Task ReloadAsync()
     {
@@ -1262,7 +1266,7 @@ internal sealed partial class MailViewModel(
     public string ListTitle => IsSearchMode ? SearchTitle ?? T("Suchergebnisse") : CurrentFolder?.Name ?? string.Empty;
 
     /// <summary>Under the quick search's results (from this device): offer the server too.</summary>
-    public bool ShowServerSearchHint => IsSearchMode && Search.CanAskServer && SearchText.Trim().Length > 0;
+    public bool ShowServerSearchHint => IsSearchMode && Search.CanAskServer;
 
     IReadOnlyList<MailAccountNode> IMailSearchHost.SearchAccounts => Accounts;
 

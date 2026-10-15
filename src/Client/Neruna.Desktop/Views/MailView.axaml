@@ -191,6 +191,7 @@
                 <StackPanel Grid.Row="5" Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
                   <Button Classes="accent" Content="{l:T 'Suchen'}" Command="{Binding Search.RunSearchCommand}" />
                   <ProgressBar IsIndeterminate="True" Width="50" MinWidth="0" Height="4" VerticalAlignment="Center" IsVisible="{Binding Search.IsSearching}" />
+                  <Button Classes="command" Content="{l:T 'Abbrechen'}" Command="{Binding Search.CancelSearchCommand}" IsVisible="{Binding Search.IsSearching}" />
                 </StackPanel>
               </Grid>
             </Border>
@@ -201,6 +202,12 @@
               <Button Grid.Column="1" Classes="command" Content="{l:T 'Suche schliessen'}" Command="{Binding CloseSearchCommand}" FontSize="12" Padding="6,2" />
               <!-- The quick search answers from this device: widen it, or ask the server too (Enter) -->
               <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding Search.IsSearching}">
+                  <ProgressBar IsIndeterminate="True" Width="50" MinWidth="0" Height="4" VerticalAlignment="Center" />
+                  <Button Classes="command" Command="{Binding Search.CancelSearchCommand}" Padding="0,2" FontSize="12">
+                    <TextBlock Text="{l:T 'Suche abbrechen'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+                  </Button>
+                </StackPanel>
                 <Button Classes="command" Command="{Binding Search.SearchEverywhereCommand}" IsVisible="{Binding Search.CanSearchEverywhere}" Padding="0,2" FontSize="12">
                   <TextBlock Text="{l:T 'In allen Ordnern suchen'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
                 </Button>

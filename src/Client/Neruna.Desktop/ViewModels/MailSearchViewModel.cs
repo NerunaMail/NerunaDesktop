@@ -34,8 +34,10 @@ internal interface IMailSearchHost
 /// dem Server suchen" adds what only the server knows (the text of mail not on this device). The advanced search
 /// (sender, subject, text; a folder or all folders of an account) asks both. The mail page shows the hits.
 /// </summary>
-internal sealed partial class MailSearchViewModel(MailController mail, MailSearchIndexer index, IMailSearchHost host) : ViewModelBase
+internal sealed partial class MailSearchViewModel(MailController mail, MailSearchIndexer index, IMailSearchHost host) : ViewModelBase, IDisposable
 {
+    public void Dispose() => _running?.Dispose();
+
     private int _typing;
 
     // The quick search goes over all folders (after "In allen Ordnern").
@@ -159,13 +161,32 @@ internal sealed partial class MailSearchViewModel(MailController mail, MailSearc
 
         var query = new MailSearchQuery(Clean(SearchFrom), Clean(SearchSubject), Clean(SearchBody));
         CanSearchEverywhere = false;
-        return SearchAsync(query, scope.Folders(SearchSubfolders), scope.Describe(SearchSubfolders), server: true);
+        return SearchAsync(query, scope.Folders(SearchSubfolders), scope.Describe(SearchSubfolders));
     }
 
-    /// <summary>Enter or "Auch auf dem Server suchen": the quick search term also on the server (the text of mail not here).</summary>
+    /// <summary>
+    /// Enter or "Auch auf dem Server suchen": the last search (quick or advanced) once more, now also on the server (the
+    /// text of mail not on this device); in the quick search box a changed term is searched anew.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanSearch))]
-    private Task SearchServerAsync() =>
-        host.SearchText.Trim() is { Length: > 0 } term ? QuickAsync(term, server: true) : Task.CompletedTask;
+    private Task SearchServerAsync()
+    {
+        if (_last is { } last && (last.KeepTerm is null || last.KeepTerm == host.SearchText.Trim()))
+        {
+            return SearchAsync(last.Query, last.Folders, last.Where, last.KeepTerm, server: true);
+        }
+
+        return host.SearchText.Trim() is { Length: > 0 } term ? QuickAsync(term, server: true) : Task.CompletedTask;
+    }
+
+    // The search on screen, to ask the server for it too.
+    private (MailSearchQuery Query, IReadOnlyList<MailFolderNode> Folders, string Where, string? KeepTerm)? _last;
+
+    private CancellationTokenSource? _running;
+
+    /// <summary>"Abbrechen" while searching: what was found so far stays.</summary>
+    [RelayCommand]
+    private void CancelSearch() => _running?.Cancel();
 
     /// <summary>Back to the folder: the search box keeps a term only if the user changed it since.</summary>
     /// <returns>Whether the search box should be emptied (it still holds the term the server searched for).</returns>
@@ -181,7 +202,8 @@ internal sealed partial class MailSearchViewModel(MailController mail, MailSearc
         return clearBox;
     }
 
-    private bool CanSearch() => !IsSearching;
+    // A new search replaces a running one.
+    private static bool CanSearch() => true;
 
     private static string? Clean(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -193,7 +215,16 @@ internal sealed partial class MailSearchViewModel(MailController mail, MailSearc
             return;
         }
 
+        _last = (query, folders, where, keepTerm);
+        if (_running is { } previous)
+        {
+            await previous.CancelAsync();
+        }
+
+        using var running = _running = new CancellationTokenSource();
+        var cancel = running.Token;
         IsSearching = true;
+        IReadOnlyList<MailSearchHit> shown = [];
         try
         {
             var nodes = folders.ToDictionary(f => (f.Folder.ConnectionId, f.Folder.RemoteId));
@@ -210,6 +241,7 @@ internal sealed partial class MailSearchViewModel(MailController mail, MailSearc
 
             void Show(IReadOnlyList<MailSearchHit> hits, bool truncated, int failed, bool more)
             {
+                shown = hits;
                 ServerTerm = keepTerm;
                 host.ShowSearchResults([.. hits.Select(Item)], F("Suche in {0}", where), keepTerm);
                 SearchInfo = (hits.Count == 1 ? T("1 Treffer") : F("{0} Treffer", hits.Count))
@@ -219,7 +251,7 @@ internal sealed partial class MailSearchViewModel(MailController mail, MailSearc
             }
 
             // On this device first: at once.
-            var local = await Task.Run(() => index.SearchAsync(searched, query));
+            var local = await Task.Run(() => index.SearchAsync(searched, query, cancellationToken: cancel), cancel);
             CanAskServer = !server && folders.Any(f => !f.Account.IsReadOnly); // an Outlook file has no server
             Show(local.Hits, local.IsTruncated, 0, server);
             if (!server)
@@ -228,11 +260,20 @@ internal sealed partial class MailSearchViewModel(MailController mail, MailSearc
             }
 
             // Then the server: hits only it knows join in (the same message is not shown twice).
-            var remote = await Task.Run(() => mail.SearchAsync(searched, query));
+            var remote = await Task.Run(() => mail.SearchAsync(searched, query, cancellationToken: cancel), cancel);
             var seen = local.Hits.Select(h => (h.Folder.ConnectionId, h.Folder.RemoteId, h.Message.RemoteId)).ToHashSet();
             var merged = local.Hits.Concat(remote.Hits.Where(h => seen.Add((h.Folder.ConnectionId, h.Folder.RemoteId, h.Message.RemoteId))))
                 .OrderByDescending(h => h.Message.Date).ToList();
             Show(merged, local.IsTruncated || remote.IsTruncated, remote.FailedFolders.Count, false);
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            // Cancelled (or replaced by a newer search, which says its own): the hits so far stay.
+            if (_running == running)
+            {
+                SearchInfo = (shown.Count == 1 ? T("1 Treffer") : F("{0} Treffer", shown.Count)) + T(" – Suche abgebrochen");
+                CanAskServer = folders.Any(f => !f.Account.IsReadOnly);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -241,7 +282,11 @@ internal sealed partial class MailSearchViewModel(MailController mail, MailSearc
         }
         finally
         {
-            IsSearching = false;
+            if (_running == running)
+            {
+                _running = null;
+                IsSearching = false;
+            }
         }
     }
 }
