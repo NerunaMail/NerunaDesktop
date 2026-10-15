@@ -88,10 +88,12 @@ internal sealed partial class MailView : UserControl
             Avalonia.Threading.Dispatcher.UIThread.Post(() => KeepListFocus(list), Avalonia.Threading.DispatcherPriority.Background);
         };
 
-        var tree = this.FindControl<TreeView>("FolderTree")!;
-        DragDrop.AddDragOverHandler(tree, OnTreeDragOver);
-        DragDrop.AddDragLeaveHandler(tree, (_, _) => Highlight(null));
-        DragDrop.AddDropHandler(tree, OnTreeDrop);
+        foreach (var tree in new[] { this.FindControl<TreeView>("FolderTree")!, this.FindControl<TreeView>("FavoritesTree")! })
+        {
+            DragDrop.AddDragOverHandler(tree, OnTreeDragOver);
+            DragDrop.AddDragLeaveHandler(tree, (_, _) => Highlight(null));
+            DragDrop.AddDropHandler(tree, OnTreeDrop);
+        }
     }
 
     private MailViewModel? ViewModel => DataContext as MailViewModel;

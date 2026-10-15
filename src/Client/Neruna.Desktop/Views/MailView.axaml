@@ -31,10 +31,9 @@
               <TextBlock Text="{l:T 'Neue E-Mail'}" />
             </StackPanel>
           </Button>
-        <Panel>
-          <TextBlock Classes="subtle" Text="{l:T 'Kein E-Mail-Konto'}" IsVisible="{Binding !Tree.HasMailAccounts}" Margin="12" />
-          <TreeView x:Name="FolderTree" ItemsSource="{Binding Tree.TreeRoots}" SelectedItem="{Binding Tree.SelectedTreeItem}" DragDrop.AllowDrop="True">
-            <TreeView.Styles>
+        <!-- Favourites fixed on top (their own scroll bar only when there are very many); the accounts scroll below -->
+        <Grid RowDefinitions="Auto,Auto,*">
+            <Grid.Styles>
               <!-- Drag & drop: the folder under the pointer is highlighted -->
               <Style Selector="TreeViewItem.drop-target /template/ Border#PART_LayoutRoot">
                 <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
@@ -45,8 +44,8 @@
               <Style Selector="TreeViewItem">
                 <Setter Property="IsExpanded" Value="{ReflectionBinding IsExpanded, Mode=TwoWay}" />
               </Style>
-            </TreeView.Styles>
-            <TreeView.DataTemplates>
+            </Grid.Styles>
+            <Grid.DataTemplates>
               <TreeDataTemplate DataType="vm:MailAccountNode" ItemsSource="{Binding Folders}">
                 <StackPanel>
                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Background="Transparent">
@@ -128,9 +127,13 @@
                   </TextBlock>
                 </Grid>
               </TreeDataTemplate>
-            </TreeView.DataTemplates>
-          </TreeView>
-        </Panel>
+            </Grid.DataTemplates>
+          <TreeView x:Name="FavoritesTree" ItemsSource="{Binding Tree.FavoriteRoots}" SelectedItem="{Binding Tree.SelectedFavoriteItem}" DragDrop.AllowDrop="True"
+                    MaxHeight="280" IsVisible="{Binding Tree.HasFavorites}" />
+          <Border Grid.Row="1" Height="1" Background="{DynamicResource DividerBrush}" Margin="6,4" IsVisible="{Binding Tree.HasFavorites}" />
+          <TextBlock Grid.Row="2" Classes="subtle" Text="{l:T 'Kein E-Mail-Konto'}" IsVisible="{Binding !Tree.HasMailAccounts}" Margin="12" />
+          <TreeView Grid.Row="2" x:Name="FolderTree" ItemsSource="{Binding Tree.Accounts}" SelectedItem="{Binding Tree.SelectedAccountItem}" DragDrop.AllowDrop="True" />
+        </Grid>
         </DockPanel>
       </Border>
 

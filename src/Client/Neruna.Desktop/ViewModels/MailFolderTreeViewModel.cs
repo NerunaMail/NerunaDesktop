@@ -33,6 +33,37 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
 
     public FavoritesNode Favorites { get; } = new();
 
+    /// <summary>"Favoriten" on its own (fixed above the accounts, which scroll): empty while there are none.</summary>
+    public ObservableCollection<object> FavoriteRoots { get; } = [];
+
+    public bool HasFavorites => FavoriteRoots.Count > 0;
+
+    /// <summary>The selection in the favourites' tree (the other tree's selection reads as nothing here).</summary>
+    public object? SelectedFavoriteItem
+    {
+        get => SelectedTreeItem is FavoritesNode or FavoriteFolderNode ? SelectedTreeItem : null;
+        set
+        {
+            if (value is not null)
+            {
+                SelectedTreeItem = value;
+            }
+        }
+    }
+
+    /// <summary>The selection in the accounts' tree.</summary>
+    public object? SelectedAccountItem
+    {
+        get => SelectedTreeItem is FavoritesNode or FavoriteFolderNode ? null : SelectedTreeItem;
+        set
+        {
+            if (value is not null)
+            {
+                SelectedTreeItem = value;
+            }
+        }
+    }
+
     public bool HasMailAccounts => Accounts.Count > 0;
 
     [ObservableProperty]
@@ -123,6 +154,9 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
 
     partial void OnSelectedTreeItemChanged(object? value)
     {
+        OnPropertyChanged(nameof(SelectedFavoriteItem));
+        OnPropertyChanged(nameof(SelectedAccountItem));
+
         // A favourite opens its folder (the list and everything else work with the real folder).
         if (value is FavoriteFolderNode favorite)
         {
@@ -260,16 +294,34 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
         {
             TreeRoots.RemoveAt(0);
         }
+
+        if ((Favorites.Items.Count > 0) != (FavoriteRoots.Count > 0))
+        {
+            if (Favorites.Items.Count > 0)
+            {
+                FavoriteRoots.Add(Favorites);
+            }
+            else
+            {
+                FavoriteRoots.Clear();
+            }
+
+            OnPropertyChanged(nameof(HasFavorites));
+        }
     }
 
     private void RebuildTreeRoots()
     {
         var selected = SelectedTreeItem;
         TreeRoots.Clear();
+        FavoriteRoots.Clear();
         if (Favorites.Items.Count > 0)
         {
             TreeRoots.Add(Favorites);
+            FavoriteRoots.Add(Favorites);
         }
+
+        OnPropertyChanged(nameof(HasFavorites));
 
         foreach (var account in Accounts)
         {
