@@ -29,6 +29,44 @@ public class MailSearchTests
     }
 
     [Fact]
+    public async Task The_search_index_gets_the_text_from_IMAP_without_attachments_and_without_marking_read()
+    {
+        Assert.SkipWhen(Host is null, "NERUNA_TEST_IMAP_HOST not set");
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var credentials = env.Get<ICredentialStore>();
+        var address = "marco@example.com";
+        var settings = new ImapSettings(Host!, 3143, SocketSecurity.None, Host!, 3025, SocketSecurity.None, address);
+        var connection = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, ProviderIds.Imap, settings.ToDictionary());
+        await credentials.SetSecretAsync(connection.Id, "geheim", ct);
+
+        var folderName = "Index-" + Guid.NewGuid().ToString("N")[..6];
+        using (var imap = new MailKit.Net.Imap.ImapClient())
+        {
+            await imap.ConnectAsync(Host!, 3143, MailKit.Security.SecureSocketOptions.None, ct);
+            await imap.AuthenticateAsync(address, "geheim", ct);
+            var folder = await imap.GetFolder(imap.PersonalNamespaces[0]).CreateAsync(folderName, true, ct);
+            var builder = new BodyBuilder { TextBody = "Die Brücke über die Reuss ist geprüft." };
+            builder.Attachments.Add("Prüfbericht.pdf", new byte[2048]);
+            var message = new MimeMessage { Subject = "Prüfbericht", Body = builder.ToMessageBody() };
+            message.From.Add(new MailboxAddress("Lea", "lea@example.com"));
+            await folder!.AppendAsync(new MailKit.AppendRequest(message, MailKit.MessageFlags.None), ct);
+            await imap.DisconnectAsync(true, ct);
+        }
+
+        var mailFolder = new MailFolder(connection.Id, folderName, folderName, null, FolderRole.None);
+        await using var provider = new ImapProviderFactory(credentials, NullLoggerFactory.Instance).Create(connection);
+        var ids = await provider.GetAllRemoteIdsAsync(mailFolder, ct);
+        var text = Assert.Single(await provider.GetSearchTextsAsync(mailFolder, ids, ct)).Value;
+        Assert.Contains("Brücke über die Reuss", text.Body, StringComparison.Ordinal);
+        Assert.Equal("Prüfbericht.pdf", text.Attachments);
+
+        // Still unread on the server.
+        var sync = await provider.SyncFolderAsync(mailFolder, [], ct);
+        Assert.False(Assert.Single(sync.AddedOrChanged).Flags.HasFlag(MessageFlags.Seen));
+    }
+
+    [Fact]
     public async Task Older_messages_load_on_demand_and_search_finds_them_on_the_server()
     {
         Assert.SkipWhen(Host is null, "NERUNA_TEST_IMAP_HOST not set");

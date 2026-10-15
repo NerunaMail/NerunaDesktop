@@ -48,7 +48,46 @@ public sealed partial class ImapMailProvider(
     public MailProviderCapabilities Capabilities =>
         MailProviderCapabilities.Send | MailProviderCapabilities.Flags | MailProviderCapabilities.Move |
         MailProviderCapabilities.Delete | MailProviderCapabilities.ServerSearch | MailProviderCapabilities.Append | MailProviderCapabilities.Push |
-        MailProviderCapabilities.Subscriptions;
+        MailProviderCapabilities.Subscriptions | MailProviderCapabilities.SearchText;
+
+    // A text part larger than this is not taken into the index (a log file sent as body, a huge newsletter).
+    private const long MaxSearchTextBytes = 1024 * 1024;
+
+    public async Task<IReadOnlyDictionary<string, MessageSearchText>> GetSearchTextsAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(remoteIds);
+        var imapFolder = await OpenAsync(folder.RemoteId, FolderAccess.ReadOnly, cancellationToken);
+
+        // The structure first (one request), then only the text part of each – BODY.PEEK: nothing is marked read.
+        var summaries = await imapFolder.FetchAsync(remoteIds.Select(ParseUid).ToList(), new FetchRequest(MessageSummaryItems.UniqueId | MessageSummaryItems.BodyStructure), cancellationToken);
+        var result = new Dictionary<string, MessageSearchText>(StringComparer.Ordinal);
+        foreach (var summary in summaries)
+        {
+            var names = summary.Attachments.Select(a => a.FileName).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+            string? text = null;
+            if ((summary.TextBody ?? summary.HtmlBody) is { } part && part.Octets <= MaxSearchTextBytes)
+            {
+                // The part's raw content (BODY.PEEK[n]), decoded by what the structure says – servers differ in
+                // what they send for the part's own MIME header.
+                await using var raw = await imapFolder.GetStreamAsync(summary.UniqueId, part.PartSpecifier, cancellationToken);
+                var body = new TextPart(part.ContentType.MediaSubtype)
+                {
+                    Content = new MimeContent(raw, MimeKit.Utils.MimeUtils.TryParse(part.ContentTransferEncoding, out ContentEncoding encoding) ? encoding : ContentEncoding.Default),
+                };
+                if (part.ContentType.Charset is { Length: > 0 } charset)
+                {
+                    body.ContentType.Charset = charset;
+                }
+
+                text = body.IsHtml ? HtmlText.ToPlainText(body.Text) : body.Text;
+            }
+
+            result[summary.UniqueId.Id.ToString(CultureInfo.InvariantCulture)] = new MessageSearchText(text, names.Count == 0 ? null : string.Join(" ", names));
+        }
+
+        return result;
+    }
 
     public async Task TestConnectionAsync(CancellationToken cancellationToken = default)
     {

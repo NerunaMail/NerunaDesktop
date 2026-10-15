@@ -56,6 +56,19 @@ public interface IMailStore
     Task<int> RemoveMessageContentBeforeAsync(Guid connectionId, string folderRemoteId, DateTimeOffset before, CancellationToken cancellationToken = default);
 }
 
+/// <summary>The local database file: its size and making it smaller (VACUUM).</summary>
+public interface IStorageMaintenance
+{
+    /// <summary>Bytes of the database (with its write-ahead log).</summary>
+    long DatabaseSize { get; }
+
+    /// <summary>
+    /// Gives free space back to the disk – left by deleted messages, accounts or index entries; SQLite reuses it
+    /// but does not shrink the file by itself. Takes a while with a large database; nothing else should write meanwhile.
+    /// </summary>
+    Task CompactAsync(CancellationToken cancellationToken = default);
+}
+
 /// <summary>What the search index keeps of a message (a text not on this device: null).</summary>
 public sealed record SearchDocument(string Sender, string Recipients, string Subject, string? Body, string? Attachments);
 

@@ -196,7 +196,8 @@ internal sealed class MessageEntity
 
     /// <summary>
     /// In the search index (table MessageSearch, rowid = <see cref="Id"/>): 0 not yet, 1 sender/subject/recipients
-    /// (the text is not on this device), 2 the text is there and waits, 3 with the text.
+    /// (the text is not on this device), 2 the text is there and waits, 3 with the text, 4 the server could not
+    /// give the text (not asked again until the message is opened).
     /// </summary>
     public int SearchLevel { get; set; }
 }

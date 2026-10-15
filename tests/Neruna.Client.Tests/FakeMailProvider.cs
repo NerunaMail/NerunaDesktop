@@ -18,6 +18,8 @@ internal sealed class FakeMailServer
 
     public int MessageDownloads { get; set; }
 
+    public int SearchTextRequests { get; set; }
+
     /// <summary>Awaited at every folder listing (= every sync of a connection): lets a test hold a sync open.</summary>
     public Func<Task>? FolderListingGate { get; set; }
 
@@ -97,7 +99,15 @@ internal sealed class FakeMailProviderFactory(FakeMailServer server) : IProvider
 
 internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server) : IMailProvider
 {
-    public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags | MailProviderCapabilities.Send | MailProviderCapabilities.Append | MailProviderCapabilities.ServerSearch;
+    public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags | MailProviderCapabilities.Send | MailProviderCapabilities.Append | MailProviderCapabilities.ServerSearch | MailProviderCapabilities.SearchText;
+
+    // The text only, as IMAP gives it for the index: no download counted.
+    public Task<IReadOnlyDictionary<string, MessageSearchText>> GetSearchTextsAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)
+    {
+        server.SearchTextRequests++;
+        return Task.FromResult<IReadOnlyDictionary<string, MessageSearchText>>(server.Folders[folder.RemoteId].Where(m => remoteIds.Contains(m.RemoteId))
+            .ToDictionary(m => m.RemoteId, m => new MessageSearchText("Hallo " + m.Subject, null)));
+    }
 
     public Task<IReadOnlyList<MessageSummary>> FetchOlderAsync(MailFolder folder, IReadOnlyCollection<string> knownRemoteIds, int count, CancellationToken cancellationToken = default)
     {

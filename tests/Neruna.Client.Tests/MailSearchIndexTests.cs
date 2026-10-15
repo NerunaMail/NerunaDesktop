@@ -24,6 +24,7 @@ public class MailSearchIndexTests
         var inbox = (await env.Mail.GetFoldersAsync(connection.Id, ct)).Single(f => f.Role == FolderRole.Inbox || f.RemoteId == "INBOX");
         using var indexer = new MailSearchIndexer(env.Get<IMailSearchIndex>(), env.MailStore, env.Accounts, env.Get<ProviderRegistry>(), env.Get<ISettingsStore>(),
             env.Mail, NullLogger<MailSearchIndexer>.Instance);
+        await indexer.SetServerTextEnabledAsync(account, false, ct); // here: only what is on this device
         await indexer.RunOnceAsync(ct);
 
         async Task<string[]> Find(MailSearchQuery query) =>
@@ -53,6 +54,38 @@ public class MailSearchIndexTests
         await indexer.RunOnceAsync(ct);
         Assert.Equal(0, (await indexer.GetStatusAsync(ct)).Single().Status.Indexed);
         Assert.Equal(["Offerte Netzwerk-Erneuerung"], await Find(new MailSearchQuery(Subject: "Offerte")));
+
+        // The freed space goes back to the disk.
+        await env.Get<IStorageMaintenance>().CompactAsync(ct);
+        Assert.True(env.Get<IStorageMaintenance>().DatabaseSize > 0);
+    }
+
+    [Fact]
+    public async Task The_text_of_mail_only_on_the_server_is_fetched_for_the_index_without_downloading_it()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var connection = await env.AddAccountAsync(ServiceKind.Mail, FakeMailProviderFactory.Id);
+        env.MailServer.Deliver("INBOX", "Offerte Netzwerk-Erneuerung", DateTimeOffset.UtcNow.AddHours(-1));
+        var account = (await env.Accounts.GetAccountsAsync(ct)).Single();
+        await env.Mail.SetOfflinePeriodAsync(account.Id, OfflinePeriod.OpenedOnly, ct);
+        await env.Mail.SyncAllAsync(ct);
+        var inbox = (await env.Mail.GetFoldersAsync(connection.Id, ct)).Single(f => f.RemoteId == "INBOX");
+        using var indexer = new MailSearchIndexer(env.Get<IMailSearchIndex>(), env.MailStore, env.Accounts, env.Get<ProviderRegistry>(), env.Get<ISettingsStore>(),
+            env.Mail, NullLogger<MailSearchIndexer>.Instance);
+        var downloads = env.MailServer.MessageDownloads;
+
+        await indexer.RunOnceAsync(ct);
+
+        Assert.Equal(["Offerte Netzwerk-Erneuerung"], (await indexer.SearchAsync([inbox], new MailSearchQuery(Text: "hallo offerte"), cancellationToken: ct)).Hits.Select(h => h.Message.Subject));
+        Assert.Equal(downloads, env.MailServer.MessageDownloads);
+        Assert.Equal(1, env.MailServer.SearchTextRequests);
+        var status = Assert.Single(await indexer.GetStatusAsync(ct));
+        Assert.Equal((1, true), (status.Status.WithText, status.ServerText));
+
+        // Nothing left to fetch: the next run does not ask the server again.
+        await indexer.RunOnceAsync(ct);
+        Assert.Equal(1, env.MailServer.SearchTextRequests);
     }
 
     [Fact]

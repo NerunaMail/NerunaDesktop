@@ -93,6 +93,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             {
                 _ = SearchIndex.ReloadAsync();
             }
+            else if (item.Tab == 1)
+            {
+                MailOptions.ShowDatabaseSize();
+            }
         }
     }
 

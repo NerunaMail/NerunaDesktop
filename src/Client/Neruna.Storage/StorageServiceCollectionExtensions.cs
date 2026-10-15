@@ -27,6 +27,7 @@ public static class StorageServiceCollectionExtensions
         services.AddSingleton<SqliteMailStore>();
         services.AddSingleton<IMailStore>(sp => sp.GetRequiredService<SqliteMailStore>());
         services.AddSingleton<IMailSearchIndex>(sp => sp.GetRequiredService<SqliteMailStore>());
+        services.AddSingleton<IStorageMaintenance>(sp => new StorageMaintenance(sp.GetRequiredService<IDbContextFactory<NerunaDbContext>>(), databasePath));
         services.AddSingleton<ICalendarStore, SqliteCalendarStore>();
         services.AddSingleton<IContactStore, SqliteContactStore>();
         services.AddSingleton<ICertificateStore, SqliteCertificateStore>();

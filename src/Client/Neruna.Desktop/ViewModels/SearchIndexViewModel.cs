@@ -57,7 +57,8 @@ internal sealed partial class SearchIndexViewModel : ViewModelBase
             Accounts.Clear();
             foreach (var account in status)
             {
-                Accounts.Add(new SearchIndexRow(account.Account, enabled => _ = SetEnabledAsync(account.Account, enabled)));
+                Accounts.Add(new SearchIndexRow(account.Account, enabled => _ = SetEnabledAsync(account.Account, enabled),
+                    fromServer => _ = SetServerTextAsync(account.Account, fromServer)));
             }
         }
 
@@ -73,6 +74,12 @@ internal sealed partial class SearchIndexViewModel : ViewModelBase
             : T("Der Index ist aktuell.");
     }
 
+    private async Task SetServerTextAsync(Account account, bool enabled)
+    {
+        await _indexer.SetServerTextEnabledAsync(account, enabled);
+        await ReloadAsync();
+    }
+
     private async Task SetEnabledAsync(Account account, bool enabled)
     {
         await _indexer.SetEnabledAsync(account, enabled);
@@ -81,7 +88,7 @@ internal sealed partial class SearchIndexViewModel : ViewModelBase
 }
 
 /// <summary>One account on the index page: on or off, and how far.</summary>
-internal sealed partial class SearchIndexRow(Account account, Action<bool> changed) : ObservableObject
+internal sealed partial class SearchIndexRow(Account account, Action<bool> changed, Action<bool> serverTextChanged) : ObservableObject
 {
     private bool _updating;
 
@@ -99,6 +106,22 @@ internal sealed partial class SearchIndexRow(Account account, Action<bool> chang
     [ObservableProperty]
     public partial double Percent { get; set; }
 
+    /// <summary>The text of mail only on the server is fetched for the index (IMAP).</summary>
+    [ObservableProperty]
+    public partial bool ServerText { get; set; }
+
+    /// <summary>The account's server can give the text for the index.</summary>
+    [ObservableProperty]
+    public partial bool CanFetchServerText { get; set; }
+
+    partial void OnServerTextChanged(bool value)
+    {
+        if (!_updating)
+        {
+            serverTextChanged(value);
+        }
+    }
+
     partial void OnIsEnabledChanged(bool value)
     {
         if (!_updating)
@@ -111,6 +134,8 @@ internal sealed partial class SearchIndexRow(Account account, Action<bool> chang
     {
         _updating = true;
         IsEnabled = state.IsEnabled;
+        ServerText = state.ServerText == true;
+        CanFetchServerText = state.IsEnabled && state.ServerText is not null;
         _updating = false;
         var status = state.Status;
         Percent = status.Messages == 0 ? 100 : 100.0 * status.Indexed / status.Messages;

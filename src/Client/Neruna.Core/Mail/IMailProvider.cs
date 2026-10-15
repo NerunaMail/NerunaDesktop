@@ -21,7 +21,13 @@ public enum MailProviderCapabilities
 
     /// <summary>The messages are on this device (a file): the search index reads their text directly.</summary>
     LocalContent = 256,
+
+    /// <summary>Can hand out the text of messages for the search index without their attachments (<see cref="IMailProvider.GetSearchTextsAsync"/>).</summary>
+    SearchText = 512,
 }
+
+/// <summary>A message's text and attachment names, for the search index only.</summary>
+public sealed record MessageSearchText(string? Body, string? Attachments);
 
 /// <summary>A folder on the server and whether it shows up in Neruna (subscribed).</summary>
 /// <param name="Required">Inbox, sent, drafts, trash: always shown – Neruna needs them.</param>
@@ -115,6 +121,14 @@ public interface IMailProvider : IAsyncDisposable
 
     /// <summary>Deletes the (empty) folder on the server.</summary>
     Task DeleteFolderAsync(MailFolder folder, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    /// <summary>
+    /// The text and attachment names of messages for the search index – without downloading attachments and without
+    /// marking them read. Messages it cannot read are missing from the result.
+    /// </summary>
+    /// <exception cref="NotSupportedException">The provider lacks <see cref="MailProviderCapabilities.SearchText"/>.</exception>
+    Task<IReadOnlyDictionary<string, MessageSearchText>> GetSearchTextsAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
 
     /// <summary>Every message in the folder on the server – also those never loaded on this device.</summary>
     Task<IReadOnlyList<string>> GetAllRemoteIdsAsync(MailFolder folder, CancellationToken cancellationToken = default) => throw new NotSupportedException();

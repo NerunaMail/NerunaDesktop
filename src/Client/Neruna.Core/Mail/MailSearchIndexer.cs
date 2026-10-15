@@ -7,7 +7,8 @@ using Neruna.Core.Providers;
 namespace Neruna.Core.Mail;
 
 /// <summary>An account in the search index: whether it is indexed and how far.</summary>
-public sealed record SearchIndexAccount(Account Account, bool IsEnabled, SearchIndexStatus Status);
+/// <param name="ServerText">Whether the text of mail only on the server is fetched for the index; null: the account's server cannot.</param>
+public sealed record SearchIndexAccount(Account Account, bool IsEnabled, SearchIndexStatus Status, bool? ServerText);
 
 /// <summary>
 /// Builds the local full-text index of the mail in the background, so searching answers at once – also for messages
@@ -20,6 +21,7 @@ public sealed class MailSearchIndexer : IDisposable
 {
     private const int HeaderBatch = 500;
     private const int TextBatch = 25;
+    private const int ServerBatch = 50;
     private const int MaxTextLength = 200_000;
 
     private readonly IMailSearchIndex _index;
@@ -143,12 +145,73 @@ public sealed class MailSearchIndexer : IDisposable
                 Progress?.Invoke(this, EventArgs.Empty);
                 await Task.Delay(20, cancellationToken);
             }
+
+            await IndexServerTextAsync(all, cancellationToken);
         }
         finally
         {
             IsBusy = false;
             _running.Release();
             Progress?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    // The text of mail only on the server (IMAP): text parts only, a batch per folder, with pauses – the server
+    // and the line are shared with the work of the user. Offline or refused: stops, the next run goes on.
+    private async Task IndexServerTextAsync(Dictionary<Guid, ServiceConnection> all, CancellationToken cancellationToken)
+    {
+        var servers = new List<Guid>();
+        foreach (var account in await _accounts.GetAccountsAsync(cancellationToken))
+        {
+            if (await IsEnabledAsync(account.Id, cancellationToken) && await IsServerTextEnabledAsync(account.Id, cancellationToken))
+            {
+                servers.AddRange(account.ConnectionsOf(ServiceKind.Mail).Where(c => SupportsServerText(c)).Select(c => c.Id));
+            }
+        }
+
+        foreach (var connectionId in servers)
+        {
+            await using var provider = _providers.CreateMail(all[connectionId]);
+            IReadOnlyList<SearchWork> work;
+            while ((work = await _index.GetSearchWorkAsync([connectionId], 1, ServerBatch, cancellationToken)).Count > 0)
+            {
+                var entries = new List<(long, SearchDocument, int)>();
+                try
+                {
+                    foreach (var folder in work.GroupBy(w => w.Folder.RemoteId))
+                    {
+                        var texts = await provider.GetSearchTextsAsync(folder.First().Folder, [.. folder.Select(w => w.Summary.RemoteId)], cancellationToken);
+                        entries.AddRange(folder.Select(w => texts.TryGetValue(w.Summary.RemoteId, out var text)
+                            ? (w.Id, Document(w.Summary, text.Body, text.Attachments), 3)
+                            : (w.Id, Document(w.Summary, null, null), 4)));
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+                {
+                    _logger.LogInformation(ex, "Server text for the search index not fetched now");
+                    await _index.SaveSearchEntriesAsync(entries, cancellationToken);
+                    break;
+                }
+
+                await _index.SaveSearchEntriesAsync(entries, cancellationToken);
+                Progress?.Invoke(this, EventArgs.Empty);
+                await Task.Delay(200, cancellationToken);
+            }
+        }
+    }
+
+    private bool SupportsServerText(ServiceConnection connection)
+    {
+        try
+        {
+            var provider = _providers.CreateMail(connection);
+            var supports = provider.Capabilities.HasFlag(MailProviderCapabilities.SearchText);
+            _ = provider.DisposeAsync().AsTask();
+            return supports;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or KeyNotFoundException)
+        {
+            return false;
         }
     }
 
@@ -217,6 +280,20 @@ public sealed class MailSearchIndexer : IDisposable
     public async Task<bool> IsEnabledAsync(Guid accountId, CancellationToken cancellationToken = default) =>
         await _settings.GetAsync(Key(accountId), cancellationToken) != "off";
 
+    private static string ServerKey(Guid accountId) => $"search.server.{accountId:N}";
+
+    /// <summary>Whether the text of mail only on the server is fetched for the index (on unless switched off).</summary>
+    public async Task<bool> IsServerTextEnabledAsync(Guid accountId, CancellationToken cancellationToken = default) =>
+        await _settings.GetAsync(ServerKey(accountId), cancellationToken) != "off";
+
+    public async Task SetServerTextEnabledAsync(Account account, bool enabled, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        await _settings.SetAsync(ServerKey(account.Id), enabled ? null : "off", cancellationToken);
+        Poke();
+        Progress?.Invoke(this, EventArgs.Empty);
+    }
+
     public async Task SetEnabledAsync(Account account, bool enabled, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(account);
@@ -252,7 +329,8 @@ public sealed class MailSearchIndexer : IDisposable
                 total = new SearchIndexStatus(total.Messages + status.Messages, total.Indexed + status.Indexed, total.WithText + status.WithText);
             }
 
-            result.Add(new SearchIndexAccount(account, await IsEnabledAsync(account.Id, cancellationToken), total));
+            result.Add(new SearchIndexAccount(account, await IsEnabledAsync(account.Id, cancellationToken), total,
+                connections.Any(SupportsServerText) ? await IsServerTextEnabledAsync(account.Id, cancellationToken) : null));
         }
 
         return result;

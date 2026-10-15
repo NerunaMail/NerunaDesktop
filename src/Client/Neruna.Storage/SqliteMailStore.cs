@@ -218,7 +218,7 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var folderId = await db.MailFolders.Where(f => f.ConnectionId == connectionId && f.RemoteId == folderRemoteId).Select(f => (long?)f.Id).SingleOrDefaultAsync(cancellationToken);
-        await db.Messages.Where(m => m.FolderId == folderId && m.RemoteId == remoteId && m.SearchLevel == 1)
+        await db.Messages.Where(m => m.FolderId == folderId && m.RemoteId == remoteId && (m.SearchLevel == 1 || m.SearchLevel == 4))
             .ExecuteUpdateAsync(u => u.SetProperty(m => m.SearchLevel, 2), cancellationToken);
     }
 
