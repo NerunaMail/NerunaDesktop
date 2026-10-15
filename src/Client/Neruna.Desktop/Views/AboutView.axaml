@@ -69,6 +69,7 @@
       <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,12,0,0">
         <HyperlinkButton Content="{l:T 'neruna.org'}" NavigateUri="https://neruna.org" Padding="0" />
         <HyperlinkButton Content="{l:T 'info@neruna.org'}" NavigateUri="mailto:info@neruna.org" Padding="0" />
+        <HyperlinkButton Content="Facebook" NavigateUri="https://www.facebook.com/NerunaMail" Padding="0" />
       </StackPanel>
       <TextBlock Classes="subtle" FontSize="12" Text="{l:T 'Copyright © 2026 Neruna contributors · Licensed under the Mozilla Public License 2.0'}" Margin="0,8,0,0" />
     </StackPanel>
