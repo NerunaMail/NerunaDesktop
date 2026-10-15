@@ -62,4 +62,12 @@ public class CalendarSpanTests
 
         Assert.Equal(["birthday", "now"], Ids(await store.GetObjectsAsync(connection.Id, "cal", At("2026-10-01T00:00Z"), At("2026-10-08T00:00Z"), ct)));
     }
+
+    [Fact]
+    public void A_feed_that_only_stamps_the_download_time_counts_as_unchanged()
+    {
+        var feed = Event("").Replace("DTSTAMP:20261001T000000Z", "DTSTAMP:20261015T120000Z", StringComparison.Ordinal);
+        Assert.Equal(Neruna.Providers.Ics.IcsCalendarProvider.HashOf(Event("")), Neruna.Providers.Ics.IcsCalendarProvider.HashOf(feed));
+        Assert.NotEqual(Neruna.Providers.Ics.IcsCalendarProvider.HashOf(Event("")), Neruna.Providers.Ics.IcsCalendarProvider.HashOf(Event("", end: "20261005T110000Z")));
+    }
 }

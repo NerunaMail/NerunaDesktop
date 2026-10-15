@@ -33,9 +33,6 @@ internal enum UserCheck
 /// </summary>
 internal static class UserVerification
 {
-    /// <summary>Windows asks in its own dialog; elsewhere the page asks for the password first.</summary>
-    public static bool UsesSystemDialog => OperatingSystem.IsWindows();
-
     /// <summary>The login name shown next to the password field.</summary>
     public static string UserName => Environment.UserName;
 

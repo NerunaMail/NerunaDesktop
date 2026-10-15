@@ -39,8 +39,6 @@ internal static class Appearance
 
     public static ColorScheme CurrentScheme { get; private set; } = ColorScheme.Blue;
 
-    public static Color AccentOf(ColorScheme scheme) => Schemes[scheme].Accent;
-
     public static async Task LoadAsync(ISettingsStore settings)
     {
         ArgumentNullException.ThrowIfNull(settings);

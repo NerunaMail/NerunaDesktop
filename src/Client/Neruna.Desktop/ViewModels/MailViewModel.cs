@@ -1727,16 +1727,7 @@ internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObje
     /// <summary>Special folders get familiar German names, whatever the server calls them (INBOX, Sent, Trash …).</summary>
     public string Name => DisplayName(Folder);
 
-    public static string DisplayName(MailFolder folder) => folder.Role switch
-    {
-        FolderRole.Inbox => T("Posteingang"),
-        FolderRole.Drafts => T("Entwürfe"),
-        FolderRole.Sent => T("Gesendete Elemente"),
-        FolderRole.Trash => T("Gelöschte Elemente"),
-        FolderRole.Junk => T("Junk-E-Mail"),
-        FolderRole.Archive => T("Archiv"),
-        _ => folder.Name,
-    };
+    public static string DisplayName(MailFolder folder) => MailFolderTree.DisplayName(folder);
 
     public ObservableCollection<MailFolderNode> Children { get; } = [];
 

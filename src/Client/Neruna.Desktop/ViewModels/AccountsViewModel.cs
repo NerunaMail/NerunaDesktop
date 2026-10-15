@@ -221,8 +221,6 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
 
     public string? Email => Account.EmailAddress;
 
-    public bool HasEmail => Email is not null;
-
     public bool HasMail => Account.ConnectionsOf(ServiceKind.Mail).Any();
 
     /// <summary>An Outlook data file: read only – no out-of-office, no offline choice, nothing to transfer.</summary>

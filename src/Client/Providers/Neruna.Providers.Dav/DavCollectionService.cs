@@ -40,10 +40,7 @@ internal sealed record DavFlavor(
 }
 
 /// <param name="SharedBy">Found in another principal's home (delegation, group): whose; null for the user's own.</param>
-internal sealed record DavCollection(Uri Url, string Name, string? Color, bool IsReadOnly, CalendarContent Content, string? SharedBy = null)
-{
-    public bool SupportsEvents => Content.HasFlag(CalendarContent.Events);
-}
+internal sealed record DavCollection(Uri Url, string Name, string? Color, bool IsReadOnly, CalendarContent Content, string? SharedBy = null);
 
 internal sealed record DavItem(string RemoteId, string? ETag, string Data);
 

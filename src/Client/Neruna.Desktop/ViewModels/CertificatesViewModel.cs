@@ -274,9 +274,6 @@ internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffs
 
     public string ValidUntil => Info.NotAfter.LocalDateTime.ToString("d", CultureInfo.CurrentCulture);
 
-    public string ValidRange =>
-        $"{Info.NotBefore.LocalDateTime.ToString("d", CultureInfo.CurrentCulture)} – {ValidUntil}";
-
     public CertificateStatus Status => Info.StatusAt(now);
 
     public string StatusText => Status switch

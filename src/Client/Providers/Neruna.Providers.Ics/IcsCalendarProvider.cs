@@ -35,7 +35,7 @@ public sealed class IcsCalendarProvider(Guid connectionId, Uri feedUrl, string? 
     {
         ArgumentNullException.ThrowIfNull(calendar);
         var content = await LoadAsync(cancellationToken);
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
+        var hash = HashOf(content);
 
         if (hash == calendar.SyncState)
         {
@@ -53,6 +53,16 @@ public sealed class IcsCalendarProvider(Guid connectionId, Uri feedUrl, string? 
         throw new NotSupportedException("ICS subscriptions are read-only.");
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    /// <summary>
+    /// The feed's content without DTSTAMP: many published calendars stamp every event with the time of the download,
+    /// which would make an unchanged feed look new at every sync (and be stored all over again).
+    /// </summary>
+    internal static string HashOf(string content)
+    {
+        var lines = content.Split('\n').Where(l => !l.StartsWith("DTSTAMP", StringComparison.OrdinalIgnoreCase));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines))));
+    }
 
     private async Task<string> LoadAsync(CancellationToken cancellationToken)
     {

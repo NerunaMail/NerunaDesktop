@@ -608,8 +608,6 @@ internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem
     /// <summary>… and the others at their time, overlapping ones side by side.</summary>
     public IReadOnlyList<TimedEventItem> TimedEvents { get; } = TimedEventItem.Layout(date, events.Where(e => !e.Occurrence.IsAllDay));
 
-    public bool HasAllDayEvents => AllDayEvents.Count > 0;
-
     public string DayName => Date.ToString("dddd", CultureInfo.CurrentCulture);
 
     public string DayNumber => Date.ToString("d.M.", CultureInfo.CurrentCulture);
