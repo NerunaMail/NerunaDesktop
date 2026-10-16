@@ -22,6 +22,9 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     /// <summary>Settings → Datenschutz.</summary>
     public PrivacyOptionsViewModel Privacy => privacy;
 
+    /// <summary>The devblog on neruna.org in the app's language (Über Neruna).</summary>
+    public static Uri DevblogUri => new($"https://neruna.org/{Neruna.Core.Localization.Texts.Language}/blog/");
+
     /// <summary>Settings → Daten → Lokale Daten.</summary>
     public LocalDataViewModel LocalData => localData;
 

@@ -68,6 +68,7 @@
 
       <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,12,0,0">
         <HyperlinkButton Content="{l:T 'neruna.org'}" NavigateUri="https://neruna.org" Padding="0" />
+        <HyperlinkButton Content="{l:T 'Devblog – was neu ist'}" NavigateUri="{x:Static vm:SettingsViewModel.DevblogUri}" Padding="0" />
         <HyperlinkButton Content="{l:T 'info@neruna.org'}" NavigateUri="mailto:info@neruna.org" Padding="0" />
         <HyperlinkButton Content="Facebook" NavigateUri="https://www.facebook.com/NerunaMail" Padding="0" />
       </StackPanel>
