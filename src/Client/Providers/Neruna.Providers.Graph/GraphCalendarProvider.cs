@@ -18,7 +18,7 @@ namespace Neruna.Providers.Graph;
 /// </summary>
 internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling
 {
-    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart";
+    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs";
 
     public CalendarProviderCapabilities Capabilities => CalendarProviderCapabilities.Write | CalendarProviderCapabilities.Scheduling;
 
@@ -122,6 +122,13 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
             Location = e.Obj("location").Str("displayName") is { Length: > 0 } location ? location : null,
             Description = e.Obj("body").Str("content") is { Length: > 0 } text ? text.Trim() : null,
         };
+        EventDraft.ApplyShowAs(evt, e.Str("showAs") switch
+        {
+            "free" => ShowAs.Free,
+            "tentative" => ShowAs.Tentative,
+            "oof" => ShowAs.OutOfOffice,
+            _ => ShowAs.Busy,
+        });
         var allDay = e.Bool("isAllDay");
         var (start, startZone) = DateOf(e.Obj("start"));
         var (end, _) = DateOf(e.Obj("end"));
@@ -193,6 +200,13 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
             ["body"] = new { contentType = "text", content = draft.Description ?? string.Empty },
             ["location"] = new { displayName = draft.Location ?? string.Empty },
             ["isAllDay"] = draft.IsAllDay,
+            ["showAs"] = draft.ShowAs switch
+            {
+                ShowAs.Free => "free",
+                ShowAs.Tentative => "tentative",
+                ShowAs.OutOfOffice => "oof",
+                _ => "busy",
+            },
             ["start"] = When(start),
             ["end"] = When(end),
             ["isReminderOn"] = draft.ReminderMinutes is not null,

@@ -28,6 +28,15 @@ public enum Participation
     Declined,
 }
 
+/// <summary>How the time of an event shows to others (free/busy, the planning view): busy unless said otherwise.</summary>
+public enum ShowAs
+{
+    Busy,
+    Free,
+    Tentative,
+    OutOfOffice,
+}
+
 /// <summary>A person invited to an event.</summary>
 public sealed record EventAttendee(string Email, string? Name = null, Participation Status = Participation.NeedsAction)
 {
@@ -95,6 +104,47 @@ public sealed record EventDraft(
     /// <summary>Reminder until the user chooses another default (Einstellungen → Kalender): 15 minutes ahead.</summary>
     public const int DefaultReminderMinutes = 15;
 
+    /// <summary>
+    /// Busy, free, tentative or away. In iCalendar TRANSP (free or not) plus X-MICROSOFT-CDO-BUSYSTATUS, which Exchange,
+    /// Outlook and many other programs read for tentative and away.
+    /// </summary>
+    public ShowAs ShowAs { get; init; } = ShowAs.Busy;
+
+    /// <summary>The Microsoft property for tentative and away (TRANSP knows only free and busy).</summary>
+    public const string BusyStatusProperty = "X-MICROSOFT-CDO-BUSYSTATUS";
+
+    /// <summary>The show-as of an event (see <see cref="ShowAs"/>).</summary>
+    public static ShowAs ShowAsOf(CalendarEvent evt)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+        return evt.Properties.Get<string>(BusyStatusProperty)?.Trim().ToUpperInvariant() switch
+        {
+            "FREE" => ShowAs.Free,
+            "TENTATIVE" => ShowAs.Tentative,
+            "OOF" => ShowAs.OutOfOffice,
+            "BUSY" => ShowAs.Busy,
+            _ => string.Equals(evt.Transparency, "TRANSPARENT", StringComparison.OrdinalIgnoreCase) ? ShowAs.Free : ShowAs.Busy,
+        };
+    }
+
+    /// <summary>Writes the show-as as TRANSP and, where TRANSP is not enough or the property is there already, X-MICROSOFT-CDO-BUSYSTATUS.</summary>
+    public static void ApplyShowAs(CalendarEvent evt, ShowAs showAs)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+        evt.Transparency = showAs == ShowAs.Free ? "TRANSPARENT" : "OPAQUE";
+        var status = showAs switch
+        {
+            ShowAs.Free => "FREE",
+            ShowAs.Tentative => "TENTATIVE",
+            ShowAs.OutOfOffice => "OOF",
+            _ => "BUSY",
+        };
+        if (showAs is ShowAs.Tentative or ShowAs.OutOfOffice || evt.Properties.Get<string>(BusyStatusProperty) is not null)
+        {
+            evt.Properties.Set(BusyStatusProperty, status);
+        }
+    }
+
     /// <param name="reminderMinutes">The user's default reminder (null = none).</param>
     public static EventDraft New(DateTime start, int? reminderMinutes = DefaultReminderMinutes) =>
         new(string.Empty, null, null, start, start.AddHours(1), false, RecurrenceKind.None, reminderMinutes, []);
@@ -118,7 +168,10 @@ public sealed record EventDraft(
             KindOf(master.RecurrenceRule),
             ReminderOf(master),
             AttendeesOf(master),
-            AddressOf(master.Organizer?.Value));
+            AddressOf(master.Organizer?.Value))
+        {
+            ShowAs = ShowAsOf(master),
+        };
     }
 
     /// <summary>UID of the (first) event in iCalendar data; null if there is none or it cannot be read.</summary>
@@ -236,6 +289,7 @@ public sealed record EventDraft(
 
         ApplyReminder(master);
         ApplyAttendees(master);
+        ApplyShowAs(master, ShowAs);
 
         // Other clients only pick up changes reliably when SEQUENCE and DTSTAMP move forward.
         if (existingData is not null)

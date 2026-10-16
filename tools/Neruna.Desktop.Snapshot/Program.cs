@@ -563,6 +563,9 @@ internal static class Snapshots
         vm.CalendarPage.NavigatorMonthCount = 1;
         vm.CalendarPage.IsTimeGrid = true;
         await SaveAsync(window, output, "calendar-timegrid.png");
+        vm.CalendarPage.IsPlanning = true;
+        await SaveAsync(window, output, "calendar-planning.png");
+        vm.CalendarPage.IsPlanning = false;
 
         // A meeting with attendees, their answers and a reminder.
         var calendarController = services.GetRequiredService<Neruna.Core.Calendar.CalendarController>();

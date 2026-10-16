@@ -69,6 +69,20 @@
           </ComboBox.ItemTemplate>
         </ComboBox>
       </StackPanel>
+      <!-- How the time shows to others (free/busy, Planungsansicht) -->
+      <StackPanel Grid.Column="2">
+        <TextBlock Classes="label" Text="{l:T 'Anzeigen als'}" />
+        <ComboBox ItemsSource="{x:Static vm:ShowAsOption.All}" SelectedItem="{Binding ShowAs}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:ShowAsOption">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Width="10" Height="10" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Label}" />
+              </StackPanel>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </StackPanel>
     </Grid>
 
     <TextBlock Classes="label" Text="{l:T 'Teilnehmer'}" />
@@ -76,6 +90,13 @@
     <ctl:RecipientBox Text="{Binding AttendeesText}" Directory="{Binding Recipients}" IsVisible="{Binding CanEditAttendees}"
                       PlaceholderText="{l:T 'Name oder Adresse eingeben, mehrere mit Komma trennen – sie erhalten eine Einladung'}" />
     <TextBox Text="{Binding AttendeesText}" IsReadOnly="True" IsVisible="{Binding !CanEditAttendees}" />
+    <!-- Someone is busy then (as far as their calendar is known); only a hint, saving still works -->
+    <Border IsVisible="{Binding HasConflicts}" Background="{DynamicResource WarnBackgroundBrush}" CornerRadius="4" Padding="10,6" Margin="0,6,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="⚠" VerticalAlignment="Top" />
+        <TextBlock Text="{Binding ConflictText}" TextWrapping="Wrap" FontSize="12" />
+      </StackPanel>
+    </Border>
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" Text="{Binding OrganizerText}" IsVisible="{Binding !IsOrganizer}" />
     <ItemsControl ItemsSource="{Binding AttendeeStatuses}" IsVisible="{Binding HasAttendeeStatuses}" Margin="0,4,0,0">
       <ItemsControl.ItemTemplate>

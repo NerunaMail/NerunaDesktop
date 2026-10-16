@@ -99,6 +99,16 @@ internal sealed partial class CalendarView : UserControl
     // data context; the swatch itself carries the color in Tag.
     // "Übernehmen" / "Originalname" in the colour/name flyout.
     // Double-click on a free spot: new event at that time, rounded down to the grid (60/30/15 minutes).
+    // Planung: double-click on a block opens the event.
+    private void OnPlanningBlockDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is Control { DataContext: PlanningBlock block } && DataContext is CalendarViewModel vm)
+        {
+            _ = vm.OpenOccurrenceAsync(block.Occurrence);
+            e.Handled = true;
+        }
+    }
+
     private void OnTimeGridDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (sender is not Control { DataContext: CalendarDay day } column || DataContext is not CalendarViewModel vm)

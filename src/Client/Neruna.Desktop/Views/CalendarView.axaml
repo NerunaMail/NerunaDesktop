@@ -29,6 +29,14 @@
           <TextBlock Text="{Binding RangeTitle}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+          <!-- Planung: the week as a time line per calendar -->
+          <ToggleButton IsChecked="{Binding IsPlanning}" Padding="10,5" Margin="0,0,8,0" VerticalAlignment="Center"
+                        ToolTip.Tip="{l:T 'Planungsansicht: jeder Kalender als Zeitstrahl – rot beschäftigt, grün frei'}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconCalendar}" Width="14" Height="14" />
+              <TextBlock Text="{l:T 'Planung'}" />
+            </StackPanel>
+          </ToggleButton>
           <!-- Days shown: full week or Monday–Friday -->
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
             <ToggleButton Content="{l:T '7 Tage'}" IsChecked="{Binding IsFullWeek}" Padding="10,5" CornerRadius="4,0,0,4" ToolTip.Tip="{l:T 'Ganze Woche anzeigen'}" />
@@ -236,7 +244,7 @@
       <Border Classes="pane" Grid.Column="2" ClipToBounds="True">
         <Panel>
         <!-- Time grid (setting "Kalender → Darstellung"): hours on the left, events at their time -->
-        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding IsTimeGrid}">
+        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding ShowTimeGrid}">
           <Grid ColumnDefinitions="52,*">
             <ItemsControl Grid.Column="1" ItemsSource="{Binding Days}">
               <ItemsControl.ItemsPanel>
@@ -383,8 +391,102 @@
           </ScrollViewer>
         </Grid>
 
+        <!-- Planung: a row per calendar, the events as blocks along the days and hours -->
+        <DockPanel IsVisible="{Binding IsPlanning}" Margin="0,4,0,0">
+          <!-- Legend -->
+          <ItemsControl DockPanel.Dock="Bottom" ItemsSource="{x:Static vm:CalendarViewModel.PlanningLegend}" Margin="12,8,12,8">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="16" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ShowAsOption">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Border Width="12" Height="12" CornerRadius="2" Background="{Binding Brush}" Opacity="0.9" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Label}" FontSize="12" Classes="subtle" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <!-- Axis: days and hours -->
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="200,*" Margin="0,0,12,0">
+            <ItemsControl Grid.Column="1" ItemsSource="{Binding PlanningDays}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Rows="1" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PlanningDay">
+                  <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1,0,0,1" Padding="4,2" Classes.today="{Binding IsToday}">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" />
+                      <ItemsControl ItemsSource="{Binding Hours}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <UniformGrid Rows="1" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding}" FontSize="10" Classes="subtle" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Grid>
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding PlanningRows}" Margin="0,0,12,0">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PlanningRow">
+                  <Grid ColumnDefinitions="200,*" Height="34">
+                    <DockPanel Margin="10,0,8,0" VerticalAlignment="Center">
+                      <Border DockPanel.Dock="Left" Width="10" Height="10" CornerRadius="2" Background="{Binding Color}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                        <TextBlock Text="{Binding Owner}" Classes="subtle" FontSize="11" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </DockPanel>
+                    <!-- Day lines behind the blocks -->
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).PlanningDays}" IsHitTestVisible="False">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <UniformGrid Rows="1" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PlanningDay">
+                          <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1,0,0,1" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Blocks}" VerticalAlignment="Center">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <views:PlanningPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PlanningBlock">
+                          <Border Background="{Binding Brush}" Opacity="{Binding Opacity}" CornerRadius="3" ToolTip.Tip="{Binding Tip}"
+                                  DoubleTapped="OnPlanningBlockDoubleTapped" Cursor="Hand" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+
         <!-- List per day (default) -->
-        <ItemsControl ItemsSource="{Binding Days}" IsVisible="{Binding IsListLayout}">
+        <ItemsControl ItemsSource="{Binding Days}" IsVisible="{Binding ShowList}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <UniformGrid Columns="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).DayCount}" Rows="1" />

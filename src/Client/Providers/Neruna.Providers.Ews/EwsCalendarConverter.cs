@@ -96,10 +96,14 @@ internal static class EwsCalendarConverter
             evt.DtEnd = new CalDateTime(Local(end, zone), zone);
         }
 
-        if (item.Val("LegacyFreeBusyStatus") == "Free")
+        // Busy, free, tentative, away – kept through an edit in Neruna.
+        EventDraft.ApplyShowAs(evt, item.Val("LegacyFreeBusyStatus") switch
         {
-            evt.Transparency = "TRANSPARENT";
-        }
+            "Free" => ShowAs.Free,
+            "Tentative" => ShowAs.Tentative,
+            "OOF" => ShowAs.OutOfOffice,
+            _ => ShowAs.Busy,
+        });
 
         if (item.Val("Sensitivity") is "Private" or "Confidential")
         {
@@ -271,6 +275,13 @@ internal static class EwsCalendarConverter
             ("calendar:Start", X.Typ("Start", Utc(start))),
             ("calendar:End", X.Typ("End", Utc(end))),
             ("calendar:IsAllDayEvent", X.Typ("IsAllDayEvent", draft.IsAllDay ? "true" : "false")),
+            ("calendar:LegacyFreeBusyStatus", X.Typ("LegacyFreeBusyStatus", draft.ShowAs switch
+            {
+                ShowAs.Free => "Free",
+                ShowAs.Tentative => "Tentative",
+                ShowAs.OutOfOffice => "OOF",
+                _ => "Busy",
+            })),
             ("calendar:Location", string.IsNullOrWhiteSpace(draft.Location) ? null : X.Typ("Location", draft.Location)),
             ("calendar:RequiredAttendees", required.Count > 0 ? Mailboxes("RequiredAttendees", required) : null),
             ("calendar:OptionalAttendees", optional.Count > 0 ? Mailboxes("OptionalAttendees", optional) : null),

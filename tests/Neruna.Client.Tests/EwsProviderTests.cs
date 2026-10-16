@@ -500,7 +500,7 @@ public class EwsProviderTests
             END:VCALENDAR
             """.Replace("\n", "\r\n", StringComparison.Ordinal), out var attendees);
         var present = fields.Where(f => f.Value is not null).ToList();
-        Assert.Equal(["Subject", "Body", "ReminderIsSet", "Start", "End", "IsAllDayEvent", "RequiredAttendees", "OptionalAttendees", "Recurrence", "StartTimeZone", "EndTimeZone"],
+        Assert.Equal(["Subject", "Body", "ReminderIsSet", "Start", "End", "IsAllDayEvent", "LegacyFreeBusyStatus", "RequiredAttendees", "OptionalAttendees", "Recurrence", "StartTimeZone", "EndTimeZone"],
             present.Select(f => f.Value!.Name.LocalName));
         Assert.Equal([("beat@example.com", true), ("marco@example.com", false)], attendees.Select(a => (a.Email, a.Optional)));
         var recurrence = present.Single(f => f.Field == "calendar:Recurrence").Value!;

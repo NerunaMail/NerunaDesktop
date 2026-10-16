@@ -20,6 +20,32 @@ internal sealed record RecurrenceOption(RecurrenceKind Kind, string Label)
     ];
 }
 
+/// <summary>"Anzeigen als": busy (red), free (green), tentative (orange), away (purple) – the colours of the planning view.</summary>
+internal sealed record ShowAsOption(ShowAs Value, string Label, Avalonia.Media.IBrush Brush)
+{
+    public static IReadOnlyList<ShowAsOption> All { get; } =
+    [
+        new(ShowAs.Busy, T("Beschäftigt"), ShowAsColors.Brush(ShowAs.Busy)),
+        new(ShowAs.Free, T("Frei"), ShowAsColors.Brush(ShowAs.Free)),
+        new(ShowAs.Tentative, T("Mit Vorbehalt"), ShowAsColors.Brush(ShowAs.Tentative)),
+        new(ShowAs.OutOfOffice, T("Abwesend"), ShowAsColors.Brush(ShowAs.OutOfOffice)),
+    ];
+
+    public static ShowAsOption Of(ShowAs value) => All.First(o => o.Value == value);
+}
+
+/// <summary>One colour per show-as, the same in the editor and the planning view.</summary>
+internal static class ShowAsColors
+{
+    public static Avalonia.Media.IBrush Brush(ShowAs value) => Avalonia.Media.Brush.Parse(value switch
+    {
+        ShowAs.Free => "#2E9E5B",
+        ShowAs.Tentative => "#E08A1E",
+        ShowAs.OutOfOffice => "#7A4FB5",
+        _ => "#D13438",
+    });
+}
+
 internal sealed record ReminderOption(int? Minutes, string Label)
 {
     public static IReadOnlyList<ReminderOption> Standard { get; } =
@@ -89,6 +115,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         IsSeries = draft.Recurrence != RecurrenceKind.None;
         ReminderOptions = ReminderOption.For(draft.ReminderMinutes);
         Reminder = ReminderOptions.First(o => o.Minutes == draft.ReminderMinutes);
+        ShowAs = ShowAsOption.Of(draft.ShowAs);
 
         var me = existing is { } own ? ownAddress(own.Calendar) : null;
         AttendeesText = string.Join(", ", _attendees.Where(a => !string.Equals(a.Email, me, StringComparison.OrdinalIgnoreCase))
@@ -118,6 +145,9 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial ReminderOption Reminder { get; set; }
+
+    [ObservableProperty]
+    public partial ShowAsOption ShowAs { get; set; }
 
     /// <summary>Invited people, as typed: "Lea Keller &lt;lea@example.com&gt;, marco@example.com".</summary>
     [ObservableProperty]
@@ -213,6 +243,8 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         {
             EndDate = end + (current - old);
         }
+
+        CheckConflictsLater();
     }
 
     partial void OnStartTimeChanged(TimeSpan? oldValue, TimeSpan? newValue)
@@ -220,6 +252,71 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         if (oldValue is { } old && newValue is { } current && EndTime is { } end && StartDate == EndDate)
         {
             EndTime = end + (current - old);
+        }
+
+        CheckConflictsLater();
+    }
+
+    partial void OnEndDateChanged(DateTime? value) => CheckConflictsLater();
+
+    partial void OnEndTimeChanged(TimeSpan? value) => CheckConflictsLater();
+
+    partial void OnIsAllDayChanged(bool value) => CheckConflictsLater();
+
+    partial void OnAttendeesTextChanged(string value) => CheckConflictsLater();
+
+    partial void OnSelectedCalendarChanged(CalendarInfo? value) => CheckConflictsLater();
+
+    /// <summary>"Lea Keller hat zur gleichen Zeit: Kundentermin 09:00–10:00" – for people whose calendar Neruna knows.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasConflicts))]
+    public partial string? ConflictText { get; set; }
+
+    public bool HasConflicts => !string.IsNullOrEmpty(ConflictText);
+
+    private int _conflictVersion;
+
+    // Once typing pauses; a later change wins.
+    private void CheckConflictsLater()
+    {
+        var version = ++_conflictVersion;
+        _ = CheckConflictsAsync(version);
+    }
+
+    private async Task CheckConflictsAsync(int version)
+    {
+        await Task.Delay(500);
+        if (version != _conflictVersion || !CanEdit || StartDate is null || EndDate is null)
+        {
+            return;
+        }
+
+        var start = StartDate.Value.Date + (IsAllDay ? TimeSpan.Zero : StartTime ?? TimeSpan.FromHours(9));
+        var end = IsAllDay ? EndDate.Value.Date.AddDays(1) : EndDate.Value.Date + (EndTime ?? TimeSpan.FromHours(10));
+        var people = EventAttendee.FromRecipients(AttendeesText).ToList();
+        var me = SelectedCalendar is { } own ? _ownAddress(own) : null;
+        if (me is not null && IsOrganizer)
+        {
+            people.Insert(0, new EventAttendee(me));
+        }
+
+        try
+        {
+            var conflicts = await Task.Run(() => EventConflicts.FindAsync(_calendar, people, start, end, _existing));
+            if (version != _conflictVersion)
+            {
+                return;
+            }
+
+            ConflictText = conflicts.Count == 0 ? null : string.Join("\n", conflicts.Take(6).Select(c => F("{0} hat zur gleichen Zeit: {1} ({2})",
+                string.Equals(c.Person, me, StringComparison.OrdinalIgnoreCase) ? T("Sie selbst") : c.Name ?? c.Person,
+                c.Occurrence.Summary,
+                c.Occurrence.IsAllDay ? T("ganztägig") : $"{c.Occurrence.Start.LocalDateTime:HH:mm}–{c.Occurrence.End.LocalDateTime:HH:mm}")))
+                + (conflicts.Count > 6 ? "\n…" : string.Empty);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ConflictText = null; // only a hint; the event can be saved anyway
         }
     }
 
@@ -250,7 +347,10 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         var target = SelectedCalendar;
         var me = _ownAddress(target);
         var draft = new EventDraft(Title.Trim(), Location.Trim(), Description.Trim(), start, end, IsAllDay, Recurrence.Kind,
-            Reminder.Minutes, IsOrganizer ? attendees : null, me);
+            Reminder.Minutes, IsOrganizer ? attendees : null, me)
+        {
+            ShowAs = (ShowAs ?? ShowAsOption.Of(Neruna.Core.Calendar.ShowAs.Busy)).Value,
+        };
         await RunAsync(async () =>
         {
             var previous = _existing is { } e ? (await _calendar.GetObjectAsync(e.Calendar, e.RemoteId))?.ICalendarData : null;

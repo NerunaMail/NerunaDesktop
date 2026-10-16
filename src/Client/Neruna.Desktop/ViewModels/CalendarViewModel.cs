@@ -187,6 +187,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         IsTimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) != "list"; // default: time grid
         _loadingSettings = true;
         IsWorkWeek = await settings.GetBoolAsync(SettingKeys.CalendarWorkWeek);
+        IsPlanning = await settings.GetBoolAsync(SettingKeys.CalendarPlanning);
         _loadingSettings = false;
         GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
         SetVisibleRange(
@@ -488,6 +489,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
                 .ToList();
             Days.Add(new CalendarDay(day, events));
         }
+
+        BuildPlanning(occurrences);
 
         // The navigator follows the week (e.g. "Heute", arrows) when the week is not visible in it.
         if (dataChanged)

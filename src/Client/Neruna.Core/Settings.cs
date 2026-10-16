@@ -123,6 +123,9 @@ public static class SettingKeys
     /// <summary>Reminder for new events and accepted invitations, minutes before the start; "none" for none. Default: 15.</summary>
     public const string CalendarDefaultReminder = "calendar.defaultReminder";
 
+    /// <summary>The calendar shows the planning view (a time line per calendar) instead of the week.</summary>
+    public const string CalendarPlanning = "calendar.planning";
+
     /// <summary>Calendar preselected for new events (<see cref="Calendar.CalendarController.CalendarKey"/>); the first writable one when unset or gone.</summary>
     public const string CalendarDefaultCalendar = "calendar.defaultCalendar";
 

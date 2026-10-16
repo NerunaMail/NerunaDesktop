@@ -22,6 +22,9 @@ public sealed record CalendarOccurrence(
 {
     /// <summary>An open task shown on its due date ("Aufgaben im Kalender anzeigen", see <see cref="TaskController"/>).</summary>
     public bool IsTask { get; init; }
+
+    /// <summary>Busy, free, tentative or away (the colours of the planning view).</summary>
+    public ShowAs ShowAs { get; init; }
 }
 
 /// <summary>A calendar offered by the server, for choosing which ones to show (Thunderbird only offers this at setup).</summary>
@@ -420,7 +423,10 @@ public sealed class CalendarController(
             start,
             end,
             evt.IsAllDay,
-            evt.RecurrenceRule is not null || evt.RecurrenceIdentifier is not null);
+            evt.RecurrenceRule is not null || evt.RecurrenceIdentifier is not null)
+        {
+            ShowAs = EventDraft.ShowAsOf(evt),
+        };
     }
 
     internal static DateTimeOffset ToDateTimeOffset(CalDateTime value)
