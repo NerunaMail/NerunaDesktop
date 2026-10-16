@@ -151,6 +151,7 @@ internal static class AppServices
         services.AddSingleton<CertificatesViewModel>();
         services.AddSingleton<MailOptionsViewModel>();
         services.AddSingleton<PrivacyOptionsViewModel>();
+        services.AddSingleton<WorkspacesViewModel>();
         services.AddSingleton<CalendarOptionsViewModel>();
         services.AddSingleton<SignaturesViewModel>();
         services.AddSingleton<AppearanceViewModel>();
@@ -160,6 +161,7 @@ internal static class AppServices
         services.AddSingleton<QuickActionsViewModel>();
         services.AddSingleton(sp => new AiOptionsViewModel(sp.GetRequiredService<Neruna.Core.Ai.AiController>()) { Browser = sp.GetRequiredService<Neruna.Core.Auth.IBrowserLauncher>() });
         services.AddSingleton<TextTemplateService>();
+        services.AddSingleton<Neruna.Core.Workspaces.WorkspaceService>();
         services.AddSingleton<MailSearchIndexer>();
         services.AddSingleton<SearchIndexViewModel>();
         services.AddSingleton<LocalDataViewModel>();

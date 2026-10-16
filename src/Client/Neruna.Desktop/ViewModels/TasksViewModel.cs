@@ -22,7 +22,7 @@ internal enum TaskFilter
 /// "Aufgaben": the tasks (VTODO) of all task lists – CalDAV calendars that hold tasks and Microsoft To Do. Each list can
 /// be shown or hidden on its own (hidden lists are also left out of the calendar); grouped by due date.
 /// </summary>
-internal sealed partial class TasksViewModel(CalendarController calendar, TaskController tasks, ISettingsStore settings, ILogger<TasksViewModel> logger) : ViewModelBase, ICollectionListHost
+internal sealed partial class TasksViewModel(CalendarController calendar, TaskController tasks, ISettingsStore settings, Neruna.Core.Workspaces.WorkspaceService workspaces, ILogger<TasksViewModel> logger) : ViewModelBase, ICollectionListHost
 {
     private IReadOnlyList<TaskItem> _all = [];
 
@@ -65,12 +65,18 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
     {
         try
         {
-            var lists = (await calendar.GetCalendarsAsync()).Where(c => c.HasTasks).ToList();
+            // Only the lists the open workspace shows.
+            var sources = await calendar.GetSourcesAsync();
+            var accountOf = sources.ToDictionary(s => s.Connection.Id, s => s.Account.Id);
+            var lists = (await calendar.GetCalendarsAsync())
+                .Where(c => c.HasTasks && workspaces.Current.ShowsCalendar(c, accountOf.TryGetValue(c.ConnectionId, out var a) ? a : null))
+                .ToList();
             var hidden = await tasks.GetHiddenListsAsync();
             var inCalendar = await tasks.GetListsInCalendarAsync();
             var colors = await CalendarViewModel.ColorsAsync(settings, await calendar.GetCalendarsAsync());
-            var accounts = (await calendar.GetSourcesAsync()).ToDictionary(s => s.Connection.Id, s => s.Account.Title);
-            _all = await Task.Run(() => tasks.GetTasksAsync());
+            var accounts = sources.ToDictionary(s => s.Connection.Id, s => s.Account.Title);
+            var shownTasks = (await Task.Run(() => tasks.GetTasksAsync())).Where(t => lists.Any(l => Same(t.List, l)));
+            _all = [.. shownTasks];
 
             ListGroups.Clear();
             foreach (var group in lists.GroupBy(l => l.ConnectionId))

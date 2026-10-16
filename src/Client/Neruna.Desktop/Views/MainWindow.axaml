@@ -139,7 +139,35 @@
     <Grid Grid.Row="1" ColumnDefinitions="60,*">
       <!-- Navigation rail -->
       <Border Grid.Column="0" Background="{DynamicResource RailBackgroundBrush}">
+        <Panel>
+        <!-- The open workspace's colour over the rail -->
+        <Border Background="{Binding RailTint}" />
         <DockPanel>
+        <!-- Workspaces (Einstellungen → Workspaces): the full view and the own ones, at the very top -->
+        <Button DockPanel.Dock="Top" Classes="rail" HorizontalAlignment="Center" Margin="0,10,0,4" IsVisible="{Binding ShowWorkspaceRail}"
+                ToolTip.Tip="{Binding CurrentWorkspace.Name, FallbackValue=''}">
+          <Panel>
+            <PathIcon Data="{StaticResource IconWorkspaces}" IsVisible="{Binding CurrentWorkspace.Workspace.IsFull, FallbackValue=True}" />
+            <Border Width="28" Height="28" CornerRadius="14" Background="{Binding CurrentWorkspace.Brush, FallbackValue=Gray}"
+                    IsVisible="{Binding !CurrentWorkspace.Workspace.IsFull, FallbackValue=False}">
+              <TextBlock Text="{Binding CurrentWorkspace.Initial, FallbackValue=''}" Foreground="White" FontWeight="SemiBold"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+          </Panel>
+          <Button.Flyout>
+            <MenuFlyout Placement="RightEdgeAlignedTop" ItemsSource="{Binding WorkspaceMenu}">
+              <MenuFlyout.ItemContainerTheme>
+                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:WorkspaceMenuItem">
+                  <Setter Property="Header" Value="{Binding Title}" />
+                  <Setter Property="Command" Value="{Binding Command}" />
+                  <Setter Property="CommandParameter" Value="{Binding Parameter}" />
+                  <Setter Property="ToggleType" Value="{Binding ToggleType}" />
+                  <Setter Property="IsChecked" Value="{Binding IsChecked}" />
+                </ControlTheme>
+              </MenuFlyout.ItemContainerTheme>
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
         <!-- Bottom of the rail: add an account, synchronize, settings -->
         <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,0,0,10">
           <Button Classes="rail" HorizontalAlignment="Center" Command="{Binding ShowAccountSetupCommand}" ToolTip.Tip="{l:T 'Konto hinzufügen'}"
@@ -156,7 +184,7 @@
           </Button>
         </StackPanel>
         <!-- E-Mail, Kalender, Kontakte, Chat: order and visibility from Einstellungen → Design -->
-        <ItemsControl ItemsSource="{Binding MailPage.Preferences.NavigationItems}" Margin="0,10,0,0">
+        <ItemsControl ItemsSource="{Binding MailPage.Preferences.NavigationItems}" Margin="0,6,0,0">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <StackPanel Spacing="6" />
@@ -164,7 +192,7 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:NavigationItem">
-              <Button Classes="rail" Classes.active="{Binding IsActive}" HorizontalAlignment="Center" IsVisible="{Binding IsVisible}"
+              <Button Classes="rail" Classes.active="{Binding IsActive}" HorizontalAlignment="Center" IsVisible="{Binding IsShown}"
                       Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).NavigateCommand}" CommandParameter="{Binding Section}"
                       ToolTip.Tip="{Binding Label}">
                 <Panel>
@@ -181,9 +209,31 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         </DockPanel>
+        </Panel>
       </Border>
 
-      <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" Margin="6,6,6,0" />
+      <DockPanel Grid.Column="1">
+        <!-- Workspaces as tabs below the header (Einstellungen → Workspaces) -->
+        <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding WorkspaceChoices}" IsVisible="{Binding ShowWorkspaceTabs}" Margin="6,6,6,0">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="4" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:WorkspaceChoice">
+              <Button Classes="workspaceTab" Classes.current="{Binding IsCurrent}" Padding="12,5"
+                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SwitchWorkspaceCommand}" CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Border Width="10" Height="10" CornerRadius="5" Background="{Binding Brush}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Name}" />
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ContentControl Content="{Binding CurrentPage}" Margin="6,6,6,0" />
+      </DockPanel>
     </Grid>
 
     <!-- Status bar; on the right a downloaded update waiting for a restart -->

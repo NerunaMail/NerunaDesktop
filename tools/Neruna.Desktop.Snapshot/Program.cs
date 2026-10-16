@@ -733,6 +733,32 @@ internal static class Snapshots
         await vm.SettingsPage.ReloadAsync();
         vm.SettingsPage.SelectedTab = 1;
         await SaveAsync(window, output, "settings-mail.png");
+        // Workspaces: "Business" without one folder, the rail in its colour, the menu, the tabs and the settings page.
+        var workspaceService = services.GetRequiredService<Neruna.Core.Workspaces.WorkspaceService>();
+        var workspaceAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync())[0];
+        var workspaceFolders = await services.GetRequiredService<Neruna.Core.Mail.MailController>().GetFoldersAsync(workspaceAccount.ConnectionsOf(Neruna.Core.Accounts.ServiceKind.Mail).First().Id);
+        var hiddenFolder = workspaceFolders.First(f => f.Role == Neruna.Core.Mail.FolderRole.None);
+        var business = new Neruna.Core.Workspaces.Workspace(Guid.NewGuid(), "Business", "#0B6A0B", [workspaceAccount.Id],
+            [Neruna.Core.Workspaces.Workspace.FolderKey(workspaceAccount.Id, hiddenFolder.RemoteId)], [], [], HideChat: true);
+        await workspaceService.SaveAsync(business);
+        await workspaceService.SaveAsync(new Neruna.Core.Workspaces.Workspace(Guid.NewGuid(), "Privat", "#C239B3", [], [], [], []));
+        await workspaceService.SwitchAsync(business.Id);
+        await Task.Delay(800);
+        vm.NavigateCommand.Execute(Section.Mail);
+        await SaveAsync(window, output, "workspace-business.png");
+        await vm.SettingsPage.Workspaces.ReloadAsync();
+        await vm.SettingsPage.Workspaces.EditCommand.ExecuteAsync(null);
+        vm.NavigateCommand.Execute(Section.Settings);
+        vm.SettingsPage.SelectedTab = 15;
+        await SaveAsync(window, output, "settings-workspaces.png");
+        vm.SettingsPage.Workspaces.ShowAsTabs = true;
+        vm.NavigateCommand.Execute(Section.Mail);
+        await SaveAsync(window, output, "workspace-tabs.png");
+        vm.SettingsPage.Workspaces.ShowAsTabs = false;
+        await workspaceService.SwitchAsync(Guid.Empty);
+        await Task.Delay(500);
+        vm.NavigateCommand.Execute(Section.Settings);
+
         // Datenschutz with a few trusted senders, and with many (the list scrolls in its own box).
         var privacy = services.GetRequiredService<Neruna.Desktop.Infrastructure.PrivacyService>();
         var privacyOptions = await privacy.GetAsync();

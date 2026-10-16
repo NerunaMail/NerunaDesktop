@@ -10,7 +10,7 @@ namespace Neruna.Desktop.Infrastructure;
 /// Notifications for new mail (setting "Benachrichtigungen"): one per message, a summary from four on – none while the
 /// user looks at exactly that folder in Neruna. A click opens the message (the shell decides how).
 /// </summary>
-internal sealed class MailNotifier(NotificationService notifications, ISettingsStore settings, ILogger<MailNotifier> logger)
+internal sealed class MailNotifier(NotificationService notifications, ISettingsStore settings, Neruna.Core.Workspaces.WorkspaceService workspaces, ILogger<MailNotifier> logger)
 {
     private const int MaxNotifications = 3;
 
@@ -27,6 +27,13 @@ internal sealed class MailNotifier(NotificationService notifications, ISettingsS
             if (!await settings.GetBoolAsync(SettingKeys.MailNotifications, fallback: true))
             {
                 logger.LogInformation("{Count} new mail(s) for {Account}: notifications are switched off", e.Messages.Count, account);
+                return;
+            }
+
+            // A workspace may keep notifications to its own accounts ("Privat" in the evening).
+            if (!workspaces.Notifies(e.Account.Id))
+            {
+                logger.LogInformation("{Count} new mail(s) for {Account}: not in the open workspace", e.Messages.Count, account);
                 return;
             }
 

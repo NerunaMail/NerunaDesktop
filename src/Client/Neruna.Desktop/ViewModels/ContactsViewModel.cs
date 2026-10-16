@@ -14,7 +14,7 @@ namespace Neruna.Desktop.ViewModels;
 /// Contacts: address books on the left (shown/hidden, own color), contacts and groups in
 /// the middle (colored by address book), details on the right.
 /// </summary>
-internal sealed partial class ContactsViewModel(ContactController contacts, ISettingsStore settings, IFileService files) : ViewModelBase
+internal sealed partial class ContactsViewModel(ContactController contacts, ISettingsStore settings, IFileService files, Neruna.Core.Workspaces.WorkspaceService workspaces) : ViewModelBase
 {
     private static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
@@ -58,11 +58,16 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     public async Task ReloadAsync()
     {
         _hidden = await LoadHiddenAsync();
-        var books = await contacts.GetAddressBooksAsync();
-        _all = await Task.Run(() => contacts.SearchAsync(null));
+        // Only the address books the open workspace shows.
+        var sources = await contacts.GetSourcesAsync();
+        var accountOf = sources.ToDictionary(s => s.Connection.Id, s => s.Account.Id);
+        var books = (await contacts.GetAddressBooksAsync())
+            .Where(b => workspaces.Current.ShowsAddressBook(b.ConnectionId, b.RemoteId, accountOf.TryGetValue(b.ConnectionId, out var a) ? a : null))
+            .ToList();
+        var shownContacts = (await Task.Run(() => contacts.SearchAsync(null))).Where(e => books.Any(b => Same(e.AddressBook, b)));
+        _all = [.. shownContacts];
 
         // With several accounts the account is shown below each address book: two "Domain Address Book" stay apart.
-        var sources = await contacts.GetSourcesAsync();
         var owners = sources.ToDictionary(s => s.Connection.Id, s => s.Account.Title);
         var showOwner = owners.Values.Distinct().Count() > 1;
 

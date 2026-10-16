@@ -10,7 +10,7 @@ namespace Neruna.Desktop.Infrastructure;
 /// Checks every 30 seconds which reminders are due and shows the reminder window when a new one comes up. Closing the
 /// window keeps the reminders; it returns with the next one that becomes due.
 /// </summary>
-internal sealed class ReminderScheduler(ReminderService reminders, UiLayout layout, TimeProvider clock, ILogger<ReminderScheduler> logger)
+internal sealed class ReminderScheduler(ReminderService reminders, UiLayout layout, TimeProvider clock, Neruna.Core.Workspaces.WorkspaceService workspaces, ILogger<ReminderScheduler> logger)
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
@@ -45,7 +45,21 @@ internal sealed class ReminderScheduler(ReminderService reminders, UiLayout layo
         try
         {
             // Expanding every event's alarms is real work; the window is only updated on the UI thread.
-            var due = await Task.Run(() => reminders.GetDueAsync());
+            var due = await Task.Run(async () =>
+            {
+                // A workspace may keep reminders to its own calendars.
+                var all = await reminders.GetDueAsync();
+                var shown = new List<Reminder>();
+                foreach (var reminder in all)
+                {
+                    if (await workspaces.NotifiesAsync(reminder.Occurrence.Calendar))
+                    {
+                        shown.Add(reminder);
+                    }
+                }
+
+                return (IReadOnlyList<Reminder>)shown;
+            });
             var model = _model ??= CreateModel();
             model.Show(due);
 

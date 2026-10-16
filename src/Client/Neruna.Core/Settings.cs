@@ -123,6 +123,15 @@ public static class SettingKeys
     /// <summary>Reminder for new events and accepted invitations, minutes before the start; "none" for none. Default: 15.</summary>
     public const string CalendarDefaultReminder = "calendar.defaultReminder";
 
+    /// <summary>The user's workspaces as JSON (Neruna.Core.Workspaces.WorkspaceService); none: only the full view.</summary>
+    public const string Workspaces = "workspaces";
+
+    /// <summary>The workspace in use (id); empty: the full view.</summary>
+    public const string WorkspaceCurrent = "workspaces.current";
+
+    /// <summary>"tabs": workspaces as tabs below the header; otherwise an icon at the top of the navigation rail.</summary>
+    public const string WorkspaceDisplay = "workspaces.display";
+
     /// <summary>The calendar shows the planning view (a time line per calendar) instead of the week.</summary>
     public const string CalendarPlanning = "calendar.planning";
 

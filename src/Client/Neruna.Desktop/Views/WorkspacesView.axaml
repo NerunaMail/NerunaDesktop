@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:ws="using:Neruna.Core.Workspaces"
+             x:Class="Neruna.Desktop.Views.WorkspacesView"
+             x:DataType="vm:WorkspacesViewModel">
+  <!-- Einstellungen → Workspaces: own views with their accounts, folders, calendars and address books -->
+  <Grid ColumnDefinitions="260,24,*" Margin="0,0,0,16">
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
+        <TextBlock TextWrapping="Wrap" Classes="subtle" FontSize="12"
+                   Text="{l:T 'Ein Workspace zeigt nur bestimmte Konten, Ordner, Kalender und Adressbücher – z. B. «Business» und «Privat». Synchronisiert wird immer alles; die Vollansicht bleibt.'}" />
+        <TextBlock Text="{l:T 'Workspaces wechseln über'}" FontWeight="SemiBold" Margin="0,8,0,0" />
+        <RadioButton GroupName="WorkspaceDisplay" IsChecked="{Binding ShowAsRail}" Content="{l:T 'Symbol oben in der linken Leiste'}" />
+        <RadioButton GroupName="WorkspaceDisplay" IsChecked="{Binding ShowAsTabs}" Content="{l:T 'Tabs unter der Kopfzeile'}" />
+      </StackPanel>
+      <WrapPanel DockPanel.Dock="Bottom" ItemSpacing="6" LineSpacing="6" Margin="0,8,0,0">
+        <Button Classes="accent" Content="{l:T 'Neu'}" Command="{Binding NewCommand}" />
+        <Button Content="{l:T 'Bearbeiten'}" Command="{Binding EditCommand}" />
+        <Button Content="{l:T 'Löschen'}" Command="{Binding DeleteCommand}" />
+        <Button Content="↑" Command="{Binding MoveUpCommand}" ToolTip.Tip="{l:T 'Nach oben'}" />
+        <Button Content="↓" Command="{Binding MoveDownCommand}" ToolTip.Tip="{l:T 'Nach unten'}" />
+      </WrapPanel>
+      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" MinHeight="160">
+        <Panel>
+          <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="12" Text="{l:T 'Noch kein Workspace – «Neu» erstellt einen.'}"
+                     IsVisible="{Binding !Workspaces.Count}" />
+          <ListBox ItemsSource="{Binding Workspaces}" SelectedItem="{Binding Selected}" Background="Transparent" DoubleTapped="OnDoubleTapped">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="ws:Workspace">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Border Width="12" Height="12" CornerRadius="3" Background="{Binding Color, Converter={x:Static l:Converters.WorkspaceBrush}}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Name}" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Panel>
+      </Border>
+    </DockPanel>
+
+    <!-- The workspace being edited -->
+    <ScrollViewer Grid.Column="2" IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel DataContext="{Binding Editor}" x:DataType="vm:WorkspaceEditor" Spacing="10" MaxWidth="720" HorizontalAlignment="Left" Margin="0,0,0,20">
+        <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" />
+        <Grid ColumnDefinitions="80,*">
+          <TextBlock Classes="subtle" Text="{l:T 'Name'}" VerticalAlignment="Center" />
+          <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="{l:T 'z. B. Business, Privat, Verein'}" MaxWidth="320" HorizontalAlignment="Left" Width="320" />
+        </Grid>
+        <Grid ColumnDefinitions="80,*">
+          <TextBlock Classes="subtle" Text="{l:T 'Farbe'}" VerticalAlignment="Center" />
+          <ItemsControl Grid.Column="1" ItemsSource="{x:Static vm:WorkspaceEditor.Palette}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <Button Width="26" Height="26" MinWidth="0" Padding="0" CornerRadius="13" Background="{Binding Converter={x:Static l:Converters.WorkspaceBrush}}"
+                        Command="{Binding $parent[ItemsControl].((vm:WorkspaceEditor)DataContext).PickColorCommand}" CommandParameter="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Grid>
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="80,0,0,0">
+          <Border Width="40" Height="16" CornerRadius="3" Background="{Binding ColorBrush}" />
+          <TextBlock Classes="subtle" FontSize="12" Text="{l:T 'färbt die linke Leiste, solange der Workspace offen ist'}" VerticalAlignment="Center" />
+        </StackPanel>
+        <CheckBox IsChecked="{Binding NotifyOnlyHere}" Content="{l:T 'Benachrichtigungen und Erinnerungen nur für diesen Workspace'}" />
+        <CheckBox IsChecked="{Binding HideChat}" Content="{l:T 'Chat in diesem Workspace ausblenden'}" />
+
+        <TextBlock Text="{l:T 'Konten, Ordner, Kalender und Adressbücher'}" FontSize="16" FontWeight="SemiBold" Margin="0,10,0,0" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Posteingang, Gesendet, Entwürfe, Papierkorb, Spam und Archiv sind immer sichtbar. Ein Unterordner lässt sich nur einblenden, wenn auch sein übergeordneter Ordner sichtbar ist. Neue Ordner vom Server erscheinen automatisch.'}" />
+        <ItemsControl ItemsSource="{Binding Accounts}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:WorkspaceAccountItem">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,6,0,0">
+                <StackPanel Spacing="4">
+                  <CheckBox IsChecked="{Binding IsIncluded}" FontWeight="SemiBold" Content="{Binding Title}" />
+                  <StackPanel Spacing="4" Margin="28,2,0,0" IsVisible="{Binding IsIncluded}">
+                    <Expander Header="{l:T 'Ordner'}" IsVisible="{Binding HasFolders}" HorizontalAlignment="Stretch">
+                      <ItemsControl ItemsSource="{Binding Folders}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:WorkspaceFolderItem">
+                            <CheckBox Margin="{Binding Indent}" IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanChange}" ToolTip.Tip="{Binding Hint}"
+                                      Content="{Binding Name}" MinHeight="26" Padding="6,0" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Expander>
+                    <Expander Header="{l:T 'Kalender und Aufgabenlisten'}" IsVisible="{Binding HasCalendars}" HorizontalAlignment="Stretch">
+                      <ItemsControl ItemsSource="{Binding Calendars}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:WorkspaceToggleItem">
+                            <CheckBox IsChecked="{Binding IsShown}" Content="{Binding Name}" MinHeight="26" Padding="6,0" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Expander>
+                    <Expander Header="{l:T 'Adressbücher'}" IsVisible="{Binding HasAddressBooks}" HorizontalAlignment="Stretch">
+                      <ItemsControl ItemsSource="{Binding AddressBooks}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:WorkspaceToggleItem">
+                            <CheckBox IsChecked="{Binding IsShown}" Content="{Binding Name}" MinHeight="26" Padding="6,0" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Expander>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+          <Button Classes="accent" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" />
+          <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

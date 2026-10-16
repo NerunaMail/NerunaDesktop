@@ -12,7 +12,7 @@ namespace Neruna.Desktop.ViewModels;
 /// (kept across restarts), the order of the accounts, and accounts still being set up. Choosing a folder raises
 /// <see cref="FolderSelected"/>; the mail page opens it.
 /// </summary>
-internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, MailController mail, ISettingsStore settings) : ViewModelBase
+internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, MailController mail, ISettingsStore settings, Neruna.Core.Workspaces.WorkspaceService workspaces) : ViewModelBase
 {
     /// <summary>A folder was chosen in the tree (also through its favourite).</summary>
     public event EventHandler<MailFolderNode>? FolderSelected;
@@ -96,11 +96,12 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
         Accounts.Clear();
         _collapsed ??= await LoadCollapsedAsync();
         _favoriteKeys ??= await LoadFavoritesAsync();
-        foreach (var account in await accounts.GetAccountsAsync())
+        // The open workspace decides which accounts and folders show (everything keeps synchronising).
+        foreach (var account in (await accounts.GetAccountsAsync()).Where(a => workspaces.Current.ShowsAccount(a.Id)))
         {
             foreach (var connection in account.ConnectionsOf(ServiceKind.Mail))
             {
-                var folders = await mail.GetFoldersAsync(connection.Id);
+                var folders = workspaces.Current.FoldersOf(account.Id, await mail.GetFoldersAsync(connection.Id));
                 var node = new MailAccountNode(account, connection, BuildTree(folders)) { IsSettingUp = _settingUp.Contains(connection.Id) };
                 TrackExpansion(node, node.ExpansionKey);
                 foreach (var folder in node.AllFolders())
@@ -122,12 +123,12 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
     {
         var structure = new List<(MailAccountNode? Node, IReadOnlyList<MailFolder> Folders)>();
         var index = 0;
-        foreach (var account in await accounts.GetAccountsAsync())
+        foreach (var account in (await accounts.GetAccountsAsync()).Where(a => workspaces.Current.ShowsAccount(a.Id)))
         {
             foreach (var connection in account.ConnectionsOf(ServiceKind.Mail))
             {
                 var node = index < Accounts.Count && Accounts[index].Connection.Id == connection.Id && Accounts[index].Title == MailAccountNode.TitleOf(account) ? Accounts[index] : null;
-                structure.Add((node, await mail.GetFoldersAsync(connection.Id)));
+                structure.Add((node, workspaces.Current.FoldersOf(account.Id, await mail.GetFoldersAsync(connection.Id))));
                 index++;
             }
         }

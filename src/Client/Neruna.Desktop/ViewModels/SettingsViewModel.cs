@@ -4,8 +4,21 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces) : ViewModelBase
 {
+    /// <summary>Settings → Workspaces.</summary>
+    public WorkspacesViewModel Workspaces => workspaces;
+
+    /// <summary>Index of the «Workspaces» tab (the switcher's "Workspaces verwalten").</summary>
+    public const int WorkspacesTab = 15;
+
+    /// <summary>Opens Einstellungen → Workspaces.</summary>
+    public void ShowWorkspaces()
+    {
+        SelectedTab = WorkspacesTab;
+        _ = Workspaces.ReloadAsync();
+    }
+
     /// <summary>Settings → Datenschutz.</summary>
     public PrivacyOptionsViewModel Privacy => privacy;
 
@@ -81,6 +94,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(13, T("Lokale Daten"), "IconFolder"),
         new(-1, T("Programm"), null, IsHeading: true),
         new(6, T("Darstellung"), "IconPalette"),
+        new(15, T("Workspaces"), "IconFolder"),
         new(8, T("KI"), "IconAi"),
         new(9, T("Über Neruna"), "IconInfo"),
     ];
@@ -135,6 +149,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         await TextTemplates.ReloadAsync();
         await QuickActions.ReloadAsync();
         await Cloud.ReloadAsync();
+        await Workspaces.ReloadAsync();
     }
 }
 

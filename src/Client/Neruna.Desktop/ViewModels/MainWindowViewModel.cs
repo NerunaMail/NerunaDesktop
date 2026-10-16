@@ -50,6 +50,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly Neruna.Core.Auth.IBrowserLauncher _browser;
     private readonly Neruna.Core.Security.ClientCertificates _clientCertificates;
     private readonly Infrastructure.IFileService _files;
+    private readonly Neruna.Core.Workspaces.WorkspaceService _workspacesToLoad;
 
     // Accounts whose password the user postponed ("Später") – asked again with the next start.
     private readonly HashSet<string> _postponedCloudAccounts = [];
@@ -90,8 +91,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Diagnostics.CrashReportService crashReports,
         Neruna.Core.Security.ClientCertificates clientCertificates,
         Infrastructure.IFileService files,
+        Neruna.Core.Workspaces.WorkspaceService workspaces,
         ILogger<MainWindowViewModel> logger)
     {
+        _workspacesToLoad = workspaces;
+        settingsPage.Workspaces.DisplayChanged += (_, display) => WorkspaceDisplay = display;
         _clientCertificates = clientCertificates;
         _files = files;
         MailPage = mailPage;
@@ -448,6 +452,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     /// <summary>Everything from the local store – fast, done while the splash screen is visible.</summary>
     public async Task LoadLocalAsync()
     {
+        // The workspace first: every page shows what it filters.
+        await InitWorkspacesAsync(_workspacesToLoad);
         // Neruna opens with the first button of the rail (E-Mail unless hidden or moved).
         Navigate(MailPage.Preferences.StartSection);
         await RefreshPagesAsync();

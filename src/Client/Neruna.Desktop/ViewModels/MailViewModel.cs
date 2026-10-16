@@ -35,6 +35,7 @@ internal sealed partial class MailViewModel(
     QuickActionService quickActions,
     MailSearchIndexer searchIndex,
     PrivacyService privacy,
+    Neruna.Core.Workspaces.WorkspaceService workspaces,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
@@ -119,7 +120,7 @@ internal sealed partial class MailViewModel(
         {
             if (_tree is null)
             {
-                _tree = new MailFolderTreeViewModel(accounts, mail, settings);
+                _tree = new MailFolderTreeViewModel(accounts, mail, settings, workspaces);
                 _tree.FolderSelected += (_, folder) =>
                 {
                     if (folder != CurrentFolder)

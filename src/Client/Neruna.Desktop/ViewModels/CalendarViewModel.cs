@@ -12,7 +12,7 @@ namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Week view across all calendars, whatever provider they come from.</summary>
 internal sealed partial class CalendarViewModel(CalendarController calendar, TaskController tasks, InvitationService invitations, ISettingsStore settings,
-    Infrastructure.RecipientDirectory recipients) : ViewModelBase, ICollectionListHost
+    Infrastructure.RecipientDirectory recipients, Neruna.Core.Workspaces.WorkspaceService workspaces) : ViewModelBase, ICollectionListHost
 {
     internal static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
@@ -198,7 +198,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
         // The new list is built first and swapped in at once: a week load starting meanwhile must never see no calendars.
         var items = new List<CalendarListItem>();
-        var all = await calendar.GetCalendarsAsync();
+        // Only what the open workspace shows (everything keeps synchronising).
+        var accountOfConnection = (await calendar.GetSourcesAsync()).ToDictionary(s => s.Connection.Id, s => s.Account.Id);
+        var all = (await calendar.GetCalendarsAsync())
+            .Where(c => workspaces.Current.ShowsCalendar(c, accountOfConnection.TryGetValue(c.ConnectionId, out var account) ? account : null))
+            .ToList();
         var colors = await ColorsAsync(settings, all);
         // Calendars that are an account of their own (birthdays, holidays, ICS) can be removed right here.
         var removable = (await calendar.GetSourcesAsync())

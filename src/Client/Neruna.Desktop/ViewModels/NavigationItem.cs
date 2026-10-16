@@ -14,7 +14,16 @@ internal sealed partial class NavigationItem(Section section, string label, stri
     public string IconKey { get; } = iconKey;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsShown))]
     public partial bool IsVisible { get; set; } = true;
+
+    /// <summary>The open workspace leaves it out (the chat in "Privat"); the choice in Design stays as it is.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsShown))]
+    public partial bool IsHiddenByWorkspace { get; set; }
+
+    /// <summary>On the rail: chosen in Design and not left out by the workspace.</summary>
+    public bool IsShown => IsVisible && !IsHiddenByWorkspace;
 
     /// <summary>The page is the one in front.</summary>
     [ObservableProperty]

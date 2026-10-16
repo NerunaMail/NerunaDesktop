@@ -8,6 +8,9 @@ namespace Neruna.Desktop;
 
 internal static class Converters
 {
+    /// <summary>A workspace colour (#RRGGBB) as a brush.</summary>
+    public static FuncValueConverter<string?, Avalonia.Media.IBrush> WorkspaceBrush { get; } = new(ViewModels.WorkspaceColors.Brush);
+
     public static FuncValueConverter<SocketSecurity, string> SecurityLabel { get; } = new(security => security switch
     {
         SocketSecurity.SslOnConnect => "SSL/TLS",
