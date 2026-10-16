@@ -11,6 +11,32 @@ internal sealed class RecipientDirectory(ContactController contacts)
     private static readonly TimeSpan KeepFor = TimeSpan.FromMinutes(2);
     private Task<IReadOnlyList<RecipientEntry>>? _load;
     private DateTime _loadedAt;
+    private Task<Dictionary<string, ContactCard>>? _cards;
+    private DateTime _cardsAt;
+
+    /// <summary>The contact with this address (the first one found), for the placeholders of text templates.</summary>
+    public async Task<ContactCard?> FindContactAsync(string email)
+    {
+        if (_cards is null || _cards.IsFaulted || _cards.IsCanceled || DateTime.UtcNow - _cardsAt > KeepFor)
+        {
+            _cardsAt = DateTime.UtcNow;
+            _cards = Task.Run(async () =>
+            {
+                var byAddress = new Dictionary<string, ContactCard>(StringComparer.OrdinalIgnoreCase);
+                foreach (var entry in await contacts.SearchAsync(null))
+                {
+                    foreach (var address in entry.Card.IsGroup ? [] : entry.Card.EmailAddresses)
+                    {
+                        byAddress.TryAdd(address, entry.Card);
+                    }
+                }
+
+                return byAddress;
+            });
+        }
+
+        return (await _cards).GetValueOrDefault(email);
+    }
 
     public Task<IReadOnlyList<RecipientEntry>> GetAllAsync()
     {

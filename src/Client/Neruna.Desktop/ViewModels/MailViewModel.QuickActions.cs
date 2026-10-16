@@ -297,7 +297,11 @@ internal sealed partial class MailViewModel
 
         if (step?.TemplateId is { } templateId && (await textTemplates.GetAllAsync()).FirstOrDefault(t => t.Id == templateId) is { } template)
         {
-            draft = draft with { LeadHtml = template.Html };
+            // Placeholders such as {{recipient_last_name}} for the reply's recipient.
+            var recipient = TemplateFields.HasFields(template.Html)
+                ? await TemplateFields.ResolveAsync(draft.To, email => recipients.FindContactAsync(email))
+                : null;
+            draft = draft with { LeadHtml = TemplateFields.Fill(template.Html, recipient) };
         }
 
         if (kind == QuickActionStepKind.NewMail)

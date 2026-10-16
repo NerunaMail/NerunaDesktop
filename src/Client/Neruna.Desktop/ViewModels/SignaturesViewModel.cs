@@ -306,4 +306,15 @@ internal sealed partial class SignatureEditorViewModel : ViewModelBase
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, null);
+
+    /// <summary>Text templates: "{{recipient_last_name}}" at the caret (see <see cref="TemplateFields"/>).</summary>
+    [RelayCommand]
+    private async Task InsertField(string? name)
+    {
+        if (name is not null && TemplateFields.Names.Contains(name) && Formatting.Editor is { } editor)
+        {
+            var field = "{{" + name + "}}";
+            await editor.InsertAsync(field, field);
+        }
+    }
 }

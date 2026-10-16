@@ -397,7 +397,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
     }
 
-    partial void OnToChanged(string value) => ScheduleEncryptionCheck();
+    partial void OnToChanged(string value)
+    {
+        ScheduleEncryptionCheck();
+        RefreshTemplateRecipient();
+    }
 
     partial void OnCcChanged(string value) => ScheduleEncryptionCheck();
 
@@ -817,9 +821,50 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
 
         OnPropertyChanged(nameof(HasTemplates));
-        var shortcuts = (await TextTemplates.GetShortcutsAsync()).ToDictionary(
-            p => p.Key, p => (p.Value.Html, HtmlText.ToPlainText(p.Value.Html)), StringComparer.OrdinalIgnoreCase);
-        editor.SetShortcuts(shortcuts);
+        _shortcutTemplates = await TextTemplates.GetShortcutsAsync();
+        await PushShortcutsAsync(editor);
+    }
+
+    private IReadOnlyDictionary<string, TextTemplate> _shortcutTemplates = new Dictionary<string, TextTemplate>();
+    private int _shortcutVersion;
+
+    // The editor replaces "kürzel::" itself, so it gets the templates already filled for the current recipient – again
+    // whenever "An" changes (see OnToChanged).
+    private async Task PushShortcutsAsync(IHtmlEditor editor)
+    {
+        var recipient = _shortcutTemplates.Values.Any(t => TemplateFields.HasFields(t.Html)) ? await TemplateRecipientAsync() : null;
+        editor.SetShortcuts(_shortcutTemplates.ToDictionary(
+            p => p.Key, p => FilledTemplate(p.Value, recipient), StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static (string Html, string Text) FilledTemplate(TextTemplate template, TemplateRecipient? recipient)
+    {
+        var html = TemplateFields.Fill(template.Html, recipient);
+        return (html, HtmlText.ToPlainText(html));
+    }
+
+    /// <summary>Who {{recipient_…}} in text templates stands for: the first address in "An", with its contact.</summary>
+    private Task<TemplateRecipient?> TemplateRecipientAsync() =>
+        TemplateFields.ResolveAsync(To, email => Recipients?.FindContactAsync(email) ?? Task.FromResult<Neruna.Core.Contacts.ContactCard?>(null));
+
+    private void RefreshTemplateRecipient()
+    {
+        if (_editor is not { } editor || !_shortcutTemplates.Values.Any(t => TemplateFields.HasFields(t.Html)))
+        {
+            return;
+        }
+
+        _ = RefreshLaterAsync(editor, ++_shortcutVersion);
+    }
+
+    // Once typing in "An" pauses; a later change wins.
+    private async Task RefreshLaterAsync(IHtmlEditor editor, int version)
+    {
+        await Task.Delay(400);
+        if (version == _shortcutVersion)
+        {
+            await PushShortcutsAsync(editor);
+        }
     }
 
     [RelayCommand]
@@ -831,7 +876,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
 
         MarkChanged();
-        await _editor.InsertAsync(template.Html, HtmlText.ToPlainText(template.Html));
+        var (html, text) = FilledTemplate(template, TemplateFields.HasFields(template.Html) ? await TemplateRecipientAsync() : null);
+        await _editor.InsertAsync(html, text);
     }
 
     [RelayCommand]
