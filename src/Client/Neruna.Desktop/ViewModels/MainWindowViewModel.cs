@@ -412,6 +412,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         GroupEditorViewModel { IsReadOnly: false } => 980,
         CalendarSelectionViewModel { HasSeveralSources: true } => 900,
         AccountTransferDialogViewModel => 900, // the QR code (up to ~520 px) with PIN and instructions beside it
+        SyncStatusViewModel or BackupChangesViewModel => 820, // account, service and state in one line, errors below
         _ => 640,
     };
 

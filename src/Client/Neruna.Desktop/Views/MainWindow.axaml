@@ -223,7 +223,7 @@
     <Border Grid.RowSpan="3" IsVisible="{Binding HasOverlay}" Background="#80000000">
       <Border Classes="pane" Width="{Binding OverlayWidth}" MaxWidth="{Binding $parent[Window].Bounds.Width}" Margin="0,24" HorizontalAlignment="Center" VerticalAlignment="Center"
               BoxShadow="0 8 32 0 #40000000">
-        <ScrollViewer>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
           <ContentControl Content="{Binding Overlay}" Margin="28" />
         </ScrollViewer>
       </Border>

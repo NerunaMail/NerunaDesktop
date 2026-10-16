@@ -13,16 +13,17 @@
     </StackPanel>
     <Panel>
       <TextBlock Text="{l:T 'Seit dem Start wurde noch nicht synchronisiert.'}" Classes="subtle" IsVisible="{Binding IsEmpty}" />
-      <ScrollViewer MaxHeight="460">
+      <!-- Only vertical: long errors wrap instead of widening the dialog -->
+      <ScrollViewer MaxHeight="460" HorizontalScrollBarVisibility="Disabled">
         <ItemsControl ItemsSource="{Binding Rows}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:SyncRow">
               <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,8">
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="{Binding Account}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="320" />
-                    <TextBlock Text="{Binding Service}" Classes="subtle" />
-                  </StackPanel>
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding Service}" Classes="subtle" Margin="8,0,12,0" />
+                    <TextBlock Text="{Binding Account}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Account}" />
+                  </DockPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                     <ProgressBar IsIndeterminate="True" Width="40" Height="4" MinWidth="0" VerticalAlignment="Center" IsVisible="{Binding IsRunning}" />
                     <TextBlock Text="{Binding State}" Classes.error="{Binding IsFailed}" />
