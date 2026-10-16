@@ -20,6 +20,9 @@ internal interface IWindowService
 
     /// <summary>An event in a window of its own (from a mail being written); true if it was saved or deleted.</summary>
     Task<bool> ShowEventEditorAsync(EventEditorViewModel editor);
+
+    /// <summary>"In welchen Ordner verschieben?" above the active window; null when cancelled.</summary>
+    Task<MailFolderNode?> ShowFolderPickerAsync(FolderPickerViewModel picker);
 }
 
 internal sealed class WindowService(UiLayout layout) : IWindowService
@@ -101,6 +104,46 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
         }
 
         return changed;
+    }
+
+    public async Task<MailFolderNode?> ShowFolderPickerAsync(FolderPickerViewModel picker)
+    {
+        ArgumentNullException.ThrowIfNull(picker);
+        MailFolderNode? result = null;
+        // Above the window the quick action ran in (the main window or a message window).
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+        var owner = lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow;
+        var window = new Window
+        {
+            Title = Neruna.Core.Localization.Texts.T("Verschieben"),
+            Icon = owner?.Icon,
+            Width = 440,
+            Height = 560,
+            MinWidth = 340,
+            MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new FolderPickerView { DataContext = picker, Margin = new Avalonia.Thickness(20, 16) },
+        };
+        window.Bind(Window.BackgroundProperty, window.GetResourceObservable("PaneBackgroundBrush"));
+        picker.Finished += (_, folder) =>
+        {
+            result = folder;
+            window.Close();
+        };
+
+        if (owner is not null)
+        {
+            await window.ShowDialog(owner);
+        }
+        else
+        {
+            var closed = new TaskCompletionSource();
+            window.Closed += (_, _) => closed.TrySetResult();
+            window.Show();
+            await closed.Task;
+        }
+
+        return result;
     }
 
     public async Task<Neruna.Core.Mail.Signature?> ShowSignatureEditorAsync(SignatureEditorViewModel editor)

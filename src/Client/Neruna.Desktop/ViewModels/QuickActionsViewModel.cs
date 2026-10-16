@@ -608,6 +608,7 @@ internal sealed partial class StepEditor : ObservableObject
                  ?? Senders.FirstOrDefault(s => s.Value is { } v && v.AccountId == step.FromAccountId)
                  ?? Senders[0];
         MoveFolder = MoveFolders.FirstOrDefault(f => f.IsFolder && f.RemoteId == step.FolderRemoteId) ?? MoveFolders.FirstOrDefault(f => f.IsFolder && f.Name == step.FolderName);
+        AskFolder = step.AskFolder;
         Folder = step.Folder ?? string.Empty;
         FileName = step.FileName ?? string.Empty;
         To = step.To ?? string.Empty;
@@ -655,6 +656,17 @@ internal sealed partial class StepEditor : ObservableObject
     public bool ShowsSubject => Kind == QuickActionStepKind.NewMail;
 
     public bool ShowsMoveFolder => Kind == QuickActionStepKind.MoveToFolder;
+
+    /// <summary>Move: "Jedes Mal fragen" instead of the fixed folder.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FixedFolder))]
+    public partial bool AskFolder { get; set; }
+
+    public bool FixedFolder
+    {
+        get => !AskFolder;
+        set => AskFolder = !value;
+    }
 
     public IReadOnlyList<Choice<Guid?>> Stamps { get; }
 
@@ -726,7 +738,8 @@ internal sealed partial class StepEditor : ObservableObject
         From = ShowsTemplate ? Sender?.Value?.Email : null,
         To = ShowsTo && !string.IsNullOrWhiteSpace(To) ? To.Trim() : null,
         Subject = ShowsSubject && !string.IsNullOrWhiteSpace(Subject) ? Subject.Trim() : null,
-        FolderRemoteId = ShowsMoveFolder ? MoveFolder?.RemoteId : null,
-        FolderName = ShowsMoveFolder ? MoveFolder?.Name : null,
+        FolderRemoteId = ShowsMoveFolder && !AskFolder ? MoveFolder?.RemoteId : null,
+        FolderName = ShowsMoveFolder && !AskFolder ? MoveFolder?.Name : null,
+        AskFolder = ShowsMoveFolder && AskFolder,
     };
 }

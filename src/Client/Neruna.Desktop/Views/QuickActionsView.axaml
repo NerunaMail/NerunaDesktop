@@ -230,9 +230,15 @@
                     <TextBlock Grid.Row="2" Classes="label" Text="{l:T 'Textvorlage'}" IsVisible="{Binding ShowsTemplate}" />
                     <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Templates}" SelectedItem="{Binding Template}" MinWidth="220" IsVisible="{Binding ShowsTemplate}" />
                   </Grid>
-                  <Grid ColumnDefinitions="140,*" IsVisible="{Binding ShowsMoveFolder}">
+                  <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" IsVisible="{Binding ShowsMoveFolder}">
                     <TextBlock Classes="label" Text="{l:T 'Nach'}" />
-                    <ComboBox Grid.Column="1" Classes="folders" ItemsSource="{Binding MoveFolders}" SelectedItem="{Binding MoveFolder}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16">
+                      <RadioButton IsChecked="{Binding FixedFolder}" Content="{l:T 'Fester Ordner'}" />
+                      <RadioButton IsChecked="{Binding AskFolder}" Content="{l:T 'Jedes Mal fragen'}"
+                                   ToolTip.Tip="{l:T 'Beim Ausführen erscheint eine Ordnerauswahl – das Konto der E-Mail ist vorgewählt.'}" />
+                    </StackPanel>
+                    <ComboBox Grid.Row="1" Grid.Column="1" Classes="folders" ItemsSource="{Binding MoveFolders}" SelectedItem="{Binding MoveFolder}"
+                              IsVisible="{Binding FixedFolder}" Margin="0,6,0,0" />
                   </Grid>
                 </StackPanel>
               </Border>

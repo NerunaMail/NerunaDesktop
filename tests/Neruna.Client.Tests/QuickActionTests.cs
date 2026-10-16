@@ -71,7 +71,8 @@ public class QuickActionTests
         var action = new QuickAction(Guid.NewGuid(), "Offerte genehmigen", "#107C10",
             new QuickActionCondition { Attachment = QuickActionAttachmentKind.Pdf, SubjectContains = "Offerte" },
             [new QuickActionStep(QuickActionStepKind.StampPdf) { StampId = stamp.Id }, new QuickActionStep(QuickActionStepKind.SaveAttachment) { Folder = "/tmp/offerten", FileName = "{Dateiname}_genehmigt" },
-             new QuickActionStep(QuickActionStepKind.Forward) { FromAccountId = Guid.NewGuid(), From = "anna@firma.ch" }]);
+             new QuickActionStep(QuickActionStepKind.Forward) { FromAccountId = Guid.NewGuid(), From = "anna@firma.ch" },
+             new QuickActionStep(QuickActionStepKind.MoveToFolder) { AskFolder = true }]);
         await service.SaveActionsAsync([action], Ct);
         await service.SaveStampsAsync([stamp with { Text = "Freigegeben" }], Ct);
 
@@ -80,6 +81,11 @@ public class QuickActionTests
         Assert.Equal(action.When, loaded.When);
         Assert.Equal(action.Steps, loaded.Steps);
         Assert.Equal("Freigegeben", Assert.Single(await again.GetStampsAsync(Ct)).Text);
+
+        // Saved before "Jedes Mal fragen" existed: the fixed folder, as before.
+        await settings.SetAsync("mail.quickActions", """[{"Id":"6f1c2a10-0000-4000-8000-000000000001","Label":"Ablegen","Color":"#107C10","When":{},"Steps":[{"Kind":"MoveToFolder","FolderRemoteId":"INBOX/Projekte","FolderName":"Projekte"}]}]""", Ct);
+        var old = Assert.Single(Assert.Single(await again.GetActionsAsync(Ct)).Steps);
+        Assert.Equal(("INBOX/Projekte", false), (old.FolderRemoteId, old.AskFolder));
     }
 
     [Fact]

@@ -123,6 +123,11 @@
     </FluentTheme>
 
     <!-- Navigation rail buttons (Mail / Kalender / Kontakte) -->
+    <!-- Folder picker: rows that look like a list, a click picks -->
+    <Style Selector="Button.folderPick">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
     <Style Selector="Button.rail">
       <Setter Property="Width" Value="48" />
       <Setter Property="Height" Value="48" />

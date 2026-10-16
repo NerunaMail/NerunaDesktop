@@ -116,6 +116,9 @@ public sealed record QuickActionStep(QuickActionStepKind Kind)
     public string? FolderRemoteId { get; init; }
 
     public string? FolderName { get; init; }
+
+    /// <summary>Move: asks each time (account and folder, the mail's own account preselected) instead of a fixed folder.</summary>
+    public bool AskFolder { get; init; }
 }
 
 /// <summary>

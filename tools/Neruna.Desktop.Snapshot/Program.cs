@@ -263,6 +263,20 @@ internal static class Snapshots
         await Task.Delay(400);
         await SaveAsync(window, output, "settings-quick-action-folders.png");
         folderBox.IsDropDownOpen = false;
+        // "Jedes Mal fragen": the editor without the folder list, and the picker that appears when the action runs.
+        var moveStep = vm.SettingsPage.QuickActions.Editing!.Steps.Last(s => s.ShowsMoveFolder);
+        moveStep.AskFolder = true;
+        await Task.Delay(200);
+        await SaveAsync(window, output, "settings-quick-action-ask.png");
+        var folderPicker = new FolderPickerViewModel(vm.MailPage.Accounts, vm.MailPage.Accounts[0], null);
+        var pickerWindow = new Window { Width = 440, Height = 560, Content = new FolderPickerView { DataContext = folderPicker, Margin = new Thickness(20, 16) } };
+        pickerWindow.Bind(Window.BackgroundProperty, pickerWindow.GetResourceObservable("PaneBackgroundBrush"));
+        pickerWindow.Show();
+        await SaveAsync(pickerWindow, output, "quick-action-folder-picker.png");
+        folderPicker.Filter = "ar";
+        await SaveAsync(pickerWindow, output, "quick-action-folder-picker-search.png");
+        Console.WriteLine($"Picker focus on search: {pickerWindow.FocusManager?.GetFocusedElement() is TextBox}, matches: {string.Join(" | ", folderPicker.Folders.Select(f => f.Name))}");
+        pickerWindow.Close();
         vm.SettingsPage.QuickActions.Editing!.CancelCommand.Execute(null);
         vm.NavigateCommand.Execute(Section.Mail);
         await Task.Delay(200);
