@@ -602,6 +602,12 @@ internal static class Snapshots
         vm.Overlay = new BackupChangesViewModel(
         [
             new Neruna.Core.Cloud.BackupChange("Einstellungen", "calendar.visibleTo", Neruna.Core.Cloud.BackupChangeKind.Changed),
+            new Neruna.Core.Cloud.BackupChange("Einstellungen", "calendar.color.a2ba0035b58c4d93a66b58ab22268061.https://mail.example.com/SOGo/dav/anna/Calendar/personal/", Neruna.Core.Cloud.BackupChangeKind.Added),
+            new Neruna.Core.Cloud.BackupChange("Einstellungen", "mail.offline.1cde456b642840d0bb57181f34bd3f64", Neruna.Core.Cloud.BackupChangeKind.Added),
+            new Neruna.Core.Cloud.BackupChange("Einstellungen", "mail.offline.673973c04b4c4b32a2837adeff3430a0", Neruna.Core.Cloud.BackupChangeKind.Added),
+            new Neruna.Core.Cloud.BackupChange("Einstellungen", "privacy.blockTrackers", Neruna.Core.Cloud.BackupChangeKind.Added),
+            new Neruna.Core.Cloud.BackupChange("Einstellungen", "mail.remoteContentAllowed", Neruna.Core.Cloud.BackupChangeKind.Changed),
+            new Neruna.Core.Cloud.BackupChange("Einstellungen", "mail.quickActions", Neruna.Core.Cloud.BackupChangeKind.Changed),
             new Neruna.Core.Cloud.BackupChange("Signaturen", "Privat", Neruna.Core.Cloud.BackupChangeKind.Added),
             new Neruna.Core.Cloud.BackupChange("Konten", "anna.muster@example.com", Neruna.Core.Cloud.BackupChangeKind.Changed),
         ], vm.BackupNowCommand, vm.BackupLaterCommand);

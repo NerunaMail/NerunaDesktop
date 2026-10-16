@@ -15,8 +15,15 @@ internal sealed partial class BackupChangesViewModel(IReadOnlyList<BackupChange>
 {
     public event EventHandler? Finished;
 
+    /// <summary>
+    /// Settings by what they are about ("Datenschutz", "Kalenderfarben"), not by their keys: several keys with the same
+    /// label are one line, "neu"/"entfernt" only when all of them are.
+    /// </summary>
     public IReadOnlyList<BackupChangeRow> Rows { get; } = changes is null ? [] :
-        [.. changes.OrderBy(c => c.Area, StringComparer.CurrentCulture).ThenBy(c => c.Name, StringComparer.CurrentCulture)
+        [.. changes.Select(c => c.Area == T("Einstellungen") ? c with { Name = SettingLabels.Of(c.Name) } : c)
+            .GroupBy(c => (c.Area, c.Name))
+            .Select(g => new BackupChange(g.Key.Area, g.Key.Name, g.Select(c => c.Kind).Distinct().Count() == 1 ? g.First().Kind : BackupChangeKind.Changed))
+            .OrderBy(c => c.Area, StringComparer.CurrentCulture).ThenBy(c => c.Name, StringComparer.CurrentCulture)
             .Select(c => new BackupChangeRow(c.Area, c.Name, c.Kind switch
             {
                 BackupChangeKind.Added => T("neu"),

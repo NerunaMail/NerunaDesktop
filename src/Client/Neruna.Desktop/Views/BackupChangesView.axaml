@@ -16,14 +16,15 @@
                  Text="{l:T 'Die letzte Sicherung wurde mit einer älteren Version erstellt. Welche Einträge sich geändert haben, zeigt Neruna ab der nächsten Sicherung.'}" />
       <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding IsEmpty}" Text="{l:T 'Nichts geändert.'}" />
       <ScrollViewer MaxHeight="440" IsVisible="{Binding HasRows}" HorizontalScrollBarVisibility="Disabled">
-        <ItemsControl ItemsSource="{Binding Rows}">
+        <!-- Right margin: the scroll bar lies over the content and would cover "neu"/"geändert" -->
+        <ItemsControl ItemsSource="{Binding Rows}" Margin="0,0,18,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:BackupChangeRow">
               <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,6">
                 <Grid ColumnDefinitions="140,*,Auto">
                   <TextBlock Text="{Binding Area}" Classes="subtle" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Area}" />
                   <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
-                  <TextBlock Grid.Column="2" Text="{Binding What}" Classes="subtle" Margin="12,0,0,0" />
+                  <TextBlock Grid.Column="2" Text="{Binding What}" Classes="subtle" Margin="12,0,0,0" MinWidth="70" TextAlignment="Right" />
                 </Grid>
               </Border>
             </DataTemplate>

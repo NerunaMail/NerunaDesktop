@@ -322,4 +322,15 @@ public class SettingsBackupTests
         Assert.Equal(json, SettingsBackupService.Decompress(compressed));
         Assert.Equal(json, SettingsBackupService.Decompress(json)); // made before 0.1.27: plain JSON
     }
+
+    [Theory]
+    [InlineData("privacy.blockTrackers", "Datenschutz")]
+    [InlineData("mail.remoteContentAllowed", "Datenschutz")]
+    [InlineData("calendar.color.a2ba0035b58c4d93a66b58ab22268061.https://mail.example.com/dav/", "Kalenderfarben")]
+    [InlineData("calendar.planningPeople", "Kalender: Planungsansicht")]
+    [InlineData("calendar.visibleTo", "Kalender: Ansicht")]
+    [InlineData("mail.offline.1cde456b642840d0bb57181f34bd3f64", "Offline verfügbare E-Mails")]
+    [InlineData("something.new", "Weitere Einstellungen")]
+    public void Settings_in_the_backup_list_are_named_as_in_the_settings(string key, string label) =>
+        Assert.Equal(label, SettingLabels.Of(key));
 }
