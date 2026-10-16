@@ -13,6 +13,9 @@ internal sealed class FakeMailServer
 
     public Dictionary<string, List<MessageSummary>> Folders { get; } = new() { ["INBOX"] = [] };
 
+    /// <summary>Added to what the fake provider can do (e.g. LocalContent, as an Outlook data file).</summary>
+    public MailProviderCapabilities ExtraCapabilities { get; set; }
+
     /// <summary>Changing it simulates an IMAP UIDVALIDITY reset.</summary>
     public int Validity { get; set; } = 1;
 
@@ -99,7 +102,7 @@ internal sealed class FakeMailProviderFactory(FakeMailServer server) : IProvider
 
 internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server) : IMailProvider
 {
-    public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags | MailProviderCapabilities.Send | MailProviderCapabilities.Append | MailProviderCapabilities.ServerSearch | MailProviderCapabilities.SearchText;
+    public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags | MailProviderCapabilities.Send | MailProviderCapabilities.Append | MailProviderCapabilities.ServerSearch | MailProviderCapabilities.SearchText | server.ExtraCapabilities;
 
     // The text only, as IMAP gives it for the index: no download counted.
     public Task<IReadOnlyDictionary<string, MessageSearchText>> GetSearchTextsAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)

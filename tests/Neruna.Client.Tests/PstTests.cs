@@ -151,6 +151,10 @@ public class PstTests
 
         var message = await provider.GetMessageAsync(inbox, summary.RemoteId, ct);
         Assert.Equal(summary.Subject, message.Subject);
+
+        // The folder object is kept: its contents table is read once per folder, not once per message.
+        var archive = PstArchive.For(File!);
+        Assert.True(await archive.ReadAsync(a => ReferenceEquals(a.Folder(inbox.RemoteId), a.Folder(inbox.RemoteId)), ct));
         Assert.True(message.HtmlBody is not null || message.TextBody is not null);
 
         // The same file again: nothing to do, and read/flagged set in Neruna stay.

@@ -69,7 +69,8 @@ public sealed class MailController(
     /// </summary>
     private async Task KeepOfflineAsync(IMailProvider provider, ServiceConnection connection, IReadOnlyList<MailFolder> folders, CancellationToken cancellationToken)
     {
-        if (settings is null
+        // Mail in a file on this device (Outlook data file) is there anyway: copying it would only double it.
+        if (settings is null || provider.Capabilities.HasFlag(MailProviderCapabilities.LocalContent)
             || (await accounts.GetAccountsAsync(cancellationToken)).FirstOrDefault(a => a.Connections.Any(c => c.Id == connection.Id)) is not { } account)
         {
             return;

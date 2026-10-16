@@ -27,6 +27,10 @@ internal sealed class PstArchive : IDisposable
     private readonly SemaphoreSlim _lock = new(1, 1);
     private XstFolder? _top;
 
+    // XstReader hands out new folder objects on every walk through the tree; kept here, so a folder's contents table
+    // (cached per folder object, see All) is read once – not once per message, which made a large folder quadratic.
+    private readonly Dictionary<string, XstFolder> _folders = new(StringComparer.Ordinal);
+
     private PstArchive(string path, string stamp)
     {
         Path = path;
@@ -127,6 +131,11 @@ internal sealed class PstArchive : IDisposable
 
     public XstFolder Folder(string remoteId)
     {
+        if (_folders.TryGetValue(remoteId, out var known))
+        {
+            return known;
+        }
+
         var folder = Top();
         foreach (var part in remoteId.Split('/'))
         {
@@ -135,6 +144,7 @@ internal sealed class PstArchive : IDisposable
                 : throw new PstException(Neruna.Core.Localization.Texts.T("Der Ordner ist in der Outlook-Datendatei nicht mehr vorhanden."));
         }
 
+        _folders[remoteId] = folder;
         return folder;
     }
 
@@ -191,17 +201,33 @@ internal sealed class PstArchive : IDisposable
     // The folder's contents table – read here, not with XstFolder.Messages: that one also tries to decrypt S/MIME mail
     // itself (with the certificates of Windows) and on the first it cannot, ends the whole list ("ASN1 bad tag value").
     // Neruna opens S/MIME itself (see Item). Internal API of XstReader.Api 1.0.6 (pinned); another version falls back.
+    // Kept for the last few folders only: a 20 GB file has hundreds of thousands of messages.
+    private const int KeptContents = 3;
     private static readonly ConditionalWeakTable<XstFolder, List<XstMessage>> Contents = [];
+    private static readonly LinkedList<XstFolder> RecentContents = [];
 
     private static List<XstMessage> All(XstFolder folder)
     {
-        if (Contents.TryGetValue(folder, out var cached))
+        lock (RecentContents)
         {
-            return cached;
+            if (Contents.TryGetValue(folder, out var cached))
+            {
+                return cached;
+            }
         }
 
         var messages = folder.ContentCount == 0 ? [] : ReadContents(folder) ?? [.. folder.Messages];
-        Contents.AddOrUpdate(folder, messages);
+        lock (RecentContents)
+        {
+            Contents.AddOrUpdate(folder, messages);
+            RecentContents.AddFirst(folder);
+            while (RecentContents.Count > KeptContents)
+            {
+                Contents.Remove(RecentContents.Last!.Value);
+                RecentContents.RemoveLast();
+            }
+        }
+
         return messages;
     }
 

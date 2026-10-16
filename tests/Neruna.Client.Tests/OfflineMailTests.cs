@@ -50,4 +50,18 @@ public sealed class OfflineMailTests
         await env.Mail.SyncAllAsync(ct);
         Assert.Equal(downloads, env.MailServer.MessageDownloads);
     }
+
+    [Fact]
+    public async Task Mail_in_a_local_file_is_not_copied_ahead()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        env.MailServer.ExtraCapabilities = MailProviderCapabilities.LocalContent;
+        env.MailServer.Deliver("INBOX", "neu", DateTimeOffset.UtcNow.AddDays(-1));
+        await env.AddAccountAsync(ServiceKind.Mail, FakeMailProviderFactory.Id);
+
+        await env.Mail.SyncAllAsync(ct);
+
+        Assert.Equal(0, env.MailServer.MessageDownloads);
+    }
 }
