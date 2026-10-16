@@ -693,11 +693,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Overlay = prompt;
     }
 
-    [RelayCommand(CanExecute = nameof(CanSync))]
+    // Always clickable: while a run is under way the click asks for another one (the coordinator lets it share the next).
+    [RelayCommand]
     private async Task SyncAsync()
     {
         // Timer, button, new accounts and the cloud all ask for syncs; the coordinator runs one at a time and lets
-        // waiting requests share the next run. "Synchronisiere …" stays until the last request is done.
+        // waiting requests share the next run. The status bar names the step, so a long one is not a riddle.
         _syncCalls++;
         IsSyncing = true;
         StatusText = T("Synchronisiere …");
@@ -705,14 +706,18 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         {
             // Accounts removed meanwhile leave the status window.
             _syncActivity.Forget((await _accounts.GetAccountsAsync()).SelectMany(a => a.Connections).Select(c => c.Id));
-            var reports = await _sync.SyncAllAsync();
-            await RefreshPagesAsync();
-            await MailPage.Agenda.ReloadAsync();
-            await _reminders.CheckAsync();
-            if (await SyncCloudAsync())
+            var reports = await StepAsync(T("Konten werden synchronisiert …"), "accounts", () => _sync.SyncAllAsync());
+            await StepAsync(T("Ansicht wird aktualisiert …"), "pages", async () =>
+            {
+                await RefreshPagesAsync();
+                await MailPage.Agenda.ReloadAsync();
+                await _reminders.CheckAsync();
+                return true;
+            });
+            if (await StepAsync(T("Neruna Cloud wird abgeglichen …"), "cloud", SyncCloudAsync))
             {
                 // New accounts from the organisation: fetch their folders and mail right away.
-                reports = [.. reports, .. await _sync.SyncAllAsync()];
+                reports = [.. reports, .. await StepAsync(T("Neue Konten werden synchronisiert …"), "new accounts", () => _sync.SyncAllAsync())];
                 await RefreshPagesAsync();
             }
 
@@ -746,6 +751,25 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     }
 
     private bool CanSync() => !IsSyncing;
+
+    /// <summary>One step of a sync run: named in the status bar and logged with its duration.</summary>
+    private async Task<T> StepAsync<T>(string status, string name, Func<Task<T>> step)
+    {
+        StatusText = status;
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        try
+        {
+            return await step();
+        }
+        finally
+        {
+            var took = System.Diagnostics.Stopwatch.GetElapsedTime(started);
+            if (took > TimeSpan.FromSeconds(5))
+            {
+                _logger.LogInformation("Sync step {Step} took {Seconds:0.0} s", name, took.TotalSeconds);
+            }
+        }
+    }
 
     /// <summary>
     /// Closing Neruna: open drafts with unsaved changes are saved or dropped as the user says.
