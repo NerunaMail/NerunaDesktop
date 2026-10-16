@@ -94,4 +94,67 @@ public class CloudTests
         Assert.Null(await cloud.GetConnectionAsync(ct));
         Assert.Null(await env.Get<ICredentialStore>().GetSecretAsync(CloudController.KeyId, ct));
     }
+
+    [Fact]
+    public async Task Requests_at_once_share_one_token_and_wait_when_the_server_is_busy()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var handler = new BusyServer();
+        using var http = new HttpClient(handler);
+        var cloud = new CloudController(http, env.Get<ISettingsStore>(), env.Get<ICredentialStore>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<CloudController>.Instance);
+        var connection = await cloud.ConnectAsync(new Uri("https://cloud.example/"), "CODE", "123456", new DeviceInfo("Telefon", "0.9.0", "Android", "15", "anna"), ct);
+
+        // As right after connecting: several lists asked for together.
+        var photos = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => cloud.GetPhotoAsync(connection, ct)));
+
+        Assert.All(photos, Assert.Null);
+        Assert.Equal(1, handler.TokensIssued);
+        Assert.Equal(2, handler.EnrollmentCalls); // the first answered 429, then repeated
+    }
+
+    /// <summary>Answers the first enrollment and the first token request with 429 (Retry-After: 0), photos with 404.</summary>
+    private sealed class BusyServer : HttpMessageHandler
+    {
+        private int _tokenCalls;
+
+        public int EnrollmentCalls;
+
+        public int TokensIssued;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/enrollment", StringComparison.Ordinal))
+            {
+                return Interlocked.Increment(ref EnrollmentCalls) == 1
+                    ? Busy()
+                    : Json(System.Net.HttpStatusCode.Created, """{"deviceId":"01DEV","organizationName":"Muster AG","memberName":"Anna Muster"}""");
+            }
+
+            if (path.EndsWith("/token", StringComparison.Ordinal))
+            {
+                if (Interlocked.Increment(ref _tokenCalls) == 1)
+                {
+                    return Busy();
+                }
+
+                await Task.Delay(100, cancellationToken);
+                Interlocked.Increment(ref TokensIssued);
+                return Json(System.Net.HttpStatusCode.OK, """{"accessToken":"T","tokenType":"Bearer","expiresIn":3600}""");
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        }
+
+        private static HttpResponseMessage Busy()
+        {
+            var response = Json(System.Net.HttpStatusCode.TooManyRequests, """{"message":"Too Many Attempts."}""");
+            response.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.Zero);
+            return response;
+        }
+
+        private static HttpResponseMessage Json(System.Net.HttpStatusCode status, string json) =>
+            new(status) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
+    }
 }

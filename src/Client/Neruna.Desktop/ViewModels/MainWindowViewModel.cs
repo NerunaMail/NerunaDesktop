@@ -820,6 +820,15 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         {
             setup.LoadForEditing(editing);
         }
+        else
+        {
+            setup.CloudRequested += (_, _) =>
+            {
+                Overlay = null;
+                CurrentPage = SettingsPage;
+                SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+            };
+        }
 
         setup.Finished += async (_, created) =>
         {

@@ -33,6 +33,13 @@
 
     <!-- Step 1: which kind of account (only providers with their own sign-in are listed; all others are "E-Mail-Konto") -->
     <StackPanel IsVisible="{Binding IsChoosing}" Spacing="10" Margin="0,4,0,0">
+      <!-- Accounts from the organisation: connect with code and PIN, the cloud brings the rest -->
+      <Button Classes="choice" Command="{Binding ChooseCloudCommand}" IsVisible="{Binding CanChooseCloud}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{l:T 'Mit Neruna Cloud verbinden'}" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Ihre Organisation richtet Konten, Signaturen und Zertifikate ein – Sie brauchen nur den Code und die PIN aus dem Portal.'}" />
+        </StackPanel>
+      </Button>
       <Button Classes="choice" Command="{Binding ChooseImapCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
         <StackPanel Spacing="2">
           <TextBlock Text="{l:T 'E-Mail-Konto'}" FontWeight="SemiBold" FontSize="15" />

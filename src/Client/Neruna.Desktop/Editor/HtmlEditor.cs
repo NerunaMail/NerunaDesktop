@@ -352,6 +352,44 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         {
             Start();
         }
+
+        _window = TopLevel.GetTopLevel(this)?.DataContext as ViewModels.MainWindowViewModel;
+        if (_window is not null)
+        {
+            _window.PropertyChanged += OnWindowChanged;
+            FollowOverlay();
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_window is not null)
+        {
+            _window.PropertyChanged -= OnWindowChanged;
+            _window = null;
+        }
+    }
+
+    // The main window this editor is in (compose in the reading pane), for its dialogs.
+    private ViewModels.MainWindowViewModel? _window;
+
+    private void OnWindowChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.HasOverlay))
+        {
+            FollowOverlay();
+        }
+    }
+
+    // The system draws the WebView above everything of the window, the dimmed dialog included: while a dialog is
+    // open (sync status, account setup …) it steps aside, and comes back unchanged afterwards.
+    private void FollowOverlay()
+    {
+        if (_web is not null && _window is not null)
+        {
+            _web.IsVisible = !_window.HasOverlay;
+        }
     }
 
     private void Start()
@@ -380,6 +418,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             _web.NavigationStarted += OnNavigationStarting;
             _web.NewWindowRequested += (_, args) => args.Handled = true;
             _host.Children.Add(_web);
+            FollowOverlay();
             _web.NavigateToString(EditorPage.Value);
             DispatcherTimer.RunOnce(() =>
             {

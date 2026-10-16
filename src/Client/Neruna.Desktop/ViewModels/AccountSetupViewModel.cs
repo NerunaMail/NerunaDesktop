@@ -130,6 +130,15 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     [RelayCommand]
     private void ChooseImap() => Step = "imap";
 
+    /// <summary>"Mit Neruna Cloud verbinden": the organisation sets up the accounts; the shell opens Einstellungen → Neruna Cloud.</summary>
+    public event EventHandler? CloudRequested;
+
+    /// <summary>Offered when adding (not when editing an account).</summary>
+    public bool CanChooseCloud => Editing is null && CloudRequested is not null;
+
+    [RelayCommand]
+    private void ChooseCloud() => CloudRequested?.Invoke(this, EventArgs.Empty);
+
     [RelayCommand]
     private async Task ChooseProtonAsync()
     {
@@ -458,7 +467,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         try
         {
             var email = Email.Trim();
-            var (_, domain) = DiscoveryPlaceholders.SplitAddress(email);
+            if (!DiscoveryPlaceholders.TrySplitAddress(email, out _, out var domain))
+            {
+                Error = T("Bitte eine gültige E-Mail-Adresse eingeben.");
+                return;
+            }
+
             var result = await discovery.DiscoverAsync(email);
             if (result is null)
             {
@@ -532,12 +546,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     {
         Error = null;
         var email = Email.Trim();
-        string domain;
-        try
-        {
-            (_, domain) = DiscoveryPlaceholders.SplitAddress(email);
-        }
-        catch (FormatException)
+        if (!DiscoveryPlaceholders.TrySplitAddress(email, out _, out var domain))
         {
             Error = T("Bitte eine gültige E-Mail-Adresse eingeben.");
             return;

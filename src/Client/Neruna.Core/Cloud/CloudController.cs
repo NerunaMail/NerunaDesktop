@@ -80,6 +80,10 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Token, DateTimeOffset Expires)> _tokens = new();
 
+    // One token request at a time: right after connecting, profile, signatures, certificates, accounts and vault are asked
+    // for together; each fetching its own token ran into the server's limit (429), with the code already redeemed.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<Task<string>>> _tokenRequests = new();
+
     /// <summary>A connection was added or removed (or the chat's or backups' organisation changed).</summary>
     public event EventHandler? ConnectionsChanged;
 
@@ -423,17 +427,22 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         for (var attempt = 0; ; attempt++)
         {
             var token = await TokenAsync(connection, cancellationToken);
-            var request = new HttpRequestMessage(method, new Uri(connection.Server, path));
-            if (body is not null)
-            {
-                // Buffered, so it goes with a Content-Length: a chunked body larger than the hosting's post_max_size
-                // would arrive empty, and the server could not tell why.
-                request.Content = JsonContent.Create(body, body.GetType(), options: NerunaJson.Options);
-                await request.Content.LoadIntoBufferAsync(cancellationToken);
-            }
+            var response = await SendPatientlyAsync(
+                async () =>
+                {
+                    var request = new HttpRequestMessage(method, new Uri(connection.Server, path));
+                    if (body is not null)
+                    {
+                        // Buffered, so it goes with a Content-Length: a chunked body larger than the hosting's post_max_size
+                        // would arrive empty, and the server could not tell why.
+                        request.Content = JsonContent.Create(body, body.GetType(), options: NerunaJson.Options);
+                        await request.Content.LoadIntoBufferAsync(cancellationToken);
+                    }
 
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            var response = await SendRawAsync(request, cancellationToken);
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                    return request;
+                },
+                cancellationToken);
             if (response.StatusCode != HttpStatusCode.Unauthorized || attempt > 0)
             {
                 return response;
@@ -451,6 +460,23 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
             return cached.Token;
         }
 
+        // Requests arriving while one is under way wait for it (not cancelled by the first caller: it is short).
+        var pending = _tokenRequests.GetOrAdd(connection.Id, _ => new Lazy<Task<string>>(async () =>
+        {
+            try
+            {
+                return await NewTokenAsync(connection, CancellationToken.None);
+            }
+            finally
+            {
+                _tokenRequests.TryRemove(connection.Id, out Lazy<Task<string>>? _);
+            }
+        }));
+        return await pending.Value.WaitAsync(cancellationToken);
+    }
+
+    private async Task<string> NewTokenAsync(CloudConnection connection, CancellationToken cancellationToken)
+    {
         var secret = await credentials.GetSecretAsync(connection.DeviceKeyId, cancellationToken)
                      ?? throw new CloudException("no_key", T("Der Geräteschlüssel fehlt. Bitte die Cloud-Verbindung neu einrichten."));
         using var key = DeviceKey.Import(secret);
@@ -507,8 +533,37 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
 
     private async Task<T> SendAsync<T>(Func<HttpRequestMessage> request, CancellationToken cancellationToken)
     {
-        using var response = await SendRawAsync(request(), cancellationToken);
+        using var response = await SendPatientlyAsync(() => Task.FromResult(request()), cancellationToken);
         return await ReadAsync<T>(response, cancellationToken);
+    }
+
+    /// <summary>How often a request is repeated when the server says "too many requests" (429), and the longest wait.</summary>
+    private const int RateLimitRetries = 3;
+
+    private static readonly TimeSpan MaxRateLimitWait = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// Sends, and when the server is busy (429) waits as long as it asks (Retry-After; otherwise 2, 4, 8 seconds) and
+    /// tries again: a step of setting up a device must not fail just because a few requests came at once.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendPatientlyAsync(Func<Task<HttpRequestMessage>> create, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var response = await SendRawAsync(await create(), cancellationToken);
+            if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt >= RateLimitRetries)
+            {
+                return response;
+            }
+
+            var wait = response.Headers.RetryAfter?.Delta
+                       ?? (response.Headers.RetryAfter?.Date is { } at ? at - DateTimeOffset.UtcNow : (TimeSpan?)null)
+                       ?? TimeSpan.FromSeconds(2 << attempt);
+            response.Dispose();
+            wait = wait < TimeSpan.Zero ? TimeSpan.Zero : wait > MaxRateLimitWait ? MaxRateLimitWait : wait;
+            logger.LogInformation("Server busy (429), trying again in {Seconds} s", (int)wait.TotalSeconds);
+            await Task.Delay(wait, cancellationToken);
+        }
     }
 
     private async Task<HttpResponseMessage> SendRawAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -545,6 +600,11 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
             // Not a Neruna error document (proxy page, wrong address …).
+        }
+
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
+        {
+            throw new CloudException("rate_limited", Localization.Texts.T("Der Server erhält gerade zu viele Anfragen. Bitte in einer Minute erneut versuchen."));
         }
 
         throw error is { Message.Length: > 0 }

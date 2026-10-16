@@ -18,6 +18,21 @@ public static class DiscoveryPlaceholders
             .Replace(EmailDomain, domain, StringComparison.Ordinal);
     }
 
+    /// <summary>For input from a form: false for an empty or invalid address instead of an exception.</summary>
+    public static bool TrySplitAddress(string? emailAddress, out string localPart, out string domain)
+    {
+        localPart = domain = string.Empty;
+        var text = emailAddress?.Trim() ?? string.Empty;
+        var at = text.LastIndexOf('@');
+        if (at <= 0 || at == text.Length - 1)
+        {
+            return false;
+        }
+
+        (localPart, domain) = (text[..at], text[(at + 1)..].ToLowerInvariant());
+        return true;
+    }
+
     public static (string LocalPart, string Domain) SplitAddress(string emailAddress)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(emailAddress);
