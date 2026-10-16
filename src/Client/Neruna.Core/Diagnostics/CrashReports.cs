@@ -352,14 +352,22 @@ public sealed class CrashReportService(CrashReportStore store, ISettingsStore se
 
     /// <summary>Sends and removes them; what could not be sent (offline) stays for the next time.</summary>
     /// <returns>How many were sent.</returns>
-    public async Task<int> SendAsync(IEnumerable<PendingCrash> crashes, CancellationToken cancellationToken = default)
+    /// <param name="comment">What the user wrote in the dialog (what was clicked …): sent with each report, addresses removed.</param>
+    public async Task<int> SendAsync(IEnumerable<PendingCrash> crashes, string? comment = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(crashes);
+        comment = string.IsNullOrWhiteSpace(comment) ? null : CrashReportBuilder.Scrub(comment.Trim(), []);
+        if (comment?.Length > MaxCommentLength)
+        {
+            comment = comment[..MaxCommentLength];
+        }
+
         var sent = 0;
         foreach (var crash in crashes)
         {
             var today = DateOnly.FromDateTime(DateTime.Now);
-            if (store.WasSentToday(crash.Record, today))
+            // The same error once a day is enough – unless the user tells something about it.
+            if (comment is null && store.WasSentToday(crash.Record, today))
             {
                 store.Remove(crash.File);
                 continue;
@@ -367,7 +375,7 @@ public sealed class CrashReportService(CrashReportStore store, ISettingsStore se
 
             try
             {
-                await cloud.SendCrashReportAsync(crash.Report, cancellationToken);
+                await cloud.SendCrashReportAsync(comment is null ? crash.Report : crash.Report with { Comment = comment }, cancellationToken);
                 store.MarkSent(crash.Record, today);
                 store.Remove(crash.File);
                 sent++;
@@ -385,6 +393,9 @@ public sealed class CrashReportService(CrashReportStore store, ISettingsStore se
 
         return sent;
     }
+
+    /// <summary>The longest comment the server takes.</summary>
+    public const int MaxCommentLength = 4000;
 
     public void Discard(IEnumerable<PendingCrash> crashes)
     {

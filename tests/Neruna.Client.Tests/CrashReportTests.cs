@@ -115,16 +115,17 @@ public class CrashReportTests
         Assert.Equal("INF Sync <name>", pending.Report.Log);
 
         // Offline: kept for later.
-        Assert.Equal(0, await service.SendAsync([pending], ct));
+        Assert.Equal(0, await service.SendAsync([pending], cancellationToken: ct));
         Assert.Single(store.Pending());
 
         env.Http.Responses[url] = (HttpStatusCode.Accepted, """{"id":"01K"}""");
-        Assert.Equal(1, await service.SendAsync([pending], ct));
+        Assert.Equal(1, await service.SendAsync([pending], "Auf «Senden» geklickt, Antwort an anna@example.com", ct));
         Assert.Empty(store.Pending());
         var body = JsonSerializer.Deserialize<CrashReportRequest>(env.Http.Sent.Last(s => s.Url == url).Body, NerunaJson.Options)!;
         Assert.Equal(pending.Report.Fingerprint, body.Fingerprint);
         Assert.Equal("Keine Verbindung für <email>", body.Message);
         Assert.Equal("desktop", body.App);
         Assert.True(body.Fatal);
+        Assert.Equal("Auf «Senden» geklickt, Antwort an <email>", body.Comment);
     }
 }

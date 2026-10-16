@@ -58,6 +58,12 @@ internal sealed partial class CrashReportViewModel(IReadOnlyList<PendingCrash> c
     [ObservableProperty]
     public partial bool AlwaysSend { get; set; }
 
+    /// <summary>Optional: what the user did when it happened, sent with the report.</summary>
+    [ObservableProperty]
+    public partial string Comment { get; set; } = string.Empty;
+
+    public static int MaxCommentLength => CrashReportService.MaxCommentLength;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(DontSendCommand))]
     public partial bool IsBusy { get; set; }
@@ -77,7 +83,7 @@ internal sealed partial class CrashReportViewModel(IReadOnlyList<PendingCrash> c
                 await service.SetModeAsync(CrashReportMode.Always);
             }
 
-            var sent = await service.SendAsync(crashes);
+            var sent = await service.SendAsync(crashes, Comment);
             if (sent < crashes.Count && service.Store.Pending().Any(p => crashes.Any(c => c.File == p.File)))
             {
                 Error = T("Der Bericht konnte nicht gesendet werden (keine Verbindung?). Er wird beim nächsten Start erneut angeboten.");

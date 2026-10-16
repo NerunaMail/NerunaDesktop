@@ -177,7 +177,7 @@ public sealed record CloudMailAccount(string Id, string Email, string DisplayNam
 
 /// <summary>
 /// POST /api/v1/crash-reports – only with the user's consent, already cleaned of addresses, hosts and paths.
-/// App: which Neruna sent it ("desktop", "android").
+/// App: which Neruna sent it ("desktop", "android"). Comment: what the user adds in the dialog (optional).
 /// </summary>
 public sealed record CrashReportRequest(
     string Fingerprint,
@@ -191,7 +191,8 @@ public sealed record CrashReportRequest(
     string Stack,
     string? Log,
     DateTimeOffset OccurredAt,
-    string? App = null);
+    string? App = null,
+    string? Comment = null);
 
 /// <summary>Response of <c>POST /api/v1/device/pairings</c>: what the desktop shows to pair a phone (QR code, PIN).</summary>
 public sealed record PairingResponse(string PairingId, string Code, string Pin, DateTimeOffset ExpiresAt);
