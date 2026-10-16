@@ -41,6 +41,15 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
             return new FolderSyncResult(archive.Stamp, false, [], new Dictionary<string, MessageFlags>(), [], folder.TotalCount, folder.UnreadCount);
         }
 
+        // Second pass after a quick first one: the flags Outlook set (flagged, answered, forwarded).
+        if (folder.SyncState == archive.Stamp + QuickPass)
+        {
+            var flagged = await OutlookFlagsAsync(archive, folder, cancellationToken);
+            return new FolderSyncResult(archive.Stamp, false, [], flagged, [], folder.TotalCount, folder.UnreadCount);
+        }
+
+        // First pass: what the folder's contents table holds, so the mail shows at once (a few ms a message instead
+        // of some 20 for everything) – the flags follow with the next sync.
         var summaries = await archive.ReadAsync(a =>
         {
             var source = a.Folder(folder.RemoteId);
@@ -50,7 +59,7 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
             {
                 try
                 {
-                    list.Add(PstArchive.Read(message, m => PstArchive.Summary(index, m)));
+                    list.Add(PstArchive.Read(message, m => PstArchive.Summary(index, m, full: false)));
                 }
                 catch (Exception ex) when (ex is not OutOfMemoryException and not OperationCanceledException)
                 {
@@ -64,8 +73,49 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
 
         // Known ones keep what was set here; only the new ones (a newer copy of the file) come in.
         var added = summaries.Where(s => !knownRemoteIds.Contains(s.RemoteId)).ToList();
-        return new FolderSyncResult(archive.Stamp, false, added, new Dictionary<string, MessageFlags>(),
+        return new FolderSyncResult(archive.Stamp + QuickPass, false, added, new Dictionary<string, MessageFlags>(),
             [.. knownRemoteIds.Where(k => !present.Contains(k))], summaries.Count, summaries.Count(s => !s.Flags.HasFlag(MessageFlags.Seen)));
+    }
+
+    /// <summary>Marks the sync state of a folder whose flags are still to be read.</summary>
+    private const string QuickPass = "|quick";
+
+    /// <summary>
+    /// The messages Outlook flagged, answered or forwarded (with read as in the file). In portions, so that opening a
+    /// message meanwhile does not wait for the whole folder.
+    /// </summary>
+    private static async Task<Dictionary<string, MessageFlags>> OutlookFlagsAsync(PstArchive archive, MailFolder folder, CancellationToken cancellationToken)
+    {
+        const int Portion = 200;
+        var result = new Dictionary<string, MessageFlags>(StringComparer.Ordinal);
+        for (var start = 0; ; start += Portion)
+        {
+            var done = await archive.ReadAsync(a =>
+            {
+                var portion = PstArchive.Messages(a.Folder(folder.RemoteId)).Skip(start).Take(Portion).ToList();
+                foreach (var (index, message) in portion)
+                {
+                    try
+                    {
+                        var (id, flags) = PstArchive.Read(message, m => (PstArchive.RemoteIdOf(index, m), PstArchive.Flags(m)));
+                        if ((flags & ~MessageFlags.Seen) != MessageFlags.None)
+                        {
+                            result[id] = flags;
+                        }
+                    }
+                    catch (Exception ex) when (ex is not OutOfMemoryException and not OperationCanceledException)
+                    {
+                        // damaged or of a kind XstReader cannot read
+                    }
+                }
+
+                return portion.Count < Portion;
+            }, cancellationToken);
+            if (done)
+            {
+                return result;
+            }
+        }
     }
 
     public async Task<MimeMessage> GetMessageAsync(MailFolder folder, string remoteId, CancellationToken cancellationToken = default)

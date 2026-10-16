@@ -157,12 +157,54 @@ public class PstTests
         Assert.True(await archive.ReadAsync(a => ReferenceEquals(a.Folder(inbox.RemoteId), a.Folder(inbox.RemoteId)), ct));
         Assert.True(message.HtmlBody is not null || message.TextBody is not null);
 
+        // First a quick pass (the contents table), then one for Outlook's flags, then nothing as long as the file stays.
+        Assert.EndsWith("|quick", first.NewSyncState, StringComparison.Ordinal);
+        var flags = await provider.SyncFolderAsync(inbox with { SyncState = first.NewSyncState }, [.. first.AddedOrChanged.Select(s => s.RemoteId)], ct);
+        Assert.Empty(flags.AddedOrChanged);
+        Assert.All(flags.FlagUpdates.Keys, id => Assert.Contains(first.AddedOrChanged, s => s.RemoteId == id));
+        Assert.DoesNotContain("|", flags.NewSyncState, StringComparison.Ordinal);
+
         // The same file again: nothing to do, and read/flagged set in Neruna stay.
-        var again = await provider.SyncFolderAsync(inbox with { SyncState = first.NewSyncState }, [.. first.AddedOrChanged.Select(s => s.RemoteId)], ct);
+        var again = await provider.SyncFolderAsync(inbox with { SyncState = flags.NewSyncState }, [.. first.AddedOrChanged.Select(s => s.RemoteId)], ct);
         Assert.Empty(again.AddedOrChanged);
+        Assert.Empty(again.FlagUpdates);
         Assert.Empty(again.RemovedRemoteIds);
         await provider.SetFlagsAsync(inbox, [summary.RemoteId], MessageFlags.Seen, false, ct);
         await Assert.ThrowsAsync<NotSupportedException>(() => provider.DeleteAsync(inbox, [summary.RemoteId], ct));
         Assert.False(provider.Capabilities.HasFlag(MailProviderCapabilities.Append));
+    }
+
+    [Fact]
+    public void The_sender_comes_from_its_one_off_entry_id()
+    {
+        // As in an OST of an IMAP account: provider UID, Unicode flag, name, "SMTP", address.
+        var entry = Convert.FromHexString("00000000812B1FA4BEA310199D6E00DD010F54020000018065006E00640065007200200069006E0066006F0072006D0061007400690063007300000053004D005400500000006E006100670069006F007300400065002D0069006E0066006F002E00630068000000");
+        Assert.Equal(("ender informatics", "nagios@e-info.ch"), PstArchive.OneOff(entry));
+
+        var exchange = (byte[])entry.Clone();
+        exchange[4] = 0xDC; // another provider: an address book entry, no SMTP address in it
+        Assert.Null(PstArchive.OneOff(exchange));
+        Assert.Null(PstArchive.OneOff([1, 2, 3]));
+    }
+
+    [Theory]
+    [InlineData("Sent Messages", FolderRole.Sent)]
+    [InlineData("Sent", FolderRole.Sent)]
+    [InlineData("Gesendete Elemente", FolderRole.Sent)]
+    [InlineData("Trash", FolderRole.Trash)]
+    [InlineData("Papierkorb", FolderRole.Trash)]
+    [InlineData("Junk", FolderRole.Junk)]
+    [InlineData("Spam", FolderRole.Junk)]
+    [InlineData("Inbox", FolderRole.Inbox)]
+    [InlineData("Projekte", FolderRole.None)]
+    public void Folders_of_an_imap_account_in_an_ost_get_their_roles(string name, FolderRole role) =>
+        Assert.Equal(role, PstArchive.RoleOf(name, null));
+
+    [Fact]
+    public void Outlooks_sync_issues_are_not_mail()
+    {
+        Assert.True(PstArchive.IsSyncIssues("Sync Issues (This computer only)"));
+        Assert.True(PstArchive.IsSyncIssues("Synchronisierungsprobleme (Nur dieser Computer)"));
+        Assert.False(PstArchive.IsSyncIssues("Inbox"));
     }
 }

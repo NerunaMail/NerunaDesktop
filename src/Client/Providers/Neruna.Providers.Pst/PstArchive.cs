@@ -165,22 +165,37 @@ internal sealed class PstArchive : IDisposable
         return best.Folder ?? root;
     }
 
-    // Calendar, contacts, tasks, notes, journal and Outlook's own folders hold no mail.
+    // Calendar, contacts, tasks, notes, journal and Outlook's own folders hold no mail; neither do "Sync Issues"
+    // (an OST's conflict logs, often thousands of them, with their subfolders).
     private static bool IsMailFolder(XstFolder folder)
     {
+        if (IsSyncIssues(folder.DisplayName))
+        {
+            return false;
+        }
+
         var kind = folder.PropertyValue(PropertyCanonicalName.PidTagContainerClass) as string;
         return string.IsNullOrEmpty(kind)
             ? !folder.DisplayName.StartsWith('~') && folder.DisplayName is not ("Freebusy Data" or "IPM_COMMON_VIEWS" or "IPM_VIEWS" or "Search Root" or "Finder" or "Views" or "Common Views" or "Shortcuts" or "Shared Data" or "Drizzle")
             : kind.StartsWith("IPF.Note", StringComparison.OrdinalIgnoreCase) || kind.StartsWith("IPF.Imap", StringComparison.OrdinalIgnoreCase);
     }
 
-    // Outlook's folders by their name (English and German Outlook); drafts stay ordinary folders here – nothing is written.
-    private static FolderRole RoleOf(string name, string? parentId) => parentId is not null ? FolderRole.None : name.ToLowerInvariant() switch
+    internal static bool IsSyncIssues(string name) =>
+        name.StartsWith("Sync Issues", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("Synchronisierungsprobleme", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("Problèmes de synchronisation", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("Problemi di sincronizzazione", StringComparison.OrdinalIgnoreCase);
+
+    // Outlook's folders by their name (Outlook's own and, in an OST of an IMAP account, the server's); drafts stay
+    // ordinary folders here – nothing is written.
+    internal static FolderRole RoleOf(string name, string? parentId) => parentId is not null ? FolderRole.None : name.ToLowerInvariant() switch
     {
         "inbox" or "posteingang" or "boîte de réception" or "posta in arrivo" => FolderRole.Inbox,
-        "sent items" or "gesendete elemente" or "gesendete objekte" or "éléments envoyés" or "posta inviata" => FolderRole.Sent,
-        "deleted items" or "gelöschte elemente" or "gelöschte objekte" or "éléments supprimés" or "posta eliminata" => FolderRole.Trash,
-        "junk e-mail" or "junk-e-mail" or "courrier indésirable" or "posta indesiderata" => FolderRole.Junk,
+        "sent items" or "gesendete elemente" or "gesendete objekte" or "éléments envoyés" or "posta inviata"
+            or "sent" or "sent messages" or "sent mail" or "gesendet" or "gesendete nachrichten" or "envoyés" or "inviata" => FolderRole.Sent,
+        "deleted items" or "gelöschte elemente" or "gelöschte objekte" or "éléments supprimés" or "posta eliminata"
+            or "trash" or "deleted messages" or "papierkorb" or "gelöschte nachrichten" or "corbeille" or "cestino" => FolderRole.Trash,
+        "junk e-mail" or "junk-e-mail" or "courrier indésirable" or "posta indesiderata" or "junk" or "spam" => FolderRole.Junk,
         "archive" or "archiv" or "archivio" => FolderRole.Archive,
         _ => FolderRole.None,
     };
@@ -311,34 +326,34 @@ internal sealed class PstArchive : IDisposable
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)).AsSpan(0, 6));
     }
 
-    public static MessageSummary Summary(int index, XstMessage message)
+    /// <summary>
+    /// The message in the list. <paramref name="full"/> false: only what the folder's contents table already brought
+    /// (subject, sender, date, read, attachments, size) – asking for anything else makes XstReader load the message's
+    /// whole property block, some 20 ms each in an OST. Flagged and answered then come with a second pass (<see cref="Flags"/>).
+    /// </summary>
+    public static MessageSummary Summary(int index, XstMessage message, bool full = true)
     {
         var flags = message.IsRead ? MessageFlags.Seen : MessageFlags.None;
-        if (message.PropertyValue(PropertyCanonicalName.PidTagFlagStatus) is int status && status == 2)
+        if (full || Has(message, PropertyCanonicalName.PidTagFlagStatus) || Has(message, PropertyCanonicalName.PidTagLastVerbExecuted))
         {
-            flags |= MessageFlags.Flagged;
+            flags |= OutlookFlags(message);
         }
 
-        flags |= message.PropertyValue(PropertyCanonicalName.PidTagLastVerbExecuted) switch
-        {
-            102 or 103 => MessageFlags.Answered,
-            104 => MessageFlags.Forwarded,
-            _ => MessageFlags.None,
-        };
-
-        var item = Recipients(message);
+        // Sender and "To" from the message's own properties: reading the recipient table costs ~70 ms a message in an
+        // OST and is not needed for the list (the message read in full still uses it).
+        var item = ListAddresses(message, full);
         var date = Utc(message.ReceivedTime ?? message.SubmittedTime ?? message.Date) ?? DateTimeOffset.UnixEpoch;
         return new MessageSummary(
             RemoteIdOf(index, message),
             Id(message.InternetMessageId),
-            Id(message.PropertyValue(PropertyCanonicalName.PidTagInReplyToId) as string),
+            full || Has(message, PropertyCanonicalName.PidTagInReplyToId) ? Id(message.PropertyValue(PropertyCanonicalName.PidTagInReplyToId) as string) : null,
             message.Subject ?? string.Empty,
             item.From is { } from ? new MailAddress(from.Name, from.Address is { } a && a.Contains('@', StringComparison.Ordinal) ? a : string.Empty) : null,
             [.. item.To.Select(t => new MailAddress(t.Name, t.Address is { } a && a.Contains('@', StringComparison.Ordinal) ? a : string.Empty))],
             date,
             flags,
             message.PropertyValue(PropertyCanonicalName.PidTagMessageSize) is int size ? size : 0,
-            message.HasAttachments && SmimeKind(message) is null,
+            HasAttachments(message) && SmimeKind(message) is null,
             null,
             SmimeKind(message) switch
             {
@@ -423,6 +438,103 @@ internal sealed class PstArchive : IDisposable
         message.PropertyValue(PropertyCanonicalName.PidTagMessageClass) is string kind && kind.StartsWith("IPM.Note.SMIME", StringComparison.OrdinalIgnoreCase)
             ? kind.Contains("MultipartSigned", StringComparison.OrdinalIgnoreCase)
             : null;
+
+    /// <summary>From the message flags (MSGFLAG_HASATTACH) – XstReader's HasAttachments reads the attachment table.</summary>
+    private static bool HasAttachments(XstMessage message) =>
+        message.PropertyValue(PropertyCanonicalName.PidTagMessageFlags) is int flags ? (flags & 0x10) != 0 : message.HasAttachments;
+
+    /// <summary>The flags Outlook set (flagged, answered, forwarded), for the second pass over a folder.</summary>
+    public static MessageFlags Flags(XstMessage message) => (message.IsRead ? MessageFlags.Seen : MessageFlags.None) | OutlookFlags(message);
+
+    /// <summary>Flagged, answered, forwarded as Outlook set them.</summary>
+    public static MessageFlags OutlookFlags(XstMessage message)
+    {
+        var flags = message.PropertyValue(PropertyCanonicalName.PidTagFlagStatus) is int status && status == 2 ? MessageFlags.Flagged : MessageFlags.None;
+        return flags | message.PropertyValue(PropertyCanonicalName.PidTagLastVerbExecuted) switch
+        {
+            102 or 103 => MessageFlags.Answered,
+            104 => MessageFlags.Forwarded,
+            _ => MessageFlags.None,
+        };
+    }
+
+    private static readonly Func<XstPropertySet, System.Collections.IDictionary?> LoadedProperties = CreateLoadedProperties();
+
+    // XstReader keeps the properties it has so far (from the contents table, or loaded) in a private dictionary.
+    private static Func<XstPropertySet, System.Collections.IDictionary?> CreateLoadedProperties()
+    {
+        const BindingFlags Any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        var property = typeof(XstPropertySet).GetProperty("DicProperties", Any);
+        var field = typeof(XstPropertySet).GetField("_DicProperties", Any);
+        return set => (property?.GetValue(set) ?? field?.GetValue(set)) as System.Collections.IDictionary;
+    }
+
+    /// <summary>Whether XstReader has the property already, so asking for it costs nothing (unknown: assume yes).</summary>
+    private static bool Has(XstMessage message, PropertyCanonicalName tag) => LoadedProperties(message.Properties) is not { } loaded || loaded.Contains(tag);
+
+    /// <summary>
+    /// For the list: the sender and the "To" names. The sender from its one-off entry id (name and SMTP address, in the
+    /// contents table) – XstReader reads the name column of that table wrongly; without one (an Exchange sender) from
+    /// the recipient table, which costs more but is then the only reliable source.
+    /// </summary>
+    private static (PstAddress? From, List<PstAddress> To) ListAddresses(XstMessage message, bool full)
+    {
+        string? Text(PropertyCanonicalName name) => (full || Has(message, name)) && message.PropertyValue(name) is string s && s.Trim().Length > 0 ? s.Trim() : null;
+        var from = message.PropertyValue(PropertyCanonicalName.PidTagSentRepresentingEntryId) is byte[] entry && OneOff(entry) is { } oneOff
+            ? new PstAddress(oneOff.Name.Length > 0 ? oneOff.Name : oneOff.Address, oneOff.Address)
+            : Recipients(message).From;
+        var to = (Text(PropertyCanonicalName.PidTagDisplayTo) ?? string.Empty)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(n => new PstAddress(n, n.Contains('@', StringComparison.Ordinal) ? n : null))
+            .ToList();
+        return (from, to);
+    }
+
+    private static readonly byte[] OneOffProvider = Convert.FromHexString("812B1FA4BEA310199D6E00DD010F5402");
+
+    /// <summary>
+    /// Name and address in a one-off entry id (MS-OXCDATA 2.2.5.1: provider, flags, then display name, address type and
+    /// address, Unicode or 8-bit); null for other kinds (an Exchange address book entry has no SMTP address in it).
+    /// </summary>
+    internal static (string Name, string Address)? OneOff(byte[] entry)
+    {
+        if (entry.Length < 24 || !entry.AsSpan(4, 16).SequenceEqual(OneOffProvider))
+        {
+            return null;
+        }
+
+        var unicode = (BitConverter.ToUInt16(entry, 22) & 0x8000) != 0;
+        var parts = new List<string>();
+        var position = 24;
+        while (parts.Count < 3 && position < entry.Length)
+        {
+            var end = position;
+            if (unicode)
+            {
+                while (end + 1 < entry.Length && (entry[end] != 0 || entry[end + 1] != 0))
+                {
+                    end += 2;
+                }
+
+                parts.Add(Encoding.Unicode.GetString(entry, position, end - position));
+                position = end + 2;
+            }
+            else
+            {
+                while (end < entry.Length && entry[end] != 0)
+                {
+                    end++;
+                }
+
+                parts.Add(Encoding.Latin1.GetString(entry, position, end - position));
+                position = end + 1;
+            }
+        }
+
+        return parts.Count == 3 && parts[1].Equals("SMTP", StringComparison.OrdinalIgnoreCase) && parts[2].Contains('@', StringComparison.Ordinal)
+            ? (parts[0].Trim(), parts[2].Trim())
+            : null;
+    }
 
     private static (PstAddress? From, List<PstAddress> To, List<PstAddress> Cc, List<PstAddress> Bcc) Recipients(XstMessage message)
     {
