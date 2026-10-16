@@ -31,6 +31,29 @@ public enum Participation
 /// <summary>A person invited to an event.</summary>
 public sealed record EventAttendee(string Email, string? Name = null, Participation Status = Participation.NeedsAction)
 {
+    /// <summary>The people in recipient fields ("Anna Muster &lt;anna@…&gt;, lea@…"), each once; half-typed parts are left out.</summary>
+    public static IReadOnlyList<EventAttendee> FromRecipients(params string?[] fields)
+    {
+        var result = new List<EventAttendee>();
+        foreach (var field in fields.Where(f => !string.IsNullOrWhiteSpace(f)))
+        {
+            // The whole field first ("Muster, Anna" <…> has a comma in the name); while it is half typed, part by part.
+            var mailboxes = MimeKit.InternetAddressList.TryParse(field, out var list)
+                ? list.Mailboxes.ToList()
+                : field!.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(p => MimeKit.MailboxAddress.TryParse(p, out var m) ? m : null).OfType<MimeKit.MailboxAddress>().ToList();
+            foreach (var mailbox in mailboxes.Where(m => m.Address.Contains('@', StringComparison.Ordinal)))
+            {
+                if (!result.Any(a => string.Equals(a.Email, mailbox.Address, StringComparison.OrdinalIgnoreCase)))
+                {
+                    result.Add(new EventAttendee(mailbox.Address, string.IsNullOrWhiteSpace(mailbox.Name) ? null : mailbox.Name));
+                }
+            }
+        }
+
+        return result;
+    }
+
     public static Participation ParseStatus(string? value) => value?.ToUpperInvariant() switch
     {
         "ACCEPTED" => Participation.Accepted,

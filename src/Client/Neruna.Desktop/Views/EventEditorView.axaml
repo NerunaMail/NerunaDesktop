@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:cal="using:Neruna.Core.Calendar"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              x:Class="Neruna.Desktop.Views.EventEditorView"
              x:DataType="vm:EventEditorViewModel">
 
@@ -71,8 +72,10 @@
     </Grid>
 
     <TextBlock Classes="label" Text="{l:T 'Teilnehmer'}" />
-    <TextBox Text="{Binding AttendeesText}" IsReadOnly="{Binding !CanEditAttendees}"
-             PlaceholderText="{l:T 'E-Mail-Adressen, mit Komma getrennt – sie erhalten eine Einladung'}" />
+    <!-- With suggestions from the address book, like An/Cc while writing -->
+    <ctl:RecipientBox Text="{Binding AttendeesText}" Directory="{Binding Recipients}" IsVisible="{Binding CanEditAttendees}"
+                      PlaceholderText="{l:T 'Name oder Adresse eingeben, mehrere mit Komma trennen – sie erhalten eine Einladung'}" />
+    <TextBox Text="{Binding AttendeesText}" IsReadOnly="True" IsVisible="{Binding !CanEditAttendees}" />
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" Text="{Binding OrganizerText}" IsVisible="{Binding !IsOrganizer}" />
     <ItemsControl ItemsSource="{Binding AttendeeStatuses}" IsVisible="{Binding HasAttendeeStatuses}" Margin="0,4,0,0">
       <ItemsControl.ItemTemplate>

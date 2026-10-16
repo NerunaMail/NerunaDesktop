@@ -26,6 +26,7 @@ internal sealed partial class MailViewModel(
     IWindowService windows,
     IHttpClientFactory httpClients,
     InvitationService invitations,
+    CalendarController calendar,
     UiPreferences preferences,
     RecipientDirectory recipients,
     TextTemplateService textTemplates,
@@ -774,6 +775,7 @@ internal sealed partial class MailViewModel(
             Recipients = recipients,
             Preferences = preferences,
             TextTemplates = textTemplates,
+            Calendars = new ComposeCalendar(calendar, invitations, windows),
         };
         compose.Ai = new ComposeAiViewModel(ai, compose);
         compose.Closed += async (_, sent) =>

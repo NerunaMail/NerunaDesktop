@@ -17,6 +17,9 @@ internal interface IWindowService
 
     /// <returns>The edited signature, or null when cancelled.</returns>
     Task<Neruna.Core.Mail.Signature?> ShowSignatureEditorAsync(SignatureEditorViewModel editor);
+
+    /// <summary>An event in a window of its own (from a mail being written); true if it was saved or deleted.</summary>
+    Task<bool> ShowEventEditorAsync(EventEditorViewModel editor);
 }
 
 internal sealed class WindowService(UiLayout layout) : IWindowService
@@ -58,6 +61,45 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
         {
             window.Show();
         }
+    }
+
+    public async Task<bool> ShowEventEditorAsync(EventEditorViewModel editor)
+    {
+        ArgumentNullException.ThrowIfNull(editor);
+        var changed = false;
+        var window = new Window
+        {
+            Title = Neruna.Core.Localization.Texts.T("Termin"),
+            Icon = new WindowIcon(Avalonia.Platform.AssetLoader.Open(new Uri("avares://Neruna.Desktop/Assets/app.ico"))),
+            Width = 640,
+            Height = 760,
+            MinWidth = 480,
+            MinHeight = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new ScrollViewer { Content = new EventEditorView { DataContext = editor, Margin = new Avalonia.Thickness(24, 18) } },
+        };
+        window.Bind(Window.BackgroundProperty, window.GetResourceObservable("PaneBackgroundBrush"));
+        editor.Finished += (_, saved) =>
+        {
+            changed = saved;
+            window.Close();
+        };
+
+        // Above the window the mail is written in (the main window or its own).
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+        if ((lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow) is { } owner)
+        {
+            await window.ShowDialog(owner);
+        }
+        else
+        {
+            var closed = new TaskCompletionSource();
+            window.Closed += (_, _) => closed.TrySetResult();
+            window.Show();
+            await closed.Task;
+        }
+
+        return changed;
     }
 
     public async Task<Neruna.Core.Mail.Signature?> ShowSignatureEditorAsync(SignatureEditorViewModel editor)

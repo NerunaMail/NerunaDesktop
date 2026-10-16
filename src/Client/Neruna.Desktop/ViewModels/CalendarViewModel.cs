@@ -11,7 +11,8 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Week view across all calendars, whatever provider they come from.</summary>
-internal sealed partial class CalendarViewModel(CalendarController calendar, TaskController tasks, InvitationService invitations, ISettingsStore settings) : ViewModelBase, ICollectionListHost
+internal sealed partial class CalendarViewModel(CalendarController calendar, TaskController tasks, InvitationService invitations, ISettingsStore settings,
+    Infrastructure.RecipientDirectory recipients) : ViewModelBase, ICollectionListHost
 {
     internal static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
@@ -442,7 +443,10 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
         // The own address per calendar: organizer of new invitations, and "me" among the attendees.
         var owners = (await calendar.GetSourcesAsync()).ToDictionary(s => s.Connection.Id, s => s.Account.EmailAddress);
-        var editor = new EventEditorViewModel(calendar, invitations, writable, draft, existing, c => owners.GetValueOrDefault(c.ConnectionId));
+        var editor = new EventEditorViewModel(calendar, invitations, writable, draft, existing, c => owners.GetValueOrDefault(c.ConnectionId))
+        {
+            Recipients = recipients,
+        };
         if (existing is null && await settings.GetAsync(SettingKeys.CalendarDefaultCalendar) is { Length: > 0 } preferred
             && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == preferred) is { } standard)
         {

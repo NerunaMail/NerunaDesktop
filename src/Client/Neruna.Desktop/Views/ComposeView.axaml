@@ -45,6 +45,9 @@
         <ctl:ToolToggleButton Icon="{StaticResource IconCertificate}" Label="{l:T 'Signieren'}" Hint="{Binding SignHint}" IsChecked="{Binding Sign}" IsVisible="{Binding CanSign}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <ctl:ToolToggleButton Icon="{StaticResource IconLock}" Label="{l:T 'Verschlüsseln'}" Hint="{Binding EncryptHint}" IsChecked="{Binding Encrypt}" IsVisible="{Binding ShowEncrypt}"
                               ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+        <!-- Termin: an event for this mail, the recipients as attendees (ComposeViewModel.Appointment) -->
+        <ctl:ToolButton Icon="{StaticResource IconCalendar}" Label="{l:T 'Termin'}" Hint="{l:T 'Termin zu dieser E-Mail erstellen – die Empfänger werden eingeladen'}"
+                        Command="{Binding MakeAppointmentCommand}" IsVisible="{Binding CanMakeAppointment}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
         <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="{l:T 'Textvorlage'}" Hint="{l:T 'Textvorlage an der Cursorposition einfügen – oder «kürzel::» tippen'}"
                         IsEnabled="{Binding HasTemplates}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
@@ -120,7 +123,20 @@
 
     <TextBox x:Name="SubjectBox" Grid.Row="5" Grid.ColumnSpan="2" Text="{Binding Subject}" PlaceholderText="{l:T 'Betreff hinzufügen'}" Margin="0,10,0,6" FontWeight="SemiBold" />
 
-    <ItemsControl Grid.Row="6" Grid.ColumnSpan="2" ItemsSource="{Binding Attachments}" Margin="0,0,0,4">
+    <StackPanel Grid.Row="6" Grid.ColumnSpan="2">
+    <!-- The event made for this mail; its details go into the text on request -->
+    <Border IsVisible="{Binding HasAppointment}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+          <Button Content="{l:T 'Termininfos einfügen'}" Command="{Binding InsertAppointmentCommand}"
+                  ToolTip.Tip="{l:T 'Titel, Datum, Zeit und Ort als Text an der Cursorposition einfügen'}" />
+          <Button Content="{l:T 'Bearbeiten'}" Command="{Binding MakeAppointmentCommand}" />
+        </StackPanel>
+        <PathIcon Data="{StaticResource IconCalendar}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding Appointment.Text, FallbackValue=''}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      </DockPanel>
+    </Border>
+    <ItemsControl ItemsSource="{Binding Attachments}" Margin="0,0,0,4">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
           <WrapPanel />
@@ -141,6 +157,7 @@
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
+    </StackPanel>
 
     <!-- Formatting toolbar (hidden without WebView) -->
     <!-- The AI bar: instructions, "Schreiben", and rewriting the marked (or the own) text -->

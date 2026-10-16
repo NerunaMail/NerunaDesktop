@@ -96,14 +96,20 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         AttendeeStatuses = _attendees.Where(a => !string.Equals(a.Email, Organizer, StringComparison.OrdinalIgnoreCase))
             .Select(a => new AttendeeStatus(string.IsNullOrWhiteSpace(a.Name) ? a.Email : a.Name, a.Status switch
             {
-                Participation.Accepted => "zugesagt",
+                Participation.Accepted => T("zugesagt"),
                 Participation.Tentative => T("mit Vorbehalt"),
-                Participation.Declined => "abgesagt",
+                Participation.Declined => T("abgesagt"),
                 _ => T("keine Antwort"),
             }))
             .ToList();
         IsOrganizer = Organizer is null || string.Equals(Organizer, me, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>Contacts suggested while typing the attendees (none in tests).</summary>
+    public Infrastructure.RecipientDirectory? Recipients { get; init; }
+
+    /// <summary>The event as saved (calendar, its id there, what was saved) – for the mail it was made from.</summary>
+    public (CalendarInfo Calendar, string RemoteId, EventDraft Draft)? Saved { get; private set; }
 
     /// <summary>"Gespeichert – Einladung an 2 Personen gesendet" for the status bar.</summary>
     public string? ResultMessage { get; private set; }
@@ -249,6 +255,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         {
             var previous = _existing is { } e ? (await _calendar.GetObjectAsync(e.Calendar, e.RemoteId))?.ICalendarData : null;
             var saved = await _calendar.SaveEventAsync(target, draft, _existing);
+            Saved = (target, saved.RemoteId, draft);
             if (!IsOrganizer)
             {
                 return;
