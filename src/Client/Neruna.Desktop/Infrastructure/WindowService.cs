@@ -67,10 +67,13 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
     {
         ArgumentNullException.ThrowIfNull(editor);
         var changed = false;
+        // Above the window the mail is written in (the main window or its own); the icon comes from there.
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+        var owner = lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow;
         var window = new Window
         {
             Title = Neruna.Core.Localization.Texts.T("Termin"),
-            Icon = new WindowIcon(Avalonia.Platform.AssetLoader.Open(new Uri("avares://Neruna.Desktop/Assets/app.ico"))),
+            Icon = owner?.Icon,
             Width = 640,
             Height = 760,
             MinWidth = 480,
@@ -85,9 +88,7 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
             window.Close();
         };
 
-        // Above the window the mail is written in (the main window or its own).
-        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
-        if ((lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow) is { } owner)
+        if (owner is not null)
         {
             await window.ShowDialog(owner);
         }
