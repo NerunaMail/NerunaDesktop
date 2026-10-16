@@ -336,11 +336,6 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         ArgumentNullException.ThrowIfNull(account);
         var me = account.EmailAddress ?? throw new InvalidOperationException(T("Das Konto hat keine E-Mail-Adresse."));
         var existing = await calendars.FindByUidAsync(invitation.Uid, cancellationToken);
-        if (existing is null && target is not null)
-        {
-            await settings.SetAsync(DefaultKey(account), target.ConnectionId.ToString("N") + "|" + target.RemoteId, cancellationToken);
-        }
-
         target = existing?.Calendar ?? target ?? await DefaultCalendarAsync(account, cancellationToken);
         var serverReplies = await calendars.SchedulesItselfAsync(target, cancellationToken);
 
@@ -541,10 +536,10 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         ArgumentNullException.ThrowIfNull(account);
         var writable = (await calendars.GetCalendarsAsync(cancellationToken)).Where(c => !c.IsReadOnly).ToList();
         var own = account.Connections.Select(c => c.Id).ToHashSet();
-        var chosen = await settings.GetAsync(DefaultKey(account), cancellationToken);
+        var chosen = await settings.GetAsync(DefaultCalendarKey(account.Id), cancellationToken);
         var local = account.EmailAddress?.Split('@')[0];
 
-        // The one chosen last time; else a calendar of this account in the user's own home (its address contains the
+        // The one set in "Kalender verwalten"; else a calendar of this account in the user's own home (its address contains the
         // user name – subscribed calendars of others live under their names); else any of this account; else any.
         int Rank(CalendarInfo c)
         {
@@ -571,5 +566,9 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         (await TargetCalendarsAsync(account, cancellationToken)).FirstOrDefault()
         ?? throw new InvalidOperationException(T("Kein beschreibbarer Kalender vorhanden, in den der Termin eingetragen werden kann."));
 
-    private static string DefaultKey(Account account) => $"invitations.calendar.{account.Id:N}";
+    /// <summary>
+    /// The setting with the calendar invitations to this account go into ("Kalender verwalten"; value:
+    /// <see cref="CalendarController.CalendarKey"/>); not set: one of the account's own calendars.
+    /// </summary>
+    public static string DefaultCalendarKey(Guid accountId) => $"invitations.calendar.{accountId:N}";
 }

@@ -1032,7 +1032,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private void ShowCalendarSelection()
     {
-        var selection = new CalendarSelectionViewModel(_calendar);
+        var selection = new CalendarSelectionViewModel(_calendar, _settings);
         selection.Finished += async (_, changed) =>
         {
             Overlay = null;

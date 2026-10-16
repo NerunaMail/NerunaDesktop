@@ -9,7 +9,7 @@
   <StackPanel>
     <TextBlock Text="{l:T 'Kalender verwalten'}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,12"
-               Text="{l:T 'Neruna fragt die Server erneut nach allen Kalendern – auch nach im Webmail abonnierten oder mit Ihnen geteilten. Wählen Sie, welche angezeigt werden.'}" />
+               Text="{l:T 'Neruna fragt die Server erneut nach allen Kalendern – auch nach im Webmail abonnierten oder mit Ihnen geteilten. Wählen Sie, welche angezeigt werden und wohin neue Termine und angenommene Einladungen kommen.'}" />
 
     <ProgressBar IsIndeterminate="True" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
     <TextBlock Classes="subtle" Text="{l:T 'Kein CalDAV-Konto eingerichtet.'}" IsVisible="{Binding HasNoSources}" />
@@ -77,6 +77,12 @@
           </Panel>
         </Border>
 
+        <!-- Where accepted invitations to this account go: one of its calendars shown -->
+        <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+          <TextBlock Text="{l:T 'Einladungen an dieses Konto in:'}" VerticalAlignment="Center" Margin="0,0,8,0" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding InvitationChoices}" SelectedItem="{Binding InvitationCalendar}" HorizontalAlignment="Stretch" />
+        </Grid>
+
         <!-- Rarely needed: where the server was asked, and a calendar it does not list -->
         <Expander Header="{l:T 'Kalender fehlt?'}" IsVisible="{Binding CanAddByUrl}" HorizontalAlignment="Stretch">
           <StackPanel Spacing="4">
@@ -95,6 +101,12 @@
           </StackPanel>
         </Expander>
       </StackPanel>
+    </Grid>
+
+    <!-- Preselected when creating an event (all accounts); another one can be chosen in the event -->
+    <Grid ColumnDefinitions="Auto,*" Margin="0,14,0,0" IsVisible="{Binding SelectedSource, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <TextBlock Text="{l:T 'Neue Termine in:'}" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold" />
+      <ComboBox Grid.Column="1" ItemsSource="{Binding DefaultChoices}" SelectedItem="{Binding DefaultCalendar}" HorizontalAlignment="Stretch" />
     </Grid>
 
     <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" Margin="0,8,0,0"

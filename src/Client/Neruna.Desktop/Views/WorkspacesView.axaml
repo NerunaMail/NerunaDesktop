@@ -6,7 +6,7 @@
              x:Class="Neruna.Desktop.Views.WorkspacesView"
              x:DataType="vm:WorkspacesViewModel">
   <!-- Einstellungen → Workspaces: own views with their accounts, folders, calendars and address books -->
-  <Grid ColumnDefinitions="260,24,*" Margin="0,0,0,16">
+  <Grid ColumnDefinitions="340,24,*" Margin="0,0,0,16">
     <DockPanel>
       <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
         <TextBlock TextWrapping="Wrap" Classes="subtle" FontSize="12"

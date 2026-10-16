@@ -151,37 +151,11 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         }
     }
 
-    /// <summary>"Standardkalender für neue Termine": automatic (the first writable one) or one of the writable calendars.</summary>
-    public System.Collections.ObjectModel.ObservableCollection<CalendarChoice> CalendarChoices { get; } = [];
-
-    [ObservableProperty]
-    public partial CalendarChoice? DefaultCalendar { get; set; }
-
-    partial void OnDefaultCalendarChanged(CalendarChoice? value)
-    {
-        if (!_loading && value is not null)
-        {
-            _ = settings.SetAsync(SettingKeys.CalendarDefaultCalendar, value.Key);
-        }
-    }
-
     public async Task ReloadAsync()
     {
         _loading = true;
         try
         {
-            CalendarChoices.Clear();
-            CalendarChoices.Add(CalendarChoice.Automatic);
-            foreach (var group in calendarPage.CalendarGroups)
-            {
-                foreach (var item in group.Items.Where(i => !i.Info.IsReadOnly))
-                {
-                    CalendarChoices.Add(new CalendarChoice(item.Key, $"{item.Name} – {group.Title}"));
-                }
-            }
-
-            var preferred = await settings.GetAsync(SettingKeys.CalendarDefaultCalendar);
-            DefaultCalendar = CalendarChoices.FirstOrDefault(c => c.Key == preferred) ?? CalendarChoice.Automatic;
             DeleteAnsweredInvitations = await settings.GetBoolAsync(SettingKeys.DeleteAnsweredInvitations, fallback: true);
             var reminder = await settings.GetDefaultReminderAsync();
             DefaultReminder = ReminderOption.Standard.FirstOrDefault(o => o.Minutes == reminder) ?? ReminderOption.Standard.First(o => o.Minutes == EventDraft.DefaultReminderMinutes);
@@ -210,14 +184,6 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         calendarPage.NavigatorMonthCount = months;
         _ = settings.SetAsync(SettingKeys.CalendarNavigatorMonths, months.ToString(CultureInfo.InvariantCulture));
     }
-}
-
-/// <summary>A calendar in the choice of the default one; <see cref="Automatic"/> has no key.</summary>
-internal sealed record CalendarChoice(string? Key, string Label)
-{
-    public static CalendarChoice Automatic { get; } = new(null, Neruna.Core.Localization.Texts.T("Automatisch (der erste beschreibbare Kalender)"));
-
-    public override string ToString() => Label;
 }
 
 /// <summary>A full hour in a choice list ("07:00").</summary>

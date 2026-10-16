@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Neruna.Core;
 using Neruna.Core.Calendar;
 using Neruna.Core.Providers;
 using static Neruna.Core.Localization.Texts;
@@ -9,11 +10,48 @@ namespace Neruna.Desktop.ViewModels;
 
 /// <summary>
 /// "Kalender verwalten": asks every calendar server again which calendars exist (own, shared, subscribed in the
-/// web interface) and lets the user choose which ones Neruna shows. Thunderbird offers this only during setup.
+/// web interface) and lets the user choose which ones Neruna shows. Also where new events go: the default calendar,
+/// and per account the one its invitations go into – both chosen from the calendars shown, so the lists are current.
 /// </summary>
-internal sealed partial class CalendarSelectionViewModel(CalendarController calendar) : ViewModelBase
+internal sealed partial class CalendarSelectionViewModel(CalendarController calendar, ISettingsStore settings) : ViewModelBase
 {
     public event EventHandler<bool>? Finished;
+
+    /// <summary>"Standardkalender für neue Termine": automatic or one of the writable calendars shown, of all accounts.</summary>
+    public ObservableCollection<CalendarChoice> DefaultChoices { get; } = [];
+
+    [ObservableProperty]
+    public partial CalendarChoice? DefaultCalendar { get; set; }
+
+    private string? _defaultKey;
+
+    partial void OnDefaultCalendarChanged(CalendarChoice? value)
+    {
+        if (value is not null)
+        {
+            _defaultKey = value.Key;
+        }
+    }
+
+    /// <summary>After a calendar was ticked or unticked: the choices follow, the chosen one stays if it still can.</summary>
+    private void UpdateChoices()
+    {
+        var key = _defaultKey;
+        DefaultChoices.Clear();
+        DefaultChoices.Add(CalendarChoice.Automatic);
+        foreach (var group in Sources)
+        {
+            foreach (var item in group.Writable())
+            {
+                DefaultChoices.Add(new CalendarChoice(CalendarController.CalendarKey(item.Candidate.Calendar), Sources.Count > 1 ? $"{item.Name} – {group.Title}" : item.Name));
+            }
+        }
+
+        var choice = DefaultChoices.FirstOrDefault(c => c.Key == key);
+        DefaultCalendar = choice ?? CalendarChoice.Automatic;
+        // Unticked here: no longer the default. Only on an unreachable server it stays (it is not listed at all).
+        _defaultKey = choice is null && Sources.Any(g => g.Lists(key)) ? null : key;
+    }
 
     public ObservableCollection<CalendarSourceGroup> Sources { get; } = [];
 
@@ -61,11 +99,13 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
         try
         {
             Sources.Clear();
+            _defaultKey ??= await settings.GetAsync(SettingKeys.CalendarDefaultCalendar);
 
             // ICS subscriptions are a single calendar each; there is nothing to choose.
             foreach (var source in (await calendar.GetSourcesAsync()).Where(s => s.Connection.ProviderId != ProviderIds.Ics))
             {
-                var group = new CalendarSourceGroup(source);
+                var group = new CalendarSourceGroup(source, await settings.GetAsync(InvitationService.DefaultCalendarKey(source.Account.Id)));
+                group.ChoicesChanged += (_, _) => UpdateChoices();
                 Sources.Add(group);
                 try
                 {
@@ -81,11 +121,13 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
                     group.Error = T("Server nicht erreichbar: ") + ex.Message;
                 }
 
+                group.IsLoaded = true;
                 group.UpdateSummary();
             }
         }
         finally
         {
+            UpdateChoices();
             IsBusy = false;
             OnPropertyChanged(nameof(HasSeveralSources));
             SelectedSource = Sources.FirstOrDefault(s => s.Source.Connection.Id == selected) ?? Sources.FirstOrDefault();
@@ -105,6 +147,14 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
                     group.Source.Connection,
                     group.Calendars.Where(c => c.IsSelected).Select(c => c.Candidate.Calendar.RemoteId).ToList(),
                     group.Calendars.Select(c => c.Candidate.Calendar.RemoteId).ToList());
+            }
+
+            // The keys, not the boxes: a chosen calendar of a server that is not reachable right now is not in the list
+            // (the box shows "Automatisch"), but stays the default.
+            await settings.SetAsync(SettingKeys.CalendarDefaultCalendar, _defaultKey);
+            foreach (var group in Sources)
+            {
+                await settings.SetAsync(InvitationService.DefaultCalendarKey(group.Source.Account.Id), group.InvitationKey);
             }
 
             Finished?.Invoke(this, true);
@@ -176,9 +226,12 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
 
 internal sealed partial class CalendarSourceGroup : ObservableObject
 {
-    public CalendarSourceGroup(CalendarSource source)
+    private string? _invitationKey;
+
+    public CalendarSourceGroup(CalendarSource source, string? invitationKey = null)
     {
         Source = source;
+        _invitationKey = invitationKey;
         Calendars.CollectionChanged += (_, e) =>
         {
             foreach (CalendarChoiceItem item in e.NewItems ?? Array.Empty<CalendarChoiceItem>())
@@ -211,8 +264,52 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
     [ObservableProperty]
     public partial bool HasMatches { get; set; } = true;
 
+    /// <summary>A calendar was ticked or unticked: the default choices of the dialog follow.</summary>
+    public event EventHandler? ChoicesChanged;
+
+    /// <summary>The calendars shown that new events can go into (not read-only, not a pure task list).</summary>
+    public IEnumerable<CalendarChoiceItem> Writable() =>
+        Calendars.Where(c => c.IsSelected && !c.IsReadOnly && c.Candidate.Calendar.Content != Neruna.Core.Calendar.CalendarContent.Tasks);
+
+    public string? InvitationKey => _invitationKey;
+
+    /// <summary>All calendars of the server are in the list (while it fills, the chosen one may still be missing).</summary>
+    public bool IsLoaded { get; set; }
+
+    /// <summary>Whether this calendar is among the ones the server listed (shown or not).</summary>
+    public bool Lists(string? key) => key is not null && Calendars.Any(c => CalendarController.CalendarKey(c.Candidate.Calendar) == key);
+
+    /// <summary>"Einladungen an dieses Konto": automatic (one of the account's own) or one of its calendars shown.</summary>
+    public ObservableCollection<CalendarChoice> InvitationChoices { get; } = [];
+
+    [ObservableProperty]
+    public partial CalendarChoice? InvitationCalendar { get; set; }
+
+    partial void OnInvitationCalendarChanged(CalendarChoice? value)
+    {
+        if (value is not null)
+        {
+            _invitationKey = value.Key;
+        }
+    }
+
     public void UpdateSummary()
     {
+        var key = _invitationKey;
+        InvitationChoices.Clear();
+        InvitationChoices.Add(CalendarChoice.AutomaticForAccount);
+        foreach (var item in Writable())
+        {
+            InvitationChoices.Add(new CalendarChoice(CalendarController.CalendarKey(item.Candidate.Calendar), item.Name));
+        }
+
+        var choice = InvitationChoices.FirstOrDefault(c => c.Key == key);
+        InvitationCalendar = choice ?? CalendarChoice.AutomaticForAccount;
+        // Not one of the account's calendars shown (unticked, or from before: the calendar chosen last, of any account):
+        // automatic, as the box says. Only while the server is not reachable the setting stays.
+        _invitationKey = choice is null && IsLoaded && Error is null ? null : key;
+        ChoicesChanged?.Invoke(this, EventArgs.Empty);
+
         Summary = Error is not null ? T("nicht erreichbar")
             : Calendars.Count == 0 ? T("keine Kalender")
             : F("{0} von {1} angezeigt", Calendars.Count(c => c.IsSelected), Calendars.Count);
@@ -280,4 +377,14 @@ internal sealed partial class CalendarChoiceItem(CalendarCandidate candidate) : 
     /// <summary>Matches the search field.</summary>
     [ObservableProperty]
     public partial bool IsVisible { get; set; } = true;
+}
+
+/// <summary>A calendar in the choice of a default one; the automatic choices have no key.</summary>
+internal sealed record CalendarChoice(string? Key, string Label)
+{
+    public static CalendarChoice Automatic { get; } = new(null, T("Automatisch (der erste beschreibbare Kalender)"));
+
+    public static CalendarChoice AutomaticForAccount { get; } = new(null, T("Automatisch (ein eigener Kalender des Kontos)"));
+
+    public override string ToString() => Label;
 }
