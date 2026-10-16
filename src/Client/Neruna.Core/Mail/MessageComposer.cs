@@ -98,6 +98,33 @@ public static partial class MessageComposer
             HtmlQuoteBlock(original));
     }
 
+    /// <summary>
+    /// Forwards whole messages as attachments (.eml, unchanged with all their attachments and headers): one or several,
+    /// e.g. all selected ones. The subject is the first one's.
+    /// </summary>
+    public static ComposeDraft ForwardAsAttachments(IReadOnlyList<MimeMessage> originals)
+    {
+        ArgumentNullException.ThrowIfNull(originals);
+        if (originals.Count == 0)
+        {
+            throw new ArgumentException("Nothing to forward.", nameof(originals));
+        }
+
+        var subject = "WG: " + StripPrefixes(originals[0].Subject);
+        if (originals.Count > 1)
+        {
+            subject += " " + F("(und {0} weitere)", originals.Count - 1);
+        }
+
+        var parts = originals.Select(original =>
+        {
+            var part = new MessagePart { Message = original, ContentDisposition = new ContentDisposition(ContentDisposition.Attachment) };
+            part.ContentDisposition.FileName = MessageContent.FileNameOf(part);
+            return (MimeEntity)part;
+        }).ToList();
+        return new ComposeDraft(string.Empty, string.Empty, subject, string.Empty, null, [], parts);
+    }
+
     /// <param name="forDraft">Saving a draft: incomplete or invalid recipients are tolerated (kept as far as readable).</param>
     public static MimeMessage Build(MailboxAddress from, ComposeDraft draft, IEnumerable<MimeEntity> extraAttachments, bool forDraft = false)
     {
@@ -211,7 +238,7 @@ public static partial class MessageComposer
     }
 
     // Embedded images become data: URIs, so the editor can show them (they become cid: attachments again on send).
-    private static string InlineImagesAsDataUris(MessageContent content)
+    internal static string InlineImagesAsDataUris(MessageContent content)
     {
         var html = content.Html;
         foreach (var (id, part) in content.InlineParts)
@@ -279,11 +306,11 @@ public static partial class MessageComposer
             return "src=\"cid:" + image.ContentId + "\"";
         });
 
-    private static string BodyOf(string html) =>
+    internal static string BodyOf(string html) =>
         BodyContent().Match(html) is { Success: true } body ? body.Groups[1].Value : html;
 
     // Keep the original's <style> blocks so a quoted newsletter does not lose its layout.
-    private static string StylesOf(string html) =>
+    internal static string StylesOf(string html) =>
         string.Concat(StyleBlock().Matches(BodyContent().Match(html) is { Success: true } b ? html[..b.Index] : string.Empty).Select(m => m.Value));
 
     private static string Encode(string text) => WebUtility.HtmlEncode(text);

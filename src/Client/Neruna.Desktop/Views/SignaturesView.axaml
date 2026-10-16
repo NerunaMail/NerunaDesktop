@@ -16,11 +16,14 @@
         <DockPanel>
           <TextBlock DockPanel.Dock="Bottom" Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0" IsVisible="{Binding IsCloudSelected}"
                      Text="{l:T 'Diese Signatur pflegt Ihre Organisation im Neruna-Portal. Sie wird hier automatisch aktuell gehalten und kann wie jede andere Signatur gewählt werden.'}" />
-          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+          <WrapPanel DockPanel.Dock="Bottom" ItemSpacing="6" LineSpacing="6" Margin="0,8,0,0">
             <Button Classes="accent" Content="{l:T 'Neu'}" Command="{Binding NewCommand}" />
             <Button Content="{l:T 'Bearbeiten'}" Command="{Binding EditCommand}" />
             <Button Content="{l:T 'Löschen'}" Command="{Binding DeleteCommand}" />
-          </StackPanel>
+            <Button Content="{l:T 'Importieren …'}" Command="{Binding ImportCommand}"
+                    ToolTip.Tip="{l:T 'Signatur aus einer Datei übernehmen: HTML (mit den Bildern im Ordner daneben), Text oder E-Mail (.eml)'}" />
+          </WrapPanel>
+          <TextBlock DockPanel.Dock="Bottom" Classes="error" TextWrapping="Wrap" Margin="0,6,0,0" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4">
             <Panel>
               <TextBlock Classes="subtle" Text="{l:T 'Noch keine Signatur – «Neu» erstellt eine.'}" TextWrapping="Wrap" Margin="12" IsVisible="{Binding !HasSignatures}" />

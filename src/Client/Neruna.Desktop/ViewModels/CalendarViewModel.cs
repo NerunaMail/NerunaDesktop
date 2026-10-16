@@ -443,6 +443,12 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         // The own address per calendar: organizer of new invitations, and "me" among the attendees.
         var owners = (await calendar.GetSourcesAsync()).ToDictionary(s => s.Connection.Id, s => s.Account.EmailAddress);
         var editor = new EventEditorViewModel(calendar, invitations, writable, draft, existing, c => owners.GetValueOrDefault(c.ConnectionId));
+        if (existing is null && await settings.GetAsync(SettingKeys.CalendarDefaultCalendar) is { Length: > 0 } preferred
+            && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == preferred) is { } standard)
+        {
+            editor.SelectedCalendar = standard;
+        }
+
         EditorRequested?.Invoke(this, editor);
     }
 

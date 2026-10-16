@@ -388,6 +388,8 @@
               <ctl:ToolButton Icon="{StaticResource IconReply}" Label="{l:T 'Antworten'}" Shortcut="Ctrl+R" Command="{Binding ReplyCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
               <ctl:ToolButton Icon="{StaticResource IconReplyAll}" Label="{l:T 'Allen antworten'}" Shortcut="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
               <ctl:ToolButton Icon="{StaticResource IconForward}" Label="{l:T 'Weiterleiten'}" Shortcut="Ctrl+F" Command="{Binding ForwardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+              <ctl:ToolButton Icon="{StaticResource IconAttach}" Label="{l:T 'Als Anhang'}" Command="{Binding ForwardAsAttachmentCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}"
+                              ToolTip.Tip="{l:T 'Als Anhang weiterleiten – unverändert als .eml-Datei, auch mehrere ausgewählte Nachrichten auf einmal'}" />
               <Separator Width="1" Height="28" Margin="6,0" VerticalAlignment="Center" Background="{DynamicResource DividerBrush}" />
               <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{l:T 'Löschen'}" Shortcut="Entf" Command="{Binding DeleteCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
               <ctl:ToolButton Icon="{StaticResource IconArchive}" Label="{l:T 'Archivieren'}" Command="{Binding ArchiveCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />

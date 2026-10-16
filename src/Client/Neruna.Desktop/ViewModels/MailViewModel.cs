@@ -141,7 +141,7 @@ internal sealed partial class MailViewModel(
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedMessage), nameof(HasSelection), nameof(ShowMessageActions))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand), nameof(ForwardAsAttachmentCommand))]
     public partial MessageListEntry? SelectedEntry { get; set; }
 
     [ObservableProperty]
@@ -495,8 +495,58 @@ internal sealed partial class MailViewModel(
     [RelayCommand(CanExecute = nameof(CanRespond))]
     private async Task ReplyAllAsync() => await RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, OwnAddresses(CurrentAccount!.Account), replyAll: true), ComposeKind.Reply);
 
+    // Several selected: they go along as attachments – there is no single message to quote.
     [RelayCommand(CanExecute = nameof(CanRespond))]
-    private async Task ForwardAsync() => await RespondAsync(MessageComposer.Forward(ReadingPane!.Message!), ComposeKind.Forward);
+    private async Task ForwardAsync()
+    {
+        if (ActionTargets.Count > 1)
+        {
+            await ForwardAsAttachmentAsync();
+            return;
+        }
+
+        await RespondAsync(MessageComposer.Forward(ReadingPane!.Message!), ComposeKind.Forward);
+    }
+
+    /// <summary>The selected messages (or the open one) as .eml attachments of a new mail; each is marked forwarded once sent.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task ForwardAsAttachmentAsync()
+    {
+        var targets = ActionTargets.ToList();
+        var originals = new List<MimeKit.MimeMessage>();
+        var forwarded = new List<(MessageItemViewModel Message, MailFolderNode Folder)>();
+        try
+        {
+            foreach (var message in targets)
+            {
+                if (FolderOf(message) is not { } folder)
+                {
+                    continue;
+                }
+
+                originals.Add(await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId));
+                forwarded.Add((message, folder));
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(T("Nachrichten konnten nicht geladen werden"), ex);
+            return;
+        }
+
+        if (originals.Count == 0)
+        {
+            return;
+        }
+
+        await StartComposeAsync(MessageComposer.ForwardAsAttachments(originals), ComposeKind.Forward, afterSent: async () =>
+        {
+            foreach (var (message, folder) in forwarded.Where(f => !f.Folder.Account.IsReadOnly))
+            {
+                await MarkRespondedAsync(message, folder, ComposeKind.Forward);
+            }
+        });
+    }
 
     private async Task<ComposeViewModel?> RespondAsync(ComposeDraft draft, ComposeKind kind)
     {

@@ -17,6 +17,11 @@
       <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,14"
                  Text="{l:T 'Gilt für neue Termine und angenommene Einladungen; im Termin lässt sie sich einzeln ändern. Termine aus dem Webmail oder anderen Programmen behalten ihre eigene Erinnerung.'}" />
 
+      <TextBlock Text="{l:T 'Standardkalender für neue Termine'}" FontSize="16" FontWeight="SemiBold" />
+      <ComboBox ItemsSource="{Binding CalendarChoices}" SelectedItem="{Binding DefaultCalendar}" MinWidth="240" MaxWidth="480" />
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,14"
+                 Text="{l:T 'Ist beim Erstellen eines Termins vorgewählt; im Termin lässt sich ein anderer Kalender wählen. Angenommene Einladungen kommen in den Kalender, den Sie dafür zuletzt gewählt haben.'}" />
+
       <TextBlock Text="{l:T 'Aufgaben'}" FontSize="16" FontWeight="SemiBold" />
       <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,14"
                  Text="{l:T 'Aufgaben erscheinen unter «Aufgaben» – im Kalender nur aus den Listen, bei denen Sie es wünschen: Farbpunkt der Liste anklicken (unter «Aufgaben» oder im Kalender) und «Aufgaben im Kalender anzeigen» wählen.'}" />

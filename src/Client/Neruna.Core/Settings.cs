@@ -123,6 +123,9 @@ public static class SettingKeys
     /// <summary>Reminder for new events and accepted invitations, minutes before the start; "none" for none. Default: 15.</summary>
     public const string CalendarDefaultReminder = "calendar.defaultReminder";
 
+    /// <summary>Calendar preselected for new events (<see cref="Calendar.CalendarController.CalendarKey"/>); the first writable one when unset or gone.</summary>
+    public const string CalendarDefaultCalendar = "calendar.defaultCalendar";
+
     /// <summary>After answering an invitation (or removing a cancelled event), its mail goes to the trash. Default: on.</summary>
     public const string DeleteAnsweredInvitations = "calendar.deleteAnsweredInvitations";
 

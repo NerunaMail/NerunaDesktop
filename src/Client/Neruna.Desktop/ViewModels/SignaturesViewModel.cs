@@ -97,6 +97,31 @@ internal sealed partial class SignaturesViewModel(SignatureService signatures, I
         }
     }
 
+    /// <summary>A signature from a file (HTML with its pictures, text or a mail); opened in the editor before it is saved.</summary>
+    [RelayCommand]
+    private async Task ImportAsync()
+    {
+        Error = null;
+        if (await files.PickFileAsync(T("Signatur importieren"), T("Signatur (HTML, Text, E-Mail)"), SignatureImport.Patterns) is not { } path)
+        {
+            return;
+        }
+
+        string html;
+        try
+        {
+            html = await SignatureImport.ReadFileAsync(path);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            Error = ex is InvalidDataException ? ex.Message : F("Die Datei lässt sich nicht lesen: {0}", ex.Message);
+            return;
+        }
+
+        var name = Path.GetFileNameWithoutExtension(path).Trim();
+        await OpenEditorAsync(new Signature(Guid.NewGuid(), name.Length > 0 ? name : T("Signatur"), html, DateTimeOffset.Now), isNew: true);
+    }
+
     [RelayCommand(CanExecute = nameof(CanModify))]
     private async Task EditAsync() => await OpenEditorAsync(Selected!, isNew: false);
 

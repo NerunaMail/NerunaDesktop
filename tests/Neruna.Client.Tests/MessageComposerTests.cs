@@ -200,4 +200,21 @@ public class MailActionTests
         await env.Mail.ArchiveAsync(connection, inbox, [message.RemoteId], TestContext.Current.CancellationToken);
         Assert.Single(env.MailServer.Folders["Archive"]);
     }
+
+    [Fact]
+    public void Several_messages_are_forwarded_unchanged_as_attachments()
+    {
+        var second = new MimeMessage { Subject = "Rechnung", Body = new TextPart("plain") { Text = "Betrag" } };
+        var first = new MimeMessage { Subject = "AW: Re: Offerte", MessageId = "orig@example.com", Body = new TextPart("plain") { Text = "Offerte" } };
+        var draft = MessageComposer.ForwardAsAttachments([first, second]);
+
+        Assert.Equal("WG: Offerte (und 1 weitere)", draft.Subject);
+        Assert.Equal(["AW: Re: Offerte.eml", "Rechnung.eml"], draft.Attachments.Select(MessageContent.FileNameOf));
+        var sent = MessageComposer.Build(new MailboxAddress("Anna", "anna@example.com"), draft with { To = "kim@example.com" }, []);
+        var attached = sent.Attachments.OfType<MessagePart>().ToList();
+        Assert.Equal(2, attached.Count);
+        Assert.Equal("orig@example.com", attached[0].Message!.MessageId);
+        Assert.Equal("Rechnung.eml", attached[1].ContentDisposition!.FileName);
+        Assert.Equal("WG: Rechnung", MessageComposer.ForwardAsAttachments([second]).Subject);
+    }
 }
