@@ -53,6 +53,13 @@ internal static class Converters
             _ => "IconFolder",
         }) as Geometry);
 
+    // Einstellungen → News: how a block of a post is shown.
+    public static FuncValueConverter<Neruna.Core.News.NewsBlockKind, bool> IsNewsParagraph { get; } = new(k => k == Neruna.Core.News.NewsBlockKind.Paragraph);
+
+    public static FuncValueConverter<Neruna.Core.News.NewsBlockKind, bool> IsNewsHeading { get; } = new(k => k == Neruna.Core.News.NewsBlockKind.Heading);
+
+    public static FuncValueConverter<Neruna.Core.News.NewsBlockKind, bool> IsNewsItem { get; } = new(k => k == Neruna.Core.News.NewsBlockKind.Item);
+
     /// <summary>An icon geometry from App.axaml by its key.</summary>
     public static FuncValueConverter<string?, Geometry?> Icon { get; } = new(key => key is null ? null : Resource(key) as Geometry);
 

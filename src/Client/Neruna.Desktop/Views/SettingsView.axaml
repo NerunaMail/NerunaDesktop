@@ -47,6 +47,7 @@
         <ContentControl Content="{Binding LocalData}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=13}" />
         <ContentControl Content="{Binding Privacy}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=14}" />
         <ContentControl Content="{Binding Workspaces}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=15}" />
+        <ContentControl Content="{Binding News}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=16}" />
         <views:AboutView IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=9}" />
       </Panel>
     </Grid>

@@ -779,6 +779,15 @@ internal static class Snapshots
         await Task.Delay(500);
         vm.NavigateCommand.Execute(Section.Settings);
 
+        // News: the devblog, from the website's own feed next door (no request to neruna.org).
+        var feedFile = Path.Combine(AppContext.BaseDirectory, "../../../../../../website/de/blog/feed.xml");
+        if (File.Exists(feedFile))
+        {
+            vm.SettingsPage.News.Show(Neruna.Core.News.DevblogFeed.Parse(await File.ReadAllTextAsync(feedFile)));
+            vm.SettingsPage.SelectedTab = SettingsViewModel.NewsTab;
+            await SaveAsync(window, output, "settings-news.png");
+        }
+
         // Datenschutz with a few trusted senders, and with many (the list scrolls in its own box).
         var privacy = services.GetRequiredService<Neruna.Desktop.Infrastructure.PrivacyService>();
         var privacyOptions = await privacy.GetAsync();

@@ -4,8 +4,13 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news) : ViewModelBase
 {
+    /// <summary>Settings → Programm → News: the devblog.</summary>
+    public NewsViewModel News => news;
+
+    public const int NewsTab = 16;
+
     /// <summary>Settings → Workspaces.</summary>
     public WorkspacesViewModel Workspaces => workspaces;
 
@@ -100,6 +105,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(15, T("Workspaces"), "IconFolder"),
         new(8, T("KI"), "IconAi"),
         new(9, T("Über Neruna"), "IconInfo"),
+        new(NewsTab, T("News"), "IconRss"),
     ];
 
     [ObservableProperty]
@@ -125,6 +131,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             else if (item.Tab == 13)
             {
                 LocalData.ShowDatabaseSize();
+            }
+            else if (item.Tab == NewsTab)
+            {
+                _ = News.ShowAsync();
             }
         }
     }

@@ -152,6 +152,8 @@ internal static class AppServices
         services.AddSingleton<MailOptionsViewModel>();
         services.AddSingleton<PrivacyOptionsViewModel>();
         services.AddSingleton<WorkspacesViewModel>();
+        services.AddSingleton<Neruna.Core.News.DevblogFeed>();
+        services.AddSingleton<NewsViewModel>();
         services.AddSingleton<CalendarOptionsViewModel>();
         services.AddSingleton<SignaturesViewModel>();
         services.AddSingleton<AppearanceViewModel>();
