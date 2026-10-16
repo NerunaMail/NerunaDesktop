@@ -153,7 +153,8 @@ internal sealed class EwsClient(HttpClient http, EwsSettings settings, string? p
         return result;
     }
 
-    private async Task<XElement> SendAsync(XElement operation, CancellationToken cancellationToken)
+    /// <summary>The SOAP body of the answer, for operations whose answer is not a list of response messages (GetUserAvailability).</summary>
+    internal async Task<XElement> SendAsync(XElement operation, CancellationToken cancellationToken)
     {
         var envelope = new XElement(X.Soap + "Envelope",
             new XAttribute(XNamespace.Xmlns + "soap", X.Soap), new XAttribute(XNamespace.Xmlns + "m", X.M), new XAttribute(XNamespace.Xmlns + "t", X.T),

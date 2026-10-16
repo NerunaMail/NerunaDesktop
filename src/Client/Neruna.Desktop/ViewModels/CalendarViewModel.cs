@@ -188,6 +188,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         _loadingSettings = true;
         IsWorkWeek = await settings.GetBoolAsync(SettingKeys.CalendarWorkWeek);
         IsPlanning = await settings.GetBoolAsync(SettingKeys.CalendarPlanning);
+        PlanningPeopleText = await settings.GetAsync(SettingKeys.CalendarPlanningPeople) ?? string.Empty;
         _loadingSettings = false;
         GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
         SetVisibleRange(

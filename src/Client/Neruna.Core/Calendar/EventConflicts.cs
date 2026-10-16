@@ -1,23 +1,28 @@
 namespace Neruna.Core.Calendar;
 
-/// <summary>Someone invited already has something at that time.</summary>
+/// <summary>Someone invited already has something at that time (the subject only if known).</summary>
 /// <param name="Person">The attendee's (or own) address.</param>
-public sealed record EventConflict(string Person, string? Name, CalendarOccurrence Occurrence);
+public sealed record EventConflict(string Person, string? Name, string? Subject, DateTimeOffset Start, DateTimeOffset End, bool IsAllDay);
 
 /// <summary>
-/// While planning an event: who of the people in it is already busy then – as far as Neruna knows their calendar. Known
-/// are the calendars of the own accounts (also a shared mailbox assigned to the user) and calendars in a person's own
-/// calendar home on the server (the address or user name in its path, as CalDAV servers name them). Free events do
-/// not count, nor does the event being edited.
+/// While planning an event: who of the people in it is already busy then. First the calendars Neruna has: those of
+/// the own accounts (also a shared mailbox assigned to the user) and calendars in a person's own calendar home on the
+/// server (the address in its path, as CalDAV servers name them). For everyone else the server is asked for free/busy
+/// (Microsoft 365, Exchange) – no subscription needed. Free time does not count, nor does the event being edited.
 /// </summary>
 public static class EventConflicts
 {
+    /// <param name="editing">The event being edited: its own entry is not a conflict.</param>
+    /// <param name="editingTimes">Its times before the change: free/busy shows the event itself there.</param>
+    /// <param name="connection">Whose server to ask for free/busy first (the calendar the event goes into).</param>
     public static async Task<IReadOnlyList<EventConflict>> FindAsync(
         CalendarController calendar,
         IEnumerable<EventAttendee> people,
         DateTime start,
         DateTime end,
         (CalendarInfo Calendar, string RemoteId)? editing,
+        (DateTime Start, DateTime End)? editingTimes = null,
+        Guid? connection = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(calendar);
@@ -30,11 +35,13 @@ public static class EventConflicts
         var sources = await calendar.GetSourcesAsync(cancellationToken);
         var calendars = (await calendar.GetCalendarsAsync(cancellationToken)).Where(c => c.HasEvents).ToList();
         var result = new List<EventConflict>();
+        var unknown = new List<EventAttendee>();
         foreach (var person in people.DistinctBy(p => p.Email, StringComparer.OrdinalIgnoreCase))
         {
             var theirs = calendars.Where(c => Belongs(c, person.Email, sources)).ToList();
             if (theirs.Count == 0)
             {
+                unknown.Add(person);
                 continue;
             }
 
@@ -42,9 +49,26 @@ public static class EventConflicts
             {
                 var isEdited = editing is { } e && o.ObjectRemoteId == e.RemoteId && o.Calendar.ConnectionId == e.Calendar.ConnectionId;
                 if (!isEdited && o.ShowAs != ShowAs.Free && o.Start.LocalDateTime < end && o.End.LocalDateTime > start
-                    && !result.Any(r => r.Occurrence.Uid == o.Uid && string.Equals(r.Person, person.Email, StringComparison.OrdinalIgnoreCase)))
+                    && !result.Any(r => string.Equals(r.Person, person.Email, StringComparison.OrdinalIgnoreCase) && r.Start == o.Start && r.Subject == o.Summary))
                 {
-                    result.Add(new EventConflict(person.Email, person.Name, o));
+                    result.Add(new EventConflict(person.Email, person.Name, o.Summary, o.Start, o.End, o.IsAllDay));
+                }
+            }
+        }
+
+        if (unknown.Count > 0
+            && await calendar.GetFreeBusyAsync([.. unknown.Select(p => p.Email)], new DateTimeOffset(start), new DateTimeOffset(end), connection, cancellationToken) is { } answers)
+        {
+            foreach (var (person, availability) in unknown.Zip(answers))
+            {
+                foreach (var slot in availability.Slots.Where(s => s.ShowAs != ShowAs.Free && s.Start.LocalDateTime < end && s.End.LocalDateTime > start))
+                {
+                    if (editingTimes is { } times && slot.Start.LocalDateTime == times.Start && slot.End.LocalDateTime == times.End)
+                    {
+                        continue; // the edited event itself
+                    }
+
+                    result.Add(new EventConflict(person.Email, person.Name, slot.Subject, slot.Start, slot.End, false));
                 }
             }
         }

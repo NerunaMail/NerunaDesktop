@@ -102,9 +102,9 @@ internal sealed partial class CalendarView : UserControl
     // Planung: double-click on a block opens the event.
     private void OnPlanningBlockDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is Control { DataContext: PlanningBlock block } && DataContext is CalendarViewModel vm)
+        if (sender is Control { DataContext: PlanningBlock { Occurrence: { } occurrence } } && DataContext is CalendarViewModel vm)
         {
-            _ = vm.OpenOccurrenceAsync(block.Occurrence);
+            _ = vm.OpenOccurrenceAsync(occurrence);
             e.Handled = true;
         }
     }

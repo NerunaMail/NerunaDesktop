@@ -215,8 +215,44 @@ public sealed class DemoCalendarProviderFactory : IProviderFactory<ICalendarProv
     public ICalendarProvider Create(ServiceConnection connection) => new DemoCalendarProvider(connection.Id);
 }
 
-internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvider
+internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvider, ICalendarFreeBusy
 {
+    /// <summary>Colleagues' free/busy, as Microsoft 365 would answer: a few meetings a day, one away day; unknown addresses outside example.com.</summary>
+    public Task<IReadOnlyList<Availability>> GetFreeBusyAsync(IReadOnlyList<string> emails, DateTimeOffset windowStart, DateTimeOffset windowEnd, CancellationToken cancellationToken = default)
+    {
+        var result = new List<Availability>();
+        foreach (var (email, index) in emails.Select((e, i) => (e, i)))
+        {
+            if (!email.EndsWith("example.com", StringComparison.OrdinalIgnoreCase))
+            {
+                result.Add(new Availability(email, [], "not found"));
+                continue;
+            }
+
+            var slots = new List<BusySlot>();
+            for (var day = windowStart.LocalDateTime.Date; day < windowEnd.LocalDateTime; day = day.AddDays(1))
+            {
+                if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                {
+                    continue;
+                }
+
+                if ((day.Day + index) % 5 == 0)
+                {
+                    slots.Add(new BusySlot(new DateTimeOffset(day.AddHours(8)), new DateTimeOffset(day.AddHours(17)), ShowAs.OutOfOffice, "Ferien"));
+                    continue;
+                }
+
+                slots.Add(new BusySlot(new DateTimeOffset(day.AddHours(9 + index)), new DateTimeOffset(day.AddHours(10 + index)), ShowAs.Busy, "Kundentermin", "Zürich"));
+                slots.Add(new BusySlot(new DateTimeOffset(day.AddHours(14)), new DateTimeOffset(day.AddHours(15.5)), (day.Day + index) % 2 == 0 ? ShowAs.Tentative : ShowAs.Busy));
+            }
+
+            result.Add(new Availability(email, slots));
+        }
+
+        return Task.FromResult<IReadOnlyList<Availability>>(result);
+    }
+
     // Tasks can be ticked off and edited in the demo; they live in memory until Neruna closes.
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, CalendarObject> Tasks = new(StringComparer.Ordinal);
 

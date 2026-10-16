@@ -16,8 +16,54 @@ namespace Neruna.Providers.Graph;
 /// what it sees from CalDAV. The version of an event is Graph's change key. The server delivers invitations itself.
 /// Not (yet) mapped: changed single occurrences of a series.
 /// </summary>
-internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling
+internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy
 {
+    /// <summary>
+    /// Free/busy of people in the organisation (getSchedule) – also without their calendar being shared; subject and
+    /// place only where they allow it. In batches of 20 addresses, times in UTC.
+    /// </summary>
+    public async Task<IReadOnlyList<Availability>> GetFreeBusyAsync(IReadOnlyList<string> emails, DateTimeOffset windowStart, DateTimeOffset windowEnd, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(emails);
+        var result = new List<Availability>();
+        object When(DateTimeOffset value) => new { dateTime = value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture), timeZone = "UTC" };
+        foreach (var batch in emails.Chunk(20))
+        {
+            var answer = await graph.SendJsonAsync(HttpMethod.Post, "me/calendar/getSchedule",
+                new { schedules = batch, startTime = When(windowStart), endTime = When(windowEnd), availabilityViewInterval = 30 },
+                cancellationToken, ("Prefer", "outlook.timezone=\"UTC\""));
+            var byAddress = answer.Arr("value").ToDictionary(v => v.Str("scheduleId") ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+            foreach (var email in batch)
+            {
+                result.Add(byAddress.TryGetValue(email, out var schedule) ? FreeBusyOf(email, schedule) : new Availability(email, [], "not answered"));
+            }
+        }
+
+        return result;
+    }
+
+    internal static Availability FreeBusyOf(string email, JsonElement schedule)
+    {
+        if (schedule.Obj("error").Str("message") is { } error)
+        {
+            return new Availability(email, [], error);
+        }
+
+        static DateTimeOffset Utc(JsonElement when) => new(DateTime.SpecifyKind(
+            DateTime.Parse(when.Str("dateTime") ?? "1970-01-01T00:00:00", CultureInfo.InvariantCulture, DateTimeStyles.None), DateTimeKind.Utc));
+        var slots = schedule.Arr("scheduleItems")
+            .Select(i => (Item: i, Status: i.Str("status")))
+            .Where(i => i.Status is not ("free" or "unknown"))
+            .Select(i => new BusySlot(Utc(i.Item.Obj("start")), Utc(i.Item.Obj("end")), i.Status switch
+            {
+                "tentative" => ShowAs.Tentative,
+                "oof" => ShowAs.OutOfOffice,
+                _ => ShowAs.Busy,
+            }, i.Item.Str("subject") is { Length: > 0 } subject ? subject : null, i.Item.Str("location") is { Length: > 0 } location ? location : null))
+            .ToList();
+        return new Availability(email, slots);
+    }
+
     private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs";
 
     public CalendarProviderCapabilities Capabilities => CalendarProviderCapabilities.Write | CalendarProviderCapabilities.Scheduling;

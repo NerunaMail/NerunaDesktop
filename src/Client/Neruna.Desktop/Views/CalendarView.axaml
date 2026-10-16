@@ -4,6 +4,7 @@
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
              xmlns:views="using:Neruna.Desktop.Views"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              x:Class="Neruna.Desktop.Views.CalendarView"
              x:DataType="vm:CalendarViewModel">
 
@@ -409,6 +410,12 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+          <!-- People to show by their free/busy (Microsoft 365, Exchange) – no subscription needed -->
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="200,*" Margin="0,0,12,8">
+            <TextBlock Text="{l:T 'Personen'}" VerticalAlignment="Center" Margin="10,0,8,0" Classes="subtle" />
+            <ctl:RecipientBox Grid.Column="1" Text="{Binding PlanningPeopleText}" Directory="{Binding Recipients}"
+                              PlaceholderText="{l:T 'Name oder Adresse – zeigt, wann jemand beschäftigt ist (Microsoft 365, Exchange)'}" />
+          </Grid>
           <!-- Axis: days and hours -->
           <Grid DockPanel.Dock="Top" ColumnDefinitions="200,*" Margin="0,0,12,0">
             <ItemsControl Grid.Column="1" ItemsSource="{Binding PlanningDays}">
@@ -441,6 +448,7 @@
             </ItemsControl>
           </Grid>
           <ScrollViewer>
+            <StackPanel>
             <ItemsControl ItemsSource="{Binding PlanningRows}" Margin="0,0,12,0">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:PlanningRow">
@@ -482,6 +490,51 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- People by their free/busy from the server -->
+            <ItemsControl ItemsSource="{Binding PlanningPeople}" Margin="0,0,12,0">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PlanningRow">
+                  <Grid ColumnDefinitions="200,*" Height="34">
+                    <DockPanel Margin="10,0,8,0" VerticalAlignment="Center">
+                      <Border DockPanel.Dock="Left" Width="10" Height="10" CornerRadius="2" Background="{Binding Color}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                        <TextBlock Text="{Binding Owner}" Classes="subtle" FontSize="11" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                    </DockPanel>
+                    <!-- Day lines behind the blocks -->
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).PlanningDays}" IsHitTestVisible="False">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <UniformGrid Rows="1" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PlanningDay">
+                          <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1,0,0,1" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Blocks}" VerticalAlignment="Center">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <views:PlanningPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PlanningBlock">
+                          <Border Background="{Binding Brush}" Opacity="{Binding Opacity}" CornerRadius="3" ToolTip.Tip="{Binding Tip}"
+                                  DoubleTapped="OnPlanningBlockDoubleTapped" Cursor="Hand" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding PlanningPeopleNote}" IsVisible="{Binding PlanningPeopleNote, Converter={x:Static ObjectConverters.IsNotNull}}"
+                       Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="10,8,12,0" />
+            </StackPanel>
           </ScrollViewer>
         </DockPanel>
 

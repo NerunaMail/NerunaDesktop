@@ -12,8 +12,40 @@ namespace Neruna.Providers.Ews;
 /// is its change key. Exchange sends invitations, updates, cancellations and answers itself: saving an invitation with
 /// a new own answer accepts or declines it on the server, deleting someone else's meeting declines it.
 /// </summary>
-internal sealed class EwsCalendarProvider(ServiceConnection connection, EwsConnectionFactory connections) : ICalendarProvider, ICalendarScheduling
+internal sealed class EwsCalendarProvider(ServiceConnection connection, EwsConnectionFactory connections) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy
 {
+    /// <summary>
+    /// Free/busy of people in the organisation (GetUserAvailability) – also without their calendar being shared;
+    /// subject and place where they allow it. Asked in UTC, in batches of 100 addresses and at most 42 days.
+    /// </summary>
+    public async Task<IReadOnlyList<Availability>> GetFreeBusyAsync(IReadOnlyList<string> emails, DateTimeOffset windowStart, DateTimeOffset windowEnd, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(emails);
+        var client = await ClientAsync(cancellationToken);
+        var end = windowEnd - windowStart > TimeSpan.FromDays(42) ? windowStart.AddDays(42) : windowEnd;
+        var result = new List<Availability>();
+        foreach (var batch in emails.Chunk(100))
+        {
+            var body = await client.SendAsync(AvailabilityRequest(batch, windowStart, end), cancellationToken);
+            result.AddRange(EwsCalendarConverter.AvailabilityOf(batch, body));
+        }
+
+        return result;
+    }
+
+    internal static XElement AvailabilityRequest(IReadOnlyList<string> emails, DateTimeOffset windowStart, DateTimeOffset windowEnd)
+    {
+        static XElement Utc(string name) => X.Typ(name, X.Typ("Bias", 0), X.Typ("Time", "00:00:00"), X.Typ("DayOrder", 0), X.Typ("Month", 0), X.Typ("DayOfWeek", "Sunday"));
+        static string At(DateTimeOffset value) => value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+        return X.Msg("GetUserAvailabilityRequest",
+            X.Typ("TimeZone", X.Typ("Bias", 0), Utc("StandardTime"), Utc("DaylightTime")),
+            X.Msg("MailboxDataArray", emails.Select(e => X.Typ("MailboxData", X.Typ("Email", X.Typ("Address", e)), X.Typ("AttendeeType", "Required"), X.Typ("ExcludeConflicts", "false")))),
+            X.Typ("FreeBusyViewOptions",
+                X.Typ("TimeWindow", X.Typ("StartTime", At(windowStart)), X.Typ("EndTime", At(windowEnd))),
+                X.Typ("MergedFreeBusyIntervalInMinutes", 30),
+                X.Typ("RequestedView", "Detailed")));
+    }
+
     private EwsClient? _client;
 
     public CalendarProviderCapabilities Capabilities => CalendarProviderCapabilities.Write | CalendarProviderCapabilities.Scheduling;

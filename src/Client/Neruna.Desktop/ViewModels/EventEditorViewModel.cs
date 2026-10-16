@@ -78,6 +78,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     private readonly (CalendarInfo Calendar, string RemoteId)? _existing;
     private readonly Func<CalendarInfo, string?> _ownAddress;
     private readonly IReadOnlyList<EventAttendee> _attendees;
+    private readonly (DateTime Start, DateTime End)? _originalTimes;
 
     public EventEditorViewModel(
         CalendarController calendar,
@@ -92,6 +93,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         _existing = existing;
         _ownAddress = ownAddress;
         _attendees = draft.Attendees ?? [];
+        _originalTimes = existing is null ? null : (draft.Start, draft.End);
         Organizer = draft.Organizer;
 
         IsReadOnly = existing?.Calendar.IsReadOnly ?? false;
@@ -302,7 +304,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
         try
         {
-            var conflicts = await Task.Run(() => EventConflicts.FindAsync(_calendar, people, start, end, _existing));
+            var conflicts = await Task.Run(() => EventConflicts.FindAsync(_calendar, people, start, end, _existing, _originalTimes, SelectedCalendar?.ConnectionId));
             if (version != _conflictVersion)
             {
                 return;
@@ -310,8 +312,8 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
             ConflictText = conflicts.Count == 0 ? null : string.Join("\n", conflicts.Take(6).Select(c => F("{0} hat zur gleichen Zeit: {1} ({2})",
                 string.Equals(c.Person, me, StringComparison.OrdinalIgnoreCase) ? T("Sie selbst") : c.Name ?? c.Person,
-                c.Occurrence.Summary,
-                c.Occurrence.IsAllDay ? T("ganztägig") : $"{c.Occurrence.Start.LocalDateTime:HH:mm}–{c.Occurrence.End.LocalDateTime:HH:mm}")))
+                c.Subject ?? T("beschäftigt"),
+                c.IsAllDay ? T("ganztägig") : $"{c.Start.LocalDateTime:HH:mm}–{c.End.LocalDateTime:HH:mm}")))
                 + (conflicts.Count > 6 ? "\n…" : string.Empty);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -126,6 +126,9 @@ public static class SettingKeys
     /// <summary>The calendar shows the planning view (a time line per calendar) instead of the week.</summary>
     public const string CalendarPlanning = "calendar.planning";
 
+    /// <summary>The people shown in the planning view by their free/busy (addresses as typed).</summary>
+    public const string CalendarPlanningPeople = "calendar.planningPeople";
+
     /// <summary>Calendar preselected for new events (<see cref="Calendar.CalendarController.CalendarKey"/>); the first writable one when unset or gone.</summary>
     public const string CalendarDefaultCalendar = "calendar.defaultCalendar";
 

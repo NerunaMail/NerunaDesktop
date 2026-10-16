@@ -245,6 +245,41 @@ internal static class EwsCalendarConverter
     private static DateOnly? DateOf(string? value) =>
         value is { Length: >= 10 } && DateOnly.TryParseExact(value[..10], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;
 
+    /// <summary>The answer to GetUserAvailability: one entry per address asked, in that order (times in UTC, as asked).</summary>
+    internal static IReadOnlyList<Availability> AvailabilityOf(IReadOnlyList<string> emails, XElement body)
+    {
+        var responses = body.Descendants(X.M + "FreeBusyResponse").ToList();
+        var result = new List<Availability>();
+        for (var i = 0; i < emails.Count; i++)
+        {
+            var response = i < responses.Count ? responses[i] : null;
+            var message = response?.Element(X.M + "ResponseMessage");
+            if (response is null || message?.Attribute("ResponseClass")?.Value == "Error")
+            {
+                result.Add(new Availability(emails[i], [], message?.Element(X.M + "MessageText")?.Value ?? "not answered"));
+                continue;
+            }
+
+            static DateTimeOffset Utc(string? value) => new(DateTime.SpecifyKind(
+                DateTime.Parse(value ?? "1970-01-01T00:00:00", CultureInfo.InvariantCulture, DateTimeStyles.None), DateTimeKind.Utc));
+            var slots = response.Descendants(X.T + "CalendarEvent")
+                .Select(e => (Event: e, Type: e.Element(X.T + "BusyType")?.Value))
+                .Where(e => e.Type is "Busy" or "Tentative" or "OOF" or "WorkingElsewhere")
+                .Select(e => new BusySlot(Utc(e.Event.Element(X.T + "StartTime")?.Value), Utc(e.Event.Element(X.T + "EndTime")?.Value), e.Type switch
+                {
+                    "Tentative" => ShowAs.Tentative,
+                    "OOF" => ShowAs.OutOfOffice,
+                    _ => ShowAs.Busy,
+                },
+                e.Event.Element(X.T + "CalendarEventDetails")?.Element(X.T + "Subject")?.Value is { Length: > 0 } subject ? subject : null,
+                e.Event.Element(X.T + "CalendarEventDetails")?.Element(X.T + "Location")?.Value is { Length: > 0 } location ? location : null))
+                .ToList();
+            result.Add(new Availability(emails[i], slots));
+        }
+
+        return result;
+    }
+
     // ── writing ──
 
     /// <summary>What Neruna writes of an event, field by field (field URI → element), in schema order.</summary>

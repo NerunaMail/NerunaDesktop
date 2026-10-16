@@ -564,7 +564,10 @@ internal static class Snapshots
         vm.CalendarPage.IsTimeGrid = true;
         await SaveAsync(window, output, "calendar-timegrid.png");
         vm.CalendarPage.IsPlanning = true;
+        vm.CalendarPage.PlanningPeopleText = "Lea Keller <lea.keller@example.com>, Marco Bernasconi <marco@bernasconi.example.com>, extern@other.org";
+        await Task.Delay(1500);
         await SaveAsync(window, output, "calendar-planning.png");
+        vm.CalendarPage.PlanningPeopleText = string.Empty;
         vm.CalendarPage.IsPlanning = false;
 
         // A meeting with attendees, their answers and a reminder.

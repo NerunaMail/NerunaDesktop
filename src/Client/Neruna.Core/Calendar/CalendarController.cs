@@ -285,6 +285,45 @@ public sealed class CalendarController(
         return saved;
     }
 
+    /// <summary>
+    /// Free/busy from the server for these addresses – through <paramref name="preferredConnection"/> (the calendar the
+    /// event goes into) or else any connected server that can tell (Microsoft 365, Exchange). Null if none can.
+    /// </summary>
+    public async Task<IReadOnlyList<Availability>?> GetFreeBusyAsync(
+        IReadOnlyList<string> emails,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        Guid? preferredConnection = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(emails);
+        if (emails.Count == 0 || to <= from)
+        {
+            return [];
+        }
+
+        var connections = (await accounts.GetAccountsAsync(cancellationToken)).SelectMany(a => a.ConnectionsOf(ServiceKind.Calendar))
+            .OrderBy(c => c.Id == preferredConnection ? 0 : 1)
+            .ToList();
+        foreach (var connection in connections)
+        {
+            try
+            {
+                await using var provider = providers.CreateCalendar(connection);
+                if (provider is ICalendarFreeBusy freeBusy)
+                {
+                    return await freeBusy.GetFreeBusyAsync(emails, from, to, cancellationToken);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogInformation(ex, "Free/busy through {Connection} failed", connection.Id);
+            }
+        }
+
+        return null;
+    }
+
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _schedulesItself = new(StringComparer.Ordinal);
 
     /// <summary>
