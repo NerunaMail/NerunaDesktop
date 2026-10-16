@@ -85,6 +85,28 @@ public sealed record PrivacyOptions
         await settings.SetBoolAsync(SettingKeys.PrivacyHideTimeZone, HideTimeZone, cancellationToken);
     }
 
+    /// <summary>
+    /// An entry for the trusted senders as typed: "Anna@Firma.ch" → "anna@firma.ch", "firma.ch" or "@firma.ch" →
+    /// "@firma.ch"; null if it is neither an address nor a domain with a known suffix.
+    /// </summary>
+    public static string? TrustedEntry(string? input)
+    {
+        var text = input?.Trim().Trim('<', '>').Trim();
+        if (string.IsNullOrEmpty(text) || text.Any(char.IsWhiteSpace))
+        {
+            return null;
+        }
+
+        var at = text.LastIndexOf('@');
+        var domain = DomainNames.ToAscii(at >= 0 ? text[(at + 1)..] : text);
+        if (domain is null || DomainNames.Registrable(domain) is null || (at > 0 && text[..at].Contains('@', StringComparison.Ordinal)))
+        {
+            return null;
+        }
+
+        return at > 0 ? text[..at].ToLowerInvariant() + "@" + domain : "@" + domain;
+    }
+
     /// <summary>The sender is on the trusted list, by address or by domain.</summary>
     public bool IsTrusted(MailboxAddress? sender)
     {

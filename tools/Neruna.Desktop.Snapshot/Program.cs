@@ -727,8 +727,24 @@ internal static class Snapshots
         await vm.SettingsPage.ReloadAsync();
         vm.SettingsPage.SelectedTab = 1;
         await SaveAsync(window, output, "settings-mail.png");
+        // Datenschutz with a few trusted senders, and with many (the list scrolls in its own box).
+        var privacy = services.GetRequiredService<Neruna.Desktop.Infrastructure.PrivacyService>();
+        var privacyOptions = await privacy.GetAsync();
+        await privacy.SetAsync(privacyOptions with { TrustedSenders = ["@bernasconi.example", "newsletter@sbb.example", "lea.keller@example.com"] });
+        await vm.SettingsPage.Privacy.ReloadAsync();
         vm.SettingsPage.SelectedTab = 14;
         await SaveAsync(window, output, "settings-privacy.png");
+        await privacy.SetAsync(privacyOptions with { TrustedSenders = [.. Enumerable.Range(1, 100).Select(i => $"absender{i:000}@example.com")] });
+        await vm.SettingsPage.Privacy.ReloadAsync();
+        await Task.Delay(200);
+        if (window.GetVisualDescendants().OfType<PrivacyOptionsView>().FirstOrDefault(v => v.IsEffectivelyVisible)?.FindDescendantOfType<ScrollViewer>() is { } scroller)
+        {
+            scroller.Offset = new Vector(0, 260);
+        }
+
+        await SaveAsync(window, output, "settings-privacy-many.png");
+        await privacy.SetAsync(privacyOptions);
+        await vm.SettingsPage.Privacy.ReloadAsync();
 
         // Konto bearbeiten with a label and an alias (sender address of the same mailbox).
         var editedAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync())[0];

@@ -274,6 +274,18 @@ public class PrivacyTests
         Assert.False(loaded.LoadsRemoteContent(new MailboxAddress("x", "x@firma.ch"), loadedBefore: true));
     }
 
+    [Theory]
+    [InlineData("Anna@Firma.ch", "anna@firma.ch")]
+    [InlineData(" firma.ch ", "@firma.ch")]
+    [InlineData("@Firma.CH", "@firma.ch")]
+    [InlineData("<news@shop.example.co.uk>", "news@shop.example.co.uk")]
+    [InlineData("hallo", null)]
+    [InlineData("anna @firma.ch", null)]
+    [InlineData("a@b@firma.ch", null)]
+    [InlineData("", null)]
+    public void Trusted_entries_are_addresses_or_domains(string input, string? expected) =>
+        Assert.Equal(expected, PrivacyOptions.TrustedEntry(input));
+
     [Fact]
     public void Trusted_senders_load_pictures_unless_forged()
     {

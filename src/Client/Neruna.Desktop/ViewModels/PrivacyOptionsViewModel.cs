@@ -64,10 +64,39 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
     public ObservableCollection<string> TrustedSenders { get; } = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasTrustedSenders))]
+    [NotifyPropertyChangedFor(nameof(HasTrustedSenders), nameof(TrustedCountText))]
     public partial int TrustedCount { get; set; }
 
     public bool HasTrustedSenders => TrustedCount > 0;
+
+    public string TrustedCountText => TrustedCount == 1 ? Neruna.Core.Localization.Texts.T("1 Eintrag") : Neruna.Core.Localization.Texts.F("{0} Einträge", TrustedCount);
+
+    /// <summary>Typed in to add: an address or a domain.</summary>
+    [ObservableProperty]
+    public partial string NewTrusted { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string? TrustedError { get; set; }
+
+    [RelayCommand]
+    private async Task AddTrustedAsync()
+    {
+        if (PrivacyOptions.TrustedEntry(NewTrusted) is not { } entry)
+        {
+            TrustedError = Neruna.Core.Localization.Texts.T("Bitte eine E-Mail-Adresse (anna@firma.ch) oder eine Domain (@firma.ch) eingeben.");
+            return;
+        }
+
+        TrustedError = null;
+        NewTrusted = string.Empty;
+        if (!TrustedSenders.Contains(entry, StringComparer.OrdinalIgnoreCase))
+        {
+            var index = TrustedSenders.TakeWhile(t => StringComparer.OrdinalIgnoreCase.Compare(t, entry) < 0).Count();
+            TrustedSenders.Insert(index, entry);
+            TrustedCount = TrustedSenders.Count;
+            await SaveAsync();
+        }
+    }
 
     public async Task ReloadAsync()
     {
