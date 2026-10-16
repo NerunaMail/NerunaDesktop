@@ -445,9 +445,13 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         if (invited.Count > 0)
         {
             var update = before is not null;
-            var text = $"{account.DisplayName} {(update ? "hat den Termin geändert" : "lädt Sie ein")}:\n\n{current.Summary}\n{when}" +
-                       (string.IsNullOrWhiteSpace(current.Location) ? string.Empty : $"\nOrt: {current.Location}");
-            await mail.SendAsync(MailConnection(account), ITip.Mail(sender, invited.Select(ToMailbox), $"{(update ? "Aktualisiert" : "Einladung")}: {current.Summary} ({when})", text, ITip.Request(newData), "REQUEST"), cancellationToken);
+            // In the user's language, like the cancellations below.
+            var text = (update
+                           ? F("{0} hat den Termin geändert:\n\n{1}\n{2}", account.DisplayName, current.Summary, when)
+                           : F("{0} lädt Sie ein:\n\n{1}\n{2}", account.DisplayName, current.Summary, when))
+                       + (string.IsNullOrWhiteSpace(current.Location) ? string.Empty : "\n" + F("Ort: {0}", current.Location));
+            var subject = update ? F("Aktualisiert: {0} ({1})", current.Summary, when) : F("Einladung: {0} ({1})", current.Summary, when);
+            await mail.SendAsync(MailConnection(account), ITip.Mail(sender, invited.Select(ToMailbox), subject, text, ITip.Request(newData), "REQUEST"), cancellationToken);
         }
 
         if (removed.Count > 0)
