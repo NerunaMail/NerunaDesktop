@@ -1301,6 +1301,7 @@
  "Postausgang (SMTP)": "Outgoing (SMTP)",
  "Posteingang": "Inbox",
  "Posteingang (IMAP)": "Incoming (IMAP)",
+ "Posteingang öffnen": "Open inbox",
  "Priorität": "Priority",
  "Privat": "Private",
  "Private Nachricht schreiben": "Write a private message",
