@@ -251,6 +251,55 @@ public class PrivacyTests
     }
 
     [Fact]
+    public void A_bank_name_with_a_strange_address_is_dangerous()
+    {
+        // As in a real phishing mail: sent through a hijacked mailbox of a holiday flat.
+        var message = new MimeMessage { Subject = "Ihr Konto wurde eingeschränkt", Body = new TextPart("plain") { Text = "Bitte bestätigen" } };
+        message.From.Add(new MailboxAddress("Raiffeisen", "raiffeisen4@a0gwcgm.ferienwohnung-niedersedlitz.de"));
+
+        var result = MessageAnalyzer.Analyze(message, known: new PhishingList());
+
+        Assert.Equal(ThreatLevel.Dangerous, result.Level);
+        Assert.Contains(result.Findings, f => f.Title.Contains("Raiffeisen", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Raiffeisen Schweiz", "news@raiffeisen.ch", false)]
+    [InlineData("Raiffeisenbank Kürten", "info@raiffeisenbank-kuerten.de", false)] // the word is part of a longer one: no claim
+    [InlineData("Sparkasse KölnBonn", "service@sparkasse-koelnbonn.de", false)]
+    [InlineData("PayPal", "service@paypal.ch", false)]
+    [InlineData("PayPal Service", "service@paypa1-secure.example", true)]
+    [InlineData("Die Post", "noreply@post-ch.example", true)]
+    [InlineData("Microsoft Teams", "noreply@email.teams.microsoft.com", false)]
+    [InlineData("Anna Muster", "anna@firma.example", false)]
+    public void Brand_names_must_fit_the_address(string name, string address, bool deceptive)
+    {
+        var claimed = Brands.Claimed(name);
+        Assert.Equal(deceptive, claimed is not null && !Brands.Owns(claimed, DomainNames.OfAddress(address)!));
+    }
+
+    [Theory]
+    [InlineData("X-Spam-Status", "No, score=5.8 required=6.0 tests=HTML_MESSAGE", false, true, "5.8 von 6 Punkten (SpamAssassin)")]
+    [InlineData("X-Spam-Status", "Yes, score=9.1 required=5.0 tests=BAYES_99", true, false, "9.1 von 5 Punkten (SpamAssassin)")]
+    [InlineData("X-Spamd-Result", "default: False [2.10 / 15.00]; R_SPF_ALLOW(-0.20)", false, false, "2.1 von 15 Punkten (Rspamd)")]
+    [InlineData("X-SASI-SpamProbability", "10%", false, false, "10 % Spamwahrscheinlichkeit (Sophos)")]
+    [InlineData("X-Forefront-Antispam-Report", "CIP:1.2.3.4;CTRY:CH;LANG:de;SCL:6;SRV:;", true, false, "Spam-Stufe 6 von 9")]
+    public void The_spam_rating_of_the_mail_server_is_read(string header, string value, bool spam, bool close, string text)
+    {
+        var message = new MimeMessage { Subject = "Hallo", Body = new TextPart("plain") { Text = "Text" } };
+        message.From.Add(new MailboxAddress("X", "x@example.com"));
+        message.Headers.Add(header, value);
+
+        var rating = SpamRatings.Of(message);
+
+        Assert.NotNull(rating);
+        Assert.Equal((spam, close), (rating.IsSpam, rating.IsClose));
+        Assert.StartsWith(text, rating.Text, StringComparison.Ordinal);
+        var findings = MessageAnalyzer.Analyze(message, known: new PhishingList()).Findings;
+        Assert.Equal(spam, findings.Any(f => f.Severity == Severity.Medium && f.Title.Contains("Spam", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public void Reply_to_elsewhere_and_program_attachments_are_noticed()
     {
         var body = new Multipart("mixed")

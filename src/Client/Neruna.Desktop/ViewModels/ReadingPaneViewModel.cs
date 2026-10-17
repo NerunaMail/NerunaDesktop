@@ -358,6 +358,9 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     public string SenderAuthentication => Assessment?.Sender.Authentication ?? T("(kein verwertbares Ergebnis Ihres Servers)");
 
+    /// <summary>The mail server's spam rating from the headers ("5.8 von 6 Punkten (SpamAssassin) – knapp unter der Spam-Schwelle").</summary>
+    public string SenderSpam => Assessment?.Sender.Spam?.Text ?? T("(keine Angabe Ihres Servers)");
+
     [RelayCommand]
     private void ToggleAnalysis()
     {
@@ -371,6 +374,7 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         OnPropertyChanged(nameof(AssessmentSummary));
         OnPropertyChanged(nameof(SenderFrom));
         OnPropertyChanged(nameof(SenderEnvelope));
+        OnPropertyChanged(nameof(SenderSpam));
         OnPropertyChanged(nameof(SenderReplyTo));
         OnPropertyChanged(nameof(SenderAuthentication));
     }

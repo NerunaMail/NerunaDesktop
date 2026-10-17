@@ -927,13 +927,12 @@ internal static class Snapshots
         vm.MailPage.ReadingPane?.ToggleAnalysisCommand.Execute(null);
         await Task.Delay(200);
         await SaveAsync(window, output, "mail-security-check.png");
-        // The spam note folded behind its "i", and every header of the mail.
-        vm.MailPage.ReadingPane?.IsSpamNoteShown = false;
+        vm.MailPage.ReadingPane?.ToggleAnalysisCommand.Execute(null);
+        // "⋮" next to the subject → every header of the mail.
         vm.MailPage.ReadingPane?.ToggleHeadersCommand.Execute(null);
         await Task.Delay(200);
         await SaveAsync(window, output, "mail-headers.png");
         vm.MailPage.ReadingPane?.ToggleHeadersCommand.Execute(null);
-        vm.MailPage.ReadingPane?.ToggleAnalysisCommand.Execute(null);
         // Antworten with AI: the bar above the text (instructions, "Schreiben", rewriting).
         await vm.MailPage.ReplyCommand.ExecuteAsync(null);
         await Task.Delay(1500);

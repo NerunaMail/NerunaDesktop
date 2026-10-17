@@ -45,7 +45,19 @@ public sealed record AnalysisContext(IReadOnlyCollection<string> OwnAddresses, I
 /// <summary>The sender as the mail states it in its different places.</summary>
 /// <param name="Envelope">Return-Path: where bounces go, set by the sending server.</param>
 /// <param name="Authentication">The check of the user's own mail server ("SPF: pass, DKIM: pass, DMARC: pass"), if it can be trusted.</param>
-public sealed record SenderFacts(string From, string? Envelope, string? ReplyTo, string? Sender, string? Authentication);
+/// <param name="Spam">The mail server's spam rating from the headers ("5.8 von 6 Punkten (SpamAssassin)"), if there is one.</param>
+public sealed record SenderFacts(string From, string? Envelope, string? ReplyTo, string? Sender, string? Authentication, SpamRating? Spam = null);
+
+/// <summary>
+/// What the mail server's spam filter wrote into the headers: a score with its threshold (SpamAssassin, Rspamd), a
+/// probability (Sophos) or Microsoft's spam confidence level. The topmost header of each kind – the one of the own
+/// server; a sender could add such headers too, so the rating only adds warnings, it never clears a mail.
+/// </summary>
+public sealed record SpamRating(string Filter, double? Score, double? Threshold, bool IsSpam, string Text)
+{
+    /// <summary>At least 80 % of the threshold, but not spam: "knapp unter der Schwelle".</summary>
+    public bool IsClose => !IsSpam && Score is { } score && Threshold is > 0 and var threshold && score >= threshold * 0.8;
+}
 
 /// <summary>The result of <see cref="MessageAnalyzer.Analyze"/>.</summary>
 public sealed record ThreatAssessment(ThreatLevel Level, IReadOnlyList<Finding> Findings, SenderFacts Sender, IReadOnlyList<LinkCheck> Links)
@@ -141,6 +153,16 @@ public static partial class MessageAnalyzer
         }
 
         var links = CheckBody(message, findings, known);
+        var spam = SpamRatings.Of(message);
+        if (spam is { IsSpam: true })
+        {
+            findings.Add(new Finding(Severity.Medium, T("Ihr Mailserver hält die Mail für Spam"), F("Bewertung: {0}.", spam.Text)));
+        }
+        else if (spam is { IsClose: true })
+        {
+            findings.Add(new Finding(Severity.Low, T("Knapp unter der Spam-Schwelle"), F("Bewertung Ihres Mailservers: {0}.", spam.Text)));
+        }
+
         CheckAttachments(message, findings);
 
         if (security is not null)
@@ -162,7 +184,7 @@ public static partial class MessageAnalyzer
             : findings.Any(f => f.Severity == Severity.Medium) || findings.Count(f => f.Severity == Severity.Low) >= 3 ? ThreatLevel.Caution
             : ThreatLevel.Unremarkable;
         var ordered = findings.OrderByDescending(f => f.Severity == Severity.Good ? -1 : (int)f.Severity).ToList();
-        var facts = new SenderFacts(from is null ? string.Empty : from.ToString(), envelope, replyTo, sender, auth?.Text);
+        var facts = new SenderFacts(from is null ? string.Empty : from.ToString(), envelope, replyTo, sender, auth?.Text, spam);
         return new ThreatAssessment(level, ordered, facts, links) { SenderForged = forged };
     }
 
@@ -333,6 +355,14 @@ public static partial class MessageAnalyzer
                         ? F("«{0}» sieht aus wie Ihre eigene Domain «{1}», ist es aber nicht.", DomainNames.ToUnicode(fromDomain), original)
                         : F("«{0}» sieht aus wie «{1}» (aus Ihren Kontakten), ist es aber nicht.", DomainNames.ToUnicode(fromDomain), original)));
             }
+        }
+
+        // "Raiffeisen <raiffeisen4@ferienwohnung-xyz.de>": the name of a bank, post or shop, the address of someone else.
+        if (fromDomain is not null && Brands.Claimed(name) is { } brand && !Brands.Owns(brand, fromDomain)
+            && !context.Contacts.Any(c => c.Addresses.Contains(address, StringComparer.OrdinalIgnoreCase)))
+        {
+            findings.Add(new Finding(Severity.High, F("Gibt sich als «{0}» aus", brand.Name),
+                F("Der Name nennt «{0}», die Adresse gehört aber zu «{1}» – nicht zu {0}.", brand.Name, DomainNames.ToUnicode(fromDomain))));
         }
 
         if (context.OwnAddresses.Any(a => string.Equals(a, address, StringComparison.OrdinalIgnoreCase)))

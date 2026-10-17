@@ -14,7 +14,19 @@
     <TextBlock IsVisible="{Binding IsInfo}" Text="{Binding InfoText}" Classes="subtle"
                HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24" />
     <Grid IsVisible="{Binding IsMessage}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*">
-      <SelectableTextBlock Text="{Binding Subject}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="24,20,24,0" />
+      <Grid ColumnDefinitions="*,Auto" Margin="24,20,24,0">
+        <SelectableTextBlock Text="{Binding Subject}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <!-- "⋮": more about this mail (all its headers) -->
+        <Button Grid.Column="1" Classes="command" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Top" IsVisible="{Binding HasHeaders}"
+                ToolTip.Tip="{l:T 'Weitere Aktionen'}">
+          <TextBlock Text="⋮" FontSize="16" FontWeight="Bold" />
+          <Button.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedRight">
+              <MenuItem Header="{l:T 'Kopfzeilen anzeigen'}" Command="{Binding ToggleHeadersCommand}" ToggleType="CheckBox" IsChecked="{Binding IsHeadersOpen, Mode=OneWay}" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+      </Grid>
       <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="24,16,24,8">
         <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentTextBrush}" VerticalAlignment="Top">
           <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
@@ -51,6 +63,23 @@
         </Grid>
       </Border>
 
+      <!-- Every header as it arrived (⋮ next to the subject) -->
+      <Border IsVisible="{Binding IsHeadersOpen}" Margin="24,0,24,10" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="14,10">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Text="{l:T 'Kopfzeilen'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="command" FontSize="12" Padding="0,2" Margin="0,0,12,0" Content="{l:T 'Kopieren'}" Click="OnCopyHeaders" />
+            <Button Grid.Column="2" Content="✕" Command="{Binding ToggleHeadersCommand}" Padding="6,0" Background="Transparent" BorderThickness="0"
+                    ToolTip.Tip="{l:T 'Schliessen'}" VerticalAlignment="Center" />
+          </Grid>
+          <Border Background="{DynamicResource PaneBackgroundBrush}" CornerRadius="4" Padding="8" MaxHeight="360">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto">
+              <SelectableTextBlock Text="{Binding HeadersText}" FontFamily="Consolas,DejaVu Sans Mono,Menlo,monospace" FontSize="11" />
+            </ScrollViewer>
+          </Border>
+        </StackPanel>
+      </Border>
+
       <!-- The security check in full -->
       <Border IsVisible="{Binding IsAnalysisOpen}" Margin="24,0,24,10" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="14,10">
         <StackPanel Spacing="8">
@@ -85,7 +114,7 @@
             </Border.Styles>
             <TextBlock Text="{Binding AssessmentSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
           </Border>
-          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
             <Grid.Styles>
               <Style Selector="TextBlock.key"><Setter Property="Margin" Value="0,1,12,1" /><Setter Property="FontSize" Value="12" /></Style>
               <Style Selector="SelectableTextBlock"><Setter Property="FontSize" Value="12" /><Setter Property="Margin" Value="0,1" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
@@ -98,6 +127,8 @@
             <SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SenderReplyTo}" />
             <TextBlock Grid.Row="3" Classes="key subtle" Text="{l:T 'Prüfung Ihres Servers'}" />
             <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SenderAuthentication}" />
+            <TextBlock Grid.Row="4" Classes="key subtle" Text="{l:T 'Spam-Bewertung Ihres Servers'}" />
+            <SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SenderSpam}" />
           </Grid>
           <ItemsControl ItemsSource="{Binding Findings}">
             <ItemsControl.ItemTemplate>
@@ -134,21 +165,6 @@
           </StackPanel>
           <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap"
                      Text="{l:T 'Geprüft auf diesem Gerät, ohne etwas ins Internet zu senden. Eine Hilfe zur Einschätzung, keine Garantie.'}" />
-          <!-- Every header as it arrived -->
-          <StackPanel Orientation="Horizontal" Spacing="16" IsVisible="{Binding HasHeaders}">
-            <Button Classes="command" FontSize="12" Padding="0,2" Command="{Binding ToggleHeadersCommand}">
-              <Panel>
-                <TextBlock Text="{l:T 'Kopfzeilen anzeigen'}" IsVisible="{Binding !IsHeadersOpen}" />
-                <TextBlock Text="{l:T 'Kopfzeilen ausblenden'}" IsVisible="{Binding IsHeadersOpen}" />
-              </Panel>
-            </Button>
-            <Button Classes="command" FontSize="12" Padding="0,2" Content="{l:T 'Kopieren'}" Click="OnCopyHeaders" IsVisible="{Binding IsHeadersOpen}" />
-          </StackPanel>
-          <Border IsVisible="{Binding IsHeadersOpen}" Background="{DynamicResource PaneBackgroundBrush}" CornerRadius="4" Padding="8" MaxHeight="320">
-            <ScrollViewer HorizontalScrollBarVisibility="Auto">
-              <SelectableTextBlock Text="{Binding HeadersText}" FontFamily="Consolas,DejaVu Sans Mono,Menlo,monospace" FontSize="11" />
-            </ScrollViewer>
-          </Border>
         </StackPanel>
       </Border>
 
