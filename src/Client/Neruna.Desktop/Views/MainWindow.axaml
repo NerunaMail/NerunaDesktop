@@ -214,7 +214,13 @@
 
       <DockPanel Grid.Column="1">
         <!-- Workspaces as tabs below the header (Einstellungen → Workspaces) -->
-        <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding WorkspaceChoices}" IsVisible="{Binding ShowWorkspaceTabs}" Margin="6,6,6,0">
+        <DockPanel DockPanel.Dock="Top" IsVisible="{Binding ShowWorkspaceTabs}" Margin="6,6,6,0">
+        <!-- The gear first: straight to Einstellungen → Workspaces -->
+        <Button DockPanel.Dock="Left" Classes="workspaceTab" Padding="8,5" Margin="0,0,4,0" Command="{Binding ManageWorkspacesCommand}"
+                ToolTip.Tip="{l:T 'Workspaces verwalten …'}">
+          <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" />
+        </Button>
+        <ItemsControl ItemsSource="{Binding WorkspaceChoices}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <StackPanel Orientation="Horizontal" Spacing="4" />
@@ -232,6 +238,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        </DockPanel>
         <ContentControl Content="{Binding CurrentPage}" Margin="6,6,6,0" />
       </DockPanel>
     </Grid>
