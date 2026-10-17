@@ -143,7 +143,7 @@ internal sealed partial class MailViewModel(
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedMessage), nameof(HasSelection), nameof(ShowMessageActions))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand), nameof(ForwardAsAttachmentCommand), nameof(SaveAsEmlCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand), nameof(ForwardAsAttachmentCommand), nameof(SaveAsEmlCommand), nameof(PrintCommand))]
     public partial MessageListEntry? SelectedEntry { get; set; }
 
     [ObservableProperty]
@@ -511,66 +511,63 @@ internal sealed partial class MailViewModel(
     }
 
     /// <summary>
-    /// "Speichern unter …": the selected message as an .eml file (the whole mail as it came, with attachments and
-    /// signature); several selected go into a folder, each under its subject.
+    /// "Speichern unter …": the selected mail as EML or PDF (the format of last time offered first); several selected go
+    /// into a folder, each under its subject.
     /// </summary>
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private async Task SaveAsEmlAsync()
     {
         var targets = ActionTargets.ToList();
-        static string NameOf(MessageItemViewModel message) =>
-            QuickActionService.SafeFileName(string.IsNullOrWhiteSpace(message.Summary.Subject) ? T("E-Mail") : message.Summary.Subject[..Math.Min(message.Summary.Subject.Length, 120)]);
         try
         {
-            if (targets.Count == 1)
-            {
-                var message = targets[0];
-                if (FolderOf(message) is not { } folder)
-                {
-                    return;
-                }
-
-                var mime = await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId);
-                await using var stream = await files.SaveFileAsync(T("E-Mail speichern"), NameOf(message) + ".eml");
-                if (stream is not null)
-                {
-                    await mime.WriteToAsync(stream);
-                    StatusMessage?.Invoke(this, T("E-Mail gespeichert."));
-                }
-
-                return;
-            }
-
-            if (await files.PickFolderAsync(F("{0} E-Mails speichern in …", targets.Count)) is not { } target)
-            {
-                return;
-            }
-
-            var saved = 0;
+            var messages = new List<MimeKit.MimeMessage>();
             foreach (var message in targets)
             {
-                if (FolderOf(message) is not { } folder)
+                if (FolderOf(message) is { } folder)
                 {
-                    continue;
+                    messages.Add(await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId));
                 }
-
-                var mime = await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId);
-                var path = Path.Combine(target, NameOf(message) + ".eml");
-                for (var n = 2; File.Exists(path); n++)
-                {
-                    path = Path.Combine(target, $"{NameOf(message)} ({n}).eml");
-                }
-
-                await using var stream = File.Create(path);
-                await mime.WriteToAsync(stream);
-                saved++;
             }
 
-            StatusMessage?.Invoke(this, F("{0} E-Mails gespeichert.", saved));
+            if (messages.Count == 1)
+            {
+                if (await MailExport.SaveAsync(messages[0], files) is { } done)
+                {
+                    StatusMessage?.Invoke(this, done);
+                }
+            }
+            else if (messages.Count > 1 && await files.PickFolderAsync(F("{0} E-Mails speichern in …", messages.Count)) is { } target)
+            {
+                StatusMessage?.Invoke(this, F("{0} E-Mails gespeichert.", await MailExport.SaveAllAsync(messages, target)));
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Report(T("E-Mail konnte nicht gespeichert werden"), ex);
+        }
+    }
+
+    /// <summary>Drucken (Ctrl+P): the open mail – or the selected one – as PDF in the system's viewer, which prints it.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task PrintAsync()
+    {
+        try
+        {
+            var message = ReadingPane?.Message;
+            if (message is null && SelectedMessage is { } item && FolderOf(item) is { } folder)
+            {
+                message = await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, item.Summary.RemoteId);
+            }
+
+            if (message is not null)
+            {
+                StatusMessage?.Invoke(this, T("Druckansicht wird erstellt …"));
+                await MailExport.PrintAsync(message, files);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(T("Drucken nicht möglich"), ex);
         }
     }
 

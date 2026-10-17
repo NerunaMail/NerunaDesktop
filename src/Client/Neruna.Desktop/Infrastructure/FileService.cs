@@ -19,6 +19,10 @@ internal interface IFileService
     /// <param name="folder">Where the dialog starts (a quick action's folder); the system's choice when null or missing.</param>
     Task<Stream?> SaveFileAsync(string title, string suggestedName, string? folder = null);
 
+    /// <summary>A save dialog with a choice of types (e.g. EML or PDF), the preferred one first.</summary>
+    /// <returns>The stream, the chosen type's extension (".pdf") and the local path; null when cancelled.</returns>
+    Task<(Stream Stream, string Extension, string? Path)?> SaveFileAsAsync(string title, string baseName, IReadOnlyList<(string Name, string Extension)> types);
+
     /// <returns>The local path of the chosen folder, or null when cancelled.</returns>
     Task<string?> PickFolderAsync(string title);
 
@@ -76,6 +80,33 @@ internal sealed class FileService : IFileService
         var start = !string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder) ? await window.StorageProvider.TryGetFolderFromPathAsync(folder) : null;
         var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = title, SuggestedFileName = suggestedName, SuggestedStartLocation = start });
         return file is null ? null : await file.OpenWriteAsync();
+    }
+
+    public async Task<(Stream Stream, string Extension, string? Path)?> SaveFileAsAsync(string title, string baseName, IReadOnlyList<(string Name, string Extension)> types)
+    {
+        ArgumentNullException.ThrowIfNull(types);
+        if (Window is not { } window || types.Count == 0)
+        {
+            return null;
+        }
+
+        var choices = types.Select(t => new FilePickerFileType(t.Name) { Patterns = ["*" + t.Extension] }).ToList();
+        var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title,
+            SuggestedFileName = baseName + types[0].Extension,
+            DefaultExtension = types[0].Extension.TrimStart('.'),
+            FileTypeChoices = choices,
+            SuggestedFileType = choices[0],
+        });
+        if (file is null)
+        {
+            return null;
+        }
+
+        // The type follows the name the person ended up with; without a known ending the one offered first.
+        var extension = types.Select(t => t.Extension).FirstOrDefault(e => file.Name.EndsWith(e, StringComparison.OrdinalIgnoreCase)) ?? types[0].Extension;
+        return (await file.OpenWriteAsync(), extension, file.TryGetLocalPath());
     }
 
     public async Task<string?> PickFolderAsync(string title)

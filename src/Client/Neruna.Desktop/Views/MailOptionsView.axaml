@@ -31,6 +31,16 @@
       </StackPanel>
 
       <StackPanel Spacing="8">
+        <TextBlock Text="{l:T 'Als PDF speichern'}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Classes="subtle" Text="{l:T 'Anhänge einer Mail, die als PDF gespeichert wird'}" />
+        <RadioButton GroupName="PdfAttachments" Content="{l:T 'Bilder und PDFs als Seiten ins PDF'}" IsChecked="{Binding PdfAttachmentsInside}" />
+        <RadioButton GroupName="PdfAttachments" Content="{l:T 'Als eigene Dateien daneben speichern'}" IsChecked="{Binding PdfAttachmentsBeside}" />
+        <RadioButton GroupName="PdfAttachments" Content="{l:T 'Nicht speichern'}" IsChecked="{Binding PdfAttachmentsNone}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T '«Speichern unter …» (Rechtsklick auf eine Mail oder ⋮ beim Betreff) bietet EML und PDF an – das zuletzt gewählte Format zuerst. PDF eignet sich zum Archivieren.'}" />
+      </StackPanel>
+
+      <StackPanel Spacing="8">
         <TextBlock Text="{l:T 'Lesebereich'}" FontSize="16" FontWeight="SemiBold" />
         <TextBlock Classes="subtle" Text="{l:T 'Nachricht als gelesen markieren'}" />
         <ItemsControl ItemsSource="{Binding MarkAsReadOptions}">

@@ -15,6 +15,7 @@
     <KeyBinding Gesture="Ctrl+F" Command="{Binding ForwardCommand}" />
     <KeyBinding Gesture="Delete" Command="{Binding DeleteCommand}" />
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding ToggleReadCommand}" />
+    <KeyBinding Gesture="Ctrl+P" Command="{Binding PrintCommand}" />
   </UserControl.KeyBindings>
 
   <Grid>
@@ -325,6 +326,7 @@
                     <MenuItem Header="{l:T 'Archivieren'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ArchiveCommand}" />
                     <MenuItem Header="{l:T 'Löschen'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).DeleteCommand}" InputGesture="Delete" />
                     <Separator />
+                    <MenuItem Header="{l:T 'Drucken …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).PrintCommand}" InputGesture="Ctrl+P" />
                     <MenuItem Header="{l:T 'Speichern unter …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).SaveAsEmlCommand}" />
                   </ContextMenu>
                 </Panel.ContextMenu>

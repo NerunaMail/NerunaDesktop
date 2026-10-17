@@ -131,6 +131,8 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         {
             ComposeInWindow = await _settings.GetBoolAsync(SettingKeys.ComposeInWindow);
             AutoLists = await _settings.GetBoolAsync(SettingKeys.ComposeAutoLists, fallback: true);
+            var pdfAttachments = await _settings.GetAsync(SettingKeys.MailPdfAttachments);
+            PdfAttachments = pdfAttachments is "beside" or "none" ? pdfAttachments : "inside";
             FormatPlainText = await _settings.GetBoolAsync(SettingKeys.ComposePlainText);
             Push = await _settings.GetBoolAsync(SettingKeys.MailPush, fallback: true);
             Notifications = await _settings.GetBoolAsync(SettingKeys.MailNotifications, fallback: true);
@@ -164,6 +166,49 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         get => !FormatPlainText;
         set => FormatPlainText = !value;
     }
+
+    /// <summary>A mail saved as PDF: its pictures and PDFs as pages ("inside"), as files beside it ("beside") or not ("none").</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PdfAttachmentsInside), nameof(PdfAttachmentsBeside), nameof(PdfAttachmentsNone))]
+    public partial string PdfAttachments { get; set; } = "inside";
+
+    public bool PdfAttachmentsInside
+    {
+        get => PdfAttachments == "inside";
+        set
+        {
+            if (value)
+            {
+                PdfAttachments = "inside";
+            }
+        }
+    }
+
+    public bool PdfAttachmentsBeside
+    {
+        get => PdfAttachments == "beside";
+        set
+        {
+            if (value)
+            {
+                PdfAttachments = "beside";
+            }
+        }
+    }
+
+    public bool PdfAttachmentsNone
+    {
+        get => PdfAttachments == "none";
+        set
+        {
+            if (value)
+            {
+                PdfAttachments = "none";
+            }
+        }
+    }
+
+    partial void OnPdfAttachmentsChanged(string value) => Save(SettingKeys.MailPdfAttachments, value);
 
     partial void OnAutoListsChanged(bool value) => Save(SettingKeys.ComposeAutoLists, value.ToString(CultureInfo.InvariantCulture));
 

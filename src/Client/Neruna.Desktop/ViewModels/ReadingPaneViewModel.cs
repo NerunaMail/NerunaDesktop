@@ -237,6 +237,55 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     /// <summary>Adds a sender or domain to the trusted ones (pictures without asking).</summary>
     private Func<string, Task>? Trust { get; init; }
 
+    /// <summary>For "Drucken" and "Speichern unter …" of this mail.</summary>
+    private IFileService? ExportFiles { get; init; }
+
+    /// <summary>"Gedruckt …", "Gespeichert" or what went wrong, below the head for a moment.</summary>
+    [ObservableProperty]
+    public partial string? ExportStatus { get; set; }
+
+    public bool CanExport => Message is not null && ExportFiles is not null;
+
+    /// <summary>Drucken: the mail as PDF in the system's viewer, which prints it (printer and pages chosen there).</summary>
+    [RelayCommand]
+    private async Task PrintAsync()
+    {
+        if (Message is not { } message || ExportFiles is not { } files)
+        {
+            return;
+        }
+
+        try
+        {
+            ExportStatus = T("Druckansicht wird erstellt …");
+            await MailExport.PrintAsync(message, files);
+            ExportStatus = null;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            ExportStatus = F("Drucken nicht möglich: {0}", ex.Message);
+        }
+    }
+
+    /// <summary>Speichern unter …: EML or PDF (the format of last time offered first).</summary>
+    [RelayCommand]
+    private async Task SaveAsAsync()
+    {
+        if (Message is not { } message || ExportFiles is not { } files)
+        {
+            return;
+        }
+
+        try
+        {
+            ExportStatus = await MailExport.SaveAsync(message, files);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            ExportStatus = F("Speichern nicht möglich: {0}", ex.Message);
+        }
+    }
+
     /// <summary>Keeps "Ausblenden" of the spam note for all mails.</summary>
     private Func<Task>? HideSpamNoteAction { get; init; }
 
@@ -476,6 +525,7 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             Trust = trust,
             HideSpamNoteAction = hideSpamNote,
             IsSpamNoteShown = !view.Privacy.HideSpamNote,
+            ExportFiles = files,
         };
     }
 

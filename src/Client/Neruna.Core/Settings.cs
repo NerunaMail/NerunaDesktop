@@ -216,6 +216,12 @@ public static class SettingKeys
     /// <summary>Einstellungen → Schreiben: new mails and answers as plain text, with the simple text editor (default off).</summary>
     public const string ComposePlainText = "compose.plainText";
 
+    /// <summary>"Speichern unter …" of a mail: the format chosen last ("eml" or "pdf").</summary>
+    public const string MailSaveFormat = "mail.saveFormat";
+
+    /// <summary>A mail saved as PDF: its attachments "inside" (pictures and PDFs as pages), "beside" (own files) or "none".</summary>
+    public const string MailPdfAttachments = "mail.pdfAttachments";
+
     /// <summary>"Bekannte Phishing-Seiten erkennen": the list from neruna.cloud, checked on the device (default on).</summary>
     public const string PrivacyPhishingList = "privacy.phishingList";
 }

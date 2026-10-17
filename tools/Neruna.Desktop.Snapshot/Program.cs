@@ -1119,6 +1119,8 @@ internal static class Snapshots
             view.Text = Neruna.Desktop.Infrastructure.MailPaper.Prepare(content.Html, darkTheme: false).Html;
             // What the renderer got, next to the picture (to see why a mail looks wrong).
             await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".html"), view.Text);
+            // And as PDF ("Speichern unter … PDF", attachments as pages), to check the print layout.
+            await File.WriteAllBytesAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".pdf"), MailExport.ToPdf(message, attachments: true));
             var window = new Window { Width = 720, Height = 1000, Content = view, Background = Brushes.White };
             window.Show();
             await Task.Delay(300);
