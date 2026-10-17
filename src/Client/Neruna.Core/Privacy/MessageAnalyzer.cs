@@ -125,7 +125,8 @@ public static partial class MessageAnalyzer
             if (known.Contains(fromDomain))
             {
                 findings.Add(new Finding(Severity.High, T("Absender bekannt für Phishing"),
-                    F("Die Absenderdomain «{0}» steht auf der Liste bekannter Phishing-Seiten.", DomainNames.ToUnicode(fromDomain!))));
+                    F("Die Absenderdomain «{0}» steht auf der Liste bekannter Phishing-Seiten.", DomainNames.ToUnicode(fromDomain!)))
+            { Code = FindingCodes.KnownPhishing });
             }
         }
 
@@ -353,7 +354,8 @@ public static partial class MessageAnalyzer
                 findings.Add(new Finding(Severity.High, T("Absenderdomain ahmt eine bekannte nach"),
                     own
                         ? F("«{0}» sieht aus wie Ihre eigene Domain «{1}», ist es aber nicht.", DomainNames.ToUnicode(fromDomain), original)
-                        : F("«{0}» sieht aus wie «{1}» (aus Ihren Kontakten), ist es aber nicht.", DomainNames.ToUnicode(fromDomain), original)));
+                        : F("«{0}» sieht aus wie «{1}» (aus Ihren Kontakten), ist es aber nicht.", DomainNames.ToUnicode(fromDomain), original))
+            { Code = FindingCodes.Impersonation });
             }
         }
 
@@ -362,7 +364,8 @@ public static partial class MessageAnalyzer
             && !context.Contacts.Any(c => c.Addresses.Contains(address, StringComparer.OrdinalIgnoreCase)))
         {
             findings.Add(new Finding(Severity.High, F("Gibt sich als «{0}» aus", brand.Name),
-                F("Der Name nennt «{0}», die Adresse gehört aber zu «{1}» – nicht zu {0}.", brand.Name, DomainNames.ToUnicode(fromDomain))));
+                F("Der Name nennt «{0}», die Adresse gehört aber zu «{1}» – nicht zu {0}.", brand.Name, DomainNames.ToUnicode(fromDomain)))
+            { Code = FindingCodes.Impersonation });
         }
 
         if (context.OwnAddresses.Any(a => string.Equals(a, address, StringComparison.OrdinalIgnoreCase)))
@@ -370,7 +373,8 @@ public static partial class MessageAnalyzer
             if (forged)
             {
                 findings.Add(new Finding(Severity.High, T("Ihre eigene Adresse als Absender gefälscht"),
-                    T("Die Mail gibt sich als von Ihnen gesendet aus, stammt aber nicht von Ihrem Server – typisch für Erpressungsmails («Ihr Konto wurde gehackt»).")));
+                    T("Die Mail gibt sich als von Ihnen gesendet aus, stammt aber nicht von Ihrem Server – typisch für Erpressungsmails («Ihr Konto wurde gehackt»)."))
+            { Code = FindingCodes.Impersonation });
             }
 
             return;
@@ -391,7 +395,8 @@ public static partial class MessageAnalyzer
         if (name.Length >= 4 && context.Contacts.FirstOrDefault(c => SameName(c.Name, name)) is { } impostor)
         {
             findings.Add(new Finding(Severity.High, T("Name eines Kontakts, aber fremde Adresse"),
-                F("«{0}» ist in Ihren Kontakten mit {1} gespeichert – diese Mail kommt aber von «{2}».", impostor.Name, string.Join(", ", impostor.Addresses), address)));
+                F("«{0}» ist in Ihren Kontakten mit {1} gespeichert – diese Mail kommt aber von «{2}».", impostor.Name, string.Join(", ", impostor.Addresses), address))
+            { Code = FindingCodes.Impersonation });
         }
     }
 
@@ -431,7 +436,7 @@ public static partial class MessageAnalyzer
             var worst = group.MaxBy(x => x.Finding.Severity);
             var count = group.Select(x => x.Check).Distinct().Count();
             var detail = count == 1 ? worst.Finding.Detail : F("{0} (und {1} weitere Links)", worst.Finding.Detail, count - 1);
-            findings.Add(new Finding(worst.Finding.Severity, worst.Finding.Title, detail));
+            findings.Add(new Finding(worst.Finding.Severity, worst.Finding.Title, detail) { Code = worst.Finding.Code });
         }
 
         var hiddenLinks = scan.Links.Count(l => l.Hidden && l.Href.StartsWith("http", StringComparison.OrdinalIgnoreCase));

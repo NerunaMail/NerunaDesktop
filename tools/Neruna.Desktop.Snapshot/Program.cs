@@ -812,6 +812,21 @@ internal static class Snapshots
         var privacy = services.GetRequiredService<Neruna.Desktop.Infrastructure.PrivacyService>();
         var privacyOptions = await privacy.GetAsync();
         await privacy.SetAsync(privacyOptions with { TrustedSenders = ["@bernasconi.example", "newsletter@sbb.example", "lea.keller@example.com"] });
+        // A few weeks of protection, for the statistics.
+        var statistics = services.GetRequiredService<Neruna.Core.Privacy.PrivacyStatistics>();
+        var forged = new MimeKit.MimeMessage { Subject = "Ihr Konto", Body = new MimeKit.TextPart("plain") { Text = "Bitte bestätigen" } };
+        forged.From.Add(new MimeKit.MailboxAddress("Raiffeisen", "raiffeisen4@ferienwohnung.example"));
+        var dangerous = Neruna.Core.Privacy.MessageAnalyzer.Analyze(forged);
+        var normal = new MimeKit.MimeMessage { Subject = "Protokoll", Date = DateTimeOffset.Now, Body = new MimeKit.TextPart("plain") { Text = "Hallo Anna" } };
+        normal.From.Add(new MimeKit.MailboxAddress("Lea Keller", "lea@example.com"));
+        normal.To.Add(new MimeKit.MailboxAddress("Anna Muster", "anna.muster@example.com"));
+        var harmless = Neruna.Core.Privacy.MessageAnalyzer.Analyze(normal);
+        for (var i = 0; i < 214; i++)
+        {
+            await statistics.RecordMailAsync($"<{i}@snapshot>", i % 40 == 0 ? dangerous : harmless, trackers: i % 3, imagesBlocked: i % 4 == 0);
+        }
+
+        await statistics.RecordLinkAsync(warned: true, cleaned: true);
         await vm.SettingsPage.Privacy.ReloadAsync();
         vm.SettingsPage.SelectedTab = 14;
         await SaveAsync(window, output, "settings-privacy.png");
@@ -953,6 +968,12 @@ internal static class Snapshots
         await Task.Delay(200);
         await SaveAsync(window, output, "mail-headers.png");
         vm.MailPage.ReadingPane?.ToggleHeadersCommand.Execute(null);
+        // The third mail of a sender moved by hand into the same folder: "Schnellaktion erstellen?"
+        vm.Overlay = new QuickActionSuggestionViewModel(new Neruna.Core.Mail.QuickActionSuggestion(Guid.NewGuid(), "news@velo-shop.example", "Velo-Shop", "INBOX/Newsletter", "Newsletter"),
+            services.GetRequiredService<Neruna.Core.Mail.QuickActionSuggestions>());
+        await Task.Delay(200);
+        await SaveAsync(window, output, "mail-quickaction-suggestion.png");
+        vm.Overlay = null;
         // Antworten with AI: the bar above the text (instructions, "Schreiben", rewriting).
         await vm.MailPage.ReplyCommand.ExecuteAsync(null);
         await Task.Delay(1500);

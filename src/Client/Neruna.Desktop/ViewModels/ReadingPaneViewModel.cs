@@ -444,7 +444,9 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             return; // no web address: never opened from here
         }
 
-        if (View.Privacy.Confirms(check) && !await confirm(check))
+        var shownFirst = View.Privacy.Confirms(check);
+        _ = Neruna.Core.Privacy.PrivacyStatistics.Current?.RecordLinkAsync(warned: shownFirst && check.IsSuspicious, cleaned: check.Opens != href);
+        if (shownFirst && !await confirm(check))
         {
             return;
         }

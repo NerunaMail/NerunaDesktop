@@ -79,7 +79,8 @@ public static partial class LinkInspector
         if ((known ?? PhishingList.Shared).Contains(host))
         {
             findings.Add(new Finding(Severity.High, T("Bekannte Phishing-Seite"),
-                F("«{0}» steht auf der Liste bekannter Phishing-Seiten. Öffnen Sie den Link nicht und geben Sie dort nichts ein.", DomainNames.ToUnicode(host))));
+                F("«{0}» steht auf der Liste bekannter Phishing-Seiten. Öffnen Sie den Link nicht und geben Sie dort nichts ein.", DomainNames.ToUnicode(host)))
+            { Code = FindingCodes.KnownPhishing });
         }
 
         if (!string.IsNullOrEmpty(target.UserInfo))

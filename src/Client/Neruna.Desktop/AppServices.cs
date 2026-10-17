@@ -131,6 +131,8 @@ internal static class AppServices
         services.AddSingleton<UiPreferences>();
         services.AddSingleton<RecipientDirectory>();
         services.AddSingleton<PrivacyService>();
+        services.AddSingleton<Neruna.Core.Privacy.PrivacyStatistics>();
+        services.AddSingleton<Neruna.Core.Mail.QuickActionSuggestions>();
         services.AddSingleton<AgendaViewModel>();
         services.AddSingleton<UpdateService>();
         services.AddSingleton<NotificationService>();

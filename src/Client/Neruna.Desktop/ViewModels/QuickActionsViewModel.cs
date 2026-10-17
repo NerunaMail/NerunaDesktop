@@ -16,8 +16,39 @@ internal sealed record Choice<T>(T Value, string Title)
 }
 
 /// <summary>Settings → E-Mail → Schnellaktionen: the actions (button, conditions, steps) and the PDF stamps.</summary>
-internal sealed partial class QuickActionsViewModel(QuickActionService service, IAccountStore accounts, MailController mail, TextTemplateService templates, IFileService files) : ViewModelBase
+internal sealed partial class QuickActionsViewModel(QuickActionService service, IAccountStore accounts, MailController mail, TextTemplateService templates, IFileService files,
+    QuickActionSuggestions? suggestions = null) : ViewModelBase
 {
+    /// <summary>"Schnellaktionen vorschlagen": after the third mail of a sender moved by hand into the same folder.</summary>
+    [ObservableProperty]
+    public partial bool SuggestEnabled { get; set; } = true;
+
+    /// <summary>Senders Neruna does not ask about any more.</summary>
+    public ObservableCollection<string> NeverSenders { get; } = [];
+
+    public bool HasNeverSenders => NeverSenders.Count > 0;
+
+    private bool _loadingSuggestions;
+
+    partial void OnSuggestEnabledChanged(bool value)
+    {
+        if (!_loadingSuggestions && suggestions is not null)
+        {
+            _ = suggestions.SetEnabledAsync(value);
+        }
+    }
+
+    [RelayCommand]
+    private async Task RemoveNeverAsync(string? sender)
+    {
+        if (sender is not null && suggestions is not null)
+        {
+            NeverSenders.Remove(sender);
+            OnPropertyChanged(nameof(HasNeverSenders));
+            await suggestions.SetNeverAsync(NeverSenders);
+        }
+    }
+
     private List<QuickAction> _actions = [];
     private bool _loadingStamps;
 
@@ -65,6 +96,20 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         }
 
         _loadingStamps = false;
+
+        if (suggestions is not null)
+        {
+            _loadingSuggestions = true;
+            SuggestEnabled = await suggestions.IsEnabledAsync();
+            NeverSenders.Clear();
+            foreach (var sender in (await suggestions.GetNeverAsync()).Order(StringComparer.OrdinalIgnoreCase))
+            {
+                NeverSenders.Add(sender);
+            }
+
+            OnPropertyChanged(nameof(HasNeverSenders));
+            _loadingSuggestions = false;
+        }
     }
 
     private void ShowActions()

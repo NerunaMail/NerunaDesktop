@@ -78,6 +78,37 @@
                    Text="{l:T 'Zum Beispiel «utm_source» oder «fbclid»: Sie dienen nur der Auswertung, wer wo geklickt hat.'}" />
       </StackPanel>
 
+      <!-- What the protection did, counted on this device -->
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel>
+            <TextBlock Text="{l:T 'Statistik'}" FontSize="16" FontWeight="SemiBold" />
+            <TextBlock Classes="subtle" FontSize="12" Text="{Binding StatisticsSince}" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="command" FontSize="12" Content="{l:T 'Zurücksetzen'}" Command="{Binding ResetStatisticsCommand}" VerticalAlignment="Top" />
+        </Grid>
+        <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12,6">
+          <ItemsControl ItemsSource="{Binding Statistics}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <UniformGrid Columns="2" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:StatisticRow">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,4,16,4">
+                  <TextBlock Text="{Binding Label}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding CountText}" FontSize="15" FontWeight="SemiBold" Margin="8,0,0,0"
+                             Classes.error="{Binding IsAlert}" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Border>
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Gezählt nur auf diesem Gerät, beim Öffnen einer E-Mail – jede einmal. Nichts davon wird gesendet.'}" />
+      </StackPanel>
+
       <StackPanel Spacing="8">
         <TextBlock Text="{l:T 'Phishing-Schutz'}" FontSize="16" FontWeight="SemiBold" />
         <CheckBox IsChecked="{Binding WarnSuspicious}" Content="{l:T 'Bei verdächtigen Mails eine Warnung anzeigen'}" />

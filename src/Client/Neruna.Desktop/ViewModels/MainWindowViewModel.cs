@@ -50,6 +50,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private readonly Neruna.Core.Auth.IBrowserLauncher _browser;
     private readonly Neruna.Core.Security.ClientCertificates _clientCertificates;
     private readonly Infrastructure.IFileService _files;
+    private readonly Neruna.Core.Mail.QuickActionSuggestions _suggestions;
     private readonly Neruna.Core.Workspaces.WorkspaceService _workspacesToLoad;
 
     // Accounts whose password the user postponed ("Später") – asked again with the next start.
@@ -92,8 +93,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Neruna.Core.Security.ClientCertificates clientCertificates,
         Infrastructure.IFileService files,
         Neruna.Core.Workspaces.WorkspaceService workspaces,
+        Neruna.Core.Mail.QuickActionSuggestions suggestions,
         ILogger<MainWindowViewModel> logger)
     {
+        _suggestions = suggestions;
         _workspacesToLoad = workspaces;
         settingsPage.Workspaces.DisplayChanged += (_, display) => WorkspaceDisplay = display;
         _clientCertificates = clientCertificates;
@@ -216,6 +219,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         CalendarPage.ManageRequested += (_, _) => ShowCalendarSelection();
         CalendarPage.PrintRequested += (_, _) => ShowCalendarPrint();
+        MailPage.QuickActionSuggested += (_, suggestion) => SuggestQuickAction(suggestion);
         CalendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
         CalendarPage.RemoveRequested += async (_, info) => await RemoveCalendarAccountAsync(info);
         CalendarPage.EditorRequested += (_, editor) => ShowEditor(editor, CalendarChangedAsync);
@@ -1030,6 +1034,26 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         Overlay = special;
+    }
+
+    // "Schnellaktion erstellen?" – not over another dialog (then it is asked again after three more moves).
+    private void SuggestQuickAction(Neruna.Core.Mail.QuickActionSuggestion suggestion)
+    {
+        if (Overlay is not null)
+        {
+            return;
+        }
+
+        var dialog = new QuickActionSuggestionViewModel(suggestion, _suggestions);
+        dialog.Finished += (_, created) =>
+        {
+            Overlay = null;
+            if (created is not null)
+            {
+                StatusText = F("Schnellaktion «{0}» erstellt.", created);
+            }
+        };
+        Overlay = dialog;
     }
 
     private void ShowCalendarPrint()

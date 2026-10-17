@@ -241,7 +241,7 @@ internal sealed partial class MailViewModel
                             return;
                         }
 
-                        await MoveToFolderAsync([item], chosen);
+                        await MoveToFolderAsync([item], chosen, byQuickAction: true);
                         break;
 
                     case QuickActionStepKind.MoveToFolder:
@@ -250,7 +250,7 @@ internal sealed partial class MailViewModel
                         if ((folders.FirstOrDefault(f => f.Folder.RemoteId == step.FolderRemoteId)
                              ?? folders.FirstOrDefault(f => string.Equals(f.Name, step.FolderName, StringComparison.OrdinalIgnoreCase))) is { } target)
                         {
-                            await MoveToFolderAsync([item], target);
+                            await MoveToFolderAsync([item], target, byQuickAction: true);
                         }
 
                         break;

@@ -33,6 +33,7 @@ internal sealed partial class MailViewModel(
     AgendaViewModel agenda,
     Neruna.Core.Ai.AiController ai,
     QuickActionService quickActions,
+    QuickActionSuggestions suggestions,
     MailSearchIndexer searchIndex,
     PrivacyService privacy,
     Neruna.Core.Workspaces.WorkspaceService workspaces,
@@ -1069,7 +1070,14 @@ internal sealed partial class MailViewModel(
     /// Moves messages (dragged from the list) into <paramref name="target"/>. Within an account the server moves them
     /// (IMAP MOVE); into another account each message is copied there and only then removed here.
     /// </summary>
-    public async Task MoveToFolderAsync(IReadOnlyList<MessageItemViewModel> messages, MailFolderNode target)
+    /// <summary>
+    /// The third mail of a sender moved by hand into the same folder: Neruna offers a quick action for it (the main
+    /// window asks; Einstellungen → Schnellaktionen can turn it off).
+    /// </summary>
+    public event EventHandler<QuickActionSuggestion>? QuickActionSuggested;
+
+    /// <param name="byQuickAction">Moved by a quick action: not counted for suggesting one.</param>
+    public async Task MoveToFolderAsync(IReadOnlyList<MessageItemViewModel> messages, MailFolderNode target, bool byQuickAction = false)
     {
         ArgumentNullException.ThrowIfNull(messages);
         ArgumentNullException.ThrowIfNull(target);
@@ -1128,6 +1136,29 @@ internal sealed partial class MailViewModel(
             StatusMessage?.Invoke(this, sameAccount
                 ? F("{0} nach «{1}» verschoben.", what, target.Name)
                 : F("{0} nach «{1}» ({2}) verschoben.", what, target.Name, target.Account.Title));
+            if (sameAccount && !byQuickAction)
+            {
+                await SuggestQuickActionAsync(messages, target);
+            }
+        }
+    }
+
+    private async Task SuggestQuickActionAsync(IReadOnlyList<MessageItemViewModel> messages, MailFolderNode target)
+    {
+        try
+        {
+            foreach (var message in messages)
+            {
+                if (await suggestions.RecordMoveAsync(target.Account.Account.Id, message.Summary.From?.Address, message.Summary.From?.Name, target.Folder) is { } suggestion)
+                {
+                    QuickActionSuggested?.Invoke(this, suggestion);
+                    return;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Quick action suggestion failed");
         }
     }
 
@@ -1649,6 +1680,12 @@ internal sealed partial class MailViewModel(
 
             ShowOpened(summary, next);
         }, privacy.TrustAsync, privacy.HideSpamNoteAsync);
+        if (view.Assessment is { } assessment && Neruna.Core.Privacy.PrivacyStatistics.Current is { } statistics)
+        {
+            // Einstellungen → Datenschutz → Statistik: each mail once.
+            _ = statistics.RecordMailAsync(opened.Readable.MessageId ?? summary.RemoteId, assessment, ReadingPane.HasTrackers ? ReadingPane.Trackers : 0, ReadingPane.HasBlockedRemoteContent);
+        }
+
         if (_invitation is { } shown && shown.RemoteId == summary.RemoteId)
         {
             ReadingPane.Invitation = shown.Banner;

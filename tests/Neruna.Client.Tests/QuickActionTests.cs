@@ -136,6 +136,52 @@ public class QuickActionTests
         Assert.Empty((stamp with { WithDate = false }).Lines(null, DateTime.Now));
     }
 
+    [Fact]
+    public async Task The_third_move_by_hand_suggests_a_quick_action()
+    {
+        var settings = new MemorySettings();
+        var service = new QuickActionService(settings);
+        var suggestions = new QuickActionSuggestions(settings, service);
+        var account = Guid.NewGuid();
+        var projects = new MailFolder(Guid.NewGuid(), "INBOX/Projekte", "Projekte", null, FolderRole.None);
+        var trash = projects with { RemoteId = "Trash", Name = "Trash", Role = FolderRole.Trash };
+
+        Assert.Null(await suggestions.RecordMoveAsync(account, "Lea@Example.com", "Lea Keller", projects, Ct));
+        Assert.Null(await suggestions.RecordMoveAsync(account, "lea@example.com", "Lea Keller", trash, Ct)); // the trash never
+        Assert.Null(await suggestions.RecordMoveAsync(account, "lea@example.com", "Lea Keller", projects, Ct));
+        var suggestion = await suggestions.RecordMoveAsync(account, "lea@example.com", "Lea Keller", projects, Ct);
+        Assert.NotNull(suggestion);
+        Assert.Equal(("lea@example.com", "Projekte"), (suggestion.Sender, suggestion.FolderName));
+
+        // "Ja": read and moved, for this sender in this account; after that nothing more to suggest.
+        var action = await suggestions.AcceptAsync(suggestion, Ct);
+        Assert.Equal([QuickActionStepKind.MarkRead, QuickActionStepKind.MoveToFolder], action.Steps.Select(s => s.Kind));
+        Assert.Equal(("lea@example.com", (Guid?)account), (action.When.SenderContains, action.When.AccountId));
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.Null(await suggestions.RecordMoveAsync(account, "lea@example.com", "Lea Keller", projects, Ct));
+        }
+
+        // "Nein, nicht mehr fragen" for another sender; turned off for all.
+        for (var i = 0; i < 2; i++)
+        {
+            await suggestions.RecordMoveAsync(account, "marco@example.com", null, projects, Ct);
+        }
+
+        await suggestions.DeclineAsync((await suggestions.RecordMoveAsync(account, "marco@example.com", null, projects, Ct))!, never: true, Ct);
+        Assert.Contains("marco@example.com", await suggestions.GetNeverAsync(Ct));
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.Null(await suggestions.RecordMoveAsync(account, "marco@example.com", null, projects, Ct));
+        }
+
+        await suggestions.SetEnabledAsync(false, Ct);
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.Null(await suggestions.RecordMoveAsync(account, "nadia@example.com", null, projects, Ct));
+        }
+    }
+
     private sealed class MemorySettings : ISettingsStore
     {
         private readonly Dictionary<string, string> _values = [];

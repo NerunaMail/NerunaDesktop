@@ -13,9 +13,17 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
     private readonly PrivacyService privacy;
     private bool _loading;
 
-    public PrivacyOptionsViewModel(PrivacyService privacy)
+    private readonly Neruna.Core.Privacy.PrivacyStatistics? _statistics;
+
+    public PrivacyOptionsViewModel(PrivacyService privacy, Neruna.Core.Privacy.PrivacyStatistics? statistics = null)
     {
         this.privacy = privacy;
+        _statistics = statistics;
+        if (statistics is not null)
+        {
+            statistics.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(async () => await LoadStatisticsAsync());
+        }
+
         // "Immer laden" above a mail adds a sender: the list here follows.
         privacy.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
         {
@@ -25,6 +33,46 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             }
         });
         privacy.PhishingListChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(PhishingListState)));
+    }
+
+    /// <summary>Statistik: what the protection did (on this device).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<StatisticRow> Statistics { get; set; } = [];
+
+    [ObservableProperty]
+    public partial string StatisticsSince { get; set; } = string.Empty;
+
+    private async Task LoadStatisticsAsync()
+    {
+        if (_statistics is null)
+        {
+            return;
+        }
+
+        var c = await _statistics.GetAsync();
+        StatisticsSince = F("Seit {0:d}", c.Since.LocalDateTime);
+        Statistics =
+        [
+            new(T("Geprüfte E-Mails"), c.Checked, false),
+            new(T("Davon verdächtig"), c.Suspicious, c.Suspicious > 0),
+            new(T("Davon gefährlich"), c.Dangerous, c.Dangerous > 0),
+            new(T("Bekannte Phishing-Seiten erkannt"), c.KnownPhishing, c.KnownPhishing > 0),
+            new(T("Gefälschte Absender"), c.ForgedSenders, c.ForgedSenders > 0),
+            new(T("Falsche Absender (Firma, Kontakt, eigene Adresse)"), c.Impersonations, c.Impersonations > 0),
+            new(T("Tracking-Pixel blockiert"), c.TrackersBlocked, false),
+            new(T("E-Mails mit zurückgehaltenen Bildern"), c.ImagesBlocked, false),
+            new(T("Verdächtige Links vor dem Öffnen gezeigt"), c.LinksWarned, false),
+            new(T("Links ohne Tracking geöffnet"), c.LinksCleaned, false),
+        ];
+    }
+
+    [RelayCommand]
+    private async Task ResetStatisticsAsync()
+    {
+        if (_statistics is not null)
+        {
+            await _statistics.ResetAsync();
+        }
     }
 
     /// <summary>"Bekannte Phishing-Seiten erkennen" (list from neruna.cloud, checked on this device).</summary>
@@ -178,6 +226,7 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             HideTimeZone = options.HideTimeZone;
             ShowSpamNote = !options.HideSpamNote;
             PhishingList = options.PhishingList;
+            await LoadStatisticsAsync();
             TrustedSenders.Clear();
             foreach (var sender in options.TrustedSenders.Order(StringComparer.OrdinalIgnoreCase))
             {
@@ -263,4 +312,10 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             TrustedSenders = [.. TrustedSenders],
         });
     }
+}
+
+/// <summary>A line of the statistics: what, how many, and whether it is a danger found (shown in red).</summary>
+internal sealed record StatisticRow(string Label, int Count, bool IsAlert)
+{
+    public string CountText => Count.ToString("N0", System.Globalization.CultureInfo.CurrentCulture);
 }

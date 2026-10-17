@@ -385,6 +385,24 @@ public class PrivacyTests
         return MimeMessage.Load(new MemoryStream(System.Text.Encoding.ASCII.GetBytes(raw)));
     }
 
+    [Fact]
+    public async Task The_statistics_count_each_mail_once()
+    {
+        using var statistics = new PrivacyStatistics(new MemorySettings());
+        var message = new MimeMessage { Subject = "Konto", Body = new TextPart("plain") { Text = "Hallo" } };
+        message.From.Add(new MailboxAddress("Raiffeisen", "raiffeisen4@ferienwohnung.example"));
+        var assessment = MessageAnalyzer.Analyze(message, known: new PhishingList());
+
+        await statistics.RecordMailAsync("<1@example>", assessment, trackers: 2, imagesBlocked: true, TestContext.Current.CancellationToken);
+        await statistics.RecordMailAsync("<1@example>", assessment, trackers: 2, imagesBlocked: true, TestContext.Current.CancellationToken); // opened again
+        await statistics.RecordLinkAsync(warned: true, cleaned: true, TestContext.Current.CancellationToken);
+        var counts = await statistics.GetAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal((1, 1, 1, 2, 1, 1, 1), (counts.Checked, counts.Dangerous, counts.Impersonations, counts.TrackersBlocked, counts.ImagesBlocked, counts.LinksWarned, counts.LinksCleaned));
+        await statistics.ResetAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, (await statistics.GetAsync(TestContext.Current.CancellationToken)).Checked);
+    }
+
     private sealed class MemorySettings : ISettingsStore
     {
         private readonly Dictionary<string, string> _values = [];

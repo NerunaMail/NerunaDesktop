@@ -115,6 +115,24 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <!-- Suggested from moving by hand: the third mail of a sender into the same folder -->
+        <TextBlock Classes="section" Text="{l:T 'Vorschläge'}" Margin="0,20,0,0" />
+        <CheckBox IsChecked="{Binding SuggestEnabled}" Content="{l:T 'Schnellaktionen vorschlagen'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-4,0,0"
+                   Text="{l:T 'Haben Sie E-Mails eines Absenders dreimal von Hand in denselben Ordner verschoben, fragt Neruna, ob daraus eine Schnellaktion werden soll (als gelesen markieren und verschieben). Verschieben durch Schnellaktionen zählt nicht.'}" />
+        <TextBlock Classes="subtle" Text="{l:T 'Bei diesen Absendern nicht mehr fragen'}" Margin="0,6,0,0" IsVisible="{Binding HasNeverSenders}" />
+        <ItemsControl ItemsSource="{Binding NeverSenders}" IsVisible="{Binding HasNeverSenders}" MaxWidth="480" HorizontalAlignment="Left">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="sys:String">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <Button Grid.Column="1" Classes="command" FontSize="12" Content="{l:T 'Entfernen'}"
+                        Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).RemoveNeverCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         <!-- Stamps for PDFs (also in the PDF preview under «Stempeln») -->
         <TextBlock Classes="section" Text="{l:T 'Stempel'}" Margin="0,20,0,0" />
         <TextBlock Classes="subtle" TextWrapping="Wrap"
