@@ -207,6 +207,48 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Senders and domains whose links to files are links that open the file.</summary>
+    public ObservableCollection<string> FileLinkSenders { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFileLinkSenders))]
+    public partial int FileLinkCount { get; set; }
+
+    public bool HasFileLinkSenders => FileLinkCount > 0;
+
+    [ObservableProperty]
+    public partial string NewFileLinkSender { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string? FileLinkError { get; set; }
+
+    [RelayCommand]
+    private async Task AddFileLinkSenderAsync()
+    {
+        if (PrivacyOptions.TrustedEntry(NewFileLinkSender) is not { } entry)
+        {
+            FileLinkError = Neruna.Core.Localization.Texts.T("Bitte eine E-Mail-Adresse (anna@firma.ch) oder eine Domain (@firma.ch) eingeben.");
+            return;
+        }
+
+        FileLinkError = null;
+        NewFileLinkSender = string.Empty;
+        if (!FileLinkSenders.Contains(entry, StringComparer.OrdinalIgnoreCase))
+        {
+            FileLinkSenders.Insert(FileLinkSenders.TakeWhile(t => StringComparer.OrdinalIgnoreCase.Compare(t, entry) < 0).Count(), entry);
+            FileLinkCount = FileLinkSenders.Count;
+            await SaveAsync();
+        }
+    }
+
+    [RelayCommand]
+    private async Task RemoveFileLinkSenderAsync(string sender)
+    {
+        FileLinkSenders.Remove(sender);
+        FileLinkCount = FileLinkSenders.Count;
+        await SaveAsync();
+    }
+
     public async Task ReloadAsync()
     {
         _loading = true;
@@ -234,6 +276,13 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             }
 
             TrustedCount = TrustedSenders.Count;
+            FileLinkSenders.Clear();
+            foreach (var sender in options.FileLinkSenders.Order(StringComparer.OrdinalIgnoreCase))
+            {
+                FileLinkSenders.Add(sender);
+            }
+
+            FileLinkCount = FileLinkSenders.Count;
         }
         finally
         {
@@ -310,6 +359,7 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             HideSpamNote = !ShowSpamNote,
             PhishingList = PhishingList,
             TrustedSenders = [.. TrustedSenders],
+            FileLinkSenders = [.. FileLinkSenders],
         });
     }
 }

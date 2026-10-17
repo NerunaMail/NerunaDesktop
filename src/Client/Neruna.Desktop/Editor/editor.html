@@ -182,6 +182,45 @@
   });
 
   // Pasted bitmaps become inline images (sent as embedded attachments).
+  // Files dragged in from outside: the app decides what happens (attach, link, ask); the page never opens them.
+  // WebView2 hands the real files (with their paths) to the app; elsewhere file:// URIs or, failing that, the content.
+  var dragPing = 0;
+  var dropRange = null;
+  var droppedFiles = null;
+  function hasFiles(e) {
+    var types = e.dataTransfer && e.dataTransfer.types;
+    return !!types && Array.prototype.indexOf.call(types, "Files") >= 0;
+  }
+  function onDragOver(e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    var now = Date.now();
+    // Every few hundred ms while dragging: the app looks which mouse button is held (right: ask after dropping).
+    if (now - dragPing > 150) {
+      post({ type: "dragging", restart: now - dragPing > 1000 });
+      dragPing = now;
+    }
+  }
+  document.addEventListener("dragenter", onDragOver);
+  document.addEventListener("dragover", onDragOver);
+  document.addEventListener("drop", function (e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    dragPing = 0;
+    var range = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+    dropRange = range && editor.contains(range.commonAncestorContainer) ? range : null;
+    droppedFiles = e.dataTransfer.files;
+    var uris = (e.dataTransfer.getData("text/uri-list") || "").split(/\r?\n/).filter(function (u) { return /^file:/i.test(u); });
+    var message = { type: "filedrop", ctrl: e.ctrlKey, x: e.clientX, y: e.clientY, uris: uris, count: droppedFiles.length };
+    var webview = window.chrome && window.chrome.webview;
+    if (webview && typeof webview.postMessageWithAdditionalObjects === "function") {
+      webview.postMessageWithAdditionalObjects(JSON.stringify(message), droppedFiles);
+    } else {
+      post(message);
+    }
+  });
+
   editor.addEventListener("paste", function (e) {
     var items = (e.clipboardData && e.clipboardData.items) || [];
     for (var i = 0; i < items.length; i++) {
@@ -507,6 +546,31 @@
     setAutoLists: function (enabled) {
       autoLists = !!enabled;
       return "ok";
+    },
+    /** Inserts html where files were dropped (or at the caret, see insertHtml). */
+    insertAtDrop: function (html) {
+      if (dropRange && editor.contains(dropRange.commonAncestorContainer)) {
+        lastRange = dropRange;
+        window.getSelection().removeAllRanges();
+      }
+      dropRange = null;
+      return window.neruna.insertHtml(html);
+    },
+    /** The dropped files' content, for attaching where the app gets no paths ({type:"filedata"} per file). */
+    readDroppedFiles: function (maxBytes) {
+      var files = droppedFiles ? Array.prototype.slice.call(droppedFiles) : [];
+      droppedFiles = null;
+      files.forEach(function (file) {
+        if (file.size > maxBytes) {
+          post({ type: "filedata", name: file.name, tooLarge: true });
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () { post({ type: "filedata", name: file.name, data: String(reader.result) }); };
+        reader.onerror = function () { post({ type: "filedata", name: file.name, failed: true }); };
+        reader.readAsDataURL(file);
+      });
+      return String(files.length);
     },
     /** Inserts html at the last caret position (start of the text if there never was one); nothing is replaced. */
     insertHtml: function (html) {

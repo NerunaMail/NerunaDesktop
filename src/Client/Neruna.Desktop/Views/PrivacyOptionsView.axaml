@@ -60,6 +60,39 @@
                    Text="{l:T 'Noch keine. Absender lassen sich auch direkt über einer Mail mit «Immer laden» hinzufügen.'}" />
       </StackPanel>
 
+      <!-- Links to files (file:…): text, except from these senders -->
+      <StackPanel Spacing="8">
+        <TextBlock Text="{l:T 'Links auf Dateien'}" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Links auf Dateien (z. B. auf einem Netzlaufwerk) zeigt Neruna nur als Text – ein Klick auf eine Datei kann ein Programm starten. Bei diesen Absendern sind es Links, die die Datei direkt öffnen; Programme und Skripte erst nach Rückfrage. Nicht bei Mails, deren Absender die Prüfung Ihres Servers nicht besteht.'}" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Width="460" HorizontalAlignment="Left">
+          <TextBox Text="{Binding NewFileLinkSender}" PlaceholderText="anna@firma.ch / @firma.ch">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding AddFileLinkSenderCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button Grid.Column="1" Content="{l:T 'Hinzufügen'}" Command="{Binding AddFileLinkSenderCommand}" />
+        </Grid>
+        <TextBlock Classes="error" FontSize="12" TextWrapping="Wrap" Text="{Binding FileLinkError}"
+                   IsVisible="{Binding FileLinkError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <Border IsVisible="{Binding HasFileLinkSenders}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4"
+                Width="460" HorizontalAlignment="Left" Padding="10,4">
+        <ScrollViewer MaxHeight="240">
+        <ItemsControl ItemsSource="{Binding FileLinkSenders}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="sys:String">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="command" Content="{l:T 'Entfernen'}" FontSize="12"
+                        Command="{Binding $parent[ItemsControl].((vm:PrivacyOptionsViewModel)DataContext).RemoveFileLinkSenderCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        </ScrollViewer>
+        </Border>
+      </StackPanel>
+
       <StackPanel Spacing="8">
         <TextBlock Text="{l:T 'Darstellung'}" FontSize="16" FontWeight="SemiBold" />
         <CheckBox IsChecked="{Binding PlainText}" Content="{l:T 'E-Mails als reinen Text anzeigen'}" />

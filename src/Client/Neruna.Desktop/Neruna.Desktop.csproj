@@ -7,6 +7,8 @@
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <Description>Neruna Desktop – mail, calendar and contacts for open standards.</Description>
+    <!-- Referenced DLLs without their API docs (.xml) in the output -->
+    <AllowedReferenceRelatedFileExtensions>.pdb</AllowedReferenceRelatedFileExtensions>
   </PropertyGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
@@ -27,6 +29,10 @@
     <PackageReference Include="QRCoder" />
     <PackageReference Include="Avalonia.HtmlRenderer" />
     <PackageReference Include="Avalonia.Controls.WebView" />
+    <!-- Only the managed wrapper of WebView2 (Windows): the paths of files dropped into the mail editor. The WebView
+         itself comes from Avalonia.Controls.WebView; no loader, WinForms or WPF parts. -->
+    <PackageReference Include="Microsoft.Web.WebView2" ExcludeAssets="all" GeneratePathProperty="true" />
+    <Reference Include="Microsoft.Web.WebView2.Core" HintPath="$(PkgMicrosoft_Web_WebView2)/lib_manual/netcoreapp3.0/Microsoft.Web.WebView2.Core.dll" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>

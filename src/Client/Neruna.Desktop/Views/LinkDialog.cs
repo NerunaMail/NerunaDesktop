@@ -112,5 +112,46 @@ internal static class LinkDialog
         return open;
     }
 
+    /// <summary>A link to a program or script (from a safe sender): opened only after asking once more.</summary>
+    /// <returns>True: open it.</returns>
+    public static async Task<bool> ShowProgramAsync(Window owner, string path)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        var open = false;
+        var dialog = new Window
+        {
+            Title = T("Programm starten?"),
+            Width = 480,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Icon = owner.Icon,
+        };
+        dialog.Bind(Window.BackgroundProperty, dialog.GetResourceObservable("PaneBackgroundBrush"));
+        var openButton = new Button { Content = T("Trotzdem öffnen"), MinWidth = 90 };
+        openButton.Click += (_, _) =>
+        {
+            open = true;
+            dialog.Close();
+        };
+        var cancel = new Button { Content = T("Abbrechen"), MinWidth = 90, IsDefault = true, IsCancel = true, Classes = { "accent" } };
+        cancel.Click += (_, _) => dialog.Close();
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(24, 20),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock { Text = "⚠ " + T("Der Link startet ein Programm oder Skript."), FontWeight = FontWeight.SemiBold, Foreground = HighBrush, TextWrapping = TextWrapping.Wrap },
+                new SelectableTextBlock { Text = path, FontSize = 12, Classes = { "subtle" }, TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = T("Öffnen Sie es nur, wenn Sie es erwartet haben – auch ein sicherer Absender kann gehackt sein."), TextWrapping = TextWrapping.Wrap },
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0), Children = { openButton, cancel } },
+            },
+        };
+        await dialog.ShowDialog(owner);
+        return open;
+    }
+
     private static TextBlock Label(string text) => new() { Text = text, FontSize = 12, Classes = { "subtle" }, Margin = new Thickness(0, 4, 0, 0) };
 }

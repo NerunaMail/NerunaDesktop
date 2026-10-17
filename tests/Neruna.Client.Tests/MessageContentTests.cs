@@ -298,4 +298,27 @@ public class MailPreviewTests
         Assert.DoesNotContain(">x<", html);
         Assert.Contains("<span>kept</span>", html);
     }
+
+    [Fact]
+    public void Links_to_files_are_text_unless_the_sender_is_safe()
+    {
+        var message = new MimeMessage { Body = new TextPart("html") { Text = "<p>Offerte: <a href=\"file://server/projekte/offerte.pdf\">hier</a> und <a href=\"file:///C:/Daten/plan.xlsx\">C:\\Daten\\plan.xlsx</a></p>" } };
+
+        var text = MessageContent.From(message).Html;
+        Assert.DoesNotContain("href=\"file:", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("hier</span> (\\\\server\\projekte\\offerte.pdf)", text, StringComparison.Ordinal); // the path shown, to copy
+        Assert.DoesNotContain("plan.xlsx (", text, StringComparison.Ordinal); // the text shows the path already
+
+        Assert.Contains("href=\"file://server/projekte/offerte.pdf\"", MessageContent.From(message, fileLinks: true).Html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void File_links_round_trip_and_programs_are_recognised()
+    {
+        Assert.Equal(@"\\server\projekte\offerte.pdf", FileLinks.ToPath(FileLinks.ToUri(@"\\server\projekte\offerte.pdf")));
+        Assert.Equal("/home/anna/Offerte 1.pdf", FileLinks.ToPath(FileLinks.ToUri("/home/anna/Offerte 1.pdf")));
+        Assert.Null(FileLinks.ToPath("https://example.com/a.pdf"));
+        Assert.True(FileLinks.IsExecutable(@"C:\Tools\setup.EXE"));
+        Assert.False(FileLinks.IsExecutable("offerte.pdf"));
+    }
 }

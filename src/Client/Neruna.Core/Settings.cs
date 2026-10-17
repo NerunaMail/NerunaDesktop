@@ -189,6 +189,9 @@ public static class SettingKeys
     /// <summary>Senders whose pictures load without asking (JSON list of addresses, or "@domain" for a whole domain).</summary>
     public const string PrivacyTrustedSenders = "privacy.trustedSenders";
 
+    /// <summary>Senders whose links to files are clickable and open the file (addresses and "@domain").</summary>
+    public const string PrivacyFileLinkSenders = "privacy.fileLinkSenders";
+
     /// <summary>Tracking pixels stay blocked even when pictures are loaded (default: on).</summary>
     public const string PrivacyBlockTrackers = "privacy.blockTrackers";
 

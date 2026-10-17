@@ -87,7 +87,8 @@ public sealed partial class MessageContent
     /// <param name="allowRemoteContent">Pictures and styles from the internet are loaded.</param>
     /// <param name="blockTrackers">Tracking pixels stay out even then.</param>
     /// <param name="plainTextOnly">The body as plain text only (no layout, nothing from the internet).</param>
-    public static MessageContent From(MimeMessage message, bool allowRemoteContent = false, bool blockTrackers = true, bool plainTextOnly = false)
+    /// <param name="fileLinks">Links to files stay links (a safe sender); otherwise they are shown as text.</param>
+    public static MessageContent From(MimeMessage message, bool allowRemoteContent = false, bool blockTrackers = true, bool plainTextOnly = false, bool fileLinks = false)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -110,7 +111,8 @@ public sealed partial class MessageContent
         }
         else if (walker.HtmlBody is { } htmlPart)
         {
-            html = Sanitize(htmlPart.Text ?? string.Empty, allowRemoteContent, blockTrackers, referencedIds, ref blocked, ref trackers);
+            var source0 = htmlPart.Text ?? string.Empty;
+            html = Sanitize(fileLinks ? source0 : FileLinks.AsText(source0), allowRemoteContent, blockTrackers, referencedIds, ref blocked, ref trackers);
             foreach (var extra in walker.ExtraBodies)
             {
                 html += TextToHtmlFragment(extra);
@@ -172,7 +174,7 @@ public sealed partial class MessageContent
             var ignored = new HashSet<string>(StringComparer.Ordinal);
             var blocked = false;
             var trackers = 0;
-            return "<hr/>" + Sanitize(part.Text ?? string.Empty, false, true, ignored, ref blocked, ref trackers);
+            return "<hr/>" + Sanitize(FileLinks.AsText(part.Text ?? string.Empty), false, true, ignored, ref blocked, ref trackers);
         }
 
         // format=flowed (Thunderbird) is first unwrapped to plain text: MimeKit's FlowedToHtml turns every line into

@@ -769,20 +769,62 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     private bool CanSend() => !IsSending && !string.IsNullOrWhiteSpace(To);
 
     [RelayCommand]
-    private async Task AddAttachmentAsync()
+    private async Task AddAttachmentAsync() => await AttachFilesAsync(await _files.PickFilesAsync(T("Datei anhängen")));
+
+    /// <summary>Files as attachments (picked, or dragged into the mail); folders cannot be attached.</summary>
+    public async Task AttachFilesAsync(IEnumerable<string> paths)
     {
-        foreach (var path in await _files.PickFilesAsync(T("Datei anhängen")))
+        ArgumentNullException.ThrowIfNull(paths);
+        foreach (var path in paths)
         {
+            if (Directory.Exists(path))
+            {
+                Error = F("«{0}» ist ein Ordner – Ordner lassen sich nur als Link einfügen (beim Ziehen Ctrl drücken).", Path.GetFileName(path.TrimEnd('/', '\\')));
+                continue;
+            }
+
             try
             {
                 var entity = await new BodyBuilder().Attachments.AddAsync(path);
                 Attachments.Add(new ComposeAttachment(Path.GetFileName(path), entity));
             }
-            catch (IOException ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 Error = F("«{0}» konnte nicht gelesen werden: {1}", Path.GetFileName(path), ex.Message);
             }
         }
+    }
+
+    /// <summary>A dropped file known only by its content (no path): attached as is.</summary>
+    public void AttachData(string name, byte[]? data, bool tooLarge)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        if (data is null)
+        {
+            Error = tooLarge ? F("«{0}» ist zu gross zum Hineinziehen – bitte über «Anhängen» wählen.", name) : F("«{0}» konnte nicht gelesen werden.", name);
+            return;
+        }
+
+        var entity = new BodyBuilder().Attachments.Add(name, data);
+        Attachments.Add(new ComposeAttachment(name, entity));
+    }
+
+    /// <summary>
+    /// Links to the files where they were dropped: the path as text, so it reads the same in every mail program
+    /// (in Neruna it is only clickable for recipients who set the sender as safe).
+    /// </summary>
+    public async Task InsertFileLinksAsync(IReadOnlyList<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        if (_editor is null || paths.Count == 0)
+        {
+            return;
+        }
+
+        var html = string.Join("<br>", paths.Select(p => $"<a href=\"{System.Net.WebUtility.HtmlEncode(FileLinks.ToUri(p))}\">{System.Net.WebUtility.HtmlEncode(p)}</a>"));
+        var text = string.Join(Environment.NewLine, paths.Select(p => "<" + FileLinks.ToUri(p) + ">"));
+        await _editor.InsertAtDropAsync(html, text);
+        MarkChanged();
     }
 
     [RelayCommand]

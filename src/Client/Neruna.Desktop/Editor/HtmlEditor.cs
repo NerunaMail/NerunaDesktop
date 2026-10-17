@@ -38,6 +38,15 @@ internal interface IHtmlEditor
     /// <summary>Raised once it is clear whether formatting is available (true) or the plain-text fallback is used (false).</summary>
     event EventHandler<bool>? ModeChanged;
 
+    /// <summary>Files were dropped into the text (with their paths).</summary>
+    event EventHandler<EditorFileDrop>? FilesDropped;
+
+    /// <summary>A file was dropped whose path the WebView does not tell: only attaching is possible.</summary>
+    event EventHandler<EditorFileData>? FileDataDropped;
+
+    /// <summary>Like <see cref="InsertAsync"/>, but where files were last dropped.</summary>
+    Task InsertAtDropAsync(string html, string text);
+
     /// <summary>False while loading and when the plain-text fallback is in use.</summary>
     bool IsRich { get; }
 
@@ -75,6 +84,15 @@ internal interface IHtmlEditor
     /// <returns>False when there was nothing marked to replace.</returns>
     Task<bool> ReplaceTextAsync(string html, string text, bool selectionOnly);
 }
+
+/// <summary>
+/// Files dragged into the text from outside, with their paths. <paramref name="Link"/>: Ctrl was held (insert links);
+/// <paramref name="Ask"/>: dragged with the right mouse button (ask what to do); <paramref name="Position"/> in the editor.
+/// </summary>
+internal sealed record EditorFileDrop(IReadOnlyList<string> Paths, bool Link, bool Ask, Avalonia.Point Position);
+
+/// <summary>A dropped file without a path (only its content is known): <paramref name="Data"/> null if it was too large or unreadable.</summary>
+internal sealed record EditorFileData(string Name, byte[]? Data, bool TooLarge);
 
 /// <param name="Own">What the user wrote: everything above the signature and the quoted message.</param>
 /// <param name="Quote">The quoted message of a reply or forward (empty for a new mail).</param>
@@ -147,6 +165,66 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     public event EventHandler<string>? ImagePasted;
 
     public event EventHandler<bool>? ModeChanged;
+
+    public event EventHandler<EditorFileDrop>? FilesDropped;
+
+    public event EventHandler<EditorFileData>? FileDataDropped;
+
+    /// <summary>Largest file attached from its content alone (where the WebView tells no path).</summary>
+    private const long MaxDroppedBytes = 50L * 1024 * 1024;
+
+    // Windows: the WebView2 wrapper that receives dropped files with their paths (a WebView2Files).
+    private object? _nativeFiles;
+
+    // The right mouse button was held during the current drag.
+    private bool _secondaryDrag;
+
+    public async Task InsertAtDropAsync(string html, string text)
+    {
+        if (_fallback is not null || _web is null)
+        {
+            await InsertAsync(html, text);
+            return;
+        }
+
+        await RunAsync($"neruna.insertAtDrop({FormattingViewModel.Js(html)})");
+    }
+
+    private void HookNativeFiles(Avalonia.Platform.IPlatformHandle? handle)
+    {
+        if (_nativeFiles is null && OperatingSystem.IsWindows() && handle is Avalonia.Platform.IWindowsWebView2PlatformHandle webView2)
+        {
+            _nativeFiles = WebView2Files.Attach(webView2.CoreWebView2, (message, paths) => Dispatcher.UIThread.Post(() => OnFileDrop(message, paths)));
+        }
+    }
+
+    private void OnFileDrop(string json, IReadOnlyList<string> paths)
+    {
+        JsonElement message;
+        try
+        {
+            message = JsonDocument.Parse(json).RootElement;
+        }
+        catch (JsonException)
+        {
+            return;
+        }
+
+        var ask = _secondaryDrag;
+        _secondaryDrag = false;
+        if (paths.Count == 0)
+        {
+            // No paths (WebKit without file:// URIs): the content only, to attach.
+            _ = _web?.InvokeScript($"neruna.readDroppedFiles({MaxDroppedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+            return;
+        }
+
+        var link = Bool(message, "ctrl") || DragKeys.IsControlDown();
+        var position = new Avalonia.Point(
+            message.TryGetProperty("x", out var x) && x.TryGetDouble(out var px) ? px : 0,
+            message.TryGetProperty("y", out var y) && y.TryGetDouble(out var py) ? py : 0);
+        FilesDropped?.Invoke(this, new EditorFileDrop(paths, link, ask, position));
+    }
 
     /// <summary>Set by the snapshot tool and tests: headless rendering has no native WebView.</summary>
     public static bool ForcePlainText { get; set; }
@@ -436,6 +514,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         try
         {
             _web = new NativeWebView();
+            _web.AdapterCreated += (_, args) => HookNativeFiles(args.TryGetPlatformHandle());
             _web.WebMessageReceived += OnWebMessage;
             _web.NavigationStarted += OnNavigationStarting;
             _web.NewWindowRequested += (_, args) => args.Handled = true;
@@ -482,8 +561,26 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
         switch (message.TryGetProperty("type", out var type) ? type.GetString() : null)
         {
+            case "dragging":
+                if (Bool(message, "restart"))
+                {
+                    _secondaryDrag = false;
+                }
+
+                _secondaryDrag |= DragKeys.IsSecondaryButtonDown();
+                break;
+            case "filedrop" when _nativeFiles is null:
+                // WebView2 sends the paths separately (WebView2Files); elsewhere they come as file:// URIs.
+                OnFileDrop(message.GetRawText(), message.TryGetProperty("uris", out var uris) && uris.ValueKind == JsonValueKind.Array
+                    ? [.. uris.EnumerateArray().Select(u => Neruna.Core.Mail.FileLinks.ToPath(u.GetString())).OfType<string>()]
+                    : []);
+                break;
+            case "filedata" when message.TryGetProperty("name", out var fileName) && fileName.GetString() is { } name:
+                FileDataDropped?.Invoke(this, new EditorFileData(name, DataOf(message), Bool(message, "tooLarge")));
+                break;
             case "ready":
                 _ready = true;
+                HookNativeFiles(_web?.TryGetPlatformHandle());
                 _ = PushContentAsync();
                 _ = PushShortcutsAsync();
                 _ = _web?.InvokeScript($"neruna.setAutoLists({(_autoLists ? "true" : "false")})");
@@ -513,6 +610,24 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                     message.TryGetProperty("size", out var size) && size.TryGetDouble(out var pt) ? pt : 0,
                     message.TryGetProperty("color", out var color) ? color.GetString() ?? "#000000" : "#000000"));
                 break;
+        }
+    }
+
+    // "data:…;base64,…" from the page's FileReader.
+    private static byte[]? DataOf(JsonElement message)
+    {
+        if (!message.TryGetProperty("data", out var data) || data.GetString() is not { } url || url.IndexOf(',', StringComparison.Ordinal) is var comma && comma < 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Convert.FromBase64String(url[(comma + 1)..]);
+        }
+        catch (FormatException)
+        {
+            return null;
         }
     }
 

@@ -1,3 +1,4 @@
+using Avalonia.Platform.Storage;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -116,6 +117,17 @@ internal sealed partial class MessageBodyView : UserControl
             return;
         }
 
+        // A link to a file: only links at all from a safe sender (otherwise shown as text); programs after asking.
+        if (Neruna.Core.Mail.FileLinks.IsFileLink(link))
+        {
+            if (DataContext is ReadingPaneViewModel { OpensFileLinks: true } safe && Neruna.Core.Mail.FileLinks.ToPath(link) is { } path && TopLevel.GetTopLevel(this) is Window owner)
+            {
+                _ = OpenFileAsync(owner, safe, path);
+            }
+
+            return;
+        }
+
         // Checked first (Einstellungen → Datenschutz): shown before opening if suspicious or always, cleaned up if set.
         if (DataContext is ReadingPaneViewModel pane && TopLevel.GetTopLevel(this) is Window window)
         {
@@ -123,6 +135,22 @@ internal sealed partial class MessageBodyView : UserControl
                 link,
                 check => LinkDialog.ShowAsync(window, check),
                 target => Uri.TryCreate(target, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http" ? window.Launcher.LaunchUriAsync(uri) : Task.CompletedTask);
+        }
+    }
+
+    private static async Task OpenFileAsync(Window owner, ReadingPaneViewModel pane, string path)
+    {
+        if (Neruna.Core.Mail.FileLinks.IsExecutable(path) && !await LinkDialog.ShowProgramAsync(owner, path))
+        {
+            return;
+        }
+
+        var opened = Directory.Exists(path)
+            ? await owner.Launcher.LaunchDirectoryInfoAsync(new DirectoryInfo(path))
+            : File.Exists(path) && await owner.Launcher.LaunchFileInfoAsync(new FileInfo(path));
+        if (!opened)
+        {
+            pane.ShowLinkError(Neruna.Core.Localization.Texts.F("«{0}» ist nicht erreichbar – fehlt die Verbindung zum Netzlaufwerk?", path));
         }
     }
 }

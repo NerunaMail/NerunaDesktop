@@ -292,3 +292,41 @@ def test_ai_replaces_only_the_selection(page):
                      r.setStart(t, 6); r.setEnd(t, 11); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }""")
     assert page.evaluate("neruna.replaceText('Lea', true)") == "ok"
     assert "Hallo Lea, danke." in page.evaluate("document.getElementById('editor').textContent")
+
+
+def drop_file(page, ctrl=False):
+    page.evaluate("""ctrl => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['Hallo'], 'offerte.txt', { type: 'text/plain' }));
+        const editor = document.getElementById('editor');
+        const box = editor.getBoundingClientRect();
+        const options = { dataTransfer: dt, clientX: box.left + 5, clientY: box.top + 5, ctrlKey: ctrl, bubbles: true, cancelable: true };
+        editor.dispatchEvent(new DragEvent('dragover', options));
+        editor.dispatchEvent(new DragEvent('drop', options));
+    }""", ctrl)
+
+
+def test_dropped_files_go_to_the_app_and_are_never_opened(page):
+    page.keyboard.type("Siehe Datei")
+    drop_file(page, ctrl=True)
+    drop = page.evaluate("window.__nerunaMessages.filter(m => m.type === 'filedrop').slice(-1)[0]")
+    assert drop["ctrl"] is True and drop["count"] == 1
+    assert page.evaluate("window.__nerunaMessages.some(m => m.type === 'dragging')")
+    assert page.url.endswith("editor.html")
+
+
+def test_link_is_inserted_where_the_files_were_dropped(page):
+    page.keyboard.type("Ende")
+    drop_file(page)
+    page.evaluate("neruna.insertAtDrop('<a href=\"file:///C:/Projekte/offerte.txt\">C:\\\\Projekte\\\\offerte.txt</a>')")
+    html = page.evaluate("neruna.getBodyHtml()")
+    assert 'href="file:///C:/Projekte/offerte.txt"' in html
+    assert html.index("offerte.txt") < html.index("Ende")
+
+
+def test_dropped_files_without_path_are_read_for_attaching(page):
+    drop_file(page)
+    page.evaluate("neruna.readDroppedFiles(1000)")
+    page.wait_for_timeout(200)
+    data = page.evaluate("window.__nerunaMessages.filter(m => m.type === 'filedata').slice(-1)[0]")
+    assert data["name"] == "offerte.txt" and data["data"].startswith("data:")

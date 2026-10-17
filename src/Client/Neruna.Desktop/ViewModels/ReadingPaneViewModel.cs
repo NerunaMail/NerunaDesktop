@@ -144,6 +144,12 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     /// <summary>The readable (decrypted) message, used for reply/forward. Null while loading.</summary>
     public MimeMessage? Message { get; }
 
+    /// <summary>Links to files are links (a safe sender, Einstellungen → Datenschutz); otherwise they are text.</summary>
+    public bool OpensFileLinks => View.Privacy.OpensFileLinks(Message?.From.Mailboxes.FirstOrDefault(), View.Assessment?.SenderForged ?? false);
+
+    /// <summary>A file link could not be opened: shown in the status line of the pane.</summary>
+    public void ShowLinkError(string text) => ExportStatus = text;
+
     public string Html => _content?.Html ?? string.Empty;
 
     /// <summary>The message as text (for the AI summary).</summary>
@@ -506,7 +512,8 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(view);
         var message = opened.Readable;
-        var content = MessageContent.From(message, view.AllowRemoteContent, view.Privacy.BlockTrackers, view.Privacy.PlainText && !view.ShowOriginal);
+        var content = MessageContent.From(message, view.AllowRemoteContent, view.Privacy.BlockTrackers, view.Privacy.PlainText && !view.ShowOriginal,
+            fileLinks: view.Privacy.OpensFileLinks(message.From.Mailboxes.FirstOrDefault(), view.Assessment?.SenderForged ?? false));
         return new ReadingPaneViewModel(
             message.Subject ?? summary.Subject,
             message.From.Mailboxes.FirstOrDefault() is { } from ? (string.IsNullOrWhiteSpace(from.Name) ? from.Address : $"{from.Name} <{from.Address}>") : string.Empty,

@@ -34,6 +34,9 @@ public sealed record PrivacyOptions
     /// <summary>Addresses ("anna@example.ch") and domains ("@example.ch") whose pictures load without asking.</summary>
     public IReadOnlyList<string> TrustedSenders { get; init; } = [];
 
+    /// <summary>Addresses and domains whose links to files (file:…) are links that open the file; for all others text.</summary>
+    public IReadOnlyList<string> FileLinkSenders { get; init; } = [];
+
     public bool BlockTrackers { get; init; } = true;
 
     public bool PlainText { get; init; }
@@ -64,6 +67,7 @@ public sealed record PrivacyOptions
                 _ => RemoteContentPolicy.Ask,
             },
             TrustedSenders = await settings.GetListAsync(SettingKeys.PrivacyTrustedSenders, cancellationToken) ?? [],
+            FileLinkSenders = await settings.GetListAsync(SettingKeys.PrivacyFileLinkSenders, cancellationToken) ?? [],
             BlockTrackers = await settings.GetBoolAsync(SettingKeys.PrivacyBlockTrackers, fallback: true, cancellationToken),
             PlainText = await settings.GetBoolAsync(SettingKeys.PrivacyPlainText, cancellationToken: cancellationToken),
             ConfirmLinks = await settings.GetAsync(SettingKeys.PrivacyConfirmLinks, cancellationToken) switch
@@ -85,6 +89,7 @@ public sealed record PrivacyOptions
         ArgumentNullException.ThrowIfNull(settings);
         await settings.SetAsync(SettingKeys.PrivacyRemoteContent, RemoteContent.ToString().ToLowerInvariant(), cancellationToken);
         await settings.SetListAsync(SettingKeys.PrivacyTrustedSenders, TrustedSenders, cancellationToken);
+        await settings.SetListAsync(SettingKeys.PrivacyFileLinkSenders, FileLinkSenders, cancellationToken);
         await settings.SetBoolAsync(SettingKeys.PrivacyBlockTrackers, BlockTrackers, cancellationToken);
         await settings.SetBoolAsync(SettingKeys.PrivacyPlainText, PlainText, cancellationToken);
         await settings.SetAsync(SettingKeys.PrivacyConfirmLinks, ConfirmLinks.ToString().ToLowerInvariant(), cancellationToken);
@@ -118,7 +123,15 @@ public sealed record PrivacyOptions
     }
 
     /// <summary>The sender is on the trusted list, by address or by domain.</summary>
-    public bool IsTrusted(MailboxAddress? sender)
+    public bool IsTrusted(MailboxAddress? sender) => Matches(TrustedSenders, sender);
+
+    /// <summary>
+    /// Links to files in this sender's mails are links that open the file: only for the senders set for it, and never
+    /// when the sender fails the authentication check (its address may be forged).
+    /// </summary>
+    public bool OpensFileLinks(MailboxAddress? sender, bool senderForged = false) => !senderForged && Matches(FileLinkSenders, sender);
+
+    private static bool Matches(IReadOnlyList<string> entries, MailboxAddress? sender)
     {
         if (sender?.Address is not { Length: > 0 } address)
         {
@@ -126,7 +139,7 @@ public sealed record PrivacyOptions
         }
 
         var domain = "@" + DomainNames.OfAddress(address);
-        return TrustedSenders.Any(t => string.Equals(t, address, StringComparison.OrdinalIgnoreCase) || string.Equals(t, domain, StringComparison.OrdinalIgnoreCase));
+        return entries.Any(t => string.Equals(t, address, StringComparison.OrdinalIgnoreCase) || string.Equals(t, domain, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

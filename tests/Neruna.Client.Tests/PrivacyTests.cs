@@ -403,6 +403,18 @@ public class PrivacyTests
         Assert.Equal(0, (await statistics.GetAsync(TestContext.Current.CancellationToken)).Checked);
     }
 
+    [Fact]
+    public void File_links_open_only_for_safe_senders_that_pass_the_check()
+    {
+        var options = new PrivacyOptions { FileLinkSenders = ["@firma.ch", "lea@example.com"] };
+
+        Assert.True(options.OpensFileLinks(new MailboxAddress("Marco", "marco@firma.ch")));
+        Assert.True(options.OpensFileLinks(new MailboxAddress("Lea", "Lea@Example.com")));
+        Assert.False(options.OpensFileLinks(new MailboxAddress("Nadia", "nadia@example.com")));
+        Assert.False(options.OpensFileLinks(new MailboxAddress("Marco", "marco@firma.ch"), senderForged: true));
+        Assert.False(options.IsTrusted(new MailboxAddress("Marco", "marco@firma.ch"))); // pictures are a separate list
+    }
+
     private sealed class MemorySettings : ISettingsStore
     {
         private readonly Dictionary<string, string> _values = [];
