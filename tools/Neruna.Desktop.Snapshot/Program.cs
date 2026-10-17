@@ -14,6 +14,7 @@ using Neruna.Desktop.Editor;
 using Neruna.Desktop.Infrastructure;
 using Neruna.Desktop.ViewModels;
 using Neruna.Desktop.Views;
+using Neruna.Desktop.Snapshot;
 
 // Usage: dotnet run --project tools/Neruna.Desktop.Snapshot -- <output-dir> [light|dark] [--live <mail-host> <dav-url>]
 var output = Path.GetFullPath(args.Length > 0 ? args[0] : "artifacts/screenshots");
@@ -1174,7 +1175,11 @@ internal static class Snapshots
             Dispatcher.UIThread.RunJobs();
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             var path = Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".png");
-            window.CaptureRenderedFrame()?.Save(path, PngBitmapEncoderOptions.Default);
+            if (window.CaptureRenderedFrame() is { } shot)
+            {
+                ScreenshotArchive.Save(shot, output, Path.GetFileName(path));
+            }
+
             Console.WriteLine(path);
             window.Close();
         }
@@ -1224,7 +1229,11 @@ internal static class Snapshots
         Dispatcher.UIThread.RunJobs();
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         var path = Path.Combine(output, "splash.png");
-        splash.CaptureRenderedFrame()?.Save(path, PngBitmapEncoderOptions.Default);
+        if (splash.CaptureRenderedFrame() is { } shot)
+        {
+            ScreenshotArchive.Save(shot, output, "splash.png");
+        }
+
         Console.WriteLine(path);
         splash.Close();
     }
@@ -1245,7 +1254,11 @@ internal static class Snapshots
         Dispatcher.UIThread.RunJobs();
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         var path = Path.Combine(output, "font-list.png");
-        window.CaptureRenderedFrame()?.Save(path, PngBitmapEncoderOptions.Default);
+        if (window.CaptureRenderedFrame() is { } shot)
+        {
+            ScreenshotArchive.Save(shot, output, "font-list.png");
+        }
+
         Console.WriteLine(path);
         window.Close();
     }
@@ -1325,7 +1338,7 @@ internal static class Snapshots
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("No frame rendered.");
         var path = Path.Combine(output, name);
-        frame.Save(path, PngBitmapEncoderOptions.Default);
+        ScreenshotArchive.Save(frame, output, name);
         Console.WriteLine(path);
     }
 

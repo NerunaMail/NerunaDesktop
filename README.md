@@ -91,6 +91,8 @@ NERUNA_TEST_IMAP_HOST=127.0.0.1 NERUNA_TEST_DAV_URL=http://127.0.0.1:5232/ dotne
 **Screenshots / UI-Prüfung ohne Bildschirm:**
 `dotnet run --project tools/Neruna.Desktop.Snapshot -- docs/screenshots` (Demo-Daten) bzw.
 `… -- <ordner> light --live 127.0.0.1 http://127.0.0.1:5232/` (Ende-zu-Ende gegen das Testlabor).
+Ersetzte Bilder einer früheren Version wandern dabei nach `docs/screenshots/archive/<Datum>_v<Version>/`
+(welche Version ein Bild zeigt, steht in `versions.json`) – so bleibt die Entwicklung der Oberfläche sichtbar.
 
 **Editor (JavaScript) testen** – Playwright in Docker, Chromium und WebKit:
 

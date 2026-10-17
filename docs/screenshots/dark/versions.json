@@ -1,0 +1,30 @@
+{
+  "calendar-timegrid.png": {
+    "Version": "0.6.0",
+    "Date": "2026-10-14"
+  },
+  "compose-autocomplete.png": {
+    "Version": "0.6.0",
+    "Date": "2026-10-14"
+  },
+  "contacts-group.png": {
+    "Version": "0.6.0",
+    "Date": "2026-10-14"
+  },
+  "mail.png": {
+    "Version": "0.6.0",
+    "Date": "2026-10-14"
+  },
+  "notification-window.png": {
+    "Version": "0.5.0",
+    "Date": "2026-10-14"
+  },
+  "recipient-picker.png": {
+    "Version": "0.1.1",
+    "Date": "2026-10-08"
+  },
+  "reply.png": {
+    "Version": "0.6.0",
+    "Date": "2026-10-14"
+  }
+}
