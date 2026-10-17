@@ -93,6 +93,34 @@ public class PhishingListTests
     }
 
     [Fact]
+    public async Task A_busy_server_is_asked_once_more_then_left_alone()
+    {
+        var directory = Directory.CreateTempSubdirectory("neruna-phishing").FullName;
+        try
+        {
+            // The host's guard: 429 without Retry-After once, then the list.
+            var http = new FakeServer { BusyTimes = 1 };
+            http.Answers["https://neruna.example/api/v1/phishing/hosts"] = Build(1, 0, ["a-phish.example"], []);
+            var list = new PhishingList();
+            var updater = new PhishingListUpdater(new HttpClient(http), directory, list, new Uri("https://neruna.example/")) { RetryDelay = TimeSpan.Zero };
+            await updater.UpdateAsync(Ct);
+            Assert.True(list.Contains("a-phish.example"));
+
+            // Still busy: no error storm – it waits, also "Jetzt aktualisieren".
+            http.BusyTimes = 5;
+            await Assert.ThrowsAsync<PhishingListBusyException>(() => updater.UpdateAsync(Ct));
+            Assert.True(updater.BusyUntil > DateTimeOffset.UtcNow.AddMinutes(4));
+            var asked = http.Requests;
+            await Assert.ThrowsAsync<PhishingListBusyException>(() => updater.UpdateAsync(Ct));
+            Assert.Equal(asked, http.Requests);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void The_real_list_is_fast_enough()
     {
         // Optional: NERUNA_TEST_PHISHING=<full list from neruna.cloud>.
@@ -134,9 +162,22 @@ public class PhishingListTests
     {
         public Dictionary<string, byte[]> Answers { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(Answers.TryGetValue(request.RequestUri!.ToString(), out var body)
+        public int BusyTimes { get; set; }
+
+        public int Requests { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests++;
+            if (BusyTimes > 0)
+            {
+                BusyTimes--;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+            }
+
+            return Task.FromResult(Answers.TryGetValue(request.RequestUri!.ToString(), out var body)
                 ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) }
                 : new HttpResponseMessage(HttpStatusCode.NotModified));
+        }
     }
 }

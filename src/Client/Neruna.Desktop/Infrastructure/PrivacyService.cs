@@ -41,7 +41,10 @@ internal sealed class PrivacyService(ISettingsStore settings, IAccountStore acco
         _phishingTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromHours(3) };
         _phishingTimer.Tick += async (_, _) => await UpdatePhishingListAsync(force: false);
         _phishingTimer.Start();
-        _ = UpdatePhishingListAsync(force: false);
+
+        // Not at once: in an office all computers start at eight – spread over a few minutes, the server stays calm.
+        await Task.Delay(TimeSpan.FromSeconds(Random.Shared.Next(30, 600)));
+        await UpdatePhishingListAsync(force: false);
     }
 
     /// <summary>Asks neruna.cloud for what changed (or, with <paramref name="force"/>, now); off: the list is dropped.</summary>

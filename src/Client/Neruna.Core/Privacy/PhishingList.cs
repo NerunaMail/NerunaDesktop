@@ -301,17 +301,52 @@ public sealed class PhishingListUpdater(HttpClient http, string directory, Phish
         File.SetLastWriteTimeUtc(CheckedPath, DateTime.UtcNow);
     }
 
+    /// <summary>Before asking again after a 429 without "Retry-After" (the host's guard, not Neruna's limit).</summary>
+    public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>The server asked to wait (429, busy): until then nothing is asked, also not by "Jetzt aktualisieren".</summary>
+    public DateTimeOffset? BusyUntil { get; private set; }
+
     // The full list (since = 0) or the changes; null when nothing changed (304).
     private async Task<byte[]?> DownloadAsync(long since, CancellationToken cancellationToken)
     {
+        if (BusyUntil is { } until && until > DateTimeOffset.UtcNow)
+        {
+            throw new PhishingListBusyException(until);
+        }
+
         var url = new Uri(_server, since > 0 ? $"api/v1/phishing/hosts?since={since.ToString(CultureInfo.InvariantCulture)}" : "api/v1/phishing/hosts");
-        using var response = await http.GetAsync(url, cancellationToken);
+        var response = await http.GetAsync(url, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests && response.Headers.RetryAfter is null)
+        {
+            // Not Neruna's limit (that one says how long to wait) but the host's guard against requests in quick
+            // succession (at start and "Jetzt aktualisieren" right after): once more, a few seconds later.
+            response.Dispose();
+            await Task.Delay(RetryDelay, cancellationToken);
+            response = await http.GetAsync(url, cancellationToken);
+        }
+
+        using var _ = response;
         if (response.StatusCode == System.Net.HttpStatusCode.NotModified)
         {
             return null;
         }
 
+        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            // Many devices behind one address (an office): wait as long as the server says, at least a few minutes.
+            var wait = response.Headers.RetryAfter?.Delta ?? (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow) ?? TimeSpan.Zero;
+            BusyUntil = DateTimeOffset.UtcNow + (wait > TimeSpan.FromMinutes(5) ? wait : TimeSpan.FromMinutes(5));
+            throw new PhishingListBusyException(BusyUntil.Value);
+        }
+
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
+}
+
+/// <summary>neruna.cloud is busy (too many requests from this address): the list is asked for again after <see cref="Until"/>.</summary>
+public sealed class PhishingListBusyException(DateTimeOffset until) : HttpRequestException(Localization.Texts.T("neruna.cloud ist gerade ausgelastet – Neruna versucht es später nochmals."))
+{
+    public DateTimeOffset Until { get; } = until;
 }
