@@ -6,7 +6,8 @@ namespace Neruna.Core.Localization;
 /// <summary>
 /// The app's languages (de, en, fr, it). German texts are written in the code and serve as keys (as with gettext);
 /// <c>Localization/{en,fr,it}.json</c> map them to the other languages. Anything not translated stays German.
-/// The language is chosen once at start (Einstellungen → Design, or the system's); a change needs a restart.
+/// The language is chosen once at start (Einstellungen → Design, or the system's – English if Neruna does not have
+/// it); a change needs a restart.
 /// </summary>
 public static class Texts
 {
@@ -27,13 +28,13 @@ public static class Texts
     /// system's own culture has the same language (then its regional formats are kept).</summary>
     public static CultureInfo Culture { get; private set; } = CultureInfo.GetCultureInfo("de-CH");
 
-    /// <summary>The language the system would pick: the OS UI language if Neruna has it, otherwise German.</summary>
+    /// <summary>The language the system would pick: the OS UI language if Neruna has it, otherwise English.</summary>
     public static string SystemLanguage
     {
         get
         {
             var system = SystemUiCulture.TwoLetterISOLanguageName;
-            return Languages.Any(l => l.Code == system) ? system : "de";
+            return Languages.Any(l => l.Code == system) ? system : "en";
         }
     }
 
