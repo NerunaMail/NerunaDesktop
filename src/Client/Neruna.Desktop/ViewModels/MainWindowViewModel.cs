@@ -215,6 +215,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     {
         CalendarPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         CalendarPage.ManageRequested += (_, _) => ShowCalendarSelection();
+        CalendarPage.PrintRequested += (_, _) => ShowCalendarPrint();
         CalendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
         CalendarPage.RemoveRequested += async (_, info) => await RemoveCalendarAccountAsync(info);
         CalendarPage.EditorRequested += (_, editor) => ShowEditor(editor, CalendarChangedAsync);
@@ -415,6 +416,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     {
         GroupEditorViewModel { IsReadOnly: false } => 980,
         CalendarSelectionViewModel { HasSeveralSources: true } => 900,
+        CalendarPrintViewModel => 1080, // options beside a page preview
         AccountTransferDialogViewModel => 900, // the QR code (up to ~520 px) with PIN and instructions beside it
         SyncStatusViewModel or BackupChangesViewModel => 820, // account, service and state in one line, errors below
         _ => 640,
@@ -1028,6 +1030,18 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         Overlay = special;
+    }
+
+    private void ShowCalendarPrint()
+    {
+        var print = new CalendarPrintViewModel(_calendar, _files, CalendarPage.CalendarGroups.SelectMany(g => g.Items), CalendarPage.WeekStart, CalendarPage.IsWorkWeek);
+        print.Finished += (_, _) =>
+        {
+            Overlay = null;
+            print.Release();
+        };
+        Overlay = print;
+        _ = print.RefreshAsync();
     }
 
     private void ShowCalendarSelection()

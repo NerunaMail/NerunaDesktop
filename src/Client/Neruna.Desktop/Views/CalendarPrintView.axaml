@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.CalendarPrintView"
+             x:DataType="vm:CalendarPrintViewModel">
+  <!-- Options on the left, the pages as they will be printed on the right -->
+  <DockPanel>
+    <TextBlock DockPanel.Dock="Top" Text="{l:T 'Kalender drucken'}" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12" />
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,16,0,0">
+      <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" VerticalAlignment="Center"
+                 IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <Button Grid.Column="1" Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="2" Content="{l:T 'Als PDF speichern …'}" Command="{Binding SavePdfCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Classes="accent" Content="{l:T 'Drucken …'}" Command="{Binding PrintCommand}"
+              ToolTip.Tip="{l:T 'Öffnet die Seiten im PDF-Programm Ihres Systems – dort wählen Sie Drucker, Seiten und Anzahl.'}" />
+    </Grid>
+    <Grid ColumnDefinitions="260,24,*">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="10">
+          <TextBlock Text="{l:T 'Darstellung'}" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{x:Static vm:CalendarPrintViewModel.Layouts}" SelectedItem="{Binding Layout}" HorizontalAlignment="Stretch" />
+          <TextBlock Text="{l:T 'Zeitraum'}" FontWeight="SemiBold" Margin="0,6,0,0" />
+          <Grid ColumnDefinitions="40,*" RowDefinitions="Auto,Auto" RowSpacing="6">
+            <TextBlock Text="{l:T 'Von'}" VerticalAlignment="Center" />
+            <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding FromDate}" HorizontalAlignment="Stretch" />
+            <TextBlock Grid.Row="1" Text="{l:T 'Bis'}" VerticalAlignment="Center" />
+            <CalendarDatePicker Grid.Row="1" Grid.Column="1" SelectedDate="{Binding ToDate}" HorizontalAlignment="Stretch" />
+          </Grid>
+          <CheckBox Content="{l:T 'Wochenende'}" IsChecked="{Binding Weekend}" IsVisible="{Binding ShowsWeekend}" />
+          <CheckBox Content="{l:T 'Ort anzeigen'}" IsChecked="{Binding Places}" />
+          <TextBlock Text="{l:T 'Kalender'}" FontWeight="SemiBold" Margin="0,6,0,0" />
+          <ItemsControl ItemsSource="{Binding Calendars}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PrintCalendarItem">
+                <CheckBox IsChecked="{Binding IsChecked}" Margin="0,1">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Width="12" Height="12" CornerRadius="3" Background="{Binding Brush}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" MaxWidth="190" />
+                  </StackPanel>
+                </CheckBox>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Preview: the page on grey, as on paper -->
+      <DockPanel Grid.Column="2">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" Margin="0,8,0,0">
+          <Button Classes="command" Content="‹" Command="{Binding PreviousPageCommand}" Padding="10,2" />
+          <TextBlock Text="{Binding PageText}" VerticalAlignment="Center" />
+          <Button Classes="command" Content="›" Command="{Binding NextPageCommand}" Padding="10,2" />
+        </StackPanel>
+        <Border Background="#E6E6E6" CornerRadius="6" Padding="16" Height="520">
+          <Panel>
+            <ProgressBar IsIndeterminate="True" Width="160" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" VerticalAlignment="Top" />
+            <Border Background="White" BoxShadow="0 2 8 0 #40000000" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="18">
+              <Image Source="{Binding Preview}" Stretch="Uniform" MaxHeight="440" />
+            </Border>
+          </Panel>
+        </Border>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</UserControl>

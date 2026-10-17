@@ -584,6 +584,21 @@ internal static class Snapshots
         vm.CalendarPage.PlanningPeopleText = string.Empty;
         vm.CalendarPage.IsPlanning = false;
 
+        // "Drucken": the print dialog with the week, the month and the list as pages.
+        vm.CalendarPage.PrintCommand.Execute(null);
+        if (vm.Overlay is CalendarPrintViewModel print)
+        {
+            await print.RefreshAsync();
+            await SaveAsync(window, output, "calendar-print.png");
+            print.Layout = CalendarPrintViewModel.Layouts[2];
+            await print.RefreshAsync();
+            await SaveAsync(window, output, "calendar-print-month.png");
+            print.Layout = CalendarPrintViewModel.Layouts[3];
+            await print.RefreshAsync();
+            await SaveAsync(window, output, "calendar-print-list.png");
+            print.CancelCommand.Execute(null);
+        }
+
         // A meeting with attendees, their answers and a reminder.
         var calendarController = services.GetRequiredService<Neruna.Core.Calendar.CalendarController>();
         var personal = (await calendarController.GetCalendarsAsync()).First(c => c.RemoteId == "personal") with { IsReadOnly = false };

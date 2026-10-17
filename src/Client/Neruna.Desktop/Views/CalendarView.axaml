@@ -7,6 +7,9 @@
              xmlns:ctl="using:Neruna.Desktop.Controls"
              x:Class="Neruna.Desktop.Views.CalendarView"
              x:DataType="vm:CalendarViewModel">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Ctrl+P" Command="{Binding PrintCommand}" />
+  </UserControl.KeyBindings>
 
   <Grid RowDefinitions="Auto,*">
 
@@ -47,6 +50,12 @@
             <StackPanel Orientation="Horizontal">
               <PathIcon Data="{StaticResource IconSync}" />
               <TextBlock Text="{l:T 'Kalender verwalten'}" />
+            </StackPanel>
+          </Button>
+          <Button Classes="command" Command="{Binding PrintCommand}" ToolTip.Tip="{l:T 'Woche, Monat, Tag oder Liste drucken bzw. als PDF speichern (Ctrl+P)'}">
+            <StackPanel Orientation="Horizontal">
+              <PathIcon Data="{StaticResource IconPrint}" />
+              <TextBlock Text="{l:T 'Drucken'}" />
             </StackPanel>
           </Button>
           <Button Classes="command" Command="{Binding AddSpecialCommand}" ToolTip.Tip="{l:T 'Geburtstage aus den Kontakten oder Feiertage hinzufügen'}">

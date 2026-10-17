@@ -402,6 +402,12 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     [RelayCommand]
     private void Manage() => ManageRequested?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>"Drucken" (Ctrl+P): the print dialog with layout, period and calendars.</summary>
+    public event EventHandler? PrintRequested;
+
+    [RelayCommand]
+    private void Print() => PrintRequested?.Invoke(this, EventArgs.Empty);
+
     [RelayCommand]
     private void AddSpecial() => SpecialRequested?.Invoke(this, EventArgs.Empty);
 
