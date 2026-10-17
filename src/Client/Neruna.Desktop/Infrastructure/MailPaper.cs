@@ -13,7 +13,10 @@ internal static partial class MailPaper
 {
     // A hard Enter (paragraph, line of a text mail) a little more apart than a line that merely wraps or a soft break;
     // the line height itself stays the renderer's (on Windows, more made soft breaks look like hard ones).
+    // HTML5's sections are blocks; the renderer only knows the older elements and laid them out like text – the tables
+    // inside a newsletter's <header>/<section> vanished (Apple Music's weekly mail showed only its logo).
     private const string Common =
+        " header, footer, section, article, nav, aside, main, figure, figcaption, hgroup, address, details, summary { display: block; }" +
         " pre, code { font-family: Consolas, 'Cascadia Mono', monospace; }" +
         " p { margin-top: 0; margin-bottom: 0.3em; } .neruna-text > div { margin-bottom: 0.3em; }";
 

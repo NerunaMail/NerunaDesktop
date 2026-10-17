@@ -1112,6 +1112,8 @@ internal static class Snapshots
                 e.Event.Callback(new Avalonia.Media.Imaging.Bitmap(stream));
             };
             view.Text = Neruna.Desktop.Infrastructure.MailPaper.Prepare(content.Html, darkTheme: false).Html;
+            // What the renderer got, next to the picture (to see why a mail looks wrong).
+            await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".html"), view.Text);
             var window = new Window { Width = 720, Height = 1000, Content = view, Background = Brushes.White };
             window.Show();
             await Task.Delay(300);

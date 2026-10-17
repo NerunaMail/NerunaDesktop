@@ -391,6 +391,9 @@ public sealed class QuickActionService(ISettingsStore settings)
         return Clean(name);
     }
 
+    /// <summary>A file name from a subject or a name: characters no file system takes become "_".</summary>
+    public static string SafeFileName(string name) => Clean(name);
+
     // Characters no file system takes become "_"; also those Windows forbids, so a name works everywhere.
     private static string Clean(string name)
     {

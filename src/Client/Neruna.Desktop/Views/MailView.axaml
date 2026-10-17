@@ -133,7 +133,9 @@
                     MaxHeight="280" IsVisible="{Binding Tree.HasFavorites}" />
           <Border Grid.Row="1" Height="1" Background="{DynamicResource DividerBrush}" Margin="6,4" IsVisible="{Binding Tree.HasFavorites}" />
           <TextBlock Grid.Row="2" Classes="subtle" Text="{l:T 'Kein E-Mail-Konto'}" IsVisible="{Binding !Tree.HasMailAccounts}" Margin="12" />
-          <TreeView Grid.Row="2" x:Name="FolderTree" ItemsSource="{Binding Tree.Accounts}" SelectedItem="{Binding Tree.SelectedAccountItem}" DragDrop.AllowDrop="True" />
+          <!-- Room below the last folder: the horizontal scroll bar (wider while used) must not cover it -->
+          <TreeView Grid.Row="2" x:Name="FolderTree" ItemsSource="{Binding Tree.Accounts}" SelectedItem="{Binding Tree.SelectedAccountItem}" DragDrop.AllowDrop="True"
+                    Padding="0,0,0,28" />
         </Grid>
         </DockPanel>
       </Border>
@@ -311,7 +313,21 @@
                 </Border>
               </DataTemplate>
               <DataTemplate DataType="vm:MessageItemViewModel">
-                <Panel>
+                <!-- Right click: the usual actions for the selected messages (a right click selects the message first) -->
+                <Panel Background="Transparent">
+                <Panel.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="{l:T 'Antworten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ReplyCommand}" InputGesture="Ctrl+R" />
+                    <MenuItem Header="{l:T 'Allen antworten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ReplyAllCommand}" InputGesture="Ctrl+Shift+R" />
+                    <MenuItem Header="{l:T 'Weiterleiten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ForwardCommand}" InputGesture="Ctrl+F" />
+                    <MenuItem Header="{l:T 'Als Anhang weiterleiten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ForwardAsAttachmentCommand}" />
+                    <Separator />
+                    <MenuItem Header="{l:T 'Archivieren'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ArchiveCommand}" />
+                    <MenuItem Header="{l:T 'Löschen'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).DeleteCommand}" InputGesture="Delete" />
+                    <Separator />
+                    <MenuItem Header="{l:T 'Speichern unter …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).SaveAsEmlCommand}" />
+                  </ContextMenu>
+                </Panel.ContextMenu>
                 <!-- Table: one line, the columns as wide as the heads above -->
                 <Grid Classes.unread="{Binding IsUnread}" IsVisible="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ListLayout.IsTable}" RowDefinitions="Auto,Auto">
                   <DockPanel Margin="0,4">
