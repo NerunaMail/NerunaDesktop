@@ -313,10 +313,12 @@ public static partial class MessageAnalyzer
                     F("«{0}» mischt Buchstaben verschiedener Schriften, um einen bekannten Namen nachzuahmen.", DomainNames.ToUnicode(fromDomain))));
             }
 
-            // Look-alikes of the own domains and of domains of contacts ("rnicrosoft.com", "neruna-mail.ch" are not caught).
+            // Look-alikes of the own domains and of domains of contacts ("rnicrosoft.com", "neruna-mail.ch" are not caught) –
+            // not when the address itself is in the contacts: then it is known, whatever it resembles.
             var known = context.OwnAddresses.Concat(context.Contacts.SelectMany(c => c.Addresses))
                 .Select(DomainNames.OfAddress).OfType<string>().Select(d => DomainNames.Registrable(d) ?? d).Distinct(StringComparer.Ordinal);
-            if (known.FirstOrDefault(k => DomainNames.LooksLike(fromDomain, k)) is { } original)
+            var isContact = context.Contacts.Any(c => c.Addresses.Contains(address, StringComparer.OrdinalIgnoreCase));
+            if (!isContact && known.FirstOrDefault(k => DomainNames.LooksLike(fromDomain, k)) is { } original)
             {
                 var own = context.OwnAddresses.Any(a => DomainNames.SameOwner(DomainNames.OfAddress(a), original));
                 findings.Add(new Finding(Severity.High, T("Absenderdomain ahmt eine bekannte nach"),

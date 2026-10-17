@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Neruna.Desktop.ViewModels;
 
 namespace Neruna.Desktop.Views;
@@ -9,6 +10,14 @@ internal sealed partial class ReadingPaneView : UserControl
     public ReadingPaneView()
     {
         InitializeComponent();
+    }
+
+    private async void OnCopyHeaders(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is ReadingPaneViewModel pane && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            await clipboard.SetTextAsync(pane.HeadersText);
+        }
     }
 
     // Placing a stamp: where on the page (as share of its shown size) the click was.

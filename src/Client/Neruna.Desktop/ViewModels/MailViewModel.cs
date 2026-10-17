@@ -599,7 +599,7 @@ internal sealed partial class MailViewModel(
                 CanDelete = false,
             };
             void Show(MessageView view) =>
-                window.Pane = ReadingPaneViewModel.ForMessage(summary, opened, view, files, _imageClient, Show, privacy.TrustAsync);
+                window.Pane = ReadingPaneViewModel.ForMessage(summary, opened, view, files, _imageClient, Show, privacy.TrustAsync, privacy.HideSpamNoteAsync);
             Show(await ViewForAsync(summary, opened, loadedBefore: false));
             windows.ShowMessage(window);
         }
@@ -890,7 +890,7 @@ internal sealed partial class MailViewModel(
                     }
 
                     _ = ShowAsync(next);
-                }, privacy.TrustAsync);
+                }, privacy.TrustAsync, privacy.HideSpamNoteAsync);
                 // The quick actions and the PDF stamps work here, for this mail (replies in their own window too).
                 var context = new QuickActionContext(pane, message, folder, InWindow: true, opened.Security.WasEncrypted, () => window.Pane == pane);
                 pane.AttachmentActions = AttachmentActionsFor(context);
@@ -1587,7 +1587,7 @@ internal sealed partial class MailViewModel(
             }
 
             ShowOpened(summary, next);
-        }, privacy.TrustAsync);
+        }, privacy.TrustAsync, privacy.HideSpamNoteAsync);
         if (_invitation is { } shown && shown.RemoteId == summary.RemoteId)
         {
             ReadingPane.Invitation = shown.Banner;

@@ -83,6 +83,9 @@
         <CheckBox IsChecked="{Binding WarnSuspicious}" Content="{l:T 'Bei verdächtigen Mails eine Warnung anzeigen'}" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
                    Text="{l:T 'Neruna prüft Absender, Umschlag-Absender, Anzeigenamen, Links und Anhänge. Mit «Sicherheit prüfen» sehen Sie die Prüfung jeder Mail im Detail.'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,0,0,0"
+                   Text="{l:T 'Das ist kein Spamfilter: Spam erkennt und sortiert Ihr Mailserver aus. Die Prüfung hilft bei Mails, die durchkommen – damit Sie Betrug und gefälschte Absender erkennen.'}" />
+        <CheckBox IsChecked="{Binding ShowSpamNote}" Content="{l:T 'Diesen Hinweis auch in der Sicherheitsprüfung anzeigen'}" Margin="28,0,0,0" />
       </StackPanel>
 
       <StackPanel Spacing="8">

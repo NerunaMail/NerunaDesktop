@@ -39,6 +39,11 @@ public class PrivacyTests
     [InlineData("login.neruna.ch", "neruna.ch", false)]
     [InlineData("neruna.de", "neruna.ch", false)]
     [InlineData("example.ch", "neruna.ch", false)]
+    [InlineData("gmail.com", "ymail.com", false)] // two real providers, no copy of each other
+    [InlineData("ymail.com", "gmail.com", false)]
+    [InlineData("gmx.net", "gmx.ch", false)]
+    [InlineData("gmai1.com", "gmail.com", true)] // but a fake of a provider still is one
+    [InlineData("bluewln.ch", "bluewin.ch", true)]
     public void Look_alike_domains_are_recognised(string candidate, string original, bool expected) =>
         Assert.Equal(expected, DomainNames.LooksLike(candidate, original));
 
@@ -217,6 +222,32 @@ public class PrivacyTests
         var result = MessageAnalyzer.Analyze(message, new AnalysisContext(["anna@firma.ch"], []));
 
         Assert.Equal(ThreatLevel.Dangerous, result.Level);
+    }
+
+    [Fact]
+    public void A_mail_provider_is_no_look_alike_of_another()
+    {
+        // A contact at ymail.com: a stranger writing from gmail.com is not imitating it.
+        var message = new MimeMessage { Subject = "Hallo", Body = new TextPart("plain") { Text = "Grüezi" } };
+        message.From.Add(new MailboxAddress("Max", "max.meier@gmail.com"));
+        var context = new AnalysisContext(["anna@firma.ch"], [new KnownPerson("Lea Keller", ["lea.keller@ymail.com"])]);
+
+        var result = MessageAnalyzer.Analyze(message, context);
+
+        Assert.DoesNotContain(result.Findings, f => f.Severity == Severity.High);
+        Assert.NotEqual(ThreatLevel.Dangerous, result.Level);
+    }
+
+    [Fact]
+    public void A_contact_is_not_suspected_of_imitating_another_contact()
+    {
+        // Both in the address book, with domains one letter apart.
+        var message = new MimeMessage { Subject = "Offerte", Body = new TextPart("plain") { Text = "Anbei" } };
+        message.From.Add(new MailboxAddress("Marco", "marco@bernasconi.ch"));
+        var context = new AnalysisContext(["anna@firma.ch"],
+            [new KnownPerson("Marco Bernasconi", ["marco@bernasconi.ch"]), new KnownPerson("Rita Bernasconl", ["rita@bernascoli.ch"])]);
+
+        Assert.DoesNotContain(MessageAnalyzer.Analyze(message, context).Findings, f => f.Severity == Severity.High);
     }
 
     [Fact]

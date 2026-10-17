@@ -206,6 +206,9 @@ public static class SettingKeys
 
     /// <summary>Sent mails carry the time in UTC instead of the own time zone (default: off).</summary>
     public const string PrivacyHideTimeZone = "privacy.hideTimeZone";
+
+    /// <summary>"Sicherheit prüfen" without the note that it is no spam filter (only an "i" for it).</summary>
+    public const string PrivacyHideSpamNote = "privacy.hideSpamNote";
 }
 
 /// <summary>When opening a message marks it as read (setting "E-Mail → Als gelesen markieren").</summary>

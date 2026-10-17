@@ -134,6 +134,13 @@ public static class DomainNames
             return false;
         }
 
+        // gmail.com and ymail.com, gmx.ch and gmx.net: well-known mail providers are each the real thing, not a copy of
+        // another one – a forger cannot register them.
+        if (IsMailProvider(a))
+        {
+            return false;
+        }
+
         var sa = Skeleton(ToUnicode(a));
         var sb = Skeleton(ToUnicode(b));
         if (sa == sb)
@@ -157,6 +164,24 @@ public static class DomainNames
         var distance = Distance(na, nb);
         return distance == 1 || (distance == 2 && Math.Min(na.Length, nb.Length) >= 8);
     }
+
+    // Big public mail providers (registrable domains). Their addresses are mixed up with contacts' all the time
+    // ("gmail" – "ymail", "gmx" – "gmx.net"), but none of them can be a look-alike: they belong to the provider.
+    private static readonly HashSet<string> MailProviders = new(StringComparer.Ordinal)
+    {
+        "gmail.com", "googlemail.com", "ymail.com", "yahoo.com", "yahoo.de", "yahoo.fr", "yahoo.it", "yahoo.co.uk", "rocketmail.com",
+        "hotmail.com", "hotmail.ch", "hotmail.de", "hotmail.fr", "hotmail.it", "hotmail.co.uk", "outlook.com", "outlook.de", "outlook.fr",
+        "outlook.it", "live.com", "live.de", "live.fr", "live.it", "msn.com", "icloud.com", "me.com", "mac.com", "aol.com", "aim.com",
+        "gmx.ch", "gmx.de", "gmx.net", "gmx.at", "gmx.com", "gmx.fr", "web.de", "t-online.de", "freenet.de", "posteo.de", "posteo.net",
+        "mailbox.org", "proton.me", "protonmail.com", "protonmail.ch", "pm.me", "tutanota.com", "tutanota.de", "tuta.io", "tuta.com",
+        "bluewin.ch", "hispeed.ch", "sunrise.ch", "swissonline.ch", "green.ch", "quickline.ch", "vtxnet.ch", "netplus.ch", "hin.ch",
+        "orange.fr", "free.fr", "sfr.fr", "laposte.net", "wanadoo.fr", "libero.it", "virgilio.it", "tiscali.it", "alice.it", "tim.it",
+        "mail.com", "email.com", "zoho.com", "yandex.com", "yandex.ru", "fastmail.com", "hey.com", "a1.net", "aon.at", "chello.at",
+    };
+
+    /// <summary>One of the big public mail providers (gmail.com, bluewin.ch, gmx.net …).</summary>
+    public static bool IsMailProvider(string? domain) =>
+        domain is not null && (Registrable(domain) ?? domain.ToLowerInvariant()) is { } registrable && MailProviders.Contains(registrable);
 
     // Characters that look alike in common fonts, mapped to one form (Unicode TR 39 "skeleton", in small).
     private static string Skeleton(string text)

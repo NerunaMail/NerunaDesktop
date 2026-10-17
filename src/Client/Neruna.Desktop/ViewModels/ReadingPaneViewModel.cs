@@ -207,7 +207,7 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             {
                 preview.Message = Attached(message, next, files);
             }
-        });
+        }, hideSpamNote: HideSpamNoteAction);
         return pane;
     }
 
@@ -236,6 +236,40 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     /// <summary>Adds a sender or domain to the trusted ones (pictures without asking).</summary>
     private Func<string, Task>? Trust { get; init; }
+
+    /// <summary>Keeps "Ausblenden" of the spam note for all mails.</summary>
+    private Func<Task>? HideSpamNoteAction { get; init; }
+
+    /// <summary>The note "kein Spamfilter" in the check; hidden, an "i" next to the title shows it again.</summary>
+    [ObservableProperty]
+    public partial bool IsSpamNoteShown { get; set; } = true;
+
+    [RelayCommand]
+    private async Task HideSpamNoteAsync()
+    {
+        IsSpamNoteShown = false;
+        if (HideSpamNoteAction is { } hide)
+        {
+            await hide();
+        }
+    }
+
+    [RelayCommand]
+    private void ShowSpamNote() => IsSpamNoteShown = !IsSpamNoteShown;
+
+    /// <summary>"Kopfzeilen anzeigen": every header of the mail as it arrived, for the curious and for support.</summary>
+    [ObservableProperty]
+    public partial bool IsHeadersOpen { get; set; }
+
+    public string HeadersText => Message is { } message
+        ? string.Join("\n", message.Headers.Select(h => h.Field + ":" + System.Text.Encoding.UTF8.GetString(h.RawValue).TrimEnd('\r', '\n')))
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+        : string.Empty;
+
+    public bool HasHeaders => Message is not null;
+
+    [RelayCommand]
+    private void ToggleHeaders() => IsHeadersOpen = !IsHeadersOpen;
 
     /// <summary>"Bilder laden" is offered (not when pictures are blocked in the settings).</summary>
     public bool CanLoadRemoteContent => View.Privacy.RemoteContent != RemoteContentPolicy.Block;
@@ -412,7 +446,8 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         IFileService files,
         HttpClient http,
         Action<MessageView> reshow,
-        Func<string, Task>? trust = null)
+        Func<string, Task>? trust = null,
+        Func<Task>? hideSpamNote = null)
     {
         ArgumentNullException.ThrowIfNull(view);
         var message = opened.Readable;
@@ -435,6 +470,8 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             View = view,
             Reshow = reshow,
             Trust = trust,
+            HideSpamNoteAction = hideSpamNote,
+            IsSpamNoteShown = !view.Privacy.HideSpamNote,
         };
     }
 

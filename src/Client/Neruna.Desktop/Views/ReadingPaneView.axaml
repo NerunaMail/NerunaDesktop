@@ -56,10 +56,27 @@
         <StackPanel Spacing="8">
           <Grid ColumnDefinitions="Auto,*,Auto">
             <PathIcon Data="{StaticResource IconShield}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="{l:T 'Sicherheitsprüfung'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{l:T 'Sicherheitsprüfung'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <!-- The spam note, folded away -->
+              <Button Classes="command" Padding="2" Command="{Binding ShowSpamNoteCommand}" IsVisible="{Binding !IsSpamNoteShown}" VerticalAlignment="Center"
+                      ToolTip.Tip="{l:T 'Kein Spamfilter: Spam erkennt Ihr Mailserver. Diese Prüfung hilft, Betrug und gefälschte Absender zu erkennen.'}">
+                <PathIcon Data="{StaticResource IconInfo}" Width="13" Height="13" />
+              </Button>
+            </StackPanel>
             <Button Grid.Column="2" Content="✕" Command="{Binding ToggleAnalysisCommand}" Padding="6,0" Background="Transparent" BorderThickness="0"
                     ToolTip.Tip="{l:T 'Schliessen'}" VerticalAlignment="Center" />
           </Grid>
+          <!-- What the check is not: spam is the mail server's job -->
+          <Border IsVisible="{Binding IsSpamNoteShown}" CornerRadius="4" Padding="10,6" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Margin="0,1,8,0" VerticalAlignment="Top" />
+              <TextBlock Grid.Column="1" FontSize="12" TextWrapping="Wrap"
+                         Text="{l:T 'Das ist kein Spamfilter: Spam erkennt und sortiert Ihr Mailserver aus. Die Prüfung hilft bei Mails, die durchkommen – damit Sie Betrug und gefälschte Absender erkennen.'}" />
+              <Button Grid.Column="2" Classes="command" Content="{l:T 'Ausblenden'}" FontSize="12" Command="{Binding HideSpamNoteCommand}" Margin="8,0,0,0"
+                      VerticalAlignment="Top" ToolTip.Tip="{l:T 'Der Hinweis bleibt hinter dem «i» neben dem Titel erreichbar.'}" />
+            </Grid>
+          </Border>
           <Border CornerRadius="4" Padding="10,6" Classes.good="{Binding IsUnremarkable}" Classes.warn="{Binding IsCaution}" Classes.bad="{Binding IsDangerous}">
             <Border.Styles>
               <Style Selector="Border.good"><Setter Property="Background" Value="{DynamicResource GoodBackgroundBrush}" /></Style>
@@ -117,6 +134,21 @@
           </StackPanel>
           <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap"
                      Text="{l:T 'Geprüft auf diesem Gerät, ohne etwas ins Internet zu senden. Eine Hilfe zur Einschätzung, keine Garantie.'}" />
+          <!-- Every header as it arrived -->
+          <StackPanel Orientation="Horizontal" Spacing="16" IsVisible="{Binding HasHeaders}">
+            <Button Classes="command" FontSize="12" Padding="0,2" Command="{Binding ToggleHeadersCommand}">
+              <Panel>
+                <TextBlock Text="{l:T 'Kopfzeilen anzeigen'}" IsVisible="{Binding !IsHeadersOpen}" />
+                <TextBlock Text="{l:T 'Kopfzeilen ausblenden'}" IsVisible="{Binding IsHeadersOpen}" />
+              </Panel>
+            </Button>
+            <Button Classes="command" FontSize="12" Padding="0,2" Content="{l:T 'Kopieren'}" Click="OnCopyHeaders" IsVisible="{Binding IsHeadersOpen}" />
+          </StackPanel>
+          <Border IsVisible="{Binding IsHeadersOpen}" Background="{DynamicResource PaneBackgroundBrush}" CornerRadius="4" Padding="8" MaxHeight="320">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto">
+              <SelectableTextBlock Text="{Binding HeadersText}" FontFamily="Consolas,DejaVu Sans Mono,Menlo,monospace" FontSize="11" />
+            </ScrollViewer>
+          </Border>
         </StackPanel>
       </Border>
 

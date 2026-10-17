@@ -24,6 +24,14 @@ internal sealed class PrivacyService(ISettingsStore settings, IAccountStore acco
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>"Ausblenden" at the spam note of the check: kept quietly, the open mail stays as it is.</summary>
+    public async Task HideSpamNoteAsync()
+    {
+        var options = await GetAsync() with { HideSpamNote = true };
+        _options = options;
+        await options.SaveAsync(settings);
+    }
+
     /// <summary>"Bilder immer laden" for a sender (address) or a whole domain ("@example.ch").</summary>
     public async Task TrustAsync(string addressOrDomain)
     {

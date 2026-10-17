@@ -60,6 +60,10 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool HideTimeZone { get; set; }
 
+    /// <summary>"Hinweis zu Spam in der Sicherheitsprüfung anzeigen".</summary>
+    [ObservableProperty]
+    public partial bool ShowSpamNote { get; set; } = true;
+
     /// <summary>Senders and domains whose pictures load without asking.</summary>
     public ObservableCollection<string> TrustedSenders { get; } = [];
 
@@ -115,6 +119,7 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             CleanLinks = options.CleanLinks;
             WarnSuspicious = options.WarnSuspicious;
             HideTimeZone = options.HideTimeZone;
+            ShowSpamNote = !options.HideSpamNote;
             TrustedSenders.Clear();
             foreach (var sender in options.TrustedSenders.Order(StringComparer.OrdinalIgnoreCase))
             {
@@ -160,6 +165,8 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
 
     partial void OnHideTimeZoneChanged(bool value) => SaveIf(true);
 
+    partial void OnShowSpamNoteChanged(bool value) => SaveIf(true);
+
     private void SaveIf(bool changed)
     {
         if (changed && !_loading)
@@ -193,6 +200,7 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             CleanLinks = CleanLinks,
             WarnSuspicious = WarnSuspicious,
             HideTimeZone = HideTimeZone,
+            HideSpamNote = !ShowSpamNote,
             TrustedSenders = [.. TrustedSenders],
         });
     }
