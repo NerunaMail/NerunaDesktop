@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core.Privacy;
 using Neruna.Desktop.Infrastructure;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
@@ -23,7 +24,63 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
                 await ReloadAsync();
             }
         });
+        privacy.PhishingListChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(PhishingListState)));
     }
+
+    /// <summary>"Bekannte Phishing-Seiten erkennen" (list from neruna.cloud, checked on this device).</summary>
+    [ObservableProperty]
+    public partial bool PhishingList { get; set; } = true;
+
+    partial void OnPhishingListChanged(bool value)
+    {
+        SaveIf(true);
+        OnPropertyChanged(nameof(PhishingListState));
+    }
+
+    /// <summary>"Stand: 17.10.2026 13:02 · 651 346 Einträge" or why there is none.</summary>
+    public string PhishingListState
+    {
+        get
+        {
+            if (!PhishingList)
+            {
+                return T("Ausgeschaltet – Neruna lädt keine Liste.");
+            }
+
+            if (_phishingError is { } error)
+            {
+                return F("Nicht aktualisiert: {0}", error);
+            }
+
+            var list = Neruna.Core.Privacy.PhishingList.Shared;
+            return list.BuiltAt is { } built
+                ? F("Stand: {0:g} · {1:N0} Einträge", built.ToLocalTime(), list.Count)
+                : T("Noch nicht geladen – Neruna holt die Liste beim nächsten Start bzw. mit «Jetzt aktualisieren».");
+        }
+    }
+
+    private string? _phishingError;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(UpdatePhishingListCommand))]
+    public partial bool IsUpdatingPhishingList { get; set; }
+
+    [RelayCommand(CanExecute = nameof(CanUpdatePhishingList))]
+    private async Task UpdatePhishingListAsync()
+    {
+        IsUpdatingPhishingList = true;
+        try
+        {
+            _phishingError = await privacy.UpdatePhishingListAsync(force: true);
+        }
+        finally
+        {
+            IsUpdatingPhishingList = false;
+            OnPropertyChanged(nameof(PhishingListState));
+        }
+    }
+
+    private bool CanUpdatePhishingList() => !IsUpdatingPhishingList && PhishingList;
 
     private bool _saving;
 
@@ -120,6 +177,7 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             WarnSuspicious = options.WarnSuspicious;
             HideTimeZone = options.HideTimeZone;
             ShowSpamNote = !options.HideSpamNote;
+            PhishingList = options.PhishingList;
             TrustedSenders.Clear();
             foreach (var sender in options.TrustedSenders.Order(StringComparer.OrdinalIgnoreCase))
             {
@@ -201,6 +259,7 @@ internal sealed partial class PrivacyOptionsViewModel : ViewModelBase
             WarnSuspicious = WarnSuspicious,
             HideTimeZone = HideTimeZone,
             HideSpamNote = !ShowSpamNote,
+            PhishingList = PhishingList,
             TrustedSenders = [.. TrustedSenders],
         });
     }

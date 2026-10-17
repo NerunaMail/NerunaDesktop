@@ -114,6 +114,7 @@ internal sealed partial class App : Application
             Infrastructure.DefaultMailApp.Current?.Refresh();
 
             await viewModel.StartAsync();
+            _ = _services.GetRequiredService<PrivacyService>().StartPhishingListAsync();
             Open(desktop.Args ?? []);
         }
 

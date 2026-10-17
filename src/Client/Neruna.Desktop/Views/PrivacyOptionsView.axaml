@@ -86,6 +86,13 @@
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,0,0,0"
                    Text="{l:T 'Das ist kein Spamfilter: Spam erkennt und sortiert Ihr Mailserver aus. Die Prüfung hilft bei Mails, die durchkommen – damit Sie Betrug und gefälschte Absender erkennen.'}" />
         <CheckBox IsChecked="{Binding ShowSpamNote}" Content="{l:T 'Diesen Hinweis auch in der Sicherheitsprüfung anzeigen'}" Margin="28,0,0,0" />
+        <CheckBox IsChecked="{Binding PhishingList}" Content="{l:T 'Bekannte Phishing-Seiten erkennen'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
+                   Text="{l:T 'Neruna lädt eine Liste bekannter Phishing-Seiten von neruna.cloud (aus Phishing.Database) und vergleicht Links und Absender damit auf diesem Gerät. Es wird nichts aus Ihren Mails gesendet – nur die Liste geladen, danach täglich die Änderungen.'}" />
+        <StackPanel Orientation="Horizontal" Spacing="12" Margin="28,0,0,0">
+          <TextBlock Classes="subtle" FontSize="12" Text="{Binding PhishingListState}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="520" />
+          <Button Classes="command" FontSize="12" Padding="0,2" Content="{l:T 'Jetzt aktualisieren'}" Command="{Binding UpdatePhishingListCommand}" />
+        </StackPanel>
       </StackPanel>
 
       <StackPanel Spacing="8">

@@ -209,6 +209,9 @@ public static class SettingKeys
 
     /// <summary>"Sicherheit prüfen" without the note that it is no spam filter (only an "i" for it).</summary>
     public const string PrivacyHideSpamNote = "privacy.hideSpamNote";
+
+    /// <summary>"Bekannte Phishing-Seiten erkennen": the list from neruna.cloud, checked on the device (default on).</summary>
+    public const string PrivacyPhishingList = "privacy.phishingList";
 }
 
 /// <summary>When opening a message marks it as read (setting "E-Mail → Als gelesen markieren").</summary>

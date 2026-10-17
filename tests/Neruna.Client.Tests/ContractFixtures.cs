@@ -13,4 +13,11 @@ internal static class ContractFixtures
         Assert.SkipUnless(File.Exists(path), "API-Vertrag nicht vorhanden (privates Repo NerunaAPI als ../api auschecken)");
         return File.ReadAllText(path);
     }
+
+    public static byte[] ReadBytes(string name)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "fixtures", name);
+        Assert.SkipUnless(File.Exists(path), "API-Vertrag nicht vorhanden (privates Repo NerunaAPI als ../api auschecken)");
+        return File.ReadAllBytes(path);
+    }
 }

@@ -49,6 +49,9 @@ public sealed record PrivacyOptions
     /// <summary>The check's note "no spam filter – spam is checked by the mail server" is folded behind an "i".</summary>
     public bool HideSpamNote { get; init; }
 
+    /// <summary>Known phishing hosts (list from neruna.cloud, checked on the device; only the download leaves it).</summary>
+    public bool PhishingList { get; init; } = true;
+
     public static async Task<PrivacyOptions> LoadAsync(ISettingsStore settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -73,6 +76,7 @@ public sealed record PrivacyOptions
             WarnSuspicious = await settings.GetBoolAsync(SettingKeys.PrivacyWarnSuspicious, fallback: true, cancellationToken),
             HideTimeZone = await settings.GetBoolAsync(SettingKeys.PrivacyHideTimeZone, cancellationToken: cancellationToken),
             HideSpamNote = await settings.GetBoolAsync(SettingKeys.PrivacyHideSpamNote, cancellationToken: cancellationToken),
+            PhishingList = await settings.GetBoolAsync(SettingKeys.PrivacyPhishingList, fallback: true, cancellationToken),
         };
     }
 
@@ -88,6 +92,7 @@ public sealed record PrivacyOptions
         await settings.SetBoolAsync(SettingKeys.PrivacyWarnSuspicious, WarnSuspicious, cancellationToken);
         await settings.SetBoolAsync(SettingKeys.PrivacyHideTimeZone, HideTimeZone, cancellationToken);
         await settings.SetBoolAsync(SettingKeys.PrivacyHideSpamNote, HideSpamNote, cancellationToken);
+        await settings.SetBoolAsync(SettingKeys.PrivacyPhishingList, PhishingList, cancellationToken);
     }
 
     /// <summary>

@@ -52,7 +52,8 @@ public static partial class LinkInspector
     private static partial Regex DomainInText();
 
     /// <summary>Checks <paramref name="href"/>; <paramref name="clean"/>: open it without tracking parameters and redirect services.</summary>
-    public static LinkCheck Inspect(string href, string? text = null, string? title = null, bool clean = true)
+    /// <param name="known">The known phishing hosts; null: <see cref="PhishingList.Shared"/>.</param>
+    public static LinkCheck Inspect(string href, string? text = null, string? title = null, bool clean = true, PhishingList? known = null)
     {
         ArgumentNullException.ThrowIfNull(href);
         var findings = new List<Finding>();
@@ -75,6 +76,12 @@ public static partial class LinkInspector
         }
 
         var host = target.IdnHost;
+        if ((known ?? PhishingList.Shared).Contains(host))
+        {
+            findings.Add(new Finding(Severity.High, T("Bekannte Phishing-Seite"),
+                F("«{0}» steht auf der Liste bekannter Phishing-Seiten. Öffnen Sie den Link nicht und geben Sie dort nichts ein.", DomainNames.ToUnicode(host))));
+        }
+
         if (!string.IsNullOrEmpty(target.UserInfo))
         {
             findings.Add(new Finding(Severity.High, T("Täuschende Adresse"),

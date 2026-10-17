@@ -795,6 +795,15 @@ internal static class Snapshots
         await vm.SettingsPage.Privacy.ReloadAsync();
         vm.SettingsPage.SelectedTab = 14;
         await SaveAsync(window, output, "settings-privacy.png");
+        // Further down: the phishing protection with the list of known phishing sites.
+        if (window.GetVisualDescendants().OfType<PrivacyOptionsView>().FirstOrDefault(v => v.IsEffectivelyVisible)?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault() is { } privacyScroll)
+        {
+            privacyScroll.Offset = new Vector(0, 100000);
+            await Task.Delay(200);
+            await SaveAsync(window, output, "settings-privacy-phishing.png");
+            privacyScroll.Offset = default;
+        }
+
         await privacy.SetAsync(privacyOptions with { TrustedSenders = [.. Enumerable.Range(1, 100).Select(i => $"absender{i:000}@example.com")] });
         await vm.SettingsPage.Privacy.ReloadAsync();
         await Task.Delay(200);

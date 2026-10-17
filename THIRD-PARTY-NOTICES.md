@@ -97,3 +97,13 @@ Not included in release builds: `AvaloniaUI.DiagnosticsSupport` (connects debug 
 tools; referenced for the Debug configuration only).
 
 The name «Neruna», the Neruna logo and the application icon are trademarks and not covered by the MPL; see `TRADEMARKS.md`.
+
+## Data
+
+- **Phishing.Database** – known phishing domains and links, MIT License, © Mitchell Krog, Nissar Chababy and
+  Phishing.Database contributors (https://github.com/Phishing-Database/Phishing.Database). Neruna downloads a list
+  derived from it from neruna.cloud (`/api/v1/phishing/hosts`): 6 bytes of SHA-256 per host.
+- **Majestic Million** – CC BY 3.0, Majestic-12 Ltd (https://majestic.com/reports/majestic-million). Used on
+  neruna.cloud to leave popular sites out of the list above.
+- **Public Suffix List** – MPL 2.0, Mozilla Foundation (https://publicsuffix.org). Bundled for domain names; on
+  neruna.cloud its private part tells hosting platforms from other sites.

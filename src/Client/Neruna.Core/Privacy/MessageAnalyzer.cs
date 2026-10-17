@@ -85,8 +85,10 @@ public static partial class MessageAnalyzer
     [GeneratedRegex(@"[\w.+-]+@[\w-]+(\.[\w-]+)+")]
     private static partial Regex AddressInText();
 
-    public static ThreatAssessment Analyze(MimeMessage message, AnalysisContext? context = null, MessageSecurityInfo? security = null)
+    /// <param name="known">The known phishing hosts; null: <see cref="PhishingList.Shared"/>.</param>
+    public static ThreatAssessment Analyze(MimeMessage message, AnalysisContext? context = null, MessageSecurityInfo? security = null, PhishingList? known = null)
     {
+        known ??= PhishingList.Shared;
         ArgumentNullException.ThrowIfNull(message);
         context ??= AnalysisContext.Empty;
         var findings = new List<Finding>();
@@ -108,6 +110,11 @@ public static partial class MessageAnalyzer
         else
         {
             CheckSender(from, fromDomain, context, forged, findings);
+            if (known.Contains(fromDomain))
+            {
+                findings.Add(new Finding(Severity.High, T("Absender bekannt für Phishing"),
+                    F("Die Absenderdomain «{0}» steht auf der Liste bekannter Phishing-Seiten.", DomainNames.ToUnicode(fromDomain!))));
+            }
         }
 
         if (envelope is not null && fromDomain is not null && !DomainNames.SameOwner(DomainNames.OfAddress(envelope), fromDomain))
@@ -133,7 +140,7 @@ public static partial class MessageAnalyzer
                 T("Der Betreff beginnt mit «Re:» oder «AW:», die Mail antwortet aber auf keine Nachricht – ein Trick, um Vertrautheit vorzutäuschen.")));
         }
 
-        var links = CheckBody(message, findings);
+        var links = CheckBody(message, findings, known);
         CheckAttachments(message, findings);
 
         if (security is not null)
@@ -370,7 +377,7 @@ public static partial class MessageAnalyzer
         return match.Success && DomainNames.Registrable(match.Value) is not null ? match.Value.ToLowerInvariant() : null;
     }
 
-    private static List<LinkCheck> CheckBody(MimeMessage message, List<Finding> findings)
+    private static List<LinkCheck> CheckBody(MimeMessage message, List<Finding> findings, PhishingList known)
     {
         if (message.HtmlBody is not { } html)
         {
@@ -384,7 +391,7 @@ public static partial class MessageAnalyzer
         {
             if (seen.Add((link.Href, link.Text, link.Title)))
             {
-                checks.Add(LinkInspector.Inspect(link.Href, link.Text, link.Title, clean: false));
+                checks.Add(LinkInspector.Inspect(link.Href, link.Text, link.Title, clean: false, known));
             }
         }
 
