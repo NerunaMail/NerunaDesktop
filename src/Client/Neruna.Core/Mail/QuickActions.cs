@@ -126,7 +126,18 @@ public sealed record QuickActionStep(QuickActionStepKind Kind)
 /// (stamp, save, answer …) with the attachments that meet the condition.
 /// </summary>
 /// <param name="Color">The button's colour, "#RRGGBB".</param>
-public sealed record QuickAction(Guid Id, string Label, string Color, QuickActionCondition When, IReadOnlyList<QuickActionStep> Steps);
+public sealed record QuickAction(Guid Id, string Label, string Color, QuickActionCondition When, IReadOnlyList<QuickActionStep> Steps)
+{
+    /// <summary>A key combination that runs it for the open mail ("Ctrl+M", "Ctrl+Shift+1", "F7"); null: only the button.</summary>
+    public string? Shortcut { get; init; }
+
+    /// <summary>Shortcuts Neruna itself uses while reading and writing – not for actions.</summary>
+    public static IReadOnlySet<string> ReservedShortcuts { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "Ctrl+N", "Ctrl+R", "Ctrl+Shift+R", "Ctrl+F", "Ctrl+Q", "Ctrl+E", "Ctrl+S", "Ctrl+Enter", "Ctrl+C", "Ctrl+V", "Ctrl+X",
+        "Ctrl+A", "Ctrl+Z", "Ctrl+Y", "Ctrl+P", "Ctrl+B", "Ctrl+I", "Ctrl+U", "Ctrl+K", "Delete", "F1", "F5", "Alt+F4",
+    };
+}
 
 /// <summary>An attachment of the open mail, as far as the conditions need it.</summary>
 public sealed record QuickActionAttachment(string FileName, string MimeType);

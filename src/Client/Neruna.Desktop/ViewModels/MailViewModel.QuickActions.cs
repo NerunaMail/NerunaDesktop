@@ -19,6 +19,21 @@ internal sealed record QuickActionButton(QuickAction Action, System.Windows.Inpu
     public string Label => Action.Label;
 
     public string Color => Action.Color;
+
+    /// <summary>The tooltip: the name, with its shortcut if it has one.</summary>
+    public string Hint => Action.Shortcut is { } shortcut ? $"{Action.Label} ({shortcut})" : Action.Label;
+
+    /// <summary>Runs the action if <paramref name="shortcut"/> is its key combination.</summary>
+    public bool RunIf(string shortcut)
+    {
+        if (!string.Equals(Action.Shortcut, shortcut, StringComparison.OrdinalIgnoreCase) || !Command.CanExecute(Action))
+        {
+            return false;
+        }
+
+        Command.Execute(Action);
+        return true;
+    }
 }
 
 // Schnellaktionen: buttons for the open mail, and running their steps one after another.
@@ -28,6 +43,9 @@ internal sealed partial class MailViewModel
 
     /// <summary>The quick actions whose conditions the open mail meets (shown in the coloured bar).</summary>
     public ObservableCollection<QuickActionButton> QuickActionButtons { get; } = [];
+
+    /// <summary>A key combination pressed in the mail view: the quick action with it runs for the open mail.</summary>
+    public bool RunQuickActionShortcut(string shortcut) => Compose is null && QuickActionButtons.Any(b => b.RunIf(shortcut));
 
     Task<IReadOnlyList<PdfStamp>> IAttachmentActions.GetStampsAsync() => quickActions.GetStampsAsync();
 

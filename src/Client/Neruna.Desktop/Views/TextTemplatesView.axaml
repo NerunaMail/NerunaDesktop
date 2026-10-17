@@ -7,7 +7,7 @@
              x:DataType="vm:TextTemplatesViewModel">
   <Grid RowDefinitions="Auto,*" Margin="0,0,0,16">
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,0,0,12" MaxWidth="900" HorizontalAlignment="Left"
-               Text="{l:T 'Textvorlagen fügen Sie beim Schreiben über «Textvorlage» an der Cursorposition ein – z. B. eine Tabelle für eine Anrufnotiz oder eine Standardantwort. Schneller: das Kürzel mit «::» tippen, z. B. «tel::».'}" />
+               Text="{l:T 'Textvorlagen fügen Sie beim Schreiben über «Textvorlage» an der Cursorposition ein – z. B. eine Tabelle für eine Anrufnotiz oder eine Standardantwort. Schneller: das Kürzel mit «::» tippen, z. B. «tel::», oder das Kürzel und dann Tab.'}" />
 
     <Grid Grid.Row="1" ColumnDefinitions="260,16,*" MinHeight="260">
       <DockPanel>

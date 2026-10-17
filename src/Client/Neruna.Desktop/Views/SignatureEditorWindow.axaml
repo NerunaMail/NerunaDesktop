@@ -21,7 +21,7 @@
       <!-- Text templates: a shortcut, typed with "::" while writing -->
       <TextBlock Grid.Column="2" Classes="subtle" Text="{l:T 'Kürzel'}" VerticalAlignment="Center" Margin="16,0,8,0" IsVisible="{Binding IsTextTemplate}" />
       <TextBox Grid.Column="3" Width="150" Text="{Binding Shortcut}" PlaceholderText="{l:T 'z. B. tel'}" IsVisible="{Binding IsTextTemplate}"
-               ToolTip.Tip="{l:T 'Beim Schreiben «kürzel::» tippen – z. B. «tel::» – fügt die Vorlage ein.'}" />
+               ToolTip.Tip="{l:T 'Beim Schreiben «kürzel::» oder «kürzel» und Tab tippen – z. B. «tel::» – fügt die Vorlage ein.'}" />
     </Grid>
 
     <views:FormattingToolbar Grid.Row="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />

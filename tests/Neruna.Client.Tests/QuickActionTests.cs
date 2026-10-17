@@ -72,7 +72,7 @@ public class QuickActionTests
             new QuickActionCondition { Attachment = QuickActionAttachmentKind.Pdf, SubjectContains = "Offerte" },
             [new QuickActionStep(QuickActionStepKind.StampPdf) { StampId = stamp.Id }, new QuickActionStep(QuickActionStepKind.SaveAttachment) { Folder = "/tmp/offerten", FileName = "{Dateiname}_genehmigt" },
              new QuickActionStep(QuickActionStepKind.Forward) { FromAccountId = Guid.NewGuid(), From = "anna@firma.ch" },
-             new QuickActionStep(QuickActionStepKind.MoveToFolder) { AskFolder = true }]);
+             new QuickActionStep(QuickActionStepKind.MoveToFolder) { AskFolder = true }]) { Shortcut = "Ctrl+M" };
         await service.SaveActionsAsync([action], Ct);
         await service.SaveStampsAsync([stamp with { Text = "Freigegeben" }], Ct);
 
@@ -80,6 +80,7 @@ public class QuickActionTests
         var loaded = Assert.Single(await again.GetActionsAsync(Ct));
         Assert.Equal(action.When, loaded.When);
         Assert.Equal(action.Steps, loaded.Steps);
+        Assert.Equal("Ctrl+M", loaded.Shortcut);
         Assert.Equal("Freigegeben", Assert.Single(await again.GetStampsAsync(Ct)).Text);
 
         // Saved before "Jedes Mal fragen" existed: the fixed folder, as before.

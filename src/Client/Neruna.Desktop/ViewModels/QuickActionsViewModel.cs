@@ -247,7 +247,10 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         var options = await LoadOptionsAsync();
         var action = item?.Action ?? new QuickAction(Guid.NewGuid(), T("Neue Aktion"), Colors[0],
             new QuickActionCondition { Attachment = QuickActionAttachmentKind.Pdf }, []);
-        Editing = new QuickActionEditor(action, options, files, SaveEditedAsync, () => Editing = null);
+        Editing = new QuickActionEditor(action, options, files, SaveEditedAsync, () => Editing = null)
+        {
+            TakenShortcuts = _actions.Where(a => a.Id != action.Id && a.Shortcut is not null).ToDictionary(a => a.Shortcut!, a => a.Label, StringComparer.OrdinalIgnoreCase),
+        };
     }
 
     private async Task SaveEditedAsync(QuickAction action)
@@ -460,6 +463,7 @@ internal sealed partial class QuickActionEditor : ObservableObject
         _cancel = cancel;
         Label = action.Label;
         Color = action.Color;
+        Shortcut = action.Shortcut ?? string.Empty;
         AttachmentKind = AttachmentKinds.FirstOrDefault(k => k.Value == action.When.Attachment) ?? AttachmentKinds[0];
         Extensions = action.When.Extensions ?? string.Empty;
         SenderContains = action.When.SenderContains ?? string.Empty;
@@ -480,6 +484,23 @@ internal sealed partial class QuickActionEditor : ObservableObject
     public partial string Color { get; set; }
 
     public static IReadOnlyList<string> Colors => QuickActionService.Colors;
+
+    /// <summary>"Tastenkürzel": recorded by pressing it in the field (Backspace clears it).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShortcutError), nameof(HasShortcutError))]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    public partial string Shortcut { get; set; }
+
+    /// <summary>The other actions' shortcuts (shortcut → their name).</summary>
+    public IReadOnlyDictionary<string, string> TakenShortcuts { get; init; } = new Dictionary<string, string>();
+
+    public string? ShortcutError =>
+        Shortcut.Length == 0 ? null
+        : QuickAction.ReservedShortcuts.Contains(Shortcut) ? F("{0} braucht Neruna selbst.", Shortcut)
+        : TakenShortcuts.TryGetValue(Shortcut, out var other) ? F("{0} hat schon «{1}».", Shortcut, other)
+        : null;
+
+    public bool HasShortcutError => ShortcutError is not null;
 
     // ── When ──
 
@@ -562,7 +583,7 @@ internal sealed partial class QuickActionEditor : ObservableObject
         OnPropertyChanged(nameof(HasSteps));
     }
 
-    private bool CanSave() => !string.IsNullOrWhiteSpace(Label);
+    private bool CanSave() => !string.IsNullOrWhiteSpace(Label) && !HasShortcutError;
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private Task SaveAsync() => _save(new QuickAction(
@@ -579,7 +600,10 @@ internal sealed partial class QuickActionEditor : ObservableObject
             FolderRemoteId = Account.Value is null ? null : Folder?.RemoteId,
             FolderName = Account.Value is null || Folder?.RemoteId is null ? null : Folder.Name,
         },
-        [.. Steps.Select(s => s.ToStep())]));
+        [.. Steps.Select(s => s.ToStep())])
+    {
+        Shortcut = Shortcut.Length > 0 ? Shortcut : null,
+    });
 
     [RelayCommand]
     private void Cancel() => _cancel();

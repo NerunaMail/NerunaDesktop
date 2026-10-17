@@ -150,9 +150,17 @@
       <!-- Editing one action -->
       <StackPanel Spacing="6" IsVisible="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).IsEditing}" DataContext="{Binding Editing}" x:DataType="vm:QuickActionEditor">
         <TextBlock Classes="section" Text="{l:T 'Button'}" Margin="0,0,0,4" />
-        <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Classes="label" Text="{l:T 'Text'}" />
           <TextBox Grid.Column="1" Text="{Binding Label}" MaxWidth="320" HorizontalAlignment="Left" Width="320" />
+          <!-- Pressed, not typed: Ctrl+M in the field becomes "Ctrl+M"; Backspace clears it -->
+          <TextBlock Grid.Row="2" Classes="label" Text="{l:T 'Tastenkürzel'}" />
+          <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2">
+            <TextBox Text="{Binding Shortcut}" IsReadOnly="True" Width="200" HorizontalAlignment="Left" KeyDown="OnShortcutKeyDown"
+                     PlaceholderText="{l:T 'Kürzel drücken, z. B. Ctrl+M'}" />
+            <TextBlock Classes="error" FontSize="12" Text="{Binding ShortcutError}" IsVisible="{Binding HasShortcutError}" />
+            <TextBlock Classes="subtle" FontSize="12" Text="{l:T 'Führt die Aktion für die geöffnete Mail aus, wenn sie dafür in Frage kommt. Rücktaste löscht das Kürzel.'}" />
+          </StackPanel>
           <TextBlock Grid.Row="1" Classes="label" Text="{l:T 'Farbe'}" />
           <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="16">
             <ListBox Classes="swatches" ItemsSource="{x:Static vm:QuickActionEditor.Colors}" SelectedItem="{Binding Color}">

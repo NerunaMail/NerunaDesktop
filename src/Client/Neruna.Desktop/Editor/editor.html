@@ -169,6 +169,9 @@
     } else if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
       e.preventDefault();
       post({ type: "save" });
+    } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey && !e.shiftKey && expandShortcut("")) {
+      // "tel" + Tab: the template, if "tel" is a shortcut; otherwise Tab as always (next cell, indent).
+      e.preventDefault();
     } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey && currentCell()) {
       e.preventDefault();
       nextCell(currentCell(), e.shiftKey ? -1 : 1);
@@ -266,21 +269,21 @@
     if (empty) caretInto(empty);
   }
 
-  // Text template shortcuts: "tel::" typed right after a word becomes the template (set by the app, case-insensitive).
+  // Text template shortcuts: "tel::" typed, or "tel" and Tab, becomes the template (set by the app, case-insensitive).
   var shortcuts = {};
   var expanding = false;
-  function expandShortcut() {
+  function expandShortcut(suffix) {
     var selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return false;
     var caret = selection.getRangeAt(0);
     if (!caret.collapsed || caret.startContainer.nodeType !== 3) return false;
     var before = caret.startContainer.nodeValue.slice(0, caret.startOffset);
-    var match = /(?:^|[^\p{L}\p{N}_-])([\p{L}\p{N}_-]+)::$/u.exec(before);
+    var match = (suffix === "::" ? /(?:^|[^\p{L}\p{N}_-])([\p{L}\p{N}_-]+)::$/u : /(?:^|[^\p{L}\p{N}_-])([\p{L}\p{N}_-]+)$/u).exec(before);
     if (!match) return false;
     var html = shortcuts[match[1].toLowerCase()];
     if (html === undefined) return false;
     var range = document.createRange();
-    range.setStart(caret.startContainer, caret.startOffset - match[1].length - 2);
+    range.setStart(caret.startContainer, caret.startOffset - match[1].length - suffix.length);
     range.setEnd(caret.startContainer, caret.startOffset);
     selection.removeAllRanges();
     selection.addRange(range);
@@ -290,7 +293,7 @@
   }
 
   editor.addEventListener("input", function (e) {
-    if (!expanding && e.inputType === "insertText" && e.data === ":") expandShortcut();
+    if (!expanding && e.inputType === "insertText" && e.data === ":") expandShortcut("::");
     ensureBlocks(); post({ type: "changed" }); scheduleState();
   });
   document.addEventListener("selectionchange", scheduleState);

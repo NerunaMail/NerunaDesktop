@@ -49,7 +49,7 @@
         <ctl:ToolButton Icon="{StaticResource IconCalendar}" Label="{l:T 'Termin'}" Hint="{l:T 'Termin zu dieser E-Mail erstellen – die Empfänger werden eingeladen'}"
                         Command="{Binding MakeAppointmentCommand}" IsVisible="{Binding CanMakeAppointment}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
-        <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="{l:T 'Textvorlage'}" Hint="{l:T 'Textvorlage an der Cursorposition einfügen – oder «kürzel::» tippen'}"
+        <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="{l:T 'Textvorlage'}" Hint="{l:T 'Textvorlage an der Cursorposition einfügen – oder «kürzel::» bzw. «kürzel» + Tab tippen'}"
                         IsEnabled="{Binding HasTemplates}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
           <ctl:ToolButton.Flyout>
             <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding TemplateMenu}">

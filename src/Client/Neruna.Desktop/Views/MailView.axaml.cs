@@ -55,6 +55,10 @@ internal sealed partial class MailView : UserControl
                 this.FindControl<TextBox>("QuickSearch")?.Focus();
                 e.Handled = true;
             }
+            else if (!e.Handled && ViewModel is { } vm && Infrastructure.Shortcuts.Of(e) is { } shortcut && vm.RunQuickActionShortcut(shortcut))
+            {
+                e.Handled = true; // a quick action's own key combination (Einstellungen → Schnellaktionen)
+            }
         };
 
         // Double-click opens the message in its own window; in "Entwürfe" it continues the draft.

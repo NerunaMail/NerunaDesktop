@@ -36,7 +36,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:QuickActionButton">
               <Button Classes="quickAction" Content="{Binding Label}" Command="{Binding Command}" CommandParameter="{Binding Action}"
-                      Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" ToolTip.Tip="{l:T 'Schnellaktion'}" />
+                      Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" ToolTip.Tip="{Binding Hint}" />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
