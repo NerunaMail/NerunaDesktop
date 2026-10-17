@@ -156,7 +156,7 @@
           <!-- Pressed, not typed: Ctrl+M in the field becomes "Ctrl+M"; Backspace clears it -->
           <TextBlock Grid.Row="2" Classes="label" Text="{l:T 'Tastenkürzel'}" />
           <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2">
-            <TextBox Text="{Binding Shortcut}" IsReadOnly="True" Width="200" HorizontalAlignment="Left" KeyDown="OnShortcutKeyDown"
+            <TextBox Text="{Binding Shortcut}" IsReadOnly="True" Width="260" HorizontalAlignment="Left" KeyDown="OnShortcutKeyDown"
                      PlaceholderText="{l:T 'Kürzel drücken, z. B. Ctrl+M'}" />
             <TextBlock Classes="error" FontSize="12" Text="{Binding ShortcutError}" IsVisible="{Binding HasShortcutError}" />
             <TextBlock Classes="subtle" FontSize="12" Text="{l:T 'Führt die Aktion für die geöffnete Mail aus, wenn sie dafür in Frage kommt. Rücktaste löscht das Kürzel.'}" />

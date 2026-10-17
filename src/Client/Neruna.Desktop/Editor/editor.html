@@ -292,8 +292,34 @@
     return true;
   }
 
+  // Automatic lists (Einstellungen → Schreiben): "- " or "* " at the start of a line becomes a bulleted list,
+  // "1. " a numbered one. Not inside a list or a table cell; Ctrl+Z undoes it.
+  var autoLists = true;
+  function autoList() {
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    var caret = selection.getRangeAt(0);
+    if (!caret.collapsed) return;
+    var node = caret.startContainer;
+    var block = node.nodeType === 1 ? node : node.parentNode;
+    while (block && block !== editor && !/^(P|DIV|LI|TD|TH|BLOCKQUOTE|H[1-6])$/.test(block.nodeName)) block = block.parentNode;
+    if (!block || /^(LI|TD|TH)$/.test(block.nodeName) || (block !== editor && block.closest && block.closest("li, td, th"))) return;
+    var start = document.createRange();
+    start.setStart(block === editor ? editor : block, 0);
+    start.setEnd(caret.startContainer, caret.startOffset);
+    var typed = start.toString();
+    var match = /^[\s\u00a0]*(?:([-*•])|(1[.)]))[\s\u00a0]$/.exec(typed);
+    if (!match) return;
+    // Through the editor's own commands, so Ctrl+Z undoes the list and then brings the typed characters back.
+    selection.removeAllRanges();
+    selection.addRange(start);
+    document.execCommand("delete", false, null);
+    exec(match[1] ? "insertUnorderedList" : "insertOrderedList");
+  }
+
   editor.addEventListener("input", function (e) {
     if (!expanding && e.inputType === "insertText" && e.data === ":") expandShortcut("::");
+    if (autoLists && !expanding && e.inputType === "insertText" && e.data === " ") autoList();
     ensureBlocks(); post({ type: "changed" }); scheduleState();
   });
   document.addEventListener("selectionchange", scheduleState);
@@ -476,6 +502,10 @@
     setShortcuts: function (map) {
       shortcuts = {};
       Object.keys(map || {}).forEach(function (key) { shortcuts[key.toLowerCase()] = map[key]; });
+      return "ok";
+    },
+    setAutoLists: function (enabled) {
+      autoLists = !!enabled;
       return "ok";
     },
     /** Inserts html at the last caret position (start of the text if there never was one); nothing is replaced. */

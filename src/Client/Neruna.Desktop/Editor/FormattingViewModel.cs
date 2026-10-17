@@ -81,7 +81,8 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
     [NotifyPropertyChangedFor(nameof(IsPlainTextFallback))]
     public partial bool IsRichText { get; set; } = true;
 
-    public bool IsPlainTextFallback => !IsRichText;
+    /// <summary>The note "Formatierung nicht verfügbar" – not when plain text was chosen (Einstellungen → Schreiben).</summary>
+    public bool IsPlainTextFallback => !IsRichText && !HtmlEditor.PlainTextOnly;
 
     public IHtmlEditor? Editor => _editor;
 

@@ -524,6 +524,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             : SignatureBlock.Apply(_draft, await _signatures.ResolveAsync(_account.Id, _kind));
         var html = draft.HtmlBody ?? (string.IsNullOrEmpty(draft.Body) ? string.Empty : PlainToHtml(draft.Body));
         Formatting.Attach(editor, html, font, size, T("Nachricht verfassen …"));
+        editor.SetAutoLists(await _settings.GetBoolAsync(SettingKeys.ComposeAutoLists, fallback: true));
         _editorDraft = draft;
         await LoadTemplatesAsync(editor);
     }

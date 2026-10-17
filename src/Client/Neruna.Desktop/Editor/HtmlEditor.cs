@@ -63,6 +63,9 @@ internal interface IHtmlEditor
     /// <summary>Text template shortcuts: typing "key::" replaces it with the template (html; text in plain mode).</summary>
     void SetShortcuts(IReadOnlyDictionary<string, (string Html, string Text)> shortcuts);
 
+    /// <summary>"- " and "1. " at the start of a line become a bulleted or numbered list (Einstellungen → Schreiben).</summary>
+    void SetAutoLists(bool enabled);
+
     void FocusEditor();
 
     /// <summary>For the AI: the own text (above signature and quote), the quoted message and the marked text.</summary>
@@ -147,6 +150,12 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
     /// <summary>Set by the snapshot tool and tests: headless rendering has no native WebView.</summary>
     public static bool ForcePlainText { get; set; }
+
+    /// <summary>
+    /// Einstellungen → Schreiben → "Nur Text": the simple text box from the start, the formatting editor (WebView) is
+    /// not even loaded.
+    /// </summary>
+    public static bool PlainTextOnly { get; set; }
 
     /// <summary>
     /// Snapshot tool only: without a WebView, show the content read-only with the HTML renderer of the reading pane
@@ -244,24 +253,37 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     }
 
     // Plain-text mode: "key::" right before the caret becomes the template's text.
-    private void ExpandPlainShortcut()
+    private bool _autoLists = true;
+
+    public void SetAutoLists(bool enabled)
+    {
+        _autoLists = enabled;
+        if (_web is not null && _ready)
+        {
+            _ = _web.InvokeScript($"neruna.setAutoLists({(enabled ? "true" : "false")})");
+        }
+    }
+
+    // "kürzel::" typed, or "kürzel" and Tab (suffix ""): the template instead. False when there is none (Tab then moves on).
+    private bool ExpandPlainShortcut(string suffix = "::")
     {
         if (_fallback is null || _shortcuts.Count == 0)
         {
-            return;
+            return false;
         }
 
         var text = _fallback.Text ?? string.Empty;
         var caret = Math.Clamp(_fallback.CaretIndex, 0, text.Length);
-        var match = System.Text.RegularExpressions.Regex.Match(text[..caret], @"(?:^|[^\p{L}\p{N}_-])([\p{L}\p{N}_-]+)::$");
+        var match = System.Text.RegularExpressions.Regex.Match(text[..caret], @"(?:^|[^\p{L}\p{N}_-])([\p{L}\p{N}_-]+)" + System.Text.RegularExpressions.Regex.Escape(suffix) + "$");
         if (!match.Success || !_shortcuts.TryGetValue(match.Groups[1].Value, out var template))
         {
-            return;
+            return false;
         }
 
-        var start = caret - match.Groups[1].Length - 2;
+        var start = caret - match.Groups[1].Length - suffix.Length;
         _fallback.Text = text[..start] + template.Text + text[caret..];
         _fallback.CaretIndex = start + template.Text.Length;
+        return true;
     }
 
     public async Task InsertAsync(string html, string text)
@@ -405,7 +427,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             return;
         }
 
-        if (ForcePlainText)
+        if (ForcePlainText || PlainTextOnly)
         {
             UseFallback();
             return;
@@ -464,6 +486,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 _ready = true;
                 _ = PushContentAsync();
                 _ = PushShortcutsAsync();
+                _ = _web?.InvokeScript($"neruna.setAutoLists({(_autoLists ? "true" : "false")})");
                 ModeChanged?.Invoke(this, true);
                 break;
             case "send":
@@ -533,6 +556,14 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             VerticalContentAlignment = VerticalAlignment.Top,
             Text = _loadedText,
         };
+        // "kürzel" + Tab: the template; otherwise Tab moves on as usual.
+        _fallback.AddHandler(InputElement.KeyDownEvent, (_, e) =>
+        {
+            if (e.Key == Avalonia.Input.Key.Tab && e.KeyModifiers == Avalonia.Input.KeyModifiers.None && ExpandPlainShortcut(string.Empty))
+            {
+                e.Handled = true;
+            }
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         _fallback.TextChanged += (_, _) =>
         {
             ExpandPlainShortcut();

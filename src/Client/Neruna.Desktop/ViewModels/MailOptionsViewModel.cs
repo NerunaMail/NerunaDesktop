@@ -130,6 +130,8 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         try
         {
             ComposeInWindow = await _settings.GetBoolAsync(SettingKeys.ComposeInWindow);
+            AutoLists = await _settings.GetBoolAsync(SettingKeys.ComposeAutoLists, fallback: true);
+            FormatPlainText = await _settings.GetBoolAsync(SettingKeys.ComposePlainText);
             Push = await _settings.GetBoolAsync(SettingKeys.MailPush, fallback: true);
             Notifications = await _settings.GetBoolAsync(SettingKeys.MailNotifications, fallback: true);
             ComposeFont = FontCatalog.Find(await _settings.GetAsync(SettingKeys.ComposeFont)) ?? FontCatalog.Find(FontCatalog.DefaultFont);
@@ -147,6 +149,29 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
     }
 
     partial void OnComposeInWindowChanged(bool value) => Save(SettingKeys.ComposeInWindow, value.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>Einstellungen → Schreiben: "- " and "1. " become lists.</summary>
+    [ObservableProperty]
+    public partial bool AutoLists { get; set; } = true;
+
+    /// <summary>Einstellungen → Schreiben: new mails and answers as plain text (the simple text editor).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FormatHtml))]
+    public partial bool FormatPlainText { get; set; }
+
+    public bool FormatHtml
+    {
+        get => !FormatPlainText;
+        set => FormatPlainText = !value;
+    }
+
+    partial void OnAutoListsChanged(bool value) => Save(SettingKeys.ComposeAutoLists, value.ToString(CultureInfo.InvariantCulture));
+
+    partial void OnFormatPlainTextChanged(bool value)
+    {
+        Editor.HtmlEditor.PlainTextOnly = value; // from the next mail written on
+        Save(SettingKeys.ComposePlainText, value.ToString(CultureInfo.InvariantCulture));
+    }
 
     partial void OnPushChanged(bool value)
     {

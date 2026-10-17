@@ -788,6 +788,11 @@ internal static class Snapshots
             await SaveAsync(window, output, "settings-news.png");
         }
 
+        // Einstellungen → E-Mail → Schreiben.
+        await vm.SettingsPage.MailOptions.ReloadAsync();
+        vm.SettingsPage.SelectedTab = 17;
+        await SaveAsync(window, output, "settings-compose.png");
+
         // Datenschutz with a few trusted senders, and with many (the list scrolls in its own box).
         var privacy = services.GetRequiredService<Neruna.Desktop.Infrastructure.PrivacyService>();
         var privacyOptions = await privacy.GetAsync();

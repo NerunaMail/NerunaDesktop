@@ -89,6 +89,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(7, T("Neruna Cloud"), "IconCloud"),
         new(-1, T("E-Mail"), null, IsHeading: true),
         new(1, T("Allgemein"), "IconMail"),
+        new(17, T("Schreiben"), "IconEdit"),
         new(3, T("Signaturen"), "IconSignature"),
         new(4, T("Textvorlagen"), "IconTextTemplate"),
         new(11, T("Schnellaktionen"), "IconFlash"),

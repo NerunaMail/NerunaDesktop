@@ -210,6 +210,12 @@ public static class SettingKeys
     /// <summary>"Sicherheit prüfen" without the note that it is no spam filter (only an "i" for it).</summary>
     public const string PrivacyHideSpamNote = "privacy.hideSpamNote";
 
+    /// <summary>Einstellungen → Schreiben: "- " and "1. " at the start of a line become a list (default on).</summary>
+    public const string ComposeAutoLists = "compose.autoLists";
+
+    /// <summary>Einstellungen → Schreiben: new mails and answers as plain text, with the simple text editor (default off).</summary>
+    public const string ComposePlainText = "compose.plainText";
+
     /// <summary>"Bekannte Phishing-Seiten erkennen": the list from neruna.cloud, checked on the device (default on).</summary>
     public const string PrivacyPhishingList = "privacy.phishingList";
 }
