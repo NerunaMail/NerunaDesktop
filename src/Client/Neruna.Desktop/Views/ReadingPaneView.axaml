@@ -88,7 +88,7 @@
       <!-- The security check in full -->
       <Border IsVisible="{Binding IsAnalysisOpen}" Margin="24,0,24,10" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="14,10">
         <StackPanel Spacing="8">
-          <Grid ColumnDefinitions="Auto,*,Auto">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto">
             <PathIcon Data="{StaticResource IconShield}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
               <TextBlock Text="{l:T 'Sicherheitsprüfung'}" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -98,7 +98,14 @@
                 <PathIcon Data="{StaticResource IconInfo}" Width="13" Height="13" />
               </Button>
             </StackPanel>
-            <Button Grid.Column="2" Content="✕" Command="{Binding ToggleAnalysisCommand}" Padding="6,0" Background="Transparent" BorderThickness="0"
+            <Button Grid.Column="2" Classes="command" Command="{Binding AskAiCheckCommand}" VerticalAlignment="Center" Margin="0,0,4,0"
+                    IsVisible="{Binding HasAiCheck}" ToolTip.Tip="{l:T 'Die E-Mail zusätzlich von der verbundenen KI beurteilen lassen'}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Data="{StaticResource IconAi}" Width="14" Height="14" Foreground="{DynamicResource AccentTextBrush}" />
+                <TextBlock Text="{l:T 'Mit KI prüfen'}" FontSize="12" />
+              </StackPanel>
+            </Button>
+            <Button Grid.Column="3" Content="✕" Command="{Binding ToggleAnalysisCommand}" Padding="6,0" Background="Transparent" BorderThickness="0"
                     ToolTip.Tip="{l:T 'Schliessen'}" VerticalAlignment="Center" />
           </Grid>
           <!-- What the check is not: spam is the mail server's job -->
@@ -118,6 +125,33 @@
               <Style Selector="Border.bad"><Setter Property="Background" Value="{DynamicResource BadBackgroundBrush}" /></Style>
             </Border.Styles>
             <TextBlock Text="{Binding AssessmentSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          </Border>
+          <!-- "Mit KI prüfen": a second opinion, only after the warning what is sent -->
+
+          <Border IsVisible="{Binding IsAiCheckConfirming}" CornerRadius="4" Padding="10,8" Background="{DynamicResource WarnBackgroundBrush}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="{l:T 'E-Mail an die KI übermitteln?'}" FontWeight="SemiBold" FontSize="12" />
+              <TextBlock Text="{Binding AiCheckWarning}" FontSize="12" TextWrapping="Wrap" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="accent" Content="{l:T 'Übermitteln und prüfen'}" FontSize="12" Command="{Binding RunAiCheckCommand}" />
+                <Button Content="{l:T 'Abbrechen'}" FontSize="12" Command="{Binding CancelAiCheckCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <Border IsVisible="{Binding AiCheck, Converter={x:Static ObjectConverters.IsNotNull}}" CornerRadius="4" Padding="10,8"
+                  BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1">
+            <StackPanel Spacing="6" DataContext="{Binding AiCheck}" x:DataType="vm:AiSummaryViewModel">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <PathIcon Data="{StaticResource IconAi}" Width="14" Height="14" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Grid.Column="1" Text="{l:T 'Einschätzung der KI'}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                <Button Grid.Column="2" Content="✕" Command="{Binding CloseCommand}" Padding="6,0" Background="Transparent" BorderThickness="0"
+                        ToolTip.Tip="{l:T 'Schliessen'}" VerticalAlignment="Center" />
+              </Grid>
+              <SelectableTextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap" />
+              <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="80" HorizontalAlignment="Left" />
+              <TextBlock Text="{Binding Error}" Foreground="#C42B1C" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap" Text="{l:T 'Von KI erstellt – kann Fehler enthalten. Im Zweifel den Absender auf einem anderen Weg fragen.'}" />
+            </StackPanel>
           </Border>
           <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
             <Grid.Styles>
@@ -170,6 +204,7 @@
           </StackPanel>
           <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap"
                      Text="{l:T 'Geprüft auf diesem Gerät, ohne etwas ins Internet zu senden. Eine Hilfe zur Einschätzung, keine Garantie.'}" />
+
         </StackPanel>
       </Border>
 

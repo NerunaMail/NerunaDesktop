@@ -49,6 +49,7 @@ internal sealed partial class MailViewModel(
         {
             OnPropertyChanged(nameof(AiAvailable));
             SummarizeCommand.NotifyCanExecuteChanged();
+            OfferAiCheck(ReadingPane);
         });
         await ai.LoadAsync();
     }
@@ -70,13 +71,27 @@ internal sealed partial class MailViewModel(
 
     private bool CanSummarize() => ai.IsConnected && ReadingPane is { Message: not null, HasBody: true };
 
+    // "Mit KI prüfen" in the security check, while an AI is connected.
+    private void OfferAiCheck(ReadingPaneViewModel? pane)
+    {
+        if (pane is null)
+        {
+            return;
+        }
+
+        pane.AiCheckRunner = p => ai.CheckMailAsync(p.HeadersText, p.Subject, p.PlainText, p.Links);
+        pane.AiProviderName = ai.IsConnected ? ai.ProviderName ?? "KI" : null;
+    }
+
     // A summary still being written belongs to its message: it stops when another one opens.
     partial void OnReadingPaneChanged(ReadingPaneViewModel? oldValue, ReadingPaneViewModel? newValue)
     {
         oldValue?.Summary?.Cancel();
+        oldValue?.AiCheck?.Cancel();
         if (newValue is not null)
         {
             newValue.AttachmentActions = this;
+            OfferAiCheck(newValue);
         }
 
         _ = ShowQuickActionsAsync(newValue);

@@ -147,6 +147,56 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     /// <summary>Links to files are links (a safe sender, Einstellungen → Datenschutz); otherwise they are text.</summary>
     public bool OpensFileLinks => View.Privacy.OpensFileLinks(Message?.From.Mailboxes.FirstOrDefault(), View.Assessment?.SenderForged ?? false);
 
+    /// <summary>
+    /// "Mit KI prüfen" (in the security check), set by the mail page while an AI is connected: the provider's name
+    /// for the warning, and how the check runs. Null: no AI, no button.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAiCheck), nameof(AiCheckWarning))]
+    public partial string? AiProviderName { get; set; }
+
+    public Func<ReadingPaneViewModel, IAsyncEnumerable<string>>? AiCheckRunner { get; set; }
+
+    public bool HasAiCheck => AiProviderName is not null && Message is not null;
+
+    /// <summary>The warning before anything is sent: the whole mail goes to the AI provider.</summary>
+    public string AiCheckWarning => F("Für die Prüfung wird die komplette E-Mail an {0} übermittelt: Absender, Betreff, alle Kopfzeilen, der Inhalt und die Links. Anhänge nicht. Was der Anbieter damit macht, regeln dessen Bedingungen.", AiProviderName ?? "KI");
+
+    [ObservableProperty]
+    public partial bool IsAiCheckConfirming { get; set; }
+
+    /// <summary>The AI's verdict, written while it arrives.</summary>
+    [ObservableProperty]
+    public partial AiSummaryViewModel? AiCheck { get; set; }
+
+    [RelayCommand]
+    private void AskAiCheck()
+    {
+        AiCheck?.Cancel();
+        AiCheck = null;
+        IsAiCheckConfirming = true;
+    }
+
+    [RelayCommand]
+    private void CancelAiCheck() => IsAiCheckConfirming = false;
+
+    [RelayCommand]
+    private async Task RunAiCheckAsync()
+    {
+        IsAiCheckConfirming = false;
+        if (AiCheckRunner is not { } runner)
+        {
+            return;
+        }
+
+        var check = new AiSummaryViewModel(() => AiCheck = null);
+        AiCheck = check;
+        await check.RunAsync(runner(this));
+    }
+
+    /// <summary>The links of an HTML mail, with the text they show (for the AI check).</summary>
+    public IReadOnlyList<Neruna.Core.Privacy.HtmlLink> Links => _content?.Links ?? [];
+
     /// <summary>A file link could not be opened: shown in the status line of the pane.</summary>
     public void ShowLinkError(string text) => ExportStatus = text;
 

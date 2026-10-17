@@ -115,6 +115,13 @@ public sealed class AiController(IEnumerable<IAiProvider> providers, ISettingsSt
     public IAsyncEnumerable<string> DraftAsync(string? instructions, string? subject, string? to, string? from, string ownText, string quote, CancellationToken cancellationToken = default) =>
         StreamAsync(AiTasks.Draft(instructions, subject, to, from, ownText, quote), cancellationToken);
 
+    /// <summary>"Mit KI prüfen": the AI's verdict on a mail (see <see cref="AiTasks.CheckMail"/>).</summary>
+    public IAsyncEnumerable<string> CheckMailAsync(string headers, string? subject, string text, IReadOnlyList<Privacy.HtmlLink> links, CancellationToken cancellationToken = default) =>
+        StreamAsync(AiTasks.CheckMail(headers, subject, text, links), cancellationToken);
+
+    /// <summary>The connected provider's name ("OpenAI" …), or null.</summary>
+    public string? ProviderName => Connection is { } connection ? Provider(connection.ProviderId)?.Name : null;
+
     public IAsyncEnumerable<string> RewriteAsync(string text, AiRewrite how, string? instructions = null, CancellationToken cancellationToken = default) =>
         StreamAsync(AiTasks.Rewrite(text, how, instructions), cancellationToken);
 

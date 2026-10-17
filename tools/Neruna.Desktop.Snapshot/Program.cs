@@ -962,6 +962,16 @@ internal static class Snapshots
         vm.MailPage.ReadingPane?.ToggleAnalysisCommand.Execute(null);
         await Task.Delay(200);
         await SaveAsync(window, output, "mail-security-check.png");
+        // "Mit KI prüfen": first the warning what goes to the AI.
+        if (vm.MailPage.ReadingPane is { } checkedPane)
+        {
+            checkedPane.AiProviderName = "OpenAI";
+            checkedPane.AskAiCheckCommand.Execute(null);
+            await Task.Delay(200);
+            await SaveAsync(window, output, "mail-ai-check.png");
+            checkedPane.CancelAiCheckCommand.Execute(null);
+        }
+
         vm.MailPage.ReadingPane?.ToggleAnalysisCommand.Execute(null);
         // "⋮" next to the subject → every header of the mail.
         vm.MailPage.ReadingPane?.ToggleHeadersCommand.Execute(null);
