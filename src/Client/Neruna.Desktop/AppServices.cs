@@ -52,6 +52,10 @@ internal static class AppServices
             logging.AddProvider(new FileLoggerProvider(options.LogDirectory, options.LogLevel));
         });
 
+        // Every client: "Neruna-Desktop/x.y" towards neruna.org/.cloud only, and 429/503 logged in detail.
+        var userAgent = "Neruna-Desktop/" + (typeof(AppServices).Assembly.GetName().Version?.ToString(3) ?? "0");
+        services.ConfigureHttpClientDefaults(http => http.AddHttpMessageHandler(sp =>
+            new Neruna.Core.Diagnostics.NerunaHttpHandler(userAgent, sp.GetRequiredService<ILoggerFactory>().CreateLogger("Http"))));
         services.AddHttpClient("neruna");
         services.AddSingleton(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("neruna"));
 
