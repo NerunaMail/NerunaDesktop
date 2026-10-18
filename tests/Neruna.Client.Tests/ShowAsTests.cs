@@ -90,5 +90,14 @@ public class ShowAsTests
         // Someone else: their own calendar home.
         Assert.True(EventConflicts.Belongs(Calendar("/calendars/lea%40example.com/personal/"), "lea@example.com", sources));
         Assert.False(EventConflicts.Belongs(Calendar("/calendars/anna/personal/"), "lea@example.com", sources));
+
+        // Shared with the user: the address in a subscription's name or path, as the calendar's name, as whose it is,
+        // or the person's user name as the home (Nextcloud) – but never the own home for a namesake elsewhere.
+        Assert.True(EventConflicts.Belongs(Calendar("/SOGo/dav/anna/Calendar/luke.hasse@ender-informatics.ch_personal/"), "luke.hasse@ender-informatics.ch", sources));
+        Assert.True(EventConflicts.Belongs(Calendar("/calendars/anna/abc123/") with { Name = "luke.hasse@ender-informatics.ch" }, "Luke.Hasse@ender-informatics.ch", sources));
+        Assert.True(EventConflicts.Belongs(Calendar("/calendars/anna/abc123/") with { SharedBy = "Luke Hasse <luke.hasse@ender-informatics.ch>" }, "luke.hasse@ender-informatics.ch", sources));
+        Assert.True(EventConflicts.Belongs(Calendar("/remote.php/dav/calendars/luke.hasse/personal/"), "luke.hasse@ender-informatics.ch", sources));
+        Assert.False(EventConflicts.Belongs(Calendar("/remote.php/dav/calendars/anna/personal/"), "anna@gmail.com", sources));
+        Assert.False(EventConflicts.Belongs(Calendar("/calendars/anna/abc123/") with { Name = "Ferien" }, "luke.hasse@ender-informatics.ch", sources));
     }
 }

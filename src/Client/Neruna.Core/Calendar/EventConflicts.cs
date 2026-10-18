@@ -85,8 +85,28 @@ public static class EventConflicts
             return true;
         }
 
+        // Someone else's calendar: the address in its path (SOGo: ".../dav/lea@firma.ch/...", also in the name of a
+        // subscription), as its name or as whose it is ("geteilt von"), or their user name as the home on the server
+        // (Nextcloud: ".../calendars/lea.keller/..." for lea.keller@…).
         var path = Uri.UnescapeDataString(calendar.RemoteId);
-        return path.Contains("/" + email + "/", StringComparison.OrdinalIgnoreCase);
+        if (path.Contains(email, StringComparison.OrdinalIgnoreCase)
+            || calendar.Name.Contains(email, StringComparison.OrdinalIgnoreCase)
+            || calendar.SharedBy?.Contains(email, StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return true;
+        }
+
+        // Only in another user's home: the account's own home has the same user name as many other people's addresses.
+        return HomeOwner(path) is { } owner && owner.Equals(email.Split('@')[0], StringComparison.OrdinalIgnoreCase)
+               && sources.FirstOrDefault(s => s.Connection.Id == calendar.ConnectionId) is { } account
+               && InOthersHome(calendar, account.Account.EmailAddress);
+    }
+
+    // The user a CalDAV calendar home belongs to: ".../calendars/<user>/<calendar>/".
+    private static string? HomeOwner(string path)
+    {
+        var home = path.IndexOf("/calendars/", StringComparison.OrdinalIgnoreCase);
+        return home < 0 ? null : path[(home + "/calendars/".Length)..].Split('/')[0] is { Length: > 0 } segment ? segment : null;
     }
 
     // A CalDAV calendar of another principal reached through this account (delegation): its path names someone else.
