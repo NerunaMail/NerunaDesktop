@@ -4,6 +4,11 @@ using Neruna.Core.Localization;
 namespace Neruna.Client.Tests;
 
 /// <summary>Every German text in the client (C# T/F calls, XAML {l:T '…'}) has its English, French and Italian version.</summary>
+/// <remarks>
+/// Not in parallel with other tests: switching the language is global, and a test running meanwhile would get French
+/// texts (the 0.14.0 release build failed on that: a reply header read «De :» instead of «Von:»).
+/// </remarks>
+[Collection(LanguageSwitch.Name)]
 public partial class LocalizationTests
 {
     [Fact]
@@ -78,4 +83,10 @@ public partial class LocalizationTests
 
     [GeneratedRegex(@"\{\d+(:[^}]*)?\}")]
     private static partial Regex PlaceholderPattern();
+}
+
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class LanguageSwitch
+{
+    public const string Name = "Language switch";
 }
