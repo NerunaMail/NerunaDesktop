@@ -806,6 +806,27 @@ internal static class Snapshots
         Console.WriteLine($"Group editor: {editable.Members.Count} members, offered: {string.Join(", ", editable.Available.Select(c => c.Name))}");
         vm.Overlay = null;
 
+        // A contact with an S/MIME certificate (made here: name and address in it, valid for two years).
+        var person = allContacts.First(c => !c.Card.IsGroup && c.Card.EmailAddresses.Count > 0);
+        var personData = (await contactController.GetContactAsync(person.AddressBook, person.RemoteId))!.VCardData;
+        using (var key = System.Security.Cryptography.RSA.Create(2048))
+        {
+            var request = new System.Security.Cryptography.X509Certificates.CertificateRequest($"CN={person.Card.DisplayName}, E={person.Card.EmailAddresses[0]}", key,
+                System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+            var names = new System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder();
+            names.AddEmailAddress(person.Card.EmailAddresses[0]);
+            request.CertificateExtensions.Add(names.Build());
+            request.CertificateExtensions.Add(new System.Security.Cryptography.X509Certificates.X509KeyUsageExtension(
+                System.Security.Cryptography.X509Certificates.X509KeyUsageFlags.DigitalSignature | System.Security.Cryptography.X509Certificates.X509KeyUsageFlags.KeyEncipherment, false));
+            using var made = request.CreateSelfSigned(DateTimeOffset.Now.AddDays(-30), DateTimeOffset.Now.AddYears(2));
+            var withCertificate = Neruna.Core.Contacts.ContactCertificates.Add(personData, made.RawData);
+            vm.Overlay = new ContactEditorViewModel(contactController, services.GetRequiredService<Neruna.Desktop.Infrastructure.IFileService>(), writable,
+                Neruna.Core.Contacts.ContactDraft.FromVCard(withCertificate) with { Certificates = Neruna.Core.Contacts.ContactCertificates.Read(withCertificate) },
+                (person.AddressBook with { IsReadOnly = false }, person.RemoteId));
+            await SaveAsync(window, output, "contacts-editor-certificate.png");
+            vm.Overlay = null;
+        }
+
         vm.ContactsPage.ManageCommand.Execute(null);
         var books = (AddressBookSelectionViewModel)vm.Overlay!;
         for (var i = 0; i < 50 && books.IsBusy; i++)

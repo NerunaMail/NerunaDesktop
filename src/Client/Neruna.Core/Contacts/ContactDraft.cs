@@ -31,6 +31,12 @@ public sealed record ContactDraft(
 
     public ContactBirthday? Birthday { get; init; }
 
+    /// <summary>
+    /// S/MIME certificates (DER) to keep in the card as KEY; null leaves the card's certificates as they are (only an
+    /// editor that changed them sets this).
+    /// </summary>
+    public IReadOnlyList<byte[]>? Certificates { get; init; }
+
     public string DisplayName
     {
         get
@@ -143,7 +149,7 @@ public sealed record ContactDraft(
             VCardWriter.Fold(result, line);
         }
 
-        return result.ToString();
+        return Certificates is null ? result.ToString() : ContactCertificates.WithAll(result.ToString(), Certificates);
     }
 
     private static string TypeParameter(string? kind) => string.IsNullOrWhiteSpace(kind) ? string.Empty : ";TYPE=" + kind.ToUpperInvariant();

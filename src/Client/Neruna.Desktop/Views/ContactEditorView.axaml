@@ -102,6 +102,32 @@
     <TextBlock Classes="label" Text="{l:T 'Notiz'}" />
     <TextBox Text="{Binding Note}" AcceptsReturn="True" TextWrapping="Wrap" Height="70" IsReadOnly="{Binding IsReadOnly}" />
 
+    <!-- S/MIME: the contact's certificates (to send encrypted mail); stored in the contact itself -->
+    <TextBlock Classes="label" Text="{l:T 'S/MIME-Zertifikate'}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding NoCertificates}"
+               Text="{l:T 'Keines hinterlegt – verschlüsselte E-Mails an diesen Kontakt sind erst mit einem Zertifikat möglich. Neruna übernimmt es auch automatisch aus einer gültig signierten E-Mail.'}" />
+    <ItemsControl ItemsSource="{Binding Certificates}" IsVisible="{Binding HasCertificates}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ContactCertificateRow">
+          <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Data="{StaticResource IconCertificate}" Width="14" Height="14" Margin="0,0,10,0" VerticalAlignment="Center"
+                        Foreground="{DynamicResource AccentTextBrush}" />
+              <StackPanel Grid.Column="1">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Details}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource ErrorBrush}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
+              </StackPanel>
+              <Button Grid.Column="2" Content="{l:T 'Entfernen'}" VerticalAlignment="Center"
+                      IsVisible="{Binding !$parent[UserControl].((vm:ContactEditorViewModel)DataContext).IsReadOnly}"
+                      Command="{Binding $parent[UserControl].((vm:ContactEditorViewModel)DataContext).RemoveCertificateCommand}" CommandParameter="{Binding}" />
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <Button Content="{l:T 'Zertifikat hinzufügen …'}" Command="{Binding AddCertificateCommand}" HorizontalAlignment="Left" IsVisible="{Binding !IsReadOnly}" Margin="0,2,0,0" />
+
     <TextBlock Classes="label" Text="{l:T 'Adressbuch'}" />
     <ComboBox ItemsSource="{Binding AddressBooks}" SelectedItem="{Binding SelectedAddressBook}" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}" />
 

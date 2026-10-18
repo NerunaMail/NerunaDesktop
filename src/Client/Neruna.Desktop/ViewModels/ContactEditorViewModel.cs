@@ -33,6 +33,48 @@ internal sealed partial class EditableField(IReadOnlyList<FieldKind> kinds, stri
     public ContactField ToField() => new(Value.Trim(), Kind.Value);
 }
 
+/// <summary>An S/MIME certificate kept with the contact: whose, until when, and whether it can be used to encrypt.</summary>
+internal sealed record ContactCertificateRow(byte[] Der, string Name, string Details, string? Warning)
+{
+    public bool HasWarning => Warning is not null;
+
+    public static ContactCertificateRow? From(byte[] der, IReadOnlyCollection<string> contactEmails)
+    {
+        Org.BouncyCastle.X509.X509Certificate certificate;
+        try
+        {
+            certificate = new Org.BouncyCastle.X509.X509CertificateParser().ReadCertificate(der);
+        }
+        catch (Exception ex) when (ex is Org.BouncyCastle.Security.Certificates.CertificateException or IOException or ArgumentException or InvalidOperationException)
+        {
+            return null;
+        }
+
+        if (certificate is null)
+        {
+            return null;
+        }
+
+        var info = Neruna.Core.Security.CertificateParser.Describe(certificate, false, Neruna.Core.Security.CertificateSource.Contact, DateTimeOffset.Now);
+        var status = info.StatusAt(DateTimeOffset.Now) switch
+        {
+            Neruna.Core.Security.CertificateStatus.Expired => T("abgelaufen am {0}"),
+            Neruna.Core.Security.CertificateStatus.NotYetValid => T("gültig ab {0}"),
+            Neruna.Core.Security.CertificateStatus.ExpiringSoon => T("läuft bald ab: {0}"),
+            _ => T("gültig bis {0}"),
+        };
+        var date = (info.StatusAt(DateTimeOffset.Now) == Neruna.Core.Security.CertificateStatus.NotYetValid ? info.NotBefore : info.NotAfter)
+            .LocalDateTime.ToString("d", Neruna.Core.Localization.Texts.Culture);
+        var details = string.Join(" · ", new[] { string.Join(", ", info.EmailAddresses), string.Format(Neruna.Core.Localization.Texts.Culture, status, date), info.IssuerName }
+            .Where(p => p.Length > 0));
+        var warning = !info.CanEncrypt ? T("Nicht zum Verschlüsseln geeignet.")
+            : contactEmails.Count > 0 && !info.EmailAddresses.Any(a => contactEmails.Contains(a, StringComparer.OrdinalIgnoreCase))
+                ? T("Gilt für keine Adresse dieses Kontakts.")
+                : null;
+        return new ContactCertificateRow(der, info.SubjectName, details, warning);
+    }
+}
+
 /// <summary>Create/edit/delete one contact. Properties the form does not show are preserved (see <see cref="ContactDraft"/>).</summary>
 internal sealed partial class ContactEditorViewModel : ViewModelBase
 {
@@ -41,6 +83,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
     private readonly (AddressBookInfo AddressBook, string RemoteId)? _existing;
     private ContactPhoto? _photo;
     private bool _photoChanged;
+    private bool _certificatesChanged;
 
     public ContactEditorViewModel(
         ContactController contacts,
@@ -77,6 +120,76 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
         {
             Phones.Add(new EditableField(FieldKind.PhoneKinds, phone.Value, phone.Kind));
         }
+
+        _certificateDers = [.. draft.Certificates ?? []];
+        ShowCertificates();
+    }
+
+    private List<byte[]> _certificateDers;
+
+    /// <summary>S/MIME certificates kept with the contact (vCard KEY; Exchange/Microsoft 365: the contact's certificates).</summary>
+    public ObservableCollection<ContactCertificateRow> Certificates { get; } = [];
+
+    public bool HasCertificates => Certificates.Count > 0;
+
+    public bool NoCertificates => !HasCertificates;
+
+    [RelayCommand]
+    private async Task AddCertificateAsync()
+    {
+        Error = null;
+        foreach (var path in await _files.PickFilesAsync(T("Zertifikat des Kontakts wählen (.cer, .crt, .pem, .der, .p7b)")))
+        {
+            IReadOnlyList<Org.BouncyCastle.X509.X509Certificate> found;
+            try
+            {
+                found = Neruna.Core.Security.CertificateParser.ReadCertificates(await File.ReadAllBytesAsync(path));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
+            {
+                Error = F("«{0}» konnte nicht gelesen werden: {1}", Path.GetFileName(path), ex.Message);
+                continue;
+            }
+
+            // Only the person's own certificates; the issuer's (in a .p7b chain) do not belong to the contact.
+            var people = found.Where(c => Neruna.Core.Security.CertificateParser.EmailAddresses(c).Count > 0).ToList();
+            if (people.Count == 0)
+            {
+                Error = F("«{0}» enthält kein Zertifikat mit E-Mail-Adresse (eine .p12/.pfx mit privatem Schlüssel gehört unter Einstellungen → Zertifikate).", Path.GetFileName(path));
+                continue;
+            }
+
+            foreach (var der in people.Select(c => c.GetEncoded()).Where(d => !_certificateDers.Any(k => k.AsSpan().SequenceEqual(d))))
+            {
+                _certificateDers.Add(der);
+                _certificatesChanged = true;
+            }
+        }
+
+        ShowCertificates();
+    }
+
+    [RelayCommand]
+    private void RemoveCertificate(ContactCertificateRow? row)
+    {
+        if (row is not null && _certificateDers.RemoveAll(d => d.AsSpan().SequenceEqual(row.Der)) > 0)
+        {
+            _certificatesChanged = true;
+            ShowCertificates();
+        }
+    }
+
+    private void ShowCertificates()
+    {
+        var emails = Emails.Select(e => e.Value.Trim()).Where(e => e.Length > 0).ToList();
+        Certificates.Clear();
+        foreach (var row in _certificateDers.Select(d => ContactCertificateRow.From(d, emails)).OfType<ContactCertificateRow>())
+        {
+            Certificates.Add(row);
+        }
+
+        OnPropertyChanged(nameof(HasCertificates));
+        OnPropertyChanged(nameof(NoCertificates));
     }
 
     public event EventHandler<bool>? Finished;
@@ -207,6 +320,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
             Photo = _photo,
             ReplacePhoto = _photoChanged,
             Birthday = birthday,
+            Certificates = _certificatesChanged ? _certificateDers : null,
         };
 
         if (draft.DisplayName.Length == 0)

@@ -43,6 +43,22 @@ public class ContactCertificatesTests
     }
 
     [Fact]
+    public void Editing_a_contact_keeps_its_certificates_and_the_editor_can_change_them()
+    {
+        var der = TestPki.User("Lea Keller", "lea@example.com").Certificate.GetEncoded();
+        var card = ContactCertificates.Add(Card3, der);
+
+        // An edit that does not touch the certificates keeps the KEY as it is.
+        var edited = (ContactDraft.FromVCard(card) with { Title = "Einkauf" }).ToVCard(card);
+        Assert.Equal(der, Assert.Single(ContactCertificates.Read(edited)));
+
+        var added = TestPki.User("Lea Keller", "lea@example.com").Certificate.GetEncoded();
+        var both = (ContactDraft.FromVCard(card) with { Certificates = [der, added] }).ToVCard(card);
+        Assert.Equal(2, ContactCertificates.Read(both).Count);
+        Assert.Empty(ContactCertificates.Read((ContactDraft.FromVCard(both) with { Certificates = [] }).ToVCard(both)));
+    }
+
+    [Fact]
     public async Task Collected_certificate_goes_to_the_contact_and_only_without_one_onto_this_device()
     {
         var contacts = new FakeContactCertificates("lea@example.com");
