@@ -44,6 +44,8 @@ internal static partial class MailPaper
     public static (string Html, bool Dark) Prepare(string html, bool darkTheme)
     {
         ArgumentNullException.ThrowIfNull(html);
+        html = Neruna.Core.Mail.StyleBlocks.CloseOpenBraces(html);
+
         // An empty paragraph (Outlook: <p><o:p>&nbsp;</o:p></p>) is a blank line; the renderer let it collapse.
         html = EmptyParagraph().Replace(html, "${open}<br>${close}") + ParagraphSpacing;
         if (!darkTheme || OwnBackground().IsMatch(html))

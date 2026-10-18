@@ -50,10 +50,11 @@ public sealed class SqliteCertificateStore(IDbContextFactory<NerunaDbContext> co
 /// Settings, read from the database once and then answered from memory (the UI asks for many of them on every
 /// page load); writes go to the database right away.
 /// </summary>
-public sealed class SqliteSettingsStore(IDbContextFactory<NerunaDbContext> contexts) : ISettingsStore
+public sealed class SqliteSettingsStore(IDbContextFactory<NerunaDbContext> contexts) : ISettingsStore, IDisposable
 {
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string?> _values = new(StringComparer.Ordinal);
     private readonly Lock _gate = new();
+    private readonly SemaphoreSlim _write = new(1, 1);
     private Task? _loaded;
 
     public async Task<string?> GetAsync(string key, CancellationToken cancellationToken = default)
@@ -72,19 +73,32 @@ public sealed class SqliteSettingsStore(IDbContextFactory<NerunaDbContext> conte
     {
         await LoadedAsync().WaitAsync(cancellationToken);
         _values[key] = value;
-        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
-        var row = await db.Settings.FindAsync([key], cancellationToken);
-        if (row is null)
-        {
-            db.Settings.Add(new SettingEntity { Key = key, Value = value });
-        }
-        else
-        {
-            row.Value = value;
-        }
 
-        await db.SaveChangesAsync(cancellationToken);
+        // One write at a time: two at once for a new key (the layout saved by its timer and by a closing window)
+        // both found no row and both inserted – UNIQUE constraint failed.
+        await _write.WaitAsync(cancellationToken);
+        try
+        {
+            await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+            var row = await db.Settings.FindAsync([key], cancellationToken);
+            if (row is null)
+            {
+                db.Settings.Add(new SettingEntity { Key = key, Value = value });
+            }
+            else
+            {
+                row.Value = value;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        finally
+        {
+            _write.Release();
+        }
     }
+
+    public void Dispose() => _write.Dispose();
 
     private Task LoadedAsync()
     {

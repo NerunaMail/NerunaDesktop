@@ -31,6 +31,7 @@ internal sealed partial class App : Application
             Neruna.Core.Localization.Texts.Use(LanguageFile.Read(Options.DataDirectory));
 
             // Splash first, so the user sees something while the database opens and the window is built.
+            ScreenFit.Install();
             var splash = new SplashWindow();
             desktop.MainWindow = splash;
             splash.Show();
@@ -77,6 +78,10 @@ internal sealed partial class App : Application
             var main = new MainWindow { DataContext = viewModel };
             layout.TrackWindow(main, "window.main", withPosition: true);
             desktop.MainWindow = main;
+
+            // Mail and draft windows are not owned by the main window (so they do not stay in front of it); closing
+            // the main window still ends Neruna.
+            desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnMainWindowClose;
             main.Show();
             splash.Close();
             Infrastructure.CrashHandler.InstallUi();

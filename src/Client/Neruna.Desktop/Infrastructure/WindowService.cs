@@ -40,14 +40,8 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
         layout.TrackWindow(window, "window.compose", withPosition: false);
         compose.Closed += (_, _) => window.Close();
 
-        if ((Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow is Window owner)
-        {
-            window.Show(owner);
-        }
-        else
-        {
-            window.Show();
-        }
+        // A window of its own, not owned by the main window: it would always stay in front of it.
+        window.Show();
     }
 
     public void ShowMessage(MessageWindowViewModel message)
@@ -56,14 +50,9 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
         var window = new MessageWindow { DataContext = message };
         layout.TrackWindow(window, "window.message", withPosition: false);
         message.CloseRequested += (_, _) => window.Close();
-        if ((Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow is Window owner)
-        {
-            window.Show(owner);
-        }
-        else
-        {
-            window.Show();
-        }
+
+        // Not owned by the main window: an opened mail can stay open beside it while other mails are worked on.
+        window.Show();
     }
 
     public async Task<bool> ShowEventEditorAsync(EventEditorViewModel editor)
