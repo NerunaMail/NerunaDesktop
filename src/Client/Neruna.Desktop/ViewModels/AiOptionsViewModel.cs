@@ -191,8 +191,23 @@ internal sealed partial class AiOptionsViewModel : ViewModelBase
     }
 
     // Connection changed: texts, and the models of the new connection.
+    /// <summary>Ask before the whole mail goes to the AI (on by default).</summary>
+    public bool ConfirmWholeMail
+    {
+        get => _ai.ConfirmWholeMail;
+        set
+        {
+            if (value != _ai.ConfirmWholeMail)
+            {
+                _ = _ai.SetConfirmWholeMailAsync(value);
+                OnPropertyChanged();
+            }
+        }
+    }
+
     private void Refresh()
     {
+        OnPropertyChanged(nameof(ConfirmWholeMail));
         OnPropertyChanged(nameof(IsConnected));
         OnPropertyChanged(nameof(IsNotConnected));
         OnPropertyChanged(nameof(ConnectedText));

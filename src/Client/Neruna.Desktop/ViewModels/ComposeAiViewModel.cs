@@ -36,6 +36,44 @@ internal sealed partial class ComposeAiViewModel(AiController ai, ComposeViewMod
     [ObservableProperty]
     public partial string? Notice { get; set; }
 
+    /// <summary>The question before the whole mail goes to the AI (null: none open).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirming))]
+    public partial string? ConfirmText { get; set; }
+
+    public bool IsConfirming => ConfirmText is not null;
+
+    private TaskCompletionSource<bool>? _confirm;
+
+    [RelayCommand]
+    private void ConfirmSend() => Answer(true);
+
+    [RelayCommand]
+    private void DeclineSend() => Answer(false);
+
+    private void Answer(bool send)
+    {
+        ConfirmText = null;
+        _confirm?.TrySetResult(send);
+    }
+
+    // Unless turned off under Einstellungen → KI: the user says "OK" before the whole mail leaves for the provider.
+    private async Task<bool> MaySendWholeMailAsync(string question, CancellationToken cancel)
+    {
+        if (!ai.ConfirmWholeMail)
+        {
+            return true;
+        }
+
+        _confirm = new TaskCompletionSource<bool>();
+        ConfirmText = question;
+        using (cancel.Register(() => Answer(false)))
+        {
+            return await _confirm.Task;
+        }
+    }
+
+    private string ProviderName => ai.ProviderName ?? T("KI");
     public string Placeholder => compose.Kind is ComposeKind.Reply
         ? T("Was soll die Antwort sagen? z. B. «zusagen und Dienstag 14 Uhr vorschlagen» – oder leer lassen")
         : T("Was soll die KI schreiben oder ändern? z. B. «Einladung zum Teamessen am Freitag» oder «auf Englisch übersetzen»");
@@ -58,6 +96,14 @@ internal sealed partial class ComposeAiViewModel(AiController ai, ComposeViewMod
         if (string.IsNullOrWhiteSpace(Instruction) && string.IsNullOrWhiteSpace(texts.Quote) && string.IsNullOrWhiteSpace(texts.Own))
         {
             Error = T("Bitte kurz beschreiben, was die Mail sagen soll.");
+            return;
+        }
+
+        if ((!string.IsNullOrWhiteSpace(texts.Own) || !string.IsNullOrWhiteSpace(texts.Quote))
+            && !await MaySendWholeMailAsync(string.IsNullOrWhiteSpace(texts.Quote)
+                ? F("Für «Schreiben» sendet Neruna Ihren ganzen bisherigen Text an {0}.", ProviderName)
+                : F("Für «Schreiben» sendet Neruna die ganze E-Mail an {0} – Ihren Text und die zitierte Nachricht.", ProviderName), cancel))
+        {
             return;
         }
 
@@ -90,6 +136,11 @@ internal sealed partial class ComposeAiViewModel(AiController ai, ComposeViewMod
         if (string.IsNullOrWhiteSpace(source))
         {
             Error = T("Noch kein eigener Text – erst etwas schreiben oder «Schreiben» verwenden.");
+            return;
+        }
+
+        if (!selection && !await MaySendWholeMailAsync(F("Es ist kein Text markiert. Neruna sendet deshalb Ihren ganzen Text an {0}.", ProviderName), cancel))
+        {
             return;
         }
 

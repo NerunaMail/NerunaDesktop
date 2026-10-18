@@ -34,8 +34,23 @@ public sealed class AiController(IEnumerable<IAiProvider> providers, ISettingsSt
 
     public IAiProvider? Provider(string id) => Providers.FirstOrDefault(p => p.Id == id);
 
+    private const string ConfirmWholeMailKey = "ai.confirmWholeMail";
+
+    /// <summary>
+    /// Ask before the whole mail goes to the AI (nothing marked, or "Schreiben" with text or a quoted message). On by
+    /// default; whoever turns it off under Einstellungen → KI does so knowingly.
+    /// </summary>
+    public bool ConfirmWholeMail { get; private set; } = true;
+
+    public async Task SetConfirmWholeMailAsync(bool confirm, CancellationToken cancellationToken = default)
+    {
+        ConfirmWholeMail = confirm;
+        await settings.SetBoolAsync(ConfirmWholeMailKey, confirm, cancellationToken);
+    }
+
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
+        ConfirmWholeMail = await settings.GetBoolAsync(ConfirmWholeMailKey, fallback: true, cancellationToken);
         var stored = await settings.GetAsync(ConnectionKey, cancellationToken);
         try
         {

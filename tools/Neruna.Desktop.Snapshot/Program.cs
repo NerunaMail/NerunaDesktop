@@ -994,6 +994,11 @@ internal static class Snapshots
             composeAi.Instruction = "zusagen, Umstellung am 7./8. November vorschlagen";
             await Task.Delay(300);
             await SaveAsync(window, output, "compose-ai.png");
+            // Before the whole mail goes to the AI: "OK" or "Nicht senden".
+            composeAi.ConfirmText = "Es ist kein Text markiert. Neruna sendet deshalb Ihren ganzen Text an OpenAI.";
+            await Task.Delay(200);
+            await SaveAsync(window, output, "compose-ai-confirm.png");
+            composeAi.ConfirmText = null;
             // Writing into the text needs the real editor (a WebView), which the snapshot tool does not have; see tests/editor.
             await vm.MailPage.Compose.DiscardCommand.ExecuteAsync(null);
             await Task.Delay(300);

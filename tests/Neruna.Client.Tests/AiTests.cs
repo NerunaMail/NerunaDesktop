@@ -119,6 +119,21 @@ public class AiTests
     }
 
     [Fact]
+    public async Task Asking_before_the_whole_mail_goes_to_the_ai_is_on_until_turned_off()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var controller = new AiController([], env.Get<ISettingsStore>(), new NoBrowser());
+        await controller.LoadAsync(ct);
+        Assert.True(controller.ConfirmWholeMail);
+
+        await controller.SetConfirmWholeMailAsync(false, ct);
+        var again = new AiController([], env.Get<ISettingsStore>(), new NoBrowser());
+        await again.LoadAsync(ct);
+        Assert.False(again.ConfirmWholeMail);
+    }
+
+    [Fact]
     public void The_sign_in_follows_openais_open_source_flow()
     {
         var first = OpenAiProvider.Endpoints("dynamic_agent_client", "urn:uuid:x", registering: true);
