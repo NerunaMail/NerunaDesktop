@@ -108,7 +108,10 @@ public static partial class LinkInspector
             findings.Add(new Finding(Severity.Low, T("Kurzlink"), T("Wohin der Link führt, zeigt sich erst beim Öffnen.")));
         }
 
-        if (target.Scheme == "http")
+        // "www.firma.ch" written in the text, made into http://www.firma.ch by the sender's mail program: nobody chose
+        // HTTP there – no warning, and with "Links bereinigen" it opens with HTTPS.
+        var autoLinked = target.Scheme == "http" && via is null && WrittenWithoutScheme(text, host);
+        if (target.Scheme == "http" && !autoLinked)
         {
             findings.Add(new Finding(Severity.Low, T("Unverschlüsselt"), T("Die Seite wird ohne HTTPS geöffnet; Eingaben dort sind nicht geschützt.")));
         }
@@ -134,7 +137,12 @@ public static partial class LinkInspector
         var opens = target;
         if (clean)
         {
-            opens = WithoutTracking(target, out var removed);
+            if (autoLinked)
+            {
+                opens = new UriBuilder(target) { Scheme = Uri.UriSchemeHttps, Port = target.IsDefaultPort ? -1 : target.Port }.Uri;
+            }
+
+            opens = WithoutTracking(opens, out var removed);
             if (removed > 0)
             {
                 findings.Add(new Finding(Severity.Info, T("Tracking-Parameter"), F("{0} Parameter, die nur der Auswertung dienen, werden beim Öffnen entfernt.", removed)));
@@ -146,6 +154,15 @@ public static partial class LinkInspector
 
     /// <summary>The link as it opens with "Links bereinigen": redirect services skipped, tracking parameters removed.</summary>
     public static string Clean(string href) => Inspect(href, clean: true).Opens;
+
+    // The link text is just this site's address, without "http://" in front ("www.firma.ch", "firma.ch/kontakt").
+    private static bool WrittenWithoutScheme(string? text, string host)
+    {
+        var written = text?.Trim();
+        return !string.IsNullOrEmpty(written) && !written.Contains("://", StringComparison.Ordinal) && !written.Contains(' ', StringComparison.Ordinal)
+               && DomainShown(written) is { } named && string.Equals(named, host, StringComparison.OrdinalIgnoreCase)
+               && written.StartsWith(named, StringComparison.OrdinalIgnoreCase);
+    }
 
     // The site a text names, if it is (mostly) an address: "www.bank.ch", "Login: https://bank.ch/x". Not every word with a dot.
     private static string? DomainShown(string? shown)

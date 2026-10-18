@@ -91,6 +91,24 @@ public class PrivacyTests
     }
 
     [Fact]
+    public void An_address_written_without_http_is_no_unencrypted_link_and_opens_with_https()
+    {
+        static bool Unencrypted(LinkCheck c) => c.Findings.Any(f => f.Title == Neruna.Core.Localization.Texts.T("Unverschlüsselt"));
+
+        // The sender's mail program made http://www.firma.ch out of "www.firma.ch".
+        var auto = LinkInspector.Inspect("http://www.firma.ch/", "www.firma.ch");
+        Assert.False(Unencrypted(auto));
+        Assert.Equal("https://www.firma.ch/", auto.Opens);
+        Assert.Equal("https://firma.ch/kontakt", LinkInspector.Inspect("http://firma.ch/kontakt", "firma.ch/kontakt").Opens);
+
+        // Written with http://, another text, another site, or not cleaned: as before.
+        Assert.True(Unencrypted(LinkInspector.Inspect("http://www.firma.ch/", "http://www.firma.ch")));
+        Assert.True(Unencrypted(LinkInspector.Inspect("http://www.firma.ch/", "Unsere Website")));
+        Assert.True(Unencrypted(LinkInspector.Inspect("http://www.firma.ch/", "www.andere.ch")));
+        Assert.Equal("http://www.firma.ch/", LinkInspector.Inspect("http://www.firma.ch/", "www.firma.ch", clean: false).Opens);
+    }
+
+    [Fact]
     public void Newsletter_click_counters_are_not_suspicious()
     {
         var check = LinkInspector.Inspect("https://u123.ct.sendgrid.net/ls/click?upn=abc", "www.shop.ch");
