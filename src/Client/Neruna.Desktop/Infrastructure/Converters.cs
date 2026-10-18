@@ -27,9 +27,6 @@ internal static class Converters
     public static FuncValueConverter<int, object?, bool> IsTab { get; } = new((tab, parameter) =>
         parameter is not null && int.TryParse(parameter.ToString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var wanted) && tab == wanted);
 
-    /// <summary>Placing a stamp: a cross over the PDF pages.</summary>
-    public static FuncValueConverter<bool, Avalonia.Input.Cursor?> StampCursor { get; } = new(stamping => stamping ? new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Cross) : null);
-
     public static FuncValueConverter<bool, double> DimmedOpacity { get; } = new(dimmed => dimmed ? 0.45 : 1);
 
     public static FuncValueConverter<bool, FontWeight> BoldIf { get; } = new(bold => bold ? FontWeight.SemiBold : FontWeight.Normal);

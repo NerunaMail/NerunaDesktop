@@ -3,7 +3,8 @@ using System.Runtime.InteropServices;
 namespace Neruna.Core.Mail;
 
 /// <summary>One rendered page: BGRA pixels, premultiplied, white background.</summary>
-public sealed record PdfPageImage(int Width, int Height, int Stride, byte[] Pixels);
+/// <param name="PointWidth">The page's width in PDF points (1/72 inch), to show things at their size on the page.</param>
+public sealed record PdfPageImage(int Width, int Height, int Stride, byte[] Pixels, double PointWidth = 0);
 
 /// <summary>The pages of a PDF as images, for the attachment preview.</summary>
 public sealed record PdfRendering(int PageCount, IReadOnlyList<PdfPageImage> Pages);
@@ -97,7 +98,7 @@ public static partial class PdfPages
                 var stride = NativeMethods.FPDFBitmap_GetStride(bitmap);
                 var pixels = new byte[stride * height];
                 Marshal.Copy(NativeMethods.FPDFBitmap_GetBuffer(bitmap), pixels, 0, pixels.Length);
-                return new PdfPageImage(width, height, stride, pixels);
+                return new PdfPageImage(width, height, stride, pixels, pageWidth);
             }
             finally
             {

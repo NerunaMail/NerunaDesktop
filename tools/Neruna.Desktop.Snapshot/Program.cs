@@ -207,6 +207,18 @@ internal static class Snapshots
         var stampPreview = vm.MailPage.ReadingPane.Preview!;
         Console.WriteLine($"Can stamp: {stampPreview.CanStamp}, stamps: {string.Join(", ", stampPreview.Stamps.Select(s => s.Text))}");
         stampPreview.StartStampCommand.Execute(stampPreview.Stamps[0]);
+        await Task.Delay(200);
+
+        // Before the click: the stamp itself follows the mouse.
+        if (Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(window).OfType<Avalonia.Controls.Image>()
+                .FirstOrDefault(i => i.DataContext is PreviewPage) is { } pageImage
+            && pageImage.TranslatePoint(new Point(pageImage.Bounds.Width * 0.6, pageImage.Bounds.Height * 0.3), window) is { } ghostAt)
+        {
+            window.MouseMove(ghostAt, Avalonia.Input.RawInputModifiers.None);
+            await Task.Delay(200);
+            await SaveAsync(window, output, "mail-pdf-stamp-ghost.png");
+        }
+
         await stampPreview.PlaceAsync(stampPreview.Pages[0], 0.72, 0.16);
         await Task.Delay(200);
         await SaveAsync(window, output, "mail-pdf-stamp.png");

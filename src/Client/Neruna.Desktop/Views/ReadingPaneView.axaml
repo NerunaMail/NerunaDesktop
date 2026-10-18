@@ -435,8 +435,11 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:PreviewPage">
                   <Border Background="White" BoxShadow="0 1 4 0 #33000000" HorizontalAlignment="Center">
-                    <Image Source="{Binding Image}" Stretch="Uniform" StretchDirection="DownOnly" PointerPressed="OnPreviewPagePressed"
-                           Cursor="{Binding $parent[ScrollViewer].((vm:AttachmentPreviewViewModel)DataContext).IsStamping, Converter={x:Static app:Converters.StampCursor}, FallbackValue={x:Null}}" />
+                    <!-- While placing: the stamp (or text) itself follows the mouse, at its size on the page -->
+                    <Panel PointerMoved="OnPreviewPageMoved" PointerExited="OnPreviewPageExited">
+                      <Image Source="{Binding Image}" Stretch="Uniform" StretchDirection="DownOnly" PointerPressed="OnPreviewPagePressed" />
+                      <Canvas IsHitTestVisible="False" ClipToBounds="True" />
+                    </Panel>
                   </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

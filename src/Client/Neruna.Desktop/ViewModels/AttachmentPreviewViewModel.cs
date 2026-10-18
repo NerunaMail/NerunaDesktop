@@ -22,9 +22,12 @@ internal interface IAttachmentActions
 }
 
 /// <summary>One shown page (or the image); the picture changes while a stamp is being placed.</summary>
-internal sealed partial class PreviewPage(int index, Bitmap image) : ObservableObject
+internal sealed partial class PreviewPage(int index, Bitmap image, double pointWidth = 0) : ObservableObject
 {
     public int Index { get; } = index;
+
+    /// <summary>The page's width in PDF points; 0 for an image.</summary>
+    public double PointWidth { get; } = pointWidth;
 
     [ObservableProperty]
     public partial Bitmap Image { get; set; } = image;
@@ -173,6 +176,18 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
 
         RestorePlaced();
         ActiveStamp = stamp;
+        _ = LoadStampNameAsync();
+    }
+
+    private string? _stampName;
+
+    private async Task LoadStampNameAsync() => _stampName = _actions is null ? null : await _actions.GetStampNameAsync();
+
+    /// <summary>The lines under the stamp's title as they will be written (name, date), for the preview at the mouse.</summary>
+    public IReadOnlyList<string> PreviewLines(PdfStamp stamp)
+    {
+        ArgumentNullException.ThrowIfNull(stamp);
+        return stamp.Lines(_stampName, DateTime.Now);
     }
 
     /// <summary>A click on a page while stamping (position as share of the page's width and height, from top left).</summary>
@@ -437,7 +452,7 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
             _pageCount = rendering.PageCount;
             foreach (var page in rendering.Pages)
             {
-                Pages.Add(new PreviewPage(Pages.Count, ToBitmap(page)));
+                Pages.Add(new PreviewPage(Pages.Count, ToBitmap(page), page.PointWidth));
             }
         }
         catch (PdfPreviewException ex)

@@ -17,11 +17,12 @@ public sealed record PdfTextMark(int Page, double X, double Y, string Text, stri
 
 public static partial class PdfPages
 {
-    private const float TitleSize = 15;
-    private const float LineSize = 9;
-    private const float LineHeight = 11.5f;
-    private const float Padding = 6;
-    private const float MinStampWidth = 110;
+    // The stamp's measures in points – public for the preview that follows the mouse while placing it.
+    public const float TitleSize = 15;
+    public const float LineSize = 9;
+    public const float LineHeight = 11.5f;
+    public const float Padding = 6;
+    public const float MinStampWidth = 110;
 
     /// <summary>The PDF with the stamp on its page, as a new file (the original bytes stay as they are).</summary>
     /// <exception cref="PdfPreviewException">The PDF cannot be read or written, or is protected by a password.</exception>
