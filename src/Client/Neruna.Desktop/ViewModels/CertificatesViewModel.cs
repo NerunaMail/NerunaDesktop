@@ -327,6 +327,7 @@ internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffs
     {
         CertificateSource.CollectedFromMail => T("Aus signierter Nachricht übernommen am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
         CertificateSource.Cloud => T("Cloud – von der Organisation bereitgestellt am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
+        CertificateSource.Contact => T("Beim Kontakt im Adressbuch gespeichert"),
         _ => T("Importiert am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
     };
 

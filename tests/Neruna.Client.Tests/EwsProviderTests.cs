@@ -548,6 +548,35 @@ public class EwsProviderTests
         Assert.Equal("+41 78 111 11 11", changes[1].Descendants(T + "Entry").Single().Value);
     }
 
+    [Fact]
+    public async Task Contact_certificates_are_read_from_and_written_to_the_outlook_property()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (connection, factory, server, _) = Connect(ServiceKind.Contacts);
+        var old = TestPki.User("Lea Keller", "lea@example.com").Certificate.GetEncoded();
+        var contact = $"""
+            <t:Contact><t:ItemId Id="C1" ChangeKey="k1"/>
+              <t:ExtendedProperty><t:ExtendedFieldURI PropertyTag="0x3a70" PropertyType="BinaryArray"/><t:Values><t:Value>{Convert.ToBase64String(old)}</t:Value></t:Values></t:ExtendedProperty>
+              <t:DisplayName>Lea Keller</t:DisplayName><t:GivenName>Lea</t:GivenName>
+              <t:EmailAddresses><t:Entry Key="EmailAddress1">lea@example.com</t:Entry></t:EmailAddresses><t:Surname>Keller</t:Surname></t:Contact>
+            """;
+        server.On("FindItem", _ => Ok("FindItem", "<m:RootFolder IncludesLastItemInRange=\"true\"><t:Items><t:Contact><t:ItemId Id=\"C1\" ChangeKey=\"k1\"/></t:Contact></t:Items></m:RootFolder>"));
+        server.On("GetItem", _ => Ok("GetItem", "<m:Items>" + contact + "</m:Items>"));
+        server.On("UpdateItem", _ => Ok("UpdateItem", "<m:Items/>"));
+        await using var contacts = new EwsContactProviderFactory(factory).Create(connection);
+        var book = new AddressBookInfo(connection.Id, "CONTACTS", "Kontakte", false);
+
+        var synced = Assert.Single((await contacts.SyncAddressBookAsync(book, new Dictionary<string, string?>(), ct)).AddedOrChanged);
+        Assert.Equal(old, Assert.Single(ContactCertificates.Read(synced.VCardData)));
+
+        // A second certificate: the property gets both, nothing else changes.
+        var added = TestPki.User("Lea Keller", "lea@example.com").Certificate.GetEncoded();
+        await contacts.SaveAsync(book, synced with { VCardData = ContactCertificates.Add(synced.VCardData, added) }, ct);
+        var change = Assert.Single(server.Operations("UpdateItem").Single().Descendants(T + "Updates").Single().Elements());
+        Assert.Equal("SetItemField", change.Name.LocalName);
+        Assert.Equal([Convert.ToBase64String(old), Convert.ToBase64String(added)], change.Descendants(T + "Value").Select(v => v.Value));
+    }
+
     // ── fake server ──
 
     private static XElement Item(string xml) =>

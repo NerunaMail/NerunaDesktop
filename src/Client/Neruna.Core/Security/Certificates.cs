@@ -20,6 +20,9 @@ public enum CertificateSource
 
     /// <summary>Provided by the organisation through Neruna Cloud/Control (removed here when it is no longer assigned).</summary>
     Cloud,
+
+    /// <summary>Kept with a contact in the address book (vCard KEY, Exchange/Microsoft 365: the contact's certificates), not here.</summary>
+    Contact,
 }
 
 public enum CertificateStatus
@@ -69,6 +72,23 @@ public interface ICertificateStore
     Task SaveAsync(StoredCertificate certificate, CancellationToken cancellationToken = default);
 
     Task DeleteAsync(string thumbprint, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Other people's certificates kept with their contacts (CardDAV, Exchange, Microsoft 365) instead of only on this
+/// device: they reach every device and program that uses the address book.
+/// </summary>
+public interface IContactCertificates
+{
+    /// <summary>The certificates (DER) of all contacts, with the addresses of the contact each belongs to.</summary>
+    Task<IReadOnlyList<(byte[] Der, IReadOnlyList<string> Emails)>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Adds the certificate to every writable contact with one of <paramref name="emails"/>.</summary>
+    /// <returns>Whether a contact has it now (also if it had it before); false: no such contact, or it could not be saved.</returns>
+    Task<bool> AddAsync(byte[] der, IReadOnlyCollection<string> emails, CancellationToken cancellationToken = default);
+
+    /// <summary>Takes the certificate out of every contact that has it.</summary>
+    Task RemoveAsync(byte[] der, CancellationToken cancellationToken = default);
 }
 
 public sealed class CertificatePasswordException(string message, Exception? inner = null) : Exception(message, inner);
@@ -232,13 +252,16 @@ public static class CertificateParser
 /// The user's S/MIME certificates: import, list, export, remove. Passwords of PKCS#12 containers are kept
 /// in the <see cref="ICredentialStore"/>, never in the database.
 /// </summary>
-public sealed class CertificateManager(ICertificateStore store, ICredentialStore secrets, TimeProvider clock)
+/// <param name="contacts">Where other people's certificates go when they have a contact; null: all stay on this device.</param>
+public sealed class CertificateManager(ICertificateStore store, ICredentialStore secrets, TimeProvider clock, IContactCertificates? contacts = null)
 {
     public async Task<IReadOnlyList<CertificateInfo>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var parser = new X509CertificateParser();
-        return (await store.GetAllAsync(cancellationToken))
+        var local = await store.GetAllAsync(cancellationToken);
+        return local
             .Select(s => CertificateParser.Describe(parser.ReadCertificate(s.Der), s.Pkcs12 is not null, s.Source, s.AddedAt))
+            .Concat((await ContactCertificatesAsync(local, cancellationToken)).Select(c => CertificateParser.Describe(c, false, CertificateSource.Contact, DateTimeOffset.MinValue)))
             .OrderByDescending(c => c.HasPrivateKey)
             .ThenBy(c => c.EmailAddresses.FirstOrDefault() ?? c.SubjectName, StringComparer.OrdinalIgnoreCase)
             .ThenByDescending(c => c.NotAfter)
@@ -264,6 +287,12 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
                 imported.Add(CertificateParser.Describe(certificate, false, source, now));
             }
 
+            // Someone else's certificate goes to their contact, if there is one.
+            if (source == CertificateSource.Imported)
+            {
+                await MoveToContactsAsync(cancellationToken);
+            }
+
             return imported;
         }
 
@@ -285,29 +314,104 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         return result;
     }
 
-    /// <summary>Keeps the signer certificate of a valid signature so the user can encrypt to that person later.</summary>
+    /// <summary>
+    /// Keeps the signer certificate of a valid signature so the user can encrypt to that person later: with their
+    /// contact if there is one, otherwise on this device.
+    /// </summary>
     public async Task<bool> CollectAsync(X509Certificate certificate, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(certificate);
         var thumbprint = CertificateParser.Thumbprint(certificate);
-        if ((await store.GetAllAsync(cancellationToken)).Any(c => c.Thumbprint == thumbprint))
+        var local = await store.GetAllAsync(cancellationToken);
+        if (local.Any(c => c.Thumbprint == thumbprint)
+            || (await ContactCertificatesAsync([], cancellationToken)).Any(c => CertificateParser.Thumbprint(c) == thumbprint))
         {
             return false;
+        }
+
+        if (contacts is not null && await contacts.AddAsync(certificate.GetEncoded(), CertificateParser.EmailAddresses(certificate), cancellationToken))
+        {
+            return true;
         }
 
         await store.SaveAsync(new StoredCertificate(thumbprint, certificate.GetEncoded(), null, CertificateSource.CollectedFromMail, clock.GetUtcNow()), cancellationToken);
         return true;
     }
 
+    /// <summary>
+    /// Moves other people's certificates kept on this device to their contacts, where there is one now (after a
+    /// contact was added or synced). Own certificates (with private key) and the organisation's stay here.
+    /// </summary>
+    /// <returns>How many were moved.</returns>
+    public async Task<int> MoveToContactsAsync(CancellationToken cancellationToken = default)
+    {
+        if (contacts is null)
+        {
+            return 0;
+        }
+
+        var parser = new X509CertificateParser();
+        var moved = 0;
+        foreach (var item in (await store.GetAllAsync(cancellationToken)).Where(c => c.Pkcs12 is null && c.Source is CertificateSource.CollectedFromMail or CertificateSource.Imported))
+        {
+            var certificate = parser.ReadCertificate(item.Der);
+            var emails = CertificateParser.EmailAddresses(certificate);
+            if (emails.Count > 0 && !CertificateParser.Describe(certificate, false, item.Source, item.AddedAt).IsAuthority
+                && await contacts.AddAsync(item.Der, emails, cancellationToken))
+            {
+                await store.DeleteAsync(item.Thumbprint, cancellationToken);
+                moved++;
+            }
+        }
+
+        return moved;
+    }
+
     /// <summary>The public certificate (DER), e.g. to send it to a contact.</summary>
     public async Task<byte[]> ExportPublicAsync(string thumbprint, CancellationToken cancellationToken = default) =>
         (await store.GetAllAsync(cancellationToken)).FirstOrDefault(c => c.Thumbprint == thumbprint)?.Der
+        ?? (await ContactCertificatesAsync([], cancellationToken)).FirstOrDefault(c => CertificateParser.Thumbprint(c) == thumbprint)?.GetEncoded()
         ?? throw new InvalidOperationException(T("Zertifikat nicht gefunden."));
 
+    /// <summary>Removes the certificate from this device and from the contacts that have it.</summary>
     public async Task RemoveAsync(string thumbprint, CancellationToken cancellationToken = default)
     {
+        if ((await ContactCertificatesAsync([], cancellationToken)).FirstOrDefault(c => CertificateParser.Thumbprint(c) == thumbprint) is { } withContact)
+        {
+            await contacts!.RemoveAsync(withContact.GetEncoded(), cancellationToken);
+        }
+
         await store.DeleteAsync(thumbprint, cancellationToken);
         await secrets.DeleteSecretAsync(SecretId(thumbprint), cancellationToken);
+    }
+
+    // The contacts' certificates that can be read and are not also kept here (those count as here).
+    private async Task<IReadOnlyList<X509Certificate>> ContactCertificatesAsync(IReadOnlyList<StoredCertificate> local, CancellationToken cancellationToken)
+    {
+        if (contacts is null)
+        {
+            return [];
+        }
+
+        var parser = new X509CertificateParser();
+        var known = local.Select(l => l.Thumbprint).ToHashSet(StringComparer.Ordinal);
+        var result = new List<X509Certificate>();
+        foreach (var (der, _) in await contacts.GetAllAsync(cancellationToken))
+        {
+            try
+            {
+                if (parser.ReadCertificate(der) is { } certificate && known.Add(CertificateParser.Thumbprint(certificate)))
+                {
+                    result.Add(certificate);
+                }
+            }
+            catch (Exception ex) when (ex is Org.BouncyCastle.Security.Certificates.CertificateException or IOException or ArgumentException or InvalidOperationException)
+            {
+                // A broken KEY in a contact is not a reason to fail.
+            }
+        }
+
+        return result;
     }
 
     public async Task<SecureMimeMaterial> LoadMaterialAsync(CancellationToken cancellationToken = default)
@@ -318,6 +422,12 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         var certificates = new List<X509Certificate>();
         var authorities = new List<X509Certificate>();
         var infos = new List<CertificateInfo>();
+
+        foreach (var certificate in await ContactCertificatesAsync(stored, cancellationToken))
+        {
+            certificates.Add(certificate);
+            infos.Add(CertificateParser.Describe(certificate, false, CertificateSource.Contact, DateTimeOffset.MinValue));
+        }
 
         foreach (var item in stored)
         {

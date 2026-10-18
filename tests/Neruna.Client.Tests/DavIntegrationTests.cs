@@ -264,6 +264,31 @@ public sealed class DavIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task CardDav_contact_keeps_an_smime_certificate_as_vcard_key()
+    {
+        Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");
+        var ct = TestContext.Current.CancellationToken;
+        await MakeCollectionAsync($"{_user}/kontakte/", "addressbook", "Kontakte", ct);
+        await using var env = await CreateEnvironmentAsync(ServiceKind.Contacts, ProviderIds.CardDav);
+        await env.Contacts.SyncAllAsync(ct);
+        var book = Assert.Single(await env.Contacts.GetAddressBooksAsync(ct));
+        var lea = await env.Contacts.SaveContactAsync(book, ContactDraft.Empty with { GivenName = "Lea", FamilyName = "Keller", Emails = [new ContactField("lea@example.com")] }, null, ct);
+
+        var der = TestPki.User("Lea Keller", "lea@example.com").Certificate.GetEncoded();
+        Assert.True(await env.Contacts.AddAsync(der, ["LEA@example.com"], ct));
+        Assert.False(await env.Contacts.AddAsync(der, ["nobody@example.com"], ct));
+        Assert.Contains("KEY;ENCODING=b;TYPE=X509:", (await GetStringAsync(lea.RemoteId, ct)).Replace("\r\n ", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
+
+        // Edited in Neruna afterwards: the certificate stays; then removed again.
+        var stored = (await env.Contacts.GetContactAsync(book, lea.RemoteId, ct))!;
+        await env.Contacts.SaveContactAsync(book, ContactDraft.FromVCard(stored.VCardData) with { Title = "Einkauf" }, (book, lea.RemoteId), ct);
+        await env.Contacts.SyncAllAsync(ct);
+        Assert.Equal(der, Assert.Single(await env.Contacts.GetAllAsync(ct)).Der);
+        await env.Contacts.RemoveAsync(der, ct);
+        Assert.Empty(await env.Contacts.GetAllAsync(ct));
+    }
+
+    [Fact]
     public async Task CardDav_group_with_chosen_addresses_resolves_to_recipients()
     {
         Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");

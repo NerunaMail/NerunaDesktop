@@ -15,10 +15,14 @@ namespace Neruna.Providers.Ews;
 /// </summary>
 internal sealed class EwsContactProvider(ServiceConnection connection, EwsConnectionFactory connections) : IContactProvider
 {
+    // The contact's S/MIME certificates as Outlook keeps them: PidTagUserX509Certificate (several DER blobs).
+    private const int CertificatesTag = 0x3A70;
+
     private static readonly object[] Fields =
     [
-        "item:Body", "contacts:DisplayName", "contacts:GivenName", "contacts:CompanyName", "contacts:EmailAddresses",
-        "contacts:PhysicalAddresses", "contacts:PhoneNumbers", "contacts:Birthday", "contacts:JobTitle", "contacts:Surname",
+        "item:Body", X.Extended(CertificatesTag, "BinaryArray"), "contacts:DisplayName", "contacts:GivenName", "contacts:CompanyName",
+        "contacts:EmailAddresses", "contacts:PhysicalAddresses", "contacts:PhoneNumbers", "contacts:Birthday", "contacts:JobTitle",
+        "contacts:Surname",
     ];
 
     // Where phone numbers go, by kind: the slots Exchange has (in order of use).
@@ -69,12 +73,13 @@ internal sealed class EwsContactProvider(ServiceConnection connection, EwsConnec
         ArgumentNullException.ThrowIfNull(contact);
         var client = await ClientAsync(cancellationToken);
         var fields = FieldsOf(ContactDraft.FromVCard(contact.VCardData));
+        var certificates = ContactCertificates.Read(contact.VCardData);
         string id;
         if (string.IsNullOrEmpty(contact.RemoteId))
         {
             var created = (await client.CallAsync(X.Msg("CreateItem",
                 X.Msg("SavedItemFolderId", X.FolderId(addressBook.RemoteId)),
-                X.Msg("Items", X.Typ("Contact", CreateElements(fields)))), cancellationToken)).Single();
+                X.Msg("Items", X.Typ("Contact", CreateElements(fields, certificates)))), cancellationToken)).Single();
             id = created.FirstItem().Id() ?? throw new EwsException(null, "Exchange returned no item id.");
         }
         else
@@ -89,6 +94,14 @@ internal sealed class EwsContactProvider(ServiceConnection connection, EwsConnec
             // Only what changed – fields Neruna does not edit stay untouched.
             var before = FieldsOf(ContactDraft.FromVCard(ToVCard(current))).ToDictionary(f => f.Key, f => f.Value, StringComparer.Ordinal);
             var updates = fields.Where(f => before.GetValueOrDefault(f.Key) != f.Value).Select(Update).ToList();
+            var known = CertificatesOf(current);
+            if (known.Count != certificates.Count || known.Zip(certificates).Any(p => !p.First.AsSpan().SequenceEqual(p.Second)))
+            {
+                updates.Insert(0, certificates.Count == 0
+                    ? X.Typ("DeleteItemField", X.Extended(CertificatesTag, "BinaryArray"))
+                    : X.Typ("SetItemField", X.Extended(CertificatesTag, "BinaryArray"), X.Typ("Contact", CertificatesElement(certificates))));
+            }
+
             if (updates.Count > 0)
             {
                 await client.CallAsync(X.Msg("UpdateItem", new XAttribute("ConflictResolution", "NeverOverwrite"),
@@ -142,8 +155,34 @@ internal sealed class EwsContactProvider(ServiceConnection connection, EwsConnec
             }
         }
 
-        return draft.ToVCard(card.Append("END:VCARD\r\n").ToString());
+        return ContactCertificates.WithAll(draft.ToVCard(card.Append("END:VCARD\r\n").ToString()), CertificatesOf(c));
     }
+
+    private static List<byte[]> CertificatesOf(XElement c)
+    {
+        var property = c.Elements(X.T + "ExtendedProperty").FirstOrDefault(p =>
+            p.Element(X.T + "ExtendedFieldURI")?.Attribute("PropertyTag")?.Value is { } tag
+            && int.TryParse(tag.Replace("0x", string.Empty, StringComparison.OrdinalIgnoreCase), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var t)
+            && t == CertificatesTag);
+        var result = new List<byte[]>();
+        foreach (var value in property?.Element(X.T + "Values")?.Elements(X.T + "Value") ?? [])
+        {
+            try
+            {
+                result.Add(Convert.FromBase64String(value.Value));
+            }
+            catch (FormatException)
+            {
+                // Not a certificate Neruna can use.
+            }
+        }
+
+        return result;
+    }
+
+    private static XElement CertificatesElement(IReadOnlyList<byte[]> certificates) =>
+        X.Typ("ExtendedProperty", X.Extended(CertificatesTag, "BinaryArray"),
+            X.Typ("Values", certificates.Select(c => X.Typ("Value", Convert.ToBase64String(c)))));
 
     // Exchange keeps a birthday as a point in time – often midnight in the zone of whoever entered it: the nearest day.
     private static ContactBirthday BirthdayOf(DateTimeOffset value)
@@ -197,11 +236,23 @@ internal sealed class EwsContactProvider(ServiceConnection connection, EwsConnec
     private static IEnumerable<string> Pad(List<ContactField> phones, int slots) =>
         Enumerable.Range(0, slots).Select(i => i < phones.Count ? phones[i].Value.Trim() : string.Empty);
 
-    private static IEnumerable<XElement> CreateElements(List<(string Key, string? Value)> fields)
+    private static IEnumerable<XElement> CreateElements(List<(string Key, string? Value)> fields, IReadOnlyList<byte[]> certificates)
     {
+        var bodyWritten = false;
         foreach (var group in fields.Where(f => !string.IsNullOrEmpty(f.Value)).GroupBy(f => f.Key.Split('/')[0]))
         {
             var key = group.Key;
+
+            // Schema order: the item's fields (Body, then ExtendedProperty) come before the contact's.
+            if (key != "item:Body" && !bodyWritten)
+            {
+                bodyWritten = true;
+                if (certificates.Count > 0)
+                {
+                    yield return CertificatesElement(certificates);
+                }
+            }
+
             if (key is "contacts:EmailAddress" or "contacts:PhoneNumber")
             {
                 yield return X.Typ(key == "contacts:EmailAddress" ? "EmailAddresses" : "PhoneNumbers",
@@ -211,6 +262,11 @@ internal sealed class EwsContactProvider(ServiceConnection connection, EwsConnec
             {
                 yield return Element(key, group.First().Value!);
             }
+        }
+
+        if (!bodyWritten && certificates.Count > 0)
+        {
+            yield return CertificatesElement(certificates);
         }
     }
 

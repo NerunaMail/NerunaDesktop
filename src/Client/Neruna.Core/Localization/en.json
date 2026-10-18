@@ -312,6 +312,7 @@
  "Beim Anklicken (sofort)": "When clicked (immediately)",
  "Beim Antworten oder Weiterleiten wird eine Nachricht immer als gelesen markiert, ausser bei «Nie automatisch». Manuell: Ctrl+Q bzw. «Gelesen/Ungelesen».": "Replying or forwarding always marks a message as read, except with “Never automatically”. By hand: Ctrl+Q or “Read/Unread”.",
  "Beim Ausführen erscheint eine Ordnerauswahl – das Konto der E-Mail ist vorgewählt.": "When run, a folder choice appears – the email’s account is preselected.",
+ "Beim Kontakt im Adressbuch gespeichert": "Kept with the contact in the address book",
  "Beim Laden eines Bildes erfährt der Absender, dass und wann Sie die Mail geöffnet haben, und Ihre IP-Adresse.": "When a picture loads, the sender learns that and when you opened the mail, and your IP address.",
  "Beim Schreiben «kürzel::» oder «kürzel» und Tab tippen – z. B. «tel::» – fügt die Vorlage ein.": "While writing, type “shortcut::” or “shortcut” and Tab – e.g. “tel::” – to insert the template.",
  "Beim Schreiben «kürzel::» tippen – z. B. «tel::» – fügt die Vorlage ein.": "Typing “shortcut::” while writing – e.g. “tel::” – inserts the template.",

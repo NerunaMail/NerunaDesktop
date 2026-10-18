@@ -38,7 +38,7 @@ public sealed class ContactController(
     ProviderRegistry providers,
     ISettingsStore settings,
     ILogger<ContactController> logger,
-    SyncActivity? activity = null)
+    SyncActivity? activity = null) : Security.IContactCertificates
 {
     public Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default) =>
         SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Contacts, SyncConnectionAsync, logger, cancellationToken, activity);
@@ -224,6 +224,75 @@ public sealed class ContactController(
         }
 
         await store.DeleteContactAsync(addressBook, remoteId, cancellationToken);
+    }
+
+    /// <summary>The S/MIME certificates kept with contacts (vCard KEY), with the contact's addresses.</summary>
+    public async Task<IReadOnlyList<(byte[] Der, IReadOnlyList<string> Emails)>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new List<(byte[], IReadOnlyList<string>)>();
+        foreach (var book in await store.GetAddressBooksAsync(null, cancellationToken))
+        {
+            foreach (var contact in await store.GetContactsAsync(book.ConnectionId, book.RemoteId, cancellationToken))
+            {
+                var certificates = ContactCertificates.Read(contact.VCardData);
+                if (certificates.Count > 0)
+                {
+                    var emails = VCardReader.Read(contact.VCardData).EmailAddresses;
+                    result.AddRange(certificates.Select(c => (c, emails)));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Adds the certificate to every contact (in a writable address book) with one of <paramref name="emails"/>. A
+    /// contact that cannot be saved right now is skipped; if none could take it, the certificate stays on this device.
+    /// </summary>
+    public async Task<bool> AddAsync(byte[] der, IReadOnlyCollection<string> emails, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(der);
+        ArgumentNullException.ThrowIfNull(emails);
+        var stored = false;
+        foreach (var entry in (await SearchAsync(null, cancellationToken))
+                     .Where(e => !e.AddressBook.IsReadOnly && !e.Card.IsGroup && e.Card.EmailAddresses.Any(a => emails.Contains(a, StringComparer.OrdinalIgnoreCase))))
+        {
+            try
+            {
+                var current = await GetContactAsync(entry.AddressBook, entry.RemoteId, cancellationToken);
+                if (current is not null && ContactCertificates.Read(current.VCardData).Any(c => c.AsSpan().SequenceEqual(der)))
+                {
+                    stored = true;
+                    continue;
+                }
+
+                var saved = await SaveCardAsync(entry.AddressBook, v => ContactCertificates.Add(v ?? string.Empty, der), (entry.AddressBook, entry.RemoteId), cancellationToken);
+
+                // Only if the server kept it (a provider that cannot store certificates drops the KEY).
+                stored |= ContactCertificates.Read(saved.VCardData).Any(c => c.AsSpan().SequenceEqual(der));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogInformation(ex, "Could not add a certificate to contact {Contact}", entry.RemoteId);
+            }
+        }
+
+        return stored;
+    }
+
+    /// <summary>Takes the certificate out of every contact that has it.</summary>
+    public async Task RemoveAsync(byte[] der, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(der);
+        foreach (var book in (await store.GetAddressBooksAsync(null, cancellationToken)).Where(b => !b.IsReadOnly))
+        {
+            foreach (var contact in (await store.GetContactsAsync(book.ConnectionId, book.RemoteId, cancellationToken))
+                         .Where(c => ContactCertificates.Read(c.VCardData).Any(k => k.AsSpan().SequenceEqual(der))))
+            {
+                await SaveCardAsync(book, v => ContactCertificates.Remove(v ?? string.Empty, der), (book, contact.RemoteId), cancellationToken);
+            }
+        }
     }
 
     /// <summary>Contacts across all address books whose name, organization or email contains <paramref name="query"/>.</summary>

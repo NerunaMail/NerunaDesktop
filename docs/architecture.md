@@ -412,7 +412,13 @@ Modi ausser «nie» als gelesen. Die Ordnerliste zeigt ungelesene Nachrichten al
   immer auch an den Absender, damit «Gesendet» lesbar bleibt), entschlüsseln, Signaturen prüfen in drei Stufen
   (gültig / gültig aber Aussteller nicht vertrauenswürdig / ungültig), Abgleich Signierer ↔ Absender.
 - Vertrauensanker: Stammzertifikate des Betriebssystems plus selbst importierte Zertifizierungsstellen (Firmen-CAs).
-- Zertifikate aus gültig signierten Mails werden automatisch übernommen.
+- Zertifikate aus gültig signierten Mails werden automatisch übernommen – **beim Kontakt**, wenn es einen gibt
+  (`IContactCertificates`, umgesetzt vom `ContactController`): CardDAV als vCard `KEY` (3.0 `ENCODING=b;TYPE=X509`,
+  4.0 `data:application/pkix-cert`), Exchange (EWS) und Microsoft 365 (Graph) in der Outlook-Eigenschaft
+  PidTagUserX509Certificate (0x3A70, `BinaryArray`). Lokal bleiben nur Zertifikate ohne Kontakt, eigene (mit privatem
+  Schlüssel) und die der Organisation. Lokal gespeicherte fremde Zertifikate wandern zum Kontakt, sobald es einen gibt
+  (nach dem Import und nach dem Abgleich, höchstens alle 30 min). Graph kann das letzte Zertifikat eines Kontakts nicht
+  entfernen (mehrwertige Eigenschaft lässt sich nicht leeren).
 - Noch nicht: Online-Sperrprüfung (CRL/OCSP), Auswahl bei mehreren eigenen Zertifikaten pro Adresse (heute: das am
   längsten gültige), LDAP-Zertifikatsuche, Speichern privater Schlüssel im OS-Schlüsselbund.
 

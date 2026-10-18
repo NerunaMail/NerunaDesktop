@@ -15,6 +15,11 @@ internal sealed class GraphContactProvider(Guid connectionId, GraphClient graph)
 
     private const string ContactFields = "id,changeKey,displayName,givenName,surname,companyName,jobTitle,emailAddresses,businessPhones,homePhones,mobilePhone,personalNotes";
 
+    // The contact's S/MIME certificates as Outlook keeps them: PidTagUserX509Certificate (0x3A70, several DER blobs).
+    internal const string CertificatesProperty = "BinaryArray 0x3A70";
+
+    private const string WithCertificates = "$expand=multiValueExtendedProperties($filter=id eq '" + CertificatesProperty + "')";
+
     public ContactProviderCapabilities Capabilities => ContactProviderCapabilities.Write;
 
     public async Task TestConnectionAsync(CancellationToken cancellationToken = default) =>
@@ -29,7 +34,7 @@ internal sealed class GraphContactProvider(Guid connectionId, GraphClient graph)
     {
         ArgumentNullException.ThrowIfNull(addressBook);
         ArgumentNullException.ThrowIfNull(knownVersions);
-        var contacts = await graph.GetAllAsync($"{FolderPath(addressBook)}?$select={ContactFields}&$top=250", cancellationToken);
+        var contacts = await graph.GetAllAsync($"{FolderPath(addressBook)}?$select={ContactFields}&{WithCertificates}&$top=250", cancellationToken);
         var changed = contacts
             .Where(c => !knownVersions.TryGetValue(c.Str("id")!, out var version) || version != c.Str("changeKey"))
             .Select(ToObject)
@@ -59,7 +64,8 @@ internal sealed class GraphContactProvider(Guid connectionId, GraphClient graph)
             saved = await graph.SendJsonAsync(HttpMethod.Patch, $"me/contacts/{contact.RemoteId}", body, cancellationToken);
         }
 
-        return ToObject(saved);
+        // The answer lacks the certificates: read the contact as a sync would.
+        return ToObject(await graph.GetAsync($"me/contacts/{saved.Str("id")}?$select={ContactFields}&{WithCertificates}", cancellationToken));
     }
 
     public async Task DeleteAsync(AddressBookInfo addressBook, ContactObject contact, CancellationToken cancellationToken = default)
@@ -92,7 +98,9 @@ internal sealed class GraphContactProvider(Guid connectionId, GraphClient graph)
             // Graph: "1985-04-15T11:59:00Z" (the time is meaningless).
             Birthday = ContactBirthday.Parse(c.Str("birthday")),
         };
-        return draft.ToVCard($"BEGIN:VCARD\r\nVERSION:3.0\r\nUID:{c.Str("id")}\r\nEND:VCARD\r\n");
+        var certificates = c.Arr("multiValueExtendedProperties").Where(p => string.Equals(p.Str("id"), CertificatesProperty, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(p => p.Arr("value")).Select(v => v.GetString()).OfType<string>().Select(Convert.FromBase64String);
+        return ContactCertificates.WithAll(draft.ToVCard($"BEGIN:VCARD\r\nVERSION:3.0\r\nUID:{c.Str("id")}\r\nEND:VCARD\r\n"), certificates);
     }
 
     /// <summary>A vCard (as Neruna edits it) as a Graph contact.</summary>
@@ -102,7 +110,7 @@ internal sealed class GraphContactProvider(Guid connectionId, GraphClient graph)
         bool Is(ContactField phone, string kind) => string.Equals(phone.Kind, kind, StringComparison.OrdinalIgnoreCase)
             || (phone.Kind?.Split(',').Any(k => string.Equals(k.Trim(), kind, StringComparison.OrdinalIgnoreCase)) ?? false);
         var mobile = draft.Phones.FirstOrDefault(p => Is(p, "cell"));
-        return new Dictionary<string, object?>
+        var contact = new Dictionary<string, object?>
         {
             ["givenName"] = draft.GivenName,
             ["surname"] = draft.FamilyName,
@@ -118,5 +126,14 @@ internal sealed class GraphContactProvider(Guid connectionId, GraphClient graph)
             ["homePhones"] = draft.Phones.Where(p => p != mobile && Is(p, "home")).Select(p => p.Value).ToList(),
             ["businessPhones"] = draft.Phones.Where(p => p != mobile && !Is(p, "home")).Select(p => p.Value).ToList(),
         };
+
+        // Sent only with certificates: Graph cannot clear a multi-valued property this way (removing the last one
+        // from a Microsoft 365 contact is not supported yet).
+        if (ContactCertificates.Read(vcard) is { Count: > 0 } certificates)
+        {
+            contact["multiValueExtendedProperties"] = new[] { new { id = CertificatesProperty, value = certificates.Select(Convert.ToBase64String).ToList() } };
+        }
+
+        return contact;
     }
 }
