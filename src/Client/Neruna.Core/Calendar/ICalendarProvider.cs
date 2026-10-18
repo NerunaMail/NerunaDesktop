@@ -39,6 +39,16 @@ public interface ICalendarProvider : IAsyncDisposable
     Task DeleteAsync(CalendarInfo calendar, CalendarObject item, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// A calendar whose server creates online meetings itself (Microsoft 365: Teams through Exchange): an event saved with a
+/// pending <see cref="Meetings.OnlineMeeting"/> of one of these kinds gets its link from the server.
+/// </summary>
+public interface ICalendarOnlineMeetings
+{
+    /// <returns>The <see cref="Meetings.MeetingKinds"/> the server offers for <paramref name="calendar"/>; empty if none.</returns>
+    Task<IReadOnlyList<string>> GetOnlineMeetingKindsAsync(CalendarInfo calendar, CancellationToken cancellationToken = default);
+}
+
 /// <summary>Optional: whether the server itself delivers invitations and replies (RFC 6638), or the client must e-mail them.</summary>
 public interface ICalendarScheduling
 {

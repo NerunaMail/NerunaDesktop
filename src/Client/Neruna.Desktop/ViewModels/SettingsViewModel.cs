@@ -4,7 +4,7 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news, MeetingsOptionsViewModel meetings) : ViewModelBase
 {
     /// <summary>Settings → Programm → News: the devblog.</summary>
     public NewsViewModel News => news;
@@ -44,6 +44,12 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
 
     /// <summary>Settings → KI: AI provider and model.</summary>
     public AiOptionsViewModel Ai => ai;
+
+    /// <summary>Settings → Besprechungen: Teams, Zoom, Jitsi.</summary>
+    public MeetingsOptionsViewModel Meetings => meetings;
+
+    /// <summary>Index of the «Besprechungen» tab.</summary>
+    public const int MeetingsTab = 18;
 
     /// <summary>Settings → Info: crash reports.</summary>
     public CrashReportsOptionsViewModel CrashReports => crashReports;
@@ -97,6 +103,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(14, T("Datenschutz"), "IconShield"),
         new(-1, T("Kalender"), null, IsHeading: true),
         new(2, T("Kalender"), "IconCalendar"),
+        new(MeetingsTab, T("Besprechungen"), "IconVideo"),
         new(-1, T("Daten"), null, IsHeading: true),
         new(12, T("Suchindex"), "IconSearch"),
         new(10, T("Datensicherung"), "IconArchive"),
@@ -132,6 +139,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             else if (item.Tab == 13)
             {
                 LocalData.ShowDatabaseSize();
+            }
+            else if (item.Tab == MeetingsTab)
+            {
+                _ = Meetings.LoadAsync();
             }
             else if (item.Tab == NewsTab)
             {

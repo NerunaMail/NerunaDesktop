@@ -127,7 +127,8 @@ public sealed class OAuthClient(HttpClient http)
             ["client_id"] = endpoints.ClientId,
             ["response_type"] = "code",
             ["redirect_uri"] = redirect,
-            ["scope"] = string.Join(' ', endpoints.Scopes),
+            // Without scopes the provider grants what the app is registered for (Zoom).
+            ["scope"] = endpoints.Scopes.Count > 0 ? string.Join(' ', endpoints.Scopes) : null,
             ["code_challenge"] = challenge,
             ["code_challenge_method"] = "S256",
             ["state"] = state,

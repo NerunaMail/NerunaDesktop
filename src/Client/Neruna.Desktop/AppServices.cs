@@ -95,6 +95,11 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Ai.IAiProvider>(sp => new Neruna.Providers.OpenAi.OpenAiProvider(
             sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ISettingsStore>()));
         services.AddSingleton<Neruna.Core.Ai.AiController>();
+        // Online meetings (Settings → Besprechungen); Teams in Microsoft 365 calendars comes from Exchange itself.
+        services.AddSingleton<Neruna.Core.Meetings.IMeetingProvider>(sp => new Neruna.Providers.Graph.TeamsMeetingProvider(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>()));
+        services.AddSingleton<Neruna.Core.Meetings.IMeetingProvider>(sp => new Neruna.Providers.Zoom.ZoomMeetingProvider(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>()));
+        services.AddSingleton<Neruna.Core.Meetings.IMeetingProvider>(sp => new Neruna.Core.Meetings.JitsiMeetingProvider(sp.GetRequiredService<HttpClient>()));
+        services.AddSingleton<Neruna.Core.Meetings.MeetingController>();
         if (options.Demo)
         {
             services.AddSingleton<IProviderFactory<IMailProvider>, DemoMailProviderFactory>();
@@ -167,6 +172,7 @@ internal static class AppServices
         services.AddSingleton<TextTemplatesViewModel>();
         services.AddSingleton<Neruna.Core.Mail.QuickActionService>();
         services.AddSingleton<QuickActionsViewModel>();
+        services.AddSingleton<MeetingsOptionsViewModel>();
         services.AddSingleton(sp => new AiOptionsViewModel(sp.GetRequiredService<Neruna.Core.Ai.AiController>()) { Browser = sp.GetRequiredService<Neruna.Core.Auth.IBrowserLauncher>() });
         services.AddSingleton<TextTemplateService>();
         services.AddSingleton<Neruna.Core.Workspaces.WorkspaceService>();

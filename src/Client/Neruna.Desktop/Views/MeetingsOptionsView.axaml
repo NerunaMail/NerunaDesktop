@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:meet="using:Neruna.Core.Meetings"
+             x:Class="Neruna.Desktop.Views.MeetingsOptionsView"
+             x:DataType="vm:MeetingsOptionsViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,20">
+      <TextBlock Text="{l:T 'Online-Besprechungen'}" FontSize="18" FontWeight="SemiBold" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap"
+                 Text="{l:T 'Im Termin unter «Online-Besprechung» erhalten Besprechungen einen Link für Teams, Zoom oder Jitsi. Der Link steht im Termin und in den Einladungen – die Teilnehmenden brauchen kein bestimmtes Programm.'}" />
+
+      <!-- Microsoft 365 accounts: Teams straight from Exchange -->
+      <StackPanel Spacing="6" IsVisible="{Binding HasAccounts}" Margin="0,8,0,0">
+        <TextBlock Text="{l:T 'Microsoft-365-Konten'}" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding Accounts}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:MeetingAccountRow">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="0,0,0,6">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{Binding Email}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding State}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- Set-up services -->
+      <TextBlock Text="{l:T 'Eingerichtete Dienste'}" FontWeight="SemiBold" Margin="0,8,0,0" />
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasServices}"
+                 Text="{l:T 'Noch keine. Fügen Sie unten einen Dienst hinzu.'}" />
+      <ItemsControl ItemsSource="{Binding Services}" IsVisible="{Binding HasServices}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="meet:MeetingService">
+            <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <PathIcon Data="{StaticResource IconVideo}" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,10,0"
+                          Foreground="{DynamicResource AccentTextBrush}" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <Button Grid.Column="2" Content="{l:T 'Entfernen'}"
+                        Command="{Binding $parent[UserControl].((vm:MeetingsOptionsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- Add: Teams -->
+      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,14" Margin="0,8,0,0" IsVisible="{Binding TeamsAvailable}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Microsoft Teams" FontWeight="SemiBold" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap"
+                     Text="{l:T 'Mit einem Geschäfts- oder Schulkonto anmelden – auch einem anderen als dem Mailkonto. Damit erhalten auch Termine in anderen Kalendern (Exchange im eigenen Netz, CalDAV) eine Teams-Besprechung.'}" />
+          <Button Content="{l:T 'Mit Microsoft anmelden …'}" Command="{Binding AddTeamsCommand}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Add: Zoom -->
+      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,14">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Zoom" FontWeight="SemiBold" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding ZoomAvailable}"
+                     Text="{l:T 'Mit Ihrem Zoom-Konto anmelden. Besprechungen entstehen mit Ihren Zoom-Einstellungen (Warteraum, Kenncode).'}" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding ZoomNotAvailable}"
+                     Text="{l:T 'Zoom ist in dieser Version noch nicht verfügbar.'}" />
+          <Button Content="{l:T 'Mit Zoom anmelden …'}" Command="{Binding AddZoomCommand}" IsVisible="{Binding ZoomAvailable}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Add: Jitsi -->
+      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,14">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Jitsi Meet" FontWeight="SemiBold" />
+          <TextBlock Classes="subtle" TextWrapping="Wrap"
+                     Text="{l:T 'Ohne Anmeldung: Neruna erzeugt für jede Besprechung einen eigenen Raum mit zufälligem Namen. Leer lassen für meet.jit.si oder die Adresse Ihres eigenen Jitsi-Servers angeben.'}" />
+          <Grid ColumnDefinitions="*,8,Auto">
+            <TextBox Text="{Binding JitsiServer}" PlaceholderText="{x:Static vm:MeetingsOptionsViewModel.JitsiPlaceholder}" />
+            <Button Grid.Column="2" Content="{l:T 'Hinzufügen'}" Command="{Binding AddJitsiCommand}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsSigningIn}">
+        <ProgressBar IsIndeterminate="True" Width="80" MinWidth="0" Height="4" VerticalAlignment="Center" />
+        <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelSignInCommand}" />
+      </StackPanel>
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

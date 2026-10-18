@@ -622,6 +622,22 @@ internal static class Snapshots
         await SaveAsync(window, output, "event-attendees.png");
         vm.Overlay = null;
 
+        // Online meeting: a Jitsi server set up (Einstellungen → Besprechungen), the meeting added in the editor.
+        var meetings = services.GetRequiredService<Neruna.Core.Meetings.MeetingController>();
+        await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.Meetings.MeetingController.ServicesKey, System.Text.Json.JsonSerializer.Serialize(new[]
+        {
+            new Neruna.Core.Meetings.MeetingService(Guid.NewGuid(), Neruna.Core.Meetings.MeetingKinds.Jitsi, "Jitsi Meet (meet.example.org)",
+                new Dictionary<string, string> { [Neruna.Core.Meetings.JitsiMeetingProvider.ServerKey] = "https://meet.example.org" }),
+        }));
+        var online = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal], meeting with { Location = null },
+            null, _ => "anna.muster@example.com") { Meetings = meetings };
+        vm.Overlay = online;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "event-meeting-choice.png");
+        await online.AddMeetingCommand.ExecuteAsync(null);
+        await SaveAsync(window, output, "event-meeting.png");
+        vm.Overlay = null;
+
         // Status bar → status window: per account and service how the last run went.
         await vm.SyncCommand.ExecuteAsync(null);
         vm.OpenSyncStatusCommand.Execute(null);
@@ -803,6 +819,11 @@ internal static class Snapshots
             vm.SettingsPage.SelectedTab = SettingsViewModel.NewsTab;
             await SaveAsync(window, output, "settings-news.png");
         }
+
+        // Einstellungen → Besprechungen.
+        await vm.SettingsPage.Meetings.LoadAsync();
+        vm.SettingsPage.SelectedTab = SettingsViewModel.MeetingsTab;
+        await SaveAsync(window, output, "settings-meetings.png");
 
         // Einstellungen → E-Mail → Schreiben.
         await vm.SettingsPage.MailOptions.ReloadAsync();

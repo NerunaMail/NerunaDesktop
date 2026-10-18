@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using MimeKit;
 using Neruna.Core;
 using Neruna.Core.Calendar;
+using Neruna.Core.Meetings;
 using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
@@ -132,6 +133,156 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             }))
             .ToList();
         IsOrganizer = Organizer is null || string.Equals(Organizer, me, StringComparison.OrdinalIgnoreCase);
+        Meeting = draft.Meeting;
+    }
+
+    /// <summary>Online meetings (Einstellungen → Besprechungen); null in tests without them.</summary>
+    public MeetingController? Meetings
+    {
+        get;
+        init
+        {
+            field = value;
+            _ = LoadMeetingChoicesAsync();
+        }
+    }
+
+    /// <summary>The event's online meeting (Teams, Zoom, Jitsi …); its join text is in <see cref="Description"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMeeting), nameof(ShowMeetingRow), nameof(NoMeetingServices), nameof(CanAddMeeting), nameof(MeetingTitle), nameof(MeetingUrl), nameof(IsMeetingPending), nameof(HasMeetingUrl))]
+    public partial OnlineMeeting? Meeting { get; set; }
+
+    public bool HasMeeting => Meeting is not null;
+
+    /// <summary>The row shows when there is something to choose or a meeting to show (not for a read-only event without one).</summary>
+    public bool ShowMeetingRow => HasMeeting || (CanEdit && Meetings is not null);
+
+    public string MeetingTitle => Meeting is { } m ? F("{0}-Besprechung", m.Name) : string.Empty;
+
+    public string? MeetingUrl => Meeting?.JoinUrl;
+
+    public bool HasMeetingUrl => Meeting?.JoinUrl is not null;
+
+    /// <summary>Teams through Exchange: the link comes with saving.</summary>
+    public bool IsMeetingPending => Meeting is { IsPending: true };
+
+    /// <summary>The services for this calendar: its own Teams (Microsoft 365) first, then the set-up ones.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanAddMeeting), nameof(NoMeetingServices))]
+    public partial IReadOnlyList<MeetingChoice> MeetingChoices { get; set; } = [];
+
+    [ObservableProperty]
+    public partial MeetingChoice? SelectedMeetingChoice { get; set; }
+
+    public bool CanAddMeeting => CanEdit && Meeting is null && MeetingChoices.Count > 0;
+
+    /// <summary>Nothing set up yet: the hint where to do it.</summary>
+    public bool NoMeetingServices => CanEdit && Meeting is null && MeetingChoices.Count == 0 && Meetings is not null && _choicesLoaded;
+
+    private bool _choicesLoaded;
+
+    [ObservableProperty]
+    public partial bool IsCreatingMeeting { get; set; }
+
+    private int _choicesVersion;
+
+    private async Task LoadMeetingChoicesAsync()
+    {
+        if (Meetings is not { } meetings)
+        {
+            return;
+        }
+
+        var version = ++_choicesVersion;
+        var calendar = SelectedCalendar;
+        try
+        {
+            var choices = await meetings.GetChoicesAsync(calendar);
+            if (version != _choicesVersion)
+            {
+                return;
+            }
+
+            MeetingChoices = choices;
+            SelectedMeetingChoice = choices.FirstOrDefault();
+
+            // A Teams meeting that Exchange was to create cannot come from another calendar.
+            if (Meeting is { IsPending: true } pending && !choices.Any(c => c.Service is null && c.Kind == pending.Service))
+            {
+                Meeting = null;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            MeetingChoices = [];
+        }
+
+        _choicesLoaded = true;
+        OnPropertyChanged(nameof(NoMeetingServices));
+    }
+
+    [RelayCommand]
+    private async Task AddMeetingAsync()
+    {
+        if (Meetings is not { } meetings || SelectedMeetingChoice is not { } choice || StartDate is null)
+        {
+            return;
+        }
+
+        Error = null;
+        IsCreatingMeeting = true;
+        try
+        {
+            var start = StartDate.Value.Date + (IsAllDay ? TimeSpan.Zero : StartTime ?? TimeSpan.FromHours(9));
+            var end = IsAllDay ? (EndDate ?? StartDate).Value.Date.AddDays(1) : (EndDate ?? StartDate).Value.Date + (EndTime ?? TimeSpan.FromHours(10));
+            var meeting = await meetings.CreateAsync(choice, new MeetingRequest(string.IsNullOrWhiteSpace(Title) ? T("Besprechung") : Title.Trim(), start, end > start ? end : start.AddHours(1)));
+            if (!meeting.IsPending)
+            {
+                Description = meeting.AddTo(Description);
+                if (string.IsNullOrWhiteSpace(Location))
+                {
+                    Location = F("{0}-Besprechung", meeting.Name);
+                }
+            }
+
+            Meeting = meeting;
+        }
+        catch (MeetingException ex)
+        {
+            Error = ex.SignInRequired
+                ? T("Die Anmeldung beim Besprechungsdienst ist abgelaufen. Bitte unter Einstellungen → Besprechungen erneut verbinden.")
+                : ex.Message;
+        }
+        catch (HttpRequestException ex)
+        {
+            Error = T("Die Besprechung konnte nicht erstellt werden: ") + ex.Message;
+        }
+        finally
+        {
+            IsCreatingMeeting = false;
+        }
+    }
+
+    /// <summary>Takes the meeting out of the event (its join text and, if Neruna set it, the place).</summary>
+    [RelayCommand]
+    private void RemoveMeeting()
+    {
+        if (Meeting is not { } meeting)
+        {
+            return;
+        }
+
+        if (meeting.JoinUrl is { } url)
+        {
+            Description = OnlineMeeting.RemoveFrom(Description, url);
+        }
+
+        if (Location.Trim() == F("{0}-Besprechung", meeting.Name))
+        {
+            Location = string.Empty;
+        }
+
+        Meeting = null;
     }
 
     /// <summary>Contacts suggested while typing the attendees (none in tests).</summary>
@@ -267,7 +418,11 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     partial void OnAttendeesTextChanged(string value) => CheckConflictsLater();
 
-    partial void OnSelectedCalendarChanged(CalendarInfo? value) => CheckConflictsLater();
+    partial void OnSelectedCalendarChanged(CalendarInfo? value)
+    {
+        CheckConflictsLater();
+        _ = LoadMeetingChoicesAsync();
+    }
 
     /// <summary>"Lea Keller hat zur gleichen Zeit: Kundentermin 09:00–10:00" – for people whose calendar Neruna knows.</summary>
     [ObservableProperty]
@@ -352,6 +507,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             Reminder.Minutes, IsOrganizer ? attendees : null, me)
         {
             ShowAs = (ShowAs ?? ShowAsOption.Of(Neruna.Core.Calendar.ShowAs.Busy)).Value,
+            Meeting = Meeting,
         };
         await RunAsync(async () =>
         {

@@ -25,6 +25,20 @@ public static class MicrosoftAccount
         AppRedirect = new Uri($"msal{ClientId}://auth"),
     };
 
+    /// <summary>
+    /// A sign-in only for Teams meetings (Einstellungen → Besprechungen), e.g. with another Microsoft account than the
+    /// mail account, or for calendars elsewhere (Exchange in your own network, CalDAV). Work or school accounts only:
+    /// Microsoft does not let apps create meetings for personal accounts.
+    /// </summary>
+    public static OAuthEndpoints TeamsEndpoints { get; } = new(
+        new Uri("https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize"),
+        new Uri("https://login.microsoftonline.com/organizations/oauth2/v2.0/token"),
+        ClientId,
+        ["offline_access", "openid", "email", "User.Read", OnlineMeetingsScope]);
+
+    /// <summary>Create Teams meetings (delegated, no admin consent needed).</summary>
+    public const string OnlineMeetingsScope = "OnlineMeetings.ReadWrite";
+
     /// <summary>Microsoft To Do; added in 0.1.14 – accounts signed in before get tasks after signing in again.</summary>
     public const string TasksScope = "Tasks.ReadWrite";
 

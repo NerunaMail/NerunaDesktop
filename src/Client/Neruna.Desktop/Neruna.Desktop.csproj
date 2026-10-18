@@ -43,6 +43,7 @@
     <ProjectReference Include="..\Providers\Neruna.Providers.Ews\Neruna.Providers.Ews.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Graph\Neruna.Providers.Graph.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.OpenAi\Neruna.Providers.OpenAi.csproj" />
+    <ProjectReference Include="..\Providers\Neruna.Providers.Zoom\Neruna.Providers.Zoom.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Ics\Neruna.Providers.Ics.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Pst\Neruna.Providers.Pst.csproj" />
     <ProjectReference Include="..\Providers\Neruna.Providers.Special\Neruna.Providers.Special.csproj" />

@@ -13,6 +13,7 @@
     <Project Path="src/Client/Providers/Neruna.Providers.Special/Neruna.Providers.Special.csproj" />
     <Project Path="src/Client/Providers/Neruna.Providers.Imap/Neruna.Providers.Imap.csproj" />
     <Project Path="src/Client/Providers/Neruna.Providers.OpenAi/Neruna.Providers.OpenAi.csproj" />
+    <Project Path="src/Client/Providers/Neruna.Providers.Zoom/Neruna.Providers.Zoom.csproj" />
     <Project Path="src/Client/Providers/Neruna.Providers.Pst/Neruna.Providers.Pst.csproj" />
   </Folder>
   <Folder Name="/Shared/">

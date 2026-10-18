@@ -1,6 +1,6 @@
 # Neruna – Architektur
 
-Stand: 2026-10-14 · lebendes Dokument, wird mit dem Code nachgeführt.
+Stand: 2026-10-18 · lebendes Dokument, wird mit dem Code nachgeführt.
 
 ## 1. Produkte
 
@@ -611,6 +611,23 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   Termine einer Serie, Kontaktbilder.
 - Google später: OAuth über die bestehenden IMAP-/DAV-Provider; Mailzugriff ist bei Google ein «restricted scope»
   (Verifizierung und jährliche Sicherheitsprüfung ab 100 Nutzern). Bis dahin IMAP mit App-Passwort.
+
+## 6e. Online-Besprechungen
+
+- `Neruna.Core.Meetings`: `MeetingController` (Einstellungen → Besprechungen, Einstellung `meetings.services`, pro Gerät
+  wie die Tokens, nicht in der Einstellungssicherung) und `IMeetingProvider` je Dienst: Teams (`TeamsMeetingProvider`
+  im Graph-Projekt, eigene Anmeldung mit `OnlineMeetings.ReadWrite` über `/organizations`, nur Geschäfts-/Schulkonten),
+  Zoom (`Neruna.Providers.Zoom`, Public Client mit PKCE, Rückleitung `http://127.0.0.1:{port}/`; aus, solange
+  `ZoomAccount.ClientId` leer ist) und Jitsi (ohne Anmeldung: Server-Adresse + zufälliger Raumname, eigene Server möglich).
+- Kalender, deren Server selbst Besprechungen erstellt, melden das über `ICalendarOnlineMeetings`: Microsoft 365 bietet
+  Teams an, wenn `allowedOnlineMeetingProviders` des Kalenders `teamsForBusiness` enthält. Dann geht der Termin mit
+  `isOnlineMeeting` an Exchange, das die Besprechung samt Einladungstext erstellt – ohne Teams-Add-in, ohne weitere
+  Berechtigung. Ein Teams-Termin bleibt online (Graph kann das nicht zurücknehmen).
+- Im Termin: RFC 7986 `CONFERENCE` (mit `LABEL`), bei Teams zusätzlich `X-MICROSOFT-SKYPETEAMSMEETINGURL`, der Dienst in
+  `X-NERUNA-MEETING` (ohne Link = Exchange erstellt ihn beim Speichern). Dazu der Teilnahmetext zwischen zwei Linien in
+  der Beschreibung, damit jeder Empfänger den Link hat. Links aus anderen Programmen (Teams, Zoom, Google Meet) werden
+  erkannt. Google Meet folgt.
+- Noch nicht: Zoom-/Teams-Besprechung mitverschieben oder löschen, wenn der Termin sich ändert (der Link bleibt gültig).
 
 ## 6f. KI-Funktionen
 

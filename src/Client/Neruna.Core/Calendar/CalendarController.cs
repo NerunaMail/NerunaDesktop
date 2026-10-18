@@ -355,6 +355,35 @@ public sealed class CalendarController(
         return result;
     }
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlyList<string>> _meetingKinds = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The online meetings the calendar's server creates itself (Teams in Microsoft 365); asked once per calendar.
+    /// Empty if none, or if the server cannot be asked right now (then asked again next time).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetOnlineMeetingKindsAsync(CalendarInfo calendar, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        var key = $"{calendar.ConnectionId:N}|{calendar.RemoteId}";
+        if (_meetingKinds.TryGetValue(key, out var known))
+        {
+            return known;
+        }
+
+        try
+        {
+            await using var provider = providers.CreateCalendar(await ConnectionAsync(calendar.ConnectionId, cancellationToken));
+            var kinds = provider is ICalendarOnlineMeetings meetings ? await meetings.GetOnlineMeetingKindsAsync(calendar, cancellationToken) : [];
+            _meetingKinds[key] = kinds;
+            return kinds;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogInformation(ex, "Could not ask {Calendar} about online meetings", calendar.RemoteId);
+            return [];
+        }
+    }
+
     /// <exception cref="RemoteConflictException">Someone changed the event on the server; sync and retry.</exception>
     public async Task DeleteEventAsync(CalendarInfo calendar, string remoteId, CancellationToken cancellationToken = default)
     {

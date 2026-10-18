@@ -4,6 +4,7 @@
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:cal="using:Neruna.Core.Calendar"
              xmlns:ctl="using:Neruna.Desktop.Controls"
+             xmlns:meet="using:Neruna.Core.Meetings"
              x:Class="Neruna.Desktop.Views.EventEditorView"
              x:DataType="vm:EventEditorViewModel">
 
@@ -19,6 +20,44 @@
 
     <TextBlock Classes="label" Text="{l:T 'Ort'}" />
     <TextBox Text="{Binding Location}" IsReadOnly="{Binding IsReadOnly}" />
+
+    <!-- Online meeting: Teams through the account, or a service from Einstellungen → Besprechungen -->
+    <TextBlock Classes="label" Text="{l:T 'Online-Besprechung'}" IsVisible="{Binding ShowMeetingRow}" />
+    <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding CanAddMeeting}">
+      <ComboBox ItemsSource="{Binding MeetingChoices}" SelectedItem="{Binding SelectedMeetingChoice}" HorizontalAlignment="Stretch">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="meet:MeetingChoice">
+            <TextBlock Text="{Binding Name}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <Button Grid.Column="2" Command="{Binding AddMeetingCommand}" IsEnabled="{Binding !IsCreatingMeeting}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <PathIcon Data="{StaticResource IconVideo}" Width="14" Height="14" />
+          <TextBlock Text="{l:T 'Hinzufügen'}" />
+        </StackPanel>
+      </Button>
+    </Grid>
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding NoMeetingServices}"
+               Text="{l:T 'Teams, Zoom oder Jitsi richten Sie unter Einstellungen → Besprechungen ein. Termine in einem Microsoft-365-Kalender bieten Teams direkt an.'}" />
+    <Border IsVisible="{Binding HasMeeting}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,8">
+      <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+        <PathIcon Data="{StaticResource IconVideo}" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,10,0"
+                  Foreground="{DynamicResource AccentTextBrush}" />
+        <TextBlock Grid.Column="1" Text="{Binding MeetingTitle}" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+          <Button Content="{l:T 'Teilnehmen'}" Click="OnJoinMeeting" IsVisible="{Binding HasMeetingUrl}" />
+          <Button Content="{l:T 'Link kopieren'}" Click="OnCopyMeetingLink" IsVisible="{Binding HasMeetingUrl}" />
+          <Button Content="{l:T 'Entfernen'}" Command="{Binding RemoveMeetingCommand}" IsVisible="{Binding CanEdit}" />
+        </StackPanel>
+        <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,0"
+                   Text="{Binding MeetingUrl}" IsVisible="{Binding HasMeetingUrl}" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,0"
+                   Text="{l:T 'Exchange erstellt die Teams-Besprechung beim Speichern; der Link steht dann im Termin und in den Einladungen.'}"
+                   IsVisible="{Binding IsMeetingPending}" />
+      </Grid>
+    </Border>
+    <ProgressBar IsIndeterminate="True" Height="4" MinWidth="0" Margin="0,6,0,0" IsVisible="{Binding IsCreatingMeeting}" />
 
     <CheckBox Content="{l:T 'Ganztägig'}" IsChecked="{Binding IsAllDay}" IsEnabled="{Binding CanEdit}" Margin="0,10,0,0" />
 

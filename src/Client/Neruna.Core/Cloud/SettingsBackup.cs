@@ -136,7 +136,7 @@ public sealed class SettingsBackupService(
         return output.ToArray();
     }
 
-    private static readonly string[] DeviceSettings = ["cloud.", "chat.", "vault.", "ui.layout", "mail.collapsedFolders", "mail.agendaOpen", "mail.lastFolder", "autoreply.cache", "ai.", "search."];
+    private static readonly string[] DeviceSettings = ["cloud.", "chat.", "vault.", "ui.layout", "mail.collapsedFolders", "mail.agendaOpen", "mail.lastFolder", "autoreply.cache", "ai.", "search.", "meetings."];
 
     public static bool IsPersonalSetting(string key) => !DeviceSettings.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal));
 

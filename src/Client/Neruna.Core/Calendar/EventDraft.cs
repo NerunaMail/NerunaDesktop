@@ -110,6 +110,9 @@ public sealed record EventDraft(
     /// </summary>
     public ShowAs ShowAs { get; init; } = ShowAs.Busy;
 
+    /// <summary>The online meeting (Teams, Zoom, Jitsi …); null: none. Its join text is part of <see cref="Description"/>.</summary>
+    public Meetings.OnlineMeeting? Meeting { get; init; }
+
     /// <summary>The Microsoft property for tentative and away (TRANSP knows only free and busy).</summary>
     public const string BusyStatusProperty = "X-MICROSOFT-CDO-BUSYSTATUS";
 
@@ -171,6 +174,7 @@ public sealed record EventDraft(
             AddressOf(master.Organizer?.Value))
         {
             ShowAs = ShowAsOf(master),
+            Meeting = Meetings.OnlineMeeting.Of(master),
         };
     }
 
@@ -290,6 +294,7 @@ public sealed record EventDraft(
         ApplyReminder(master);
         ApplyAttendees(master);
         ApplyShowAs(master, ShowAs);
+        Meetings.OnlineMeeting.Apply(master, Meeting);
 
         // Other clients only pick up changes reliably when SEQUENCE and DTSTAMP move forward.
         if (existingData is not null)

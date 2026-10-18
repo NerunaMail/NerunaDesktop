@@ -6,6 +6,7 @@ using Ical.Net.DataTypes;
 using Ical.Net.Serialization;
 using Neruna.Core;
 using Neruna.Core.Calendar;
+using Neruna.Core.Meetings;
 using CalendarObject = Neruna.Core.Calendar.CalendarObject;
 using ICalendar = Ical.Net.Calendar;
 
@@ -16,7 +17,7 @@ namespace Neruna.Providers.Graph;
 /// what it sees from CalDAV. The version of an event is Graph's change key. The server delivers invitations itself.
 /// Not (yet) mapped: changed single occurrences of a series.
 /// </summary>
-internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy
+internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy, ICalendarOnlineMeetings
 {
     /// <summary>
     /// Free/busy of people in the organisation (getSchedule) – also without their calendar being shared; subject and
@@ -64,7 +65,26 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
         return new Availability(email, slots);
     }
 
-    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs";
+    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs,isOnlineMeeting,onlineMeetingProvider,onlineMeeting";
+
+    /// <summary>
+    /// Teams, where the organisation has it for this calendar (work or school accounts): Exchange then creates the
+    /// meeting itself when the event is saved – no Teams add-in, no further permission.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetOnlineMeetingKindsAsync(CalendarInfo calendar, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        if (GraphTasks.IsTaskList(calendar))
+        {
+            return [];
+        }
+
+        var info = await graph.GetAsync($"me/calendars/{calendar.RemoteId}?$select=allowedOnlineMeetingProviders", cancellationToken);
+        return info.Arr("allowedOnlineMeetingProviders").Any(p => p.GetString() == TeamsProvider) ? [MeetingKinds.Teams] : [];
+    }
+
+    // Graph's name of Teams (personal accounts have "skypeForConsumer", which cannot be created any more).
+    private const string TeamsProvider = "teamsForBusiness";
 
     public CalendarProviderCapabilities Capabilities => CalendarProviderCapabilities.Write | CalendarProviderCapabilities.Scheduling;
 
@@ -222,6 +242,12 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
             });
         }
 
+        // The join link Exchange created (Teams), for the editor's "Teilnehmen" and other programs.
+        if (e.Bool("isOnlineMeeting") && e.Obj("onlineMeeting").Str("joinUrl") is { Length: > 0 } joinUrl)
+        {
+            OnlineMeeting.Apply(evt, new OnlineMeeting(e.Str("onlineMeetingProvider") == TeamsProvider ? MeetingKinds.Teams : MeetingKinds.FromUrl(joinUrl), joinUrl));
+        }
+
         if (e.Bool("isReminderOn"))
         {
             evt.Alarms.Add(new Alarm { Action = "DISPLAY", Description = evt.Summary, Trigger = new Trigger(Duration.FromMinutes(-e.Int("reminderMinutesBeforeStart"))) });
@@ -240,7 +266,7 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
         object When(DateTime value) => new { dateTime = value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture), timeZone = zone };
         var start = draft.IsAllDay ? draft.Start.Date : draft.Start;
         var end = draft.IsAllDay ? (draft.End.Date > draft.Start.Date ? draft.End.Date : draft.Start.Date.AddDays(1)) : draft.End;
-        return new Dictionary<string, object?>
+        var graphEvent = new Dictionary<string, object?>
         {
             ["subject"] = draft.Summary,
             ["body"] = new { contentType = "text", content = draft.Description ?? string.Empty },
@@ -260,6 +286,16 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
             ["attendees"] = (draft.Attendees ?? []).Select(a => new { emailAddress = new { address = a.Email, name = a.Name }, type = "required" }).ToList(),
             ["recurrence"] = master?.RecurrenceRule is { } rule ? GraphRecurrence(rule, DateOnly.FromDateTime(start)) : null,
         };
+
+        // A Teams meeting still to be created: Exchange makes it and adds the join text to the body. Once there it
+        // stays (Graph cannot turn it off again), so later saves leave these fields alone.
+        if (draft.Meeting is { IsPending: true, Service: MeetingKinds.Teams })
+        {
+            graphEvent["isOnlineMeeting"] = true;
+            graphEvent["onlineMeetingProvider"] = TeamsProvider;
+        }
+
+        return graphEvent;
     }
 
     private static (DateTime Value, string Zone) DateOf(JsonElement when)

@@ -133,6 +133,27 @@ public class GraphProviderTests
     }
 
     [Fact]
+    public void Teams_meeting_is_asked_from_exchange_and_its_link_read_back()
+    {
+        var pending = (EventDraft.New(new DateTime(2026, 11, 3, 10, 0, 0), null) with { Summary = "Projekt" })
+            with { Meeting = new Neruna.Core.Meetings.OnlineMeeting(Neruna.Core.Meetings.MeetingKinds.Teams, null) };
+        var asked = JsonSerializer.SerializeToElement(GraphCalendarProvider.ToGraph(pending.ToICalendar(null)));
+        Assert.True(asked.GetProperty("isOnlineMeeting").GetBoolean());
+        Assert.Equal("teamsForBusiness", asked.GetProperty("onlineMeetingProvider").GetString());
+
+        var created = JsonDocument.Parse("""
+            {"id":"E1","subject":"Projekt","start":{"dateTime":"2026-11-03T10:00:00","timeZone":"UTC"},"end":{"dateTime":"2026-11-03T11:00:00","timeZone":"UTC"},
+             "isOnlineMeeting":true,"onlineMeetingProvider":"teamsForBusiness","onlineMeeting":{"joinUrl":"https://teams.microsoft.com/l/meetup-join/19%3ameeting_x"}}
+            """).RootElement;
+        var draft = EventDraft.FromICalendar(GraphCalendarProvider.ToICalendar(created));
+        Assert.Equal(new Neruna.Core.Meetings.OnlineMeeting(Neruna.Core.Meetings.MeetingKinds.Teams, "https://teams.microsoft.com/l/meetup-join/19%3ameeting_x"), draft.Meeting);
+
+        // Saved again: the meeting exists, nothing is asked any more.
+        var again = JsonSerializer.SerializeToElement(GraphCalendarProvider.ToGraph(draft.ToICalendar(null)));
+        Assert.False(again.TryGetProperty("isOnlineMeeting", out _));
+    }
+
+    [Fact]
     public void Events_become_icalendar_with_time_zone_series_and_attendees_and_back()
     {
         var graphEvent = JsonDocument.Parse("""

@@ -12,7 +12,7 @@ namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Week view across all calendars, whatever provider they come from.</summary>
 internal sealed partial class CalendarViewModel(CalendarController calendar, TaskController tasks, InvitationService invitations, ISettingsStore settings,
-    Infrastructure.RecipientDirectory recipients, Neruna.Core.Workspaces.WorkspaceService workspaces) : ViewModelBase, ICollectionListHost
+    Infrastructure.RecipientDirectory recipients, Neruna.Core.Workspaces.WorkspaceService workspaces, Neruna.Core.Meetings.MeetingController meetings) : ViewModelBase, ICollectionListHost
 {
     internal static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
@@ -458,6 +458,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var editor = new EventEditorViewModel(calendar, invitations, writable, draft, existing, c => owners.GetValueOrDefault(c.ConnectionId))
         {
             Recipients = recipients,
+            Meetings = meetings,
         };
         if (existing is null && await settings.GetAsync(SettingKeys.CalendarDefaultCalendar) is { Length: > 0 } preferred
             && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == preferred) is { } standard)
