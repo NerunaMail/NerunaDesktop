@@ -251,7 +251,9 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             var matches = sender is not null && emails.Contains(sender, StringComparer.OrdinalIgnoreCase);
             result.Add(new SignatureInfo(name, emails, issuer, status, matches, signature.CreationDate == default ? null : new DateTimeOffset(signature.CreationDate, TimeSpan.Zero), detail));
 
-            if (status != SignatureStatus.Invalid && certificate is not null && await certificates.CollectAsync(certificate, cancellationToken))
+            // Only a trusted certificate of the sender itself may go to the sender's (shared) contact.
+            if (status != SignatureStatus.Invalid && certificate is not null
+                && await certificates.CollectAsync(certificate, verified: status == SignatureStatus.Valid && matches, cancellationToken))
             {
                 logger.LogInformation("Collected S/MIME certificate of {Signer}", string.Join(", ", emails));
             }

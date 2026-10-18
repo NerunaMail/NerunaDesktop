@@ -56,6 +56,13 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
 
     public bool HasActions => Actions.Count > 0;
 
+    /// <summary>Some actions were made from suggestions: the export asks whether to include them.</summary>
+    public bool HasSuggestedActions => _actions.Any(a => a.IsSuggested);
+
+    /// <summary>"Auch automatisch erstellte exportieren" – off: only the actions set up by hand (e.g. for the company).</summary>
+    [ObservableProperty]
+    public partial bool ExportSuggested { get; set; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsEditing), nameof(IsListing))]
     public partial QuickActionEditor? Editing { get; set; }
@@ -121,6 +128,7 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         }
 
         OnPropertyChanged(nameof(HasActions));
+        OnPropertyChanged(nameof(HasSuggestedActions));
     }
 
     // Imported from another computer: a save folder that does not exist here is pointed out (to adjust it).
@@ -143,7 +151,14 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
     [RelayCommand]
     private async Task ExportAsync()
     {
-        if (_actions.Count == 0 || await files.PickFolderAsync(T("Ordner für die Schnellaktionen")) is not { } folder)
+        var exported = _actions.Where(a => ExportSuggested || !a.IsSuggested).ToList();
+        if (exported.Count == 0)
+        {
+            Notice = T("Es gibt nur automatisch erstellte Schnellaktionen – zum Exportieren «Auch automatisch erstellte exportieren» einschalten.");
+            return;
+        }
+
+        if (await files.PickFolderAsync(T("Ordner für die Schnellaktionen")) is not { } folder)
         {
             return;
         }
@@ -153,7 +168,7 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            foreach (var action in _actions)
+            foreach (var action in exported)
             {
                 // Two actions with the same text: "Name (2)".
                 var name = FileService.SanitizeFileName(action.Label);
@@ -166,7 +181,7 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
                 await File.WriteAllTextAsync(Path.Combine(folder, unique + FileExtension), QuickActionService.Export([action], stamps, accountAddresses, templateNames));
             }
 
-            Notice = _actions.Count == 1 ? F("1 Schnellaktion nach «{0}» exportiert.", folder) : F("{0} Schnellaktionen nach «{1}» exportiert – eine Datei pro Aktion.", _actions.Count, folder);
+            Notice = exported.Count == 1 ? F("1 Schnellaktion nach «{0}» exportiert.", folder) : F("{0} Schnellaktionen nach «{1}» exportiert – eine Datei pro Aktion.", exported.Count, folder);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -452,6 +467,8 @@ internal sealed record QuickActionItem(QuickAction Action, string Summary, strin
     public string Label => Action.Label;
 
     public string Color => Action.Color;
+
+    public bool IsSuggested => Action.IsSuggested;
 }
 
 internal sealed record EditorOptions(
@@ -494,6 +511,7 @@ internal sealed partial class StampEditor(PdfStamp stamp, Func<StampEditor, Task
 internal sealed partial class QuickActionEditor : ObservableObject
 {
     private readonly Guid _id;
+    private readonly bool _suggested;
     private readonly EditorOptions _options;
     private readonly IFileService _files;
     private readonly Func<QuickAction, Task> _save;
@@ -502,6 +520,7 @@ internal sealed partial class QuickActionEditor : ObservableObject
     public QuickActionEditor(QuickAction action, EditorOptions options, IFileService files, Func<QuickAction, Task> save, Action cancel)
     {
         _id = action.Id;
+        _suggested = action.IsSuggested;
         _options = options;
         _files = files;
         _save = save;
@@ -648,6 +667,7 @@ internal sealed partial class QuickActionEditor : ObservableObject
         [.. Steps.Select(s => s.ToStep())])
     {
         Shortcut = Shortcut.Length > 0 ? Shortcut : null,
+        IsSuggested = _suggested,
     });
 
     [RelayCommand]

@@ -62,12 +62,12 @@ internal sealed partial class ReadingPaneView : UserControl
             var size = shown.DesiredSize;
             Canvas.SetLeft(shown, stamp is null ? point.X : point.X - (size.Width / 2));
             Canvas.SetTop(shown, stamp is null ? point.Y : point.Y - (size.Height / 2));
-            image.Cursor = new Cursor(StandardCursorType.None);
+            image.Cursor = NoCursor;
         }
         else
         {
             // Text not typed yet: where it will start.
-            image.Cursor = new Cursor(StandardCursorType.Ibeam);
+            image.Cursor = TextCursor;
         }
     }
 
@@ -134,6 +134,10 @@ internal sealed partial class ReadingPaneView : UserControl
         Foreground = Avalonia.Media.Brush.Parse(color),
         Opacity = 0.7,
     };
+
+    // Made once: a cursor holds a native handle.
+    private static readonly Cursor NoCursor = new(StandardCursorType.None);
+    private static readonly Cursor TextCursor = new(StandardCursorType.Ibeam);
 
     // The stamp is written in Helvetica (PDF base font); on screen the closest the system has.
     private static readonly Avalonia.Media.FontFamily GhostFont = new("Helvetica, Arial, Liberation Sans, sans-serif");

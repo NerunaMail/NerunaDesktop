@@ -80,7 +80,10 @@ public sealed class QuickActionSuggestions(ISettingsStore settings, QuickActionS
         var label = F("{0} → {1}", Shorten(suggestion.SenderName), suggestion.FolderName);
         var action = new QuickAction(Guid.NewGuid(), label, color,
             new QuickActionCondition { SenderContains = suggestion.Sender, AccountId = suggestion.AccountId },
-            [new QuickActionStep(QuickActionStepKind.MarkRead), new QuickActionStep(QuickActionStepKind.MoveToFolder) { FolderRemoteId = suggestion.FolderRemoteId, FolderName = suggestion.FolderName }]);
+            [new QuickActionStep(QuickActionStepKind.MarkRead), new QuickActionStep(QuickActionStepKind.MoveToFolder) { FolderRemoteId = suggestion.FolderRemoteId, FolderName = suggestion.FolderName }])
+        {
+            IsSuggested = true,
+        };
         actions.Add(action);
         await quickActions.SaveActionsAsync(actions, cancellationToken);
         return action;

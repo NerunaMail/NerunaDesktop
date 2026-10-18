@@ -52,14 +52,18 @@ public class ContactCertificatesTests
 
         var lea = TestPki.User("Lea Keller", "lea@example.com").Certificate;
         var nadia = TestPki.User("Nadia Rossi", "nadia@example.com").Certificate;
-        Assert.True(await manager.CollectAsync(lea, ct));
-        Assert.True(await manager.CollectAsync(nadia, ct));
-        Assert.False(await manager.CollectAsync(lea, ct));
+        Assert.True(await manager.CollectAsync(lea, verified: true, ct));
+        Assert.True(await manager.CollectAsync(nadia, verified: true, ct));
+        Assert.False(await manager.CollectAsync(lea, verified: true, ct));
+
+        // Not verified (self-made, or not the sender's): never into the shared address book, not even later.
+        var forged = TestPki.User("Lea Keller", "lea@example.com").Certificate;
+        Assert.True(await manager.CollectAsync(forged, verified: false, ct));
 
         Assert.Single(contacts.Stored);
         var all = await manager.GetAllAsync(ct);
-        Assert.Equal(CertificateSource.Contact, all.Single(c => c.Covers("lea@example.com")).Source);
-        Assert.Equal(CertificateSource.CollectedFromMail, all.Single(c => c.Covers("nadia@example.com")).Source);
+        Assert.Equal(CertificateSource.Contact, all.Single(c => c.Covers("lea@example.com") && c.Source != CertificateSource.CollectedFromMail).Source);
+        Assert.Equal(CertificateSource.CollectedVerified, all.Single(c => c.Covers("nadia@example.com")).Source);
 
         // Encrypting to Lea uses the contact's certificate.
         Assert.Contains((await manager.LoadMaterialAsync(ct)).Infos, i => i.Covers("lea@example.com"));
@@ -67,10 +71,11 @@ public class ContactCertificatesTests
         // Nadia gets a contact: her certificate moves there.
         contacts.Addresses.Add("nadia@example.com");
         Assert.Equal(1, await manager.MoveToContactsAsync(ct));
-        Assert.All(await manager.GetAllAsync(ct), c => Assert.Equal(CertificateSource.Contact, c.Source));
+        Assert.Equal(2, contacts.Stored.Count);
+        Assert.Equal(CertificateSource.CollectedFromMail, Assert.Single(await manager.GetAllAsync(ct), c => c.Source != CertificateSource.Contact).Source);
 
         await manager.RemoveAsync(Neruna.Core.Security.CertificateParser.Thumbprint(lea), ct);
-        Assert.DoesNotContain(await manager.GetAllAsync(ct), c => c.Covers("lea@example.com"));
+        Assert.DoesNotContain(await manager.GetAllAsync(ct), c => c.Covers("lea@example.com") && c.Source == CertificateSource.Contact);
     }
 
     [Fact]

@@ -688,7 +688,7 @@ public sealed class SettingsBackupService(
         {
             Connections = [.. a.Connections.Select(c => c.ProviderId.StartsWith(ProviderIds.Graph, StringComparison.Ordinal) ? c with { Secret = null } : c)],
         })],
-        Certificates = [.. content.Certificates.Where(c => c.Source != CertificateSource.CollectedFromMail)],
+        Certificates = [.. content.Certificates.Where(c => c.Source is not (CertificateSource.CollectedFromMail or CertificateSource.CollectedVerified))],
     };
 
     private static List<WrappedKey> Keys(CloudVault info) =>

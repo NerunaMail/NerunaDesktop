@@ -126,7 +126,7 @@ public class SecureMimeTests
         Assert.Contains("12 %", MessageContent.From(opened.Readable).PlainText, StringComparison.Ordinal);
 
         // Bob now has Anna's certificate and could answer encrypted.
-        Assert.Contains(await bobEnv.Get<CertificateManager>().GetAllAsync(ct), c => c.Covers("anna@example.com") && c.Source == CertificateSource.CollectedFromMail);
+        Assert.Contains(await bobEnv.Get<CertificateManager>().GetAllAsync(ct), c => c.Covers("anna@example.com") && c.Source is CertificateSource.CollectedFromMail or CertificateSource.CollectedVerified);
 
         // Anna can still read her own sent copy.
         var own = await annaEnv.Get<SecureMimeService>().OpenAsync(Reparse(message), ct);

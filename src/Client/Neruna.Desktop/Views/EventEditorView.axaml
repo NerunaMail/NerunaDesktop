@@ -48,7 +48,7 @@
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
           <Button Content="{l:T 'Teilnehmen'}" Click="OnJoinMeeting" IsVisible="{Binding HasMeetingUrl}" />
           <Button Content="{l:T 'Link kopieren'}" Click="OnCopyMeetingLink" IsVisible="{Binding HasMeetingUrl}" />
-          <Button Content="{l:T 'Entfernen'}" Command="{Binding RemoveMeetingCommand}" IsVisible="{Binding CanEdit}" />
+          <Button Content="{l:T 'Entfernen'}" Command="{Binding RemoveMeetingCommand}" IsVisible="{Binding CanRemoveMeeting}" />
         </StackPanel>
         <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,0"
                    Text="{Binding MeetingUrl}" IsVisible="{Binding HasMeetingUrl}" />

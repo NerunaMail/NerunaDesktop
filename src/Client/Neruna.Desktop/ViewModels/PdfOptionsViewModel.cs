@@ -60,7 +60,6 @@ internal sealed partial class PdfOptionsViewModel(QuickActionsViewModel quickAct
         _loading = true;
         OfferProtection = await security.GetOfferAsync();
         _loading = false;
-        await quickActions.ReloadAsync();
         await ReloadRulesAsync();
     }
 

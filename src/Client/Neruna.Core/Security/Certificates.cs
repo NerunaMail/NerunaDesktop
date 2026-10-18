@@ -23,6 +23,13 @@ public enum CertificateSource
 
     /// <summary>Kept with a contact in the address book (vCard KEY, Exchange/Microsoft 365: the contact's certificates), not here.</summary>
     Contact,
+
+    /// <summary>
+    /// From a message whose signature was fully valid (trusted issuer) and whose certificate names the sender: may go to
+    /// the sender's contact once there is one. <see cref="CollectedFromMail"/> ones never do – anyone can sign with a
+    /// self-made certificate, and a shared address book must not take it.
+    /// </summary>
+    CollectedVerified,
 }
 
 public enum CertificateStatus
@@ -315,10 +322,10 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
     }
 
     /// <summary>
-    /// Keeps the signer certificate of a valid signature so the user can encrypt to that person later: with their
-    /// contact if there is one, otherwise on this device.
+    /// Keeps the signer certificate of a valid signature so the user can encrypt to that person later: on this device,
+    /// or – if <paramref name="verified"/> (trusted issuer, certificate of the sender) – with the sender's contact.
     /// </summary>
-    public async Task<bool> CollectAsync(X509Certificate certificate, CancellationToken cancellationToken = default)
+    public async Task<bool> CollectAsync(X509Certificate certificate, bool verified = false, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(certificate);
         var thumbprint = CertificateParser.Thumbprint(certificate);
@@ -329,18 +336,20 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
             return false;
         }
 
-        if (contacts is not null && await contacts.AddAsync(certificate.GetEncoded(), CertificateParser.EmailAddresses(certificate), cancellationToken))
+        if (verified && contacts is not null && await contacts.AddAsync(certificate.GetEncoded(), CertificateParser.EmailAddresses(certificate), cancellationToken))
         {
             return true;
         }
 
-        await store.SaveAsync(new StoredCertificate(thumbprint, certificate.GetEncoded(), null, CertificateSource.CollectedFromMail, clock.GetUtcNow()), cancellationToken);
+        var source = verified ? CertificateSource.CollectedVerified : CertificateSource.CollectedFromMail;
+        await store.SaveAsync(new StoredCertificate(thumbprint, certificate.GetEncoded(), null, source, clock.GetUtcNow()), cancellationToken);
         return true;
     }
 
     /// <summary>
     /// Moves other people's certificates kept on this device to their contacts, where there is one now (after a
-    /// contact was added or synced). Own certificates (with private key) and the organisation's stay here.
+    /// contact was added or synced): those the user imported, and those from fully valid signatures of their owner.
+    /// Own certificates (with private key), the organisation's and unverified ones stay here.
     /// </summary>
     /// <returns>How many were moved.</returns>
     public async Task<int> MoveToContactsAsync(CancellationToken cancellationToken = default)
@@ -352,7 +361,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
 
         var parser = new X509CertificateParser();
         var moved = 0;
-        foreach (var item in (await store.GetAllAsync(cancellationToken)).Where(c => c.Pkcs12 is null && c.Source is CertificateSource.CollectedFromMail or CertificateSource.Imported))
+        foreach (var item in (await store.GetAllAsync(cancellationToken)).Where(c => c.Pkcs12 is null && c.Source is CertificateSource.CollectedVerified or CertificateSource.Imported))
         {
             var certificate = parser.ReadCertificate(item.Der);
             var emails = CertificateParser.EmailAddresses(certificate);

@@ -137,6 +137,26 @@ public class QuickActionTests
     }
 
     [Fact]
+    public async Task Actions_saved_before_the_flag_are_recognised_as_suggested_by_their_shape()
+    {
+        var settings = new MemorySettings();
+        var service = new QuickActionService(settings);
+        var account = Guid.NewGuid();
+        var suggested = new QuickAction(Guid.NewGuid(), "Lea Keller → Projekte", "#0F6CBD", new QuickActionCondition { SenderContains = "lea@example.com", AccountId = account },
+            [new QuickActionStep(QuickActionStepKind.MarkRead), new QuickActionStep(QuickActionStepKind.MoveToFolder) { FolderRemoteId = "INBOX/Projekte" }]);
+        var own = new QuickAction(Guid.NewGuid(), "Offerte genehmigen", "#107C10", new QuickActionCondition { Attachment = QuickActionAttachmentKind.Pdf },
+            [new QuickActionStep(QuickActionStepKind.MarkRead)]);
+        var old = System.Text.Json.JsonSerializer.Serialize(new[] { suggested, own }).Replace(",\"IsSuggested\":false", string.Empty, StringComparison.Ordinal);
+        await settings.SetAsync("mail.quickActions", old, Ct);
+
+        Assert.Equal([true, false], (await service.GetActionsAsync(Ct)).Select(a => a.IsSuggested));
+
+        // Once saved with the flag, it is taken as stored.
+        await service.SaveActionsAsync([.. (await service.GetActionsAsync(Ct)).Select(a => a with { IsSuggested = false })], Ct);
+        Assert.All(await service.GetActionsAsync(Ct), a => Assert.False(a.IsSuggested));
+    }
+
+    [Fact]
     public async Task The_third_move_by_hand_suggests_a_quick_action()
     {
         var settings = new MemorySettings();
@@ -157,6 +177,8 @@ public class QuickActionTests
         var action = await suggestions.AcceptAsync(suggestion, Ct);
         Assert.Equal([QuickActionStepKind.MarkRead, QuickActionStepKind.MoveToFolder], action.Steps.Select(s => s.Kind));
         Assert.Equal(("lea@example.com", (Guid?)account), (action.When.SenderContains, action.When.AccountId));
+        Assert.True(action.IsSuggested);
+        Assert.True(Assert.Single(await service.GetActionsAsync(Ct)).IsSuggested);
         for (var i = 0; i < 3; i++)
         {
             Assert.Null(await suggestions.RecordMoveAsync(account, "lea@example.com", "Lea Keller", projects, Ct));

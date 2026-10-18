@@ -149,7 +149,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     /// <summary>The event's online meeting (Teams, Zoom, Jitsi …); its join text is in <see cref="Description"/>.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasMeeting), nameof(ShowMeetingRow), nameof(NoMeetingServices), nameof(CanAddMeeting), nameof(MeetingTitle), nameof(MeetingUrl), nameof(IsMeetingPending), nameof(HasMeetingUrl))]
+    [NotifyPropertyChangedFor(nameof(HasMeeting), nameof(ShowMeetingRow), nameof(NoMeetingServices), nameof(CanAddMeeting), nameof(CanRemoveMeeting), nameof(MeetingTitle), nameof(MeetingUrl), nameof(IsMeetingPending), nameof(HasMeetingUrl))]
     public partial OnlineMeeting? Meeting { get; set; }
 
     public bool HasMeeting => Meeting is not null;
@@ -168,13 +168,20 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     /// <summary>The services for this calendar: its own Teams (Microsoft 365) first, then the set-up ones.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanAddMeeting), nameof(NoMeetingServices))]
+    [NotifyPropertyChangedFor(nameof(CanAddMeeting), nameof(CanRemoveMeeting), nameof(NoMeetingServices))]
     public partial IReadOnlyList<MeetingChoice> MeetingChoices { get; set; } = [];
 
     [ObservableProperty]
     public partial MeetingChoice? SelectedMeetingChoice { get; set; }
 
     public bool CanAddMeeting => CanEdit && Meeting is null && MeetingChoices.Count > 0;
+
+    /// <summary>
+    /// A Teams meeting Exchange made for a saved event stays (Graph cannot take it back – removing only the text
+    /// would bring the link back with the next sync).
+    /// </summary>
+    public bool CanRemoveMeeting => CanEdit && !(IsExisting && Meeting is { Service: MeetingKinds.Teams, IsPending: false }
+                                                  && MeetingChoices.Any(c => c.Service is null && c.Kind == MeetingKinds.Teams));
 
     /// <summary>Nothing set up yet: the hint where to do it.</summary>
     public bool NoMeetingServices => CanEdit && Meeting is null && MeetingChoices.Count == 0 && Meetings is not null && _choicesLoaded;

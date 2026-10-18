@@ -232,7 +232,9 @@ public sealed class ContactController(
         var result = new List<(byte[], IReadOnlyList<string>)>();
         foreach (var book in await store.GetAddressBooksAsync(null, cancellationToken))
         {
-            foreach (var contact in await store.GetContactsAsync(book.ConnectionId, book.RemoteId, cancellationToken))
+            // Read whenever a signed mail is opened or recipients are checked for encryption: only cards with a KEY are parsed.
+            foreach (var contact in (await store.GetContactsAsync(book.ConnectionId, book.RemoteId, cancellationToken))
+                         .Where(c => c.VCardData.Contains("KEY", StringComparison.OrdinalIgnoreCase)))
             {
                 var certificates = ContactCertificates.Read(contact.VCardData);
                 if (certificates.Count > 0)

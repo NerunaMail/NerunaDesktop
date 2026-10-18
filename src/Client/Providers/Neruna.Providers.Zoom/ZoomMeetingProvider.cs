@@ -118,7 +118,17 @@ public sealed class ZoomMeetingProvider(HttpClient http, ICredentialStore creden
         using var request = new HttpRequestMessage(method, new Uri(Api, path)) { Content = body is null ? null : JsonContent.Create(body) };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var response = await http.SendAsync(request, cancellationToken);
-        var answer = response.Content.Headers.ContentLength is 0 ? default : await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        JsonElement answer;
+        try
+        {
+            answer = response.Content.Headers.ContentLength is 0 ? default : await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+            // A page instead of JSON (Zoom disturbed, a proxy in between).
+            throw new MeetingException(F("Zoom hat abgelehnt: {0}", response.ReasonPhrase ?? ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture)), inner: ex);
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             var reason = answer.ValueKind == JsonValueKind.Object ? Str(answer, "message") : null;

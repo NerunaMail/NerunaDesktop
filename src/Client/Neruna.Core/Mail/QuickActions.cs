@@ -131,6 +131,12 @@ public sealed record QuickAction(Guid Id, string Label, string Color, QuickActio
     /// <summary>A key combination that runs it for the open mail ("Ctrl+M", "Ctrl+Shift+1", "F7"); null: only the button.</summary>
     public string? Shortcut { get; init; }
 
+    /// <summary>
+    /// Made by Neruna from a suggestion ("immer in diesen Ordner?"), not set up by hand – such personal sorting rules are
+    /// left out of an export unless asked for.
+    /// </summary>
+    public bool IsSuggested { get; init; }
+
     /// <summary>Shortcuts Neruna itself uses while reading and writing – not for actions.</summary>
     public static IReadOnlySet<string> ReservedShortcuts { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -179,8 +185,23 @@ public sealed class QuickActionService(ISettingsStore settings)
         new(new Guid("6a0e6f3e-3c1b-4c53-9a43-0d2f6b1d0004"), T("Erhalten"), "#8764B8"),
     ];
 
-    public async Task<IReadOnlyList<QuickAction>> GetActionsAsync(CancellationToken cancellationToken = default) =>
-        Read<List<QuickAction>>(await settings.GetAsync(ActionsKey, cancellationToken)) ?? [];
+    public async Task<IReadOnlyList<QuickAction>> GetActionsAsync(CancellationToken cancellationToken = default)
+    {
+        var json = await settings.GetAsync(ActionsKey, cancellationToken);
+        var actions = Read<List<QuickAction>>(json) ?? [];
+
+        // Saved before actions knew where they came from: those made from a suggestion are recognised by their shape.
+        return json is not null && !json.Contains("\"IsSuggested\"", StringComparison.Ordinal)
+            ? [.. actions.Select(a => LooksSuggested(a) ? a with { IsSuggested = true } : a)]
+            : actions;
+    }
+
+    // As QuickActionSuggestions makes them: "Sender → Ordner", only the sender (and account) as condition, read + move.
+    private static bool LooksSuggested(QuickAction action) =>
+        action.Label.Contains(" → ", StringComparison.Ordinal)
+        && action.When is { SenderContains: not null, SubjectContains: null, Extensions: null, FolderRemoteId: null, Attachment: QuickActionAttachmentKind.None }
+        && action.Steps.Select(s => s.Kind).SequenceEqual([QuickActionStepKind.MarkRead, QuickActionStepKind.MoveToFolder])
+        && action.Shortcut is null;
 
     public async Task SaveActionsAsync(IReadOnlyList<QuickAction> actions, CancellationToken cancellationToken = default)
     {

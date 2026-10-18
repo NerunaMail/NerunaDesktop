@@ -65,6 +65,8 @@ internal sealed partial class ComposeAiViewModel(AiController ai, ComposeViewMod
             return true;
         }
 
+        // A question still open (another request started meanwhile) counts as "Nicht senden".
+        _confirm?.TrySetResult(false);
         _confirm = new TaskCompletionSource<bool>();
         ConfirmText = question;
         using (cancel.Register(() => Answer(false)))

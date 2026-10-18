@@ -66,6 +66,7 @@
             <!-- As a file, to share in the company (file share, mail) -->
             <Button Content="{l:T 'Importieren …'}" Command="{Binding ImportCommand}" />
             <Button Content="{l:T 'Exportieren …'}" Command="{Binding ExportCommand}" IsEnabled="{Binding HasActions}" />
+            <CheckBox Content="{l:T 'Auch automatisch erstellte exportieren'}" IsChecked="{Binding ExportSuggested}" IsVisible="{Binding HasSuggestedActions}" />
             <Button Classes="accent" Command="{Binding NewCommand}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
@@ -91,6 +92,7 @@
                   </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0">
                     <TextBlock Text="{Binding Summary}" Classes="subtle" TextWrapping="Wrap" />
+                    <TextBlock Text="{l:T 'Automatisch erstellt (aus einem Vorschlag)'}" Classes="subtle" FontSize="11" FontStyle="Italic" IsVisible="{Binding IsSuggested}" />
                     <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource ErrorBrush}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
                   </StackPanel>
                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
