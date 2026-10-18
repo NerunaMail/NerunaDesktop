@@ -174,7 +174,10 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LabeledValue">
                           <StackPanel Orientation="Horizontal" Spacing="8">
-                            <SelectableTextBlock Text="{Binding Value}" />
+                            <!-- tel: opens the program set up for calls (phone app, softphone) -->
+                            <HyperlinkButton Content="{Binding Value}" NavigateUri="{Binding TelUri}" Padding="0" IsVisible="{Binding HasTelUri}"
+                                             ToolTip.Tip="{l:T 'Anrufen'}" />
+                            <SelectableTextBlock Text="{Binding Value}" IsVisible="{Binding !HasTelUri}" />
                             <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" VerticalAlignment="Center" />
                           </StackPanel>
                         </DataTemplate>

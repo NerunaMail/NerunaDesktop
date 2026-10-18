@@ -134,7 +134,7 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
                 ContactDraft.FromVCard(stored.VCardData) with { Certificates = ContactCertificates.Read(stored.VCardData) }, (entry.AddressBook, entry.RemoteId)));
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelection))]
+    [RelayCommand(CanExecute = nameof(CanWriteMail))]
     private async Task WriteMailAsync()
     {
         var entry = Selected!.Entry;
@@ -148,6 +148,9 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     }
 
     private bool HasSelection() => Selected is not null;
+
+    // A contact without an address (only a phone number) or an empty group: nothing to write to.
+    private bool CanWriteMail() => Selected?.Entry.Card is { } card && (card.IsGroup ? card.Members.Count > 0 : card.EmailAddresses.Count > 0);
 
     private List<AddressBookInfo> Writable() => AddressBooks.Select(b => b.Info).Where(b => !b.IsReadOnly).ToList();
 
@@ -339,4 +342,17 @@ internal static class ContactPhotoBitmap
     }
 }
 
-internal sealed record LabeledValue(string Value, string Label);
+internal sealed record LabeledValue(string Value, string Label)
+{
+    /// <summary>A phone number as tel: link ("+41 31 555 88 10" → tel:+41315558810), for the program that makes calls.</summary>
+    public Uri? TelUri
+    {
+        get
+        {
+            var digits = new string([.. Value.Where((c, i) => char.IsAsciiDigit(c) || (c == '+' && i == Value.TakeWhile(char.IsWhiteSpace).Count()))]);
+            return digits.Count(char.IsAsciiDigit) >= 3 ? new Uri("tel:" + digits) : null;
+        }
+    }
+
+    public bool HasTelUri => TelUri is not null;
+}
