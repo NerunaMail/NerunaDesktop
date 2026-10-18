@@ -257,6 +257,23 @@ public class PrivacyTests
     }
 
     [Fact]
+    public void A_new_address_at_a_known_domain_is_no_imitation_of_a_similar_contact_domain()
+    {
+        // bruno@ is new, but info@ and samuel@bmtreuhand.ch are contacts – and so is someone at bdm-treuhand.ch.
+        var message = new MimeMessage { Subject = "Abschluss", Body = new TextPart("plain") { Text = "Grüezi" } };
+        message.From.Add(new MailboxAddress("Bruno", "bruno@bmtreuhand.ch"));
+        var context = new AnalysisContext(["anna@firma.ch"],
+            [new KnownPerson("BM Treuhand", ["info@bmtreuhand.ch"]), new KnownPerson("Samuel", ["samuel@bmtreuhand.ch"]), new KnownPerson("BDM", ["kontakt@bdm-treuhand.ch"])]);
+
+        var result = MessageAnalyzer.Analyze(message, context);
+        Assert.DoesNotContain(result.Findings, f => f.Code == FindingCodes.Impersonation);
+
+        // Without a contact at bmtreuhand.ch it still looks like bdm-treuhand.ch.
+        var stranger = MessageAnalyzer.Analyze(message, new AnalysisContext(["anna@firma.ch"], [new KnownPerson("BDM", ["kontakt@bdm-treuhand.ch"])]));
+        Assert.Contains(stranger.Findings, f => f.Code == FindingCodes.Impersonation);
+    }
+
+    [Fact]
     public void A_contact_is_not_suspected_of_imitating_another_contact()
     {
         // Both in the address book, with domains one letter apart.

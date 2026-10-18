@@ -344,11 +344,13 @@ public static partial class MessageAnalyzer
             }
 
             // Look-alikes of the own domains and of domains of contacts ("rnicrosoft.com", "neruna-mail.ch" are not caught) –
-            // not when the address itself is in the contacts: then it is known, whatever it resembles.
+            // not when the address or its domain is known itself (another address there is in the contacts): two similar
+            // domains of real contacts ("bmtreuhand.ch", "bdm-treuhand.ch") are no imitation of each other.
             var known = context.OwnAddresses.Concat(context.Contacts.SelectMany(c => c.Addresses))
-                .Select(DomainNames.OfAddress).OfType<string>().Select(d => DomainNames.Registrable(d) ?? d).Distinct(StringComparer.Ordinal);
+                .Select(DomainNames.OfAddress).OfType<string>().Select(d => DomainNames.Registrable(d) ?? d).Distinct(StringComparer.Ordinal).ToList();
             var isContact = context.Contacts.Any(c => c.Addresses.Contains(address, StringComparer.OrdinalIgnoreCase));
-            if (!isContact && known.FirstOrDefault(k => DomainNames.LooksLike(fromDomain, k)) is { } original)
+            var isKnownDomain = known.Contains(DomainNames.Registrable(fromDomain) ?? fromDomain, StringComparer.OrdinalIgnoreCase);
+            if (!isContact && !isKnownDomain && known.FirstOrDefault(k => DomainNames.LooksLike(fromDomain, k)) is { } original)
             {
                 var own = context.OwnAddresses.Any(a => DomainNames.SameOwner(DomainNames.OfAddress(a), original));
                 findings.Add(new Finding(Severity.High, T("Absenderdomain ahmt eine bekannte nach"),
