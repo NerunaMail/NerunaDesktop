@@ -954,7 +954,12 @@ internal static class Snapshots
         vm.NavigateCommand.Execute(Section.Mail);
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
         await Task.Delay(400);
-        await vm.MailPage.SummarizeCommand.ExecuteAsync(null);
+        // First the question (the whole mail goes to the AI), then "OK".
+        var summarizing = vm.MailPage.SummarizeCommand.ExecuteAsync(null);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-ai-summary-confirm.png");
+        vm.MailPage.ReadingPane?.ConfirmSummaryCommand.Execute(null);
+        await summarizing;
         await Task.Delay(200);
         Console.WriteLine($"AI summary: {vm.MailPage.ReadingPane?.Summary?.Text.Length} characters, error={vm.MailPage.ReadingPane?.Summary?.Error}");
         await SaveAsync(window, output, "mail-ai-summary.png");

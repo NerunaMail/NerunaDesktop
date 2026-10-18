@@ -63,7 +63,14 @@ internal sealed partial class MailViewModel(
             return;
         }
 
+        // The whole mail goes to the AI (a selection in the reading pane is not used): asked first, unless turned off.
         pane.Summary?.Cancel();
+        pane.Summary = null;
+        if (ai.ConfirmWholeMail && !await pane.ConfirmSummaryAsync(F("Zum Zusammenfassen sendet Neruna die ganze E-Mail an {0} – Absender, Betreff und den kompletten Text.", ai.ProviderName ?? T("KI"))))
+        {
+            return;
+        }
+
         var summary = new AiSummaryViewModel(() => pane.Summary = null);
         pane.Summary = summary;
         await summary.RunAsync(ai.SummarizeAsync(pane.Subject, pane.From, pane.PlainText));

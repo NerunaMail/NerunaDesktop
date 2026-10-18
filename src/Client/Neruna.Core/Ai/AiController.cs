@@ -37,7 +37,7 @@ public sealed class AiController(IEnumerable<IAiProvider> providers, ISettingsSt
     private const string ConfirmWholeMailKey = "ai.confirmWholeMail";
 
     /// <summary>
-    /// Ask before the whole mail goes to the AI (nothing marked, or "Schreiben" with text or a quoted message). On by
+    /// Ask before the whole mail goes to the AI ("Zusammenfassen", nothing marked, or "Schreiben" with text or a quoted message). On by
     /// default; whoever turns it off under Einstellungen → KI does so knowingly.
     /// </summary>
     public bool ConfirmWholeMail { get; private set; } = true;

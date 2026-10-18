@@ -165,6 +165,36 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool IsAiCheckConfirming { get; set; }
 
+    /// <summary>"Zusammenfassen" asks first (Einstellungen → KI): the question, or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSummaryConfirming))]
+    public partial string? SummaryConfirmText { get; set; }
+
+    public bool IsSummaryConfirming => SummaryConfirmText is not null;
+
+    private TaskCompletionSource<bool>? _summaryConfirm;
+
+    /// <summary>Shows the question above the mail; true when the user says "OK".</summary>
+    public Task<bool> ConfirmSummaryAsync(string question)
+    {
+        _summaryConfirm?.TrySetResult(false);
+        _summaryConfirm = new TaskCompletionSource<bool>();
+        SummaryConfirmText = question;
+        return _summaryConfirm.Task;
+    }
+
+    [RelayCommand]
+    private void ConfirmSummary() => AnswerSummary(true);
+
+    [RelayCommand]
+    private void DeclineSummary() => AnswerSummary(false);
+
+    private void AnswerSummary(bool send)
+    {
+        SummaryConfirmText = null;
+        _summaryConfirm?.TrySetResult(send);
+    }
+
     /// <summary>The AI's verdict, written while it arrives.</summary>
     [ObservableProperty]
     public partial AiSummaryViewModel? AiCheck { get; set; }

@@ -86,7 +86,7 @@
       <TextBlock Text="{l:T 'Datenschutz'}" FontWeight="SemiBold" Margin="0,10,0,0" />
       <CheckBox IsChecked="{Binding ConfirmWholeMail}" Content="{l:T 'Nachfragen, bevor die ganze E-Mail an die KI geht'}" />
       <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-4,0,0"
-                 Text="{l:T 'Beim Überarbeiten ohne Markierung und bei «Schreiben» mit Text oder zitierter Nachricht. Ausschalten nur, wenn Ihnen bewusst ist, dass dann jedes Mal die ganze Mail zum Anbieter geht.'}" />
+                 Text="{l:T 'Beim Zusammenfassen, beim Überarbeiten ohne Markierung und bei «Schreiben» mit Text oder zitierter Nachricht. Ausschalten nur, wenn Ihnen bewusst ist, dass dann jedes Mal die ganze Mail zum Anbieter geht.'}" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

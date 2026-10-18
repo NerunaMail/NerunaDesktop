@@ -328,6 +328,17 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
+      <!-- "Zusammenfassen": first the question, as the whole mail goes to the AI -->
+      <Border Grid.Row="6" IsVisible="{Binding IsSummaryConfirming}" Margin="24,0,24,10" CornerRadius="6" Padding="14,10" Background="{DynamicResource WarnBackgroundBrush}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding SummaryConfirmText}" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="accent" Content="{l:T 'OK'}" FontSize="12" Command="{Binding ConfirmSummaryCommand}" />
+            <Button Content="{l:T 'Nicht senden'}" FontSize="12" Command="{Binding DeclineSummaryCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
       <!-- AI summary ("Zusammenfassen"): written while it arrives -->
       <Border Grid.Row="6" IsVisible="{Binding Summary, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="24,0,24,10"
               Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="14,10">
