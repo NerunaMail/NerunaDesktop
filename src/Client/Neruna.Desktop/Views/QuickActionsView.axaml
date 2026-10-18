@@ -133,36 +133,8 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- Stamps for PDFs (also in the PDF preview under «Stempeln») -->
-        <TextBlock Classes="section" Text="{l:T 'Stempel'}" Margin="0,20,0,0" />
-        <TextBlock Classes="subtle" TextWrapping="Wrap"
-                   Text="{l:T 'Zum Stempeln von PDFs in der Vorschau und in Schnellaktionen. Unter dem Text stehen auf Wunsch Ihr Name und Datum mit Uhrzeit. Ein Stempel ist ein sichtbarer Vermerk, keine digitale Signatur.'}" />
-        <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,6,0,4">
-          <TextBlock Text="{l:T 'Name auf dem Stempel'}" VerticalAlignment="Center" Margin="0,0,12,0" />
-          <TextBox Grid.Column="1" Text="{Binding StampName}" PlaceholderText="{x:Static vm:QuickActionsViewModel.SystemName}" Width="260" />
-          <TextBlock Grid.Column="2" Classes="subtle" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,0"
-                     Text="{l:T 'Leer: der Name, mit dem Sie am Computer angemeldet sind – nicht der Name des Postfachs.'}" />
-        </Grid>
-        <ItemsControl ItemsSource="{Binding Stamps}" Margin="0,6,0,0">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:StampEditor">
-              <Grid ColumnDefinitions="220,Auto,Auto,Auto,*" Margin="0,0,0,6">
-                <TextBox Text="{Binding Text}" />
-                <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:StampEditor.Colors}" SelectedItem="{Binding Color}" Margin="8,0,0,0" VerticalAlignment="Center">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="sys:String">
-                      <Border Width="28" Height="16" CornerRadius="3" Background="{Binding Converter={x:Static l:Converters.ColorBrush}}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-                <CheckBox Grid.Column="2" Content="{l:T 'Name'}" IsChecked="{Binding WithName}" Margin="14,0,0,0" />
-                <CheckBox Grid.Column="3" Content="{l:T 'Datum'}" IsChecked="{Binding WithDate}" Margin="10,0,0,0" />
-                <Button Grid.Column="4" Content="{l:T 'Entfernen'}" Command="{Binding RemoveCommand}" HorizontalAlignment="Left" Margin="10,0,0,0" />
-              </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <Button Content="{l:T 'Stempel hinzufügen'}" Command="{Binding AddStampCommand}" HorizontalAlignment="Left" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,16,0,0"
+                   Text="{l:T 'Die Stempel für PDFs richten Sie unter Einstellungen → PDF ein.'}" />
       </StackPanel>
 
       <!-- Editing one action -->

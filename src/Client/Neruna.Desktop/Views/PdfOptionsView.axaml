@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:sys="using:System"
+             x:Class="Neruna.Desktop.Views.PdfOptionsView"
+             x:DataType="vm:PdfOptionsViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,12,0,4" />
+    </Style>
+  </UserControl.Styles>
+  <ScrollViewer>
+    <StackPanel Spacing="6" MaxWidth="760" HorizontalAlignment="Left" Margin="0,0,0,20">
+      <TextBlock Text="PDF" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,6" />
+
+      <!-- Stamps: kept with the quick actions (they export them along) -->
+      <StackPanel Spacing="6" DataContext="{Binding Stamps}" x:DataType="vm:QuickActionsViewModel">
+        <!-- Stamps for PDFs (also in the PDF preview under «Stempeln») -->
+        <TextBlock Classes="section" Text="{l:T 'Stempel'}" Margin="0,0,0,4" />
+        <TextBlock Classes="subtle" TextWrapping="Wrap"
+                   Text="{l:T 'Zum Stempeln von PDFs in der Vorschau und in Schnellaktionen. Unter dem Text stehen auf Wunsch Ihr Name und Datum mit Uhrzeit. Ein Stempel ist ein sichtbarer Vermerk, keine digitale Signatur.'}" />
+        <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,6,0,4">
+          <TextBlock Text="{l:T 'Name auf dem Stempel'}" VerticalAlignment="Center" Margin="0,0,12,0" />
+          <TextBox Grid.Column="1" Text="{Binding StampName}" PlaceholderText="{x:Static vm:QuickActionsViewModel.SystemName}" Width="260" />
+          <TextBlock Grid.Column="2" Classes="subtle" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,0"
+                     Text="{l:T 'Leer: der Name, mit dem Sie am Computer angemeldet sind – nicht der Name des Postfachs.'}" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Stamps}" Margin="0,6,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:StampEditor">
+              <Grid ColumnDefinitions="220,Auto,Auto,Auto,*" Margin="0,0,0,6">
+                <TextBox Text="{Binding Text}" />
+                <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:StampEditor.Colors}" SelectedItem="{Binding Color}" Margin="8,0,0,0" VerticalAlignment="Center">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="sys:String">
+                      <Border Width="28" Height="16" CornerRadius="3" Background="{Binding Converter={x:Static l:Converters.ColorBrush}}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <CheckBox Grid.Column="2" Content="{l:T 'Name'}" IsChecked="{Binding WithName}" Margin="14,0,0,0" />
+                <CheckBox Grid.Column="3" Content="{l:T 'Datum'}" IsChecked="{Binding WithDate}" Margin="10,0,0,0" />
+                <Button Grid.Column="4" Content="{l:T 'Entfernen'}" Command="{Binding RemoveCommand}" HorizontalAlignment="Left" Margin="10,0,0,0" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Content="{l:T 'Stempel hinzufügen'}" Command="{Binding AddStampCommand}" HorizontalAlignment="Left" />
+      </StackPanel>
+
+      <!-- Security: passwords for PDF attachments -->
+      <TextBlock Classes="section" Text="{l:T 'Sicherheit'}" Margin="0,24,0,4" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap"
+                 Text="{l:T 'Ein PDF mit Kennwort (AES-256) lässt sich nur mit diesem Kennwort öffnen – auch wenn die E-Mail in falsche Hände gerät. Das Kennwort teilen Sie dem Empfänger auf einem anderen Weg mit. Neruna schützt die PDFs auf diesem Gerät, nichts geht dafür ins Internet.'}" />
+      <CheckBox Content="{l:T 'Bei ungeschützten PDF-Anhängen «Schützen» anbieten'}" IsChecked="{Binding OfferProtection}" Margin="0,4,0,0" />
+
+      <TextBlock Text="{l:T 'Empfänger mit Kennwort'}" FontWeight="SemiBold" Margin="0,14,0,0" />
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                 Text="{l:T 'Für diese Adressen (oder alle Adressen einer Domain, z. B. @treuhand.example) weist Neruna beim Verfassen auf ungeschützte PDFs hin und schützt sie mit einem Klick mit dem vereinbarten Kennwort – oder automatisch beim Senden. Die Kennwörter liegen im Schlüsselbund dieses Geräts.'}" />
+      <ItemsControl ItemsSource="{Binding Rules}" IsVisible="{Binding HasRules}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:PdfRuleRow">
+            <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12,6" Margin="0,0,0,6">
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <PathIcon Data="{StaticResource IconLock}" Width="14" Height="14" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentTextBrush}" />
+                <TextBlock Grid.Column="1" Text="{Binding Recipient}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding Mode}" Classes="subtle" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <Button Grid.Column="3" Content="{l:T 'Entfernen'}"
+                        Command="{Binding $parent[UserControl].((vm:PdfOptionsViewModel)DataContext).RemoveRuleCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="*,8,*">
+            <TextBox Text="{Binding NewRecipient}" PlaceholderText="{l:T 'anna@treuhand.example oder @treuhand.example'}" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+              <TextBox Text="{Binding NewPassword}" PlaceholderText="{l:T 'Vereinbartes Kennwort'}" Width="200" PasswordChar="•" RevealPassword="{Binding ShowNewPassword}"
+                       FontFamily="Consolas, Cascadia Mono, monospace" />
+              <Button Content="{l:T 'Vorschlagen'}" Command="{Binding SuggestPasswordCommand}" ToolTip.Tip="{l:T 'Ein zufälliges Kennwort erzeugen'}" />
+            </StackPanel>
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="14">
+            <CheckBox Content="{l:T 'Anzeigen'}" IsChecked="{Binding ShowNewPassword}" />
+            <CheckBox Content="{l:T 'Automatisch beim Senden schützen'}" IsChecked="{Binding NewAutomatic}" />
+          </StackPanel>
+          <Button Content="{l:T 'Empfänger hinzufügen'}" Command="{Binding AddRuleCommand}" HorizontalAlignment="Left" />
+        </StackPanel>
+      </Border>
+      <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

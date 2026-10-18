@@ -4,7 +4,7 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news, MeetingsOptionsViewModel meetings) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf) : ViewModelBase
 {
     /// <summary>Settings → Programm → News: the devblog.</summary>
     public NewsViewModel News => news;
@@ -50,6 +50,11 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
 
     /// <summary>Index of the «Besprechungen» tab.</summary>
     public const int MeetingsTab = 18;
+
+    /// <summary>Settings → PDF: stamps and passwords for PDF attachments.</summary>
+    public PdfOptionsViewModel Pdf => pdf;
+
+    public const int PdfTab = 19;
 
     /// <summary>Settings → Info: crash reports.</summary>
     public CrashReportsOptionsViewModel CrashReports => crashReports;
@@ -99,6 +104,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(3, T("Signaturen"), "IconSignature"),
         new(4, T("Textvorlagen"), "IconTextTemplate"),
         new(11, T("Schnellaktionen"), "IconFlash"),
+        new(PdfTab, "PDF", "IconLock"),
         new(5, T("Zertifikate (S/MIME)"), "IconCertificate"),
         new(14, T("Datenschutz"), "IconShield"),
         new(-1, T("Kalender"), null, IsHeading: true),
@@ -139,6 +145,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             else if (item.Tab == 13)
             {
                 LocalData.ShowDatabaseSize();
+            }
+            else if (item.Tab == PdfTab)
+            {
+                _ = Pdf.LoadAsync();
             }
             else if (item.Tab == MeetingsTab)
             {

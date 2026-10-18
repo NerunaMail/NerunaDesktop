@@ -437,6 +437,31 @@ internal static class Snapshots
         await SaveAsync(window, output, "compose-icons-only.png");
         vm.MailPage.Preferences.ToolbarLabels = true;
 
+        // A PDF for a recipient who gets PDFs only with a password: the bar, and the lock on the attachment.
+        var pdfSecurity = services.GetRequiredService<Neruna.Core.Mail.PdfProtectionService>();
+        await pdfSecurity.SaveRuleAsync(new Neruna.Core.Mail.PdfProtectionRule(Guid.NewGuid(), "@bernasconi.example", false), "Rigi-2026-Pilatus");
+        await pdfSecurity.SaveRuleAsync(new Neruna.Core.Mail.PdfProtectionRule(Guid.NewGuid(), "treuhand@muster-treuhand.example", true), "Kontrolle-Q4");
+        var pdfFile = Path.Combine(Path.GetTempPath(), "Offerte Netzwerk Q4.pdf");
+        using (var blank = new PdfSharp.Pdf.PdfDocument())
+        {
+            blank.AddPage();
+            using var page = new MemoryStream();
+            blank.Save(page);
+            await File.WriteAllBytesAsync(pdfFile, Neruna.Core.Mail.PdfPages.Stamp(page.ToArray(), new Neruna.Core.Mail.PdfStampMark(0, 0.5, 0.2, "Offerte", ["Q4 2026"], "#0F6CBD")));
+        }
+
+        await vm.MailPage.Compose.AttachFilesAsync([pdfFile]);
+        await Task.Delay(500);
+        await SaveAsync(window, output, "compose-pdf-protect.png");
+        vm.MailPage.Compose.ProtectWithOtherPasswordCommand.Execute(null);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "compose-pdf-password.png");
+        await vm.MailPage.Compose.ConfirmPdfPasswordCommand.ExecuteAsync(null);
+        await Task.Delay(500);
+        await SaveAsync(window, output, "compose-pdf-protected.png");
+        vm.MailPage.Compose.RemoveAttachmentCommand.Execute(vm.MailPage.Compose.Attachments[0]);
+        File.Delete(pdfFile);
+
         // An: typing suggests contacts and groups; the "An …" button opens the picker (several at once).
         var toBox = window.GetVisualDescendants().OfType<Neruna.Desktop.Controls.RecipientBox>().First();
         // Letter by letter (each one replaces the suggestions; the first versions crashed here on Windows).
@@ -831,6 +856,11 @@ internal static class Snapshots
             vm.SettingsPage.SelectedTab = SettingsViewModel.NewsTab;
             await SaveAsync(window, output, "settings-news.png");
         }
+
+        // Einstellungen → PDF: stamps and the recipients with a password.
+        await vm.SettingsPage.Pdf.LoadAsync();
+        vm.SettingsPage.SelectedTab = SettingsViewModel.PdfTab;
+        await SaveAsync(window, output, "settings-pdf.png");
 
         // Einstellungen → Besprechungen.
         await vm.SettingsPage.Meetings.LoadAsync();

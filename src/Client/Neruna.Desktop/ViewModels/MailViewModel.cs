@@ -38,6 +38,7 @@ internal sealed partial class MailViewModel(
     PrivacyService privacy,
     Neruna.Core.Workspaces.WorkspaceService workspaces,
     Neruna.Core.Meetings.MeetingController meetings,
+    PdfProtectionService pdfSecurity,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
@@ -862,6 +863,7 @@ internal sealed partial class MailViewModel(
             Preferences = preferences,
             TextTemplates = textTemplates,
             Calendars = new ComposeCalendar(calendar, invitations, windows, meetings),
+            PdfSecurity = pdfSecurity,
         };
         compose.Ai = new ComposeAiViewModel(ai, compose);
         compose.Closed += async (_, sent) =>

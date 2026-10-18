@@ -109,7 +109,18 @@ internal sealed partial class ComposeViewModel : ViewModelBase
                 MarkChanged();
             }
         };
-        Attachments.CollectionChanged += (_, _) => MarkChanged();
+        Attachments.CollectionChanged += (_, _) =>
+        {
+            MarkChanged();
+            _ = CheckPdfProtectionAsync();
+        };
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(To) or nameof(Cc) or nameof(Bcc))
+            {
+                _ = CheckPdfProtectionAsync();
+            }
+        };
 
         _autosave = new DispatcherTimer { Interval = AutosaveInterval };
         _autosave.Tick += async (_, _) =>
@@ -740,6 +751,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         IsSending = true;
         try
         {
+            if (!await ProtectPdfsForSendingAsync())
+            {
+                return;
+            }
+
             var message = MessageComposer.Build(SenderAddress, await SnapshotAsync(), []);
             await _secureMime.ProtectAsync(message, Sign, Encrypt);
             await _mail.SendAsync(_connection, message);
@@ -934,7 +950,30 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         string.Join("", text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(line => "<div>" + (line.Length == 0 ? "<br>" : WebUtility.HtmlEncode(line)) + "</div>"));
 }
 
-internal sealed record ComposeAttachment(string FileName, MimeEntity Entity);
+/// <summary>An attachment of the mail being written; PDFs know whether they need a password to open.</summary>
+internal sealed partial class ComposeAttachment(string fileName, MimeEntity entity) : ObservableObject
+{
+    public string FileName { get; } = fileName;
+
+    public MimeEntity Entity { get; } = entity;
+
+    public bool IsPdf { get; } = fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) || entity.ContentType.IsMimeType("application", "pdf");
+
+    /// <summary>Opens only with a password (checked when attached).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanProtect))]
+    public partial bool IsProtected { get; set; }
+
+    /// <summary>Settings → PDF: "Mit Kennwort schützen" is offered (on unless switched off).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanProtect))]
+    public partial bool OffersProtection { get; set; }
+
+    public bool CanProtect => OffersProtection && IsPdf && !IsProtected;
+
+    /// <summary>Whether <see cref="IsProtected"/> was looked up already.</summary>
+    public bool IsChecked { get; set; }
+}
 
 /// <summary>An address to send from: of which account (through its server), with which name.</summary>
 internal sealed class SenderChoice(Account account, ServiceConnection connection, MailIdentity identity)

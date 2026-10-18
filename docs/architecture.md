@@ -167,6 +167,22 @@ Internet (keine DNS-Sperrlisten, keine Favicon- oder Whois-Abfragen).
   als HTML an ein neues Fenster.
 - Tests: `tests/editor` (Playwright, Chromium + WebKit) für die JS-API; die WebView selbst ist headless nicht prüfbar.
 
+### PDF: Vorschau, Stempel, Kennwort
+
+- Vorschau und Stempel mit PDFium (`PdfPages`, bblanchon.PDFium): Seiten als Bilder, Stempel/Text als echte
+  PDF-Objekte in eine Kopie. Beim Platzieren folgt eine Vorschau des Stempels der Maus, in seiner Grösse auf der Seite
+  (Masse aus `PdfPages.TitleSize` …, Seitenbreite in Punkt aus dem Rendern).
+- Kennwortschutz mit PDFsharp (MIT, rein .NET – PDFium kann nicht verschlüsseln): `PdfProtection.Protect` setzt AES-256
+  (PDF 2.0, V5), Öffnen-Kennwort vom Benutzer, Besitzer-Kennwort zufällig; `PdfPages.NeedsPassword` erkennt
+  geschützte PDFs. Alles auf dem Gerät.
+- Einstellungen → PDF: Stempel (gehören weiter zu den Schnellaktionen, die sie mit exportieren), «Schützen» bei
+  ungeschützten PDF-Anhängen anbieten (`pdf.protection.offer`, Standard ein) und Empfänger mit Kennwort
+  (`PdfProtectionService`, Adresse oder `@domain`, Regeln in `pdf.protection.rules`, Kennwörter im Schlüsselbund unter
+  der Regel-ID; pro Gerät, nicht in der Einstellungssicherung). Beim Verfassen: Balken «Für … nur mit Kennwort» mit
+  «Mit hinterlegtem Kennwort schützen» / «Anderes Kennwort …» (Vorschlag aus `PdfProtection.NewPassword`); Regeln mit
+  «automatisch» schützen beim Senden, bei verschiedenen Kennwörtern in einer Mail wird nicht gesendet.
+- Noch nicht: geschützte PDFs in der Vorschau mit Kennwort öffnen.
+
 ### Entwürfe
 
 - `MailController.SaveDraftAsync`: legt die Nachricht per IMAP APPEND (`\Draft \Seen`) in «Entwürfe» ab – fehlt der

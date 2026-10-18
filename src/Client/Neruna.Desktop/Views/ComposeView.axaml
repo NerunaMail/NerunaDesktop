@@ -148,6 +148,15 @@
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource IconAttach}" Width="12" Height="12" />
               <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
+              <PathIcon Data="{StaticResource IconLock}" Width="11" Height="11" IsVisible="{Binding IsProtected}"
+                        Foreground="{DynamicResource AccentTextBrush}" ToolTip.Tip="{l:T 'Mit Kennwort geschützt'}" />
+              <Button Classes="command" Padding="4,2" IsVisible="{Binding CanProtect}" ToolTip.Tip="{l:T 'Mit Kennwort schützen'}"
+                      Command="{Binding $parent[UserControl].((vm:ComposeViewModel)DataContext).ProtectAttachmentCommand}" CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <PathIcon Data="{StaticResource IconLock}" Width="11" Height="11" />
+                  <TextBlock Text="{l:T 'Schützen'}" FontSize="12" />
+                </StackPanel>
+              </Button>
               <Button Classes="command" Padding="4" ToolTip.Tip="{l:T 'Entfernen'}"
                       Command="{Binding $parent[UserControl].((vm:ComposeViewModel)DataContext).RemoveAttachmentCommand}" CommandParameter="{Binding}">
                 <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
@@ -157,6 +166,32 @@
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
+    <!-- A recipient wants PDFs only with a password (Einstellungen → PDF) -->
+    <Border IsVisible="{Binding HasPdfHint}" Background="{DynamicResource WarnBackgroundBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+      <StackPanel Spacing="6">
+        <DockPanel>
+          <PathIcon Data="{StaticResource IconLock}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Top" />
+          <TextBlock Text="{Binding PdfHint}" TextWrapping="Wrap" />
+        </DockPanel>
+        <WrapPanel ItemSpacing="6" LineSpacing="6">
+          <Button Classes="accent" Content="{l:T 'Mit hinterlegtem Kennwort schützen'}" Command="{Binding ProtectWithStoredPasswordCommand}" />
+          <Button Content="{l:T 'Anderes Kennwort …'}" Command="{Binding ProtectWithOtherPasswordCommand}" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+    <!-- The password for the PDF(s): suggested, shown so it can be passed on (by phone, SMS – not in this mail) -->
+    <Border IsVisible="{Binding IsAskingPdfPassword}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,8" Margin="0,0,0,6">
+      <StackPanel Spacing="6">
+        <TextBlock TextWrapping="Wrap" Text="{l:T 'Kennwort für das PDF – teilen Sie es dem Empfänger auf einem anderen Weg mit (Telefon, SMS), nicht in dieser E-Mail.'}" />
+        <WrapPanel ItemSpacing="8" LineSpacing="6">
+          <TextBox Text="{Binding PdfPassword}" Width="240" FontFamily="Consolas, Cascadia Mono, monospace"
+                   PasswordChar="•" RevealPassword="{Binding ShowPdfPassword}" />
+          <CheckBox Content="{l:T 'Anzeigen'}" IsChecked="{Binding ShowPdfPassword}" />
+          <Button Classes="accent" Content="{l:T 'Schützen'}" Command="{Binding ConfirmPdfPasswordCommand}" IsEnabled="{Binding !IsProtectingPdf}" />
+          <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelPdfPasswordCommand}" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
     </StackPanel>
 
     <!-- Formatting toolbar (hidden without WebView) -->

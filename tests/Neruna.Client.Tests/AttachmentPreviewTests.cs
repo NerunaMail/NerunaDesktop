@@ -103,7 +103,7 @@ public class AttachmentPreviewTests
 
     private static byte Pixel(PdfPageImage page, int x, int y) => page.Pixels[(y * page.Stride) + (x * 4)];
 
-    private static byte[] MinimalPdf(params string[] pageContents)
+    internal static byte[] MinimalPdf(params string[] pageContents)
     {
         var objects = new List<string> { "<< /Type /Catalog /Pages 2 0 R >>" };
         var kids = string.Join(' ', pageContents.Select((_, i) => $"{3 + (i * 2)} 0 R"));

@@ -23,6 +23,46 @@ public static partial class PdfPages
     private static readonly Lock Gate = new();
     private static bool _initialized;
 
+    /// <summary>Whether the PDF needs a password to be opened (an owner password that only restricts printing does not count).</summary>
+    public static bool NeedsPassword(byte[] pdf) => !Opens(pdf, null, out var passwordError) && passwordError;
+
+    /// <summary>Whether the PDF opens with <paramref name="password"/> (null: without one).</summary>
+    public static bool Opens(byte[] pdf, string? password) => Opens(pdf, password, out _);
+
+    private static bool Opens(byte[] pdf, string? password, out bool passwordError)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+        lock (Gate)
+        {
+            Initialize();
+            var buffer = Marshal.AllocHGlobal(pdf.Length);
+            var secret = password is null ? IntPtr.Zero : Marshal.StringToCoTaskMemUTF8(password);
+            try
+            {
+                Marshal.Copy(pdf, 0, buffer, pdf.Length);
+                var document = NativeMethods.FPDF_LoadMemDocument(buffer, pdf.Length, secret);
+                if (document == IntPtr.Zero)
+                {
+                    passwordError = NativeMethods.FPDF_GetLastError().Value == PasswordError;
+                    return false;
+                }
+
+                NativeMethods.FPDF_CloseDocument(document);
+                passwordError = false;
+                return true;
+            }
+            finally
+            {
+                if (secret != IntPtr.Zero)
+                {
+                    Marshal.ZeroFreeCoTaskMemUTF8(secret);
+                }
+
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+    }
+
     /// <summary>
     /// Renders the pages <paramref name="first"/> to <paramref name="first"/> + <paramref name="count"/> − 1 (as far as
     /// they exist) at <paramref name="width"/> pixels.

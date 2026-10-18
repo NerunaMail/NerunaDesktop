@@ -50,6 +50,7 @@ internal sealed class ViewLocator : IDataTemplate
         CalendarOptionsViewModel => new CalendarOptionsView(),
         AiOptionsViewModel => new AiOptionsView(),
         MeetingsOptionsViewModel => new MeetingsOptionsView(),
+        PdfOptionsViewModel => new PdfOptionsView(),
         SignaturesViewModel => new SignaturesView(),
         AppearanceViewModel => new AppearanceView(),
         CloudViewModel => new CloudView(),
