@@ -114,6 +114,27 @@ public class MessageContentTests
     }
 
     [Fact]
+    public void A_blocked_picture_with_only_a_width_does_not_become_a_screen_high_square()
+    {
+        // Newsletters give big pictures only a width ("100%"); the 1×1 placeholder would be stretched to a square.
+        const string html = """
+            <img src="https://example.com/hero.jpg" width="100%">
+            <img src="https://example.com/logo.jpg" width="150px" style="margin:10px auto;">
+            <img src="https://example.com/banner.jpg" width="600" height="200">
+            <img src="https://example.com/box.jpg" style="height: 80px">
+            """;
+        var content = MessageContent.From(Message(new TextPart("html") { Text = html }));
+
+        var pictures = System.Text.RegularExpressions.Regex.Matches(content.Html, "<img[^>]*>").Select(m => m.Value).ToList();
+        Assert.Equal(4, pictures.Count);
+        Assert.Contains("height: 1px", pictures[0], StringComparison.Ordinal);
+        Assert.Contains("margin:10px auto; height: 1px", pictures[1], StringComparison.Ordinal);
+        Assert.Contains("height: 200px", pictures[2], StringComparison.Ordinal);
+        Assert.DoesNotContain("height: 1px", pictures[3], StringComparison.Ordinal);
+        Assert.Contains("80px", pictures[3], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Remote_images_are_kept_when_allowed()
     {
         var message = Message(new TextPart("html") { Text = "<img src=\"https://example.com/logo.png\">" });

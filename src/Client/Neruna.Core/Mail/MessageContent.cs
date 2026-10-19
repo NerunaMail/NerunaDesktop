@@ -283,6 +283,7 @@ public sealed partial class MessageContent
 
                 var centered = false;
                 var styled = false;
+                var placeholder = false;
                 foreach (var attribute in context.Attributes.OrderBy(a => a.Name.Equals("style", StringComparison.OrdinalIgnoreCase)))
                 {
                     var value = attribute.Value ?? string.Empty;
@@ -308,6 +309,7 @@ public sealed partial class MessageContent
                             if (attributeName.Equals("src", StringComparison.OrdinalIgnoreCase))
                             {
                                 writer.WriteAttribute("src", TransparentPixel);
+                                placeholder = name.Equals("img", StringComparison.OrdinalIgnoreCase);
                             }
 
                             continue;
@@ -326,6 +328,12 @@ public sealed partial class MessageContent
                     if (attributeName.Equals("style", StringComparison.OrdinalIgnoreCase))
                     {
                         value = SanitizeCss(value, allowRemote, referencedIds, ref blockedLocal);
+                        if (placeholder)
+                        {
+                            value = PlaceholderStyle(value, context.Attributes);
+                            placeholder = false;
+                        }
+
                         if (isTable)
                         {
                             value = TableStyle(value, centered);
@@ -341,6 +349,12 @@ public sealed partial class MessageContent
                     }
 
                     writer.WriteAttribute(attributeName, value);
+                }
+
+                // A blocked picture without a style attribute of its own (the style attribute comes last, see OrderBy).
+                if (placeholder)
+                {
+                    writer.WriteAttribute("style", PlaceholderStyle(string.Empty, context.Attributes));
                 }
 
                 if (centered && !styled)
@@ -372,6 +386,26 @@ public sealed partial class MessageContent
         blocked |= blockedLocal;
         trackers += trackersLocal;
         return result;
+    }
+
+    /// <summary>
+    /// The transparent pixel standing in for a blocked picture keeps the picture's height only when the mail gives one;
+    /// with just a width ("100%") it would be stretched to a square that size – screen-high empty areas in newsletters.
+    /// An inline height also wins over a view's own "img { height: auto }".
+    /// </summary>
+    private static string PlaceholderStyle(string style, HtmlAttributeCollection attributes)
+    {
+        // A height in pixels of its own stays (it is the picture's place in the layout).
+        if (FixedHeight().IsMatch(style))
+        {
+            return style;
+        }
+
+        var height = attributes.FirstOrDefault(a => a.Name.Equals("height", StringComparison.OrdinalIgnoreCase))?.Value?.Trim();
+        var pixels = int.TryParse(height?.Replace("px", string.Empty, StringComparison.OrdinalIgnoreCase), System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var n) && n > 0 ? n : 1;
+        var rule = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"height: {pixels}px");
+        return string.IsNullOrWhiteSpace(style) ? rule : style.TrimEnd().TrimEnd(';') + "; " + rule;
     }
 
     /// <summary>
@@ -407,6 +441,9 @@ public sealed partial class MessageContent
 
         return width.Value * height.Value <= 25;
     }
+
+    [GeneratedRegex(@"(?<![-\w])height\s*:\s*\d+(\.\d+)?px", RegexOptions.IgnoreCase)]
+    private static partial Regex FixedHeight();
 
     [GeneratedRegex(@"/(track/open|wf/open|e/o/|open\.php|open\.aspx|trk/open|t/open|o\.gif|pixel\.gif|beacon|tracking/open)|[?&](open|pixel)=|google-analytics\.com/|/__utm\.gif", RegexOptions.IgnoreCase)]
     private static partial Regex TrackingPath();
