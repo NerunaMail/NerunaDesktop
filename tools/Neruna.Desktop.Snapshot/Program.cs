@@ -675,6 +675,29 @@ internal static class Snapshots
         await SaveAsync(window, output, "event-meeting.png");
         vm.Overlay = null;
 
+        // The same with a connected Zoom account (also for the Zoom Marketplace listing). The meeting itself would
+        // need Zoom's API: it is put in as Zoom would return it.
+        var zoom = new Neruna.Core.Meetings.MeetingService(Guid.NewGuid(), Neruna.Core.Meetings.MeetingKinds.Zoom, "Zoom (anna.muster@example.com)",
+            new Dictionary<string, string> { [Neruna.Providers.Zoom.ZoomMeetingProvider.UserKey] = "anna.muster@example.com" });
+        await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.Meetings.MeetingController.ServicesKey, System.Text.Json.JsonSerializer.Serialize(new[]
+        {
+            zoom,
+            new Neruna.Core.Meetings.MeetingService(Guid.NewGuid(), Neruna.Core.Meetings.MeetingKinds.Jitsi, "Jitsi Meet (meet.example.org)",
+                new Dictionary<string, string> { [Neruna.Core.Meetings.JitsiMeetingProvider.ServerKey] = "https://meet.example.org" }),
+        }));
+        var zoomEvent = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal], meeting with { Location = null },
+            null, _ => "anna.muster@example.com") { Meetings = meetings };
+        vm.Overlay = zoomEvent;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "event-zoom-choice.png");
+        var zoomMeeting = new Neruna.Core.Meetings.OnlineMeeting(Neruna.Core.Meetings.MeetingKinds.Zoom, "https://us06web.zoom.us/j/81234567890?pwd=Qk9tU1hYcFpLb3dNZ0x0dz09",
+            Neruna.Core.Localization.Texts.T("Besprechungs-ID:") + " 812 3456 7890\n" + Neruna.Core.Localization.Texts.T("Kenncode:") + " 482913");
+        zoomEvent.Description = zoomMeeting.AddTo(zoomEvent.Description);
+        zoomEvent.Location = Neruna.Core.Localization.Texts.F("{0}-Besprechung", zoomMeeting.Name);
+        zoomEvent.Meeting = zoomMeeting;
+        await SaveAsync(window, output, "event-zoom.png");
+        vm.Overlay = null;
+
         // Status bar → status window: per account and service how the last run went.
         await vm.SyncCommand.ExecuteAsync(null);
         vm.OpenSyncStatusCommand.Execute(null);

@@ -12,14 +12,14 @@ namespace Neruna.Providers.Zoom;
 
 /// <summary>
 /// Neruna's app in the Zoom App Marketplace (General app, user-managed, "public client" with PKCE – no secret). The
-/// client id is not secret; while it is empty, Zoom stays switched off in the settings. Redirect: Zoom accepts
-/// <c>http://127.0.0.1:{any port}/</c> for public clients; the scopes are those set for the app
+/// client id is not secret; while it is empty, Zoom stays switched off in the settings. Redirect: the app's "PKCE OAuth
+/// Redirect URL" is <c>http://127.0.0.1/callback</c>, any port is accepted for it; the scopes are those set for the app
 /// (<c>meeting:write:meeting</c>, <c>user:read:user</c>).
 /// </summary>
 public static class ZoomAccount
 {
     /// <summary>The app's public client id from marketplace.zoom.us → Manage → the app → App Credentials.</summary>
-    public const string ClientId = "";
+    public const string ClientId = "JSgW_4jaSaSeDoMXjqkGtg";
 
     public static OAuthEndpoints Endpoints { get; } = new(
         new Uri("https://zoom.us/oauth/authorize"),
@@ -28,6 +28,7 @@ public static class ZoomAccount
         [])
     {
         RedirectHost = "127.0.0.1",
+        RedirectPath = "/callback",
         SelectAccount = false,
         ScopeOnTokenRequests = false,
     };
