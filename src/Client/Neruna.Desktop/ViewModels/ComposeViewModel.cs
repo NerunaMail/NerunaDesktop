@@ -825,6 +825,34 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         Attachments.Add(new ComposeAttachment(name, entity));
     }
 
+    /// <summary>Messages dragged in from the mail list: attached as .eml, as with "Als Anhang weiterleiten".</summary>
+    public async Task AttachMessagesAsync(Func<Task<IReadOnlyList<MimeMessage>>> load)
+    {
+        ArgumentNullException.ThrowIfNull(load);
+        IReadOnlyList<MimeMessage> messages;
+        try
+        {
+            messages = await load();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Error = T("Nachrichten konnten nicht geladen werden") + ": " + ex.Message;
+            return;
+        }
+
+        foreach (var message in messages)
+        {
+            var part = new MessagePart { Message = message, ContentDisposition = new ContentDisposition(ContentDisposition.Attachment) };
+            part.ContentDisposition.FileName = MessageContent.FileNameOf(part);
+            Attachments.Add(new ComposeAttachment(part.ContentDisposition.FileName, part));
+        }
+
+        if (messages.Count > 0)
+        {
+            MarkChanged();
+        }
+    }
+
     /// <summary>
     /// Links to the files where they were dropped: the path as text, so it reads the same in every mail program
     /// (in Neruna it is only clickable for recipients who set the sender as safe).

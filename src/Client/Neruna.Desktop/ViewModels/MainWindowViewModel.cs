@@ -1058,7 +1058,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private void ShowCalendarPrint()
     {
-        var print = new CalendarPrintViewModel(_calendar, _files, CalendarPage.CalendarGroups.SelectMany(g => g.Items), CalendarPage.WeekStart, CalendarPage.IsWorkWeek);
+        var print = new CalendarPrintViewModel(_calendar, _files, CalendarPage.CalendarGroups.SelectMany(g => g.Items), CalendarViewModel.StartOfWeek(CalendarPage.WeekStart), CalendarPage.IsWorkWeek);
         print.Finished += (_, _) =>
         {
             Overlay = null;

@@ -2298,5 +2298,8 @@
  "Überschneidet sich mit: ": "Chevauche : ",
  "über der Spam-Schwelle": "au-dessus du seuil de spam",
  "– nie in der Neruna-Datenbank und nie in den Protokolldateien.": "– jamais dans la base de données Neruna ni dans les fichiers journaux.",
- "← Zur Nachricht": "← Retour au message"
+ "← Zur Nachricht": "← Retour au message",
+ "Vorheriger Tag": "Jour précédent",
+ "Nächster Tag": "Jour suivant",
+ "Nur einen Tag anzeigen": "Afficher un seul jour"
 }

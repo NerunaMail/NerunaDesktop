@@ -10,12 +10,16 @@ namespace Neruna.Desktop.Views;
 
 /// <summary>
 /// Mail page. Drag messages from the list onto a folder in the tree to move them there – several at once with
-/// Ctrl/Shift-click, also into another account.
+/// Ctrl/Shift-click, also into another account – or into a mail being written to attach them.
 /// </summary>
 internal sealed partial class MailView : UserControl
 {
     private const double DragThreshold = 6;
     internal static readonly DataFormat<MessageItemViewModel[]> MessageFormat = DataFormat.CreateInProcessFormat<MessageItemViewModel[]>("neruna-messages");
+
+    /// <summary>The dragged messages' content for a mail being written: loaded only when they are dropped there.</summary>
+    internal static readonly DataFormat<Func<Task<IReadOnlyList<MimeKit.MimeMessage>>>> MessageContentFormat =
+        DataFormat.CreateInProcessFormat<Func<Task<IReadOnlyList<MimeKit.MimeMessage>>>>("neruna-message-content");
 
     private PointerPressedEventArgs? _pressed;
     private MessageItemViewModel? _pressedMessage;
@@ -275,7 +279,12 @@ internal sealed partial class MailView : UserControl
             MessageItemViewModel[] dragged = selected.Contains(message) ? [.. selected] : [message];
             var data = new DataTransfer();
             data.Add(DataTransferItem.Create(MessageFormat, dragged));
-            await DragDrop.DoDragDropAsync(pressed, data, DragDropEffects.Move);
+            if (ViewModel is { } vm)
+            {
+                data.Add(DataTransferItem.Create(MessageContentFormat, () => vm.LoadMessagesAsync(dragged)));
+            }
+
+            await DragDrop.DoDragDropAsync(pressed, data, DragDropEffects.Move | DragDropEffects.Copy);
         }
         finally
         {

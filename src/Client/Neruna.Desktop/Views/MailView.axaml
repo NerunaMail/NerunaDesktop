@@ -355,15 +355,15 @@
                   <Border Background="{DynamicResource UnreadBarBrush}" IsVisible="{Binding IsUnread}" CornerRadius="2" Margin="0,6" />
                   <Grid Grid.Column="1" Margin="10,7,10,7" RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                     <TextBlock Classes="sender" Text="{Binding Sender}" TextTrimming="CharacterEllipsis" />
-                    <!-- Status icons and time right-aligned, whatever is wider of the two -->
+                    <!-- Status icons and time right-aligned, whatever is wider of the two; answered/forwarded first, then security and attachment -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
+                      <PathIcon Data="{StaticResource IconReply}" Width="12" Height="12" IsVisible="{Binding IsAnswered}" ToolTip.Tip="{l:T 'Beantwortet'}" />
+                      <PathIcon Data="{StaticResource IconForward}" Width="12" Height="12" IsVisible="{Binding IsForwarded}" ToolTip.Tip="{l:T 'Weitergeleitet'}" />
                       <PathIcon Data="{StaticResource IconCertificate}" Width="14" Height="14" Foreground="{DynamicResource AccentTextBrush}"
                                 IsVisible="{Binding IsSigned}" ToolTip.Tip="{l:T 'Digital signiert (S/MIME)'}" />
                       <PathIcon Data="{StaticResource IconLock}" Width="14" Height="14" Foreground="#B8860B"
                                 IsVisible="{Binding IsEncrypted}" ToolTip.Tip="{l:T 'Verschlüsselt (S/MIME)'}" />
                       <PathIcon Data="{StaticResource IconAttach}" Width="12" Height="12" IsVisible="{Binding HasAttachments}" />
-                      <PathIcon Data="{StaticResource IconReply}" Width="12" Height="12" IsVisible="{Binding IsAnswered}" ToolTip.Tip="{l:T 'Beantwortet'}" />
-                      <PathIcon Data="{StaticResource IconForward}" Width="12" Height="12" IsVisible="{Binding IsForwarded}" ToolTip.Tip="{l:T 'Weitergeleitet'}" />
                       <PathIcon Data="{StaticResource IconFlag}" Width="12" Height="12" Foreground="#C50F1F" IsVisible="{Binding IsFlagged}" />
                     </StackPanel>
                     <TextBlock Grid.Row="1" Classes="subject" Text="{Binding Subject}" TextTrimming="CharacterEllipsis" FontSize="13" />

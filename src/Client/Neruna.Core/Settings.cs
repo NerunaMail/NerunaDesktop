@@ -109,8 +109,11 @@ public static class SettingKeys
     /// <summary>Time grid subdivision in minutes: 60, 30 (default) or 15.</summary>
     public const string CalendarGridMinutes = "calendar.gridMinutes";
 
-    /// <summary>"true": the week view shows Monday–Friday only.</summary>
+    /// <summary>"true": the week view shows Monday–Friday only (before <see cref="CalendarDays"/>; still read as its default).</summary>
     public const string CalendarWorkWeek = "calendar.workWeek";
+
+    /// <summary>Days shown: "7" (week), "5" (Monday–Friday) or "1" (one day).</summary>
+    public const string CalendarDays = "calendar.days";
 
     /// <summary>Time grid: the hours that fill the view ("7" and "21": 07:00–21:00); the rest is reached by scrolling.</summary>
     public const string CalendarVisibleFrom = "calendar.visibleFrom";

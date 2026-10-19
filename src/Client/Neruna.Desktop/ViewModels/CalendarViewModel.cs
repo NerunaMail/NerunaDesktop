@@ -76,24 +76,75 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
     public bool IsListLayout => !IsTimeGrid;
 
-    /// <summary>Monday–Friday only (toolbar toggle "Mo–Fr"), otherwise the full week.</summary>
+    /// <summary>Days shown (toolbar "7 Tage", "Mo–Fr", "1 Tag"): 7, 5 or 1.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DayCount), nameof(RangeTitle), nameof(IsFullWeek))]
-    public partial bool IsWorkWeek { get; set; }
+    [NotifyPropertyChangedFor(nameof(DayCount), nameof(RangeTitle), nameof(IsFullWeek), nameof(IsWorkWeek), nameof(IsSingleDay),
+        nameof(PreviousTip), nameof(NextTip))]
+    public partial int ShownDays { get; set; } = 7;
 
     public bool IsFullWeek
     {
-        get => !IsWorkWeek;
-        set => IsWorkWeek = !value;
+        get => ShownDays == 7;
+        set
+        {
+            if (value)
+            {
+                ShownDays = 7;
+            }
+            else
+            {
+                OnPropertyChanged(); // a toggle in the group cannot be switched off by clicking it again
+            }
+        }
     }
 
-    public int DayCount => IsWorkWeek ? 5 : 7;
-
-    partial void OnIsWorkWeekChanged(bool value)
+    public bool IsWorkWeek
     {
+        get => ShownDays == 5;
+        set
+        {
+            if (value)
+            {
+                ShownDays = 5;
+            }
+            else
+            {
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsSingleDay
+    {
+        get => ShownDays == 1;
+        set
+        {
+            if (value)
+            {
+                ShownDays = 1;
+            }
+            else
+            {
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public int DayCount => ShownDays;
+
+    public string PreviousTip => IsSingleDay ? T("Vorheriger Tag") : T("Vorherige Woche");
+
+    public string NextTip => IsSingleDay ? T("Nächster Tag") : T("Nächste Woche");
+
+    partial void OnShownDaysChanged(int oldValue, int newValue)
+    {
+        // One day: today if it is in the week shown, otherwise the week's first day; back to a week: the day's week.
+        WeekStart = newValue == 1
+            ? (DateTime.Today >= WeekStart && DateTime.Today < WeekStart.AddDays(oldValue) ? DateTime.Today : WeekStart)
+            : StartOfWeek(WeekStart);
         if (!_loadingSettings)
         {
-            _ = settings.SetAsync(SettingKeys.CalendarWorkWeek, value ? "true" : "false");
+            _ = settings.SetAsync(SettingKeys.CalendarDays, newValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
             _ = LoadWeekAsync();
         }
     }
@@ -172,6 +223,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     {
         get
         {
+            if (IsSingleDay)
+            {
+                return $"{WeekStart:dddd, d. MMMM yyyy}";
+            }
+
             var end = WeekStart.AddDays(DayCount - 1);
             return WeekStart.Month == end.Month
                 ? $"{WeekStart:d.}–{end:d. MMMM yyyy}"
@@ -186,7 +242,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         NavigatorMonthCount = int.TryParse(await settings.GetAsync(SettingKeys.CalendarNavigatorMonths), out var months) && months is 1 or 2 ? months : 1;
         IsTimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) != "list"; // default: time grid
         _loadingSettings = true;
-        IsWorkWeek = await settings.GetBoolAsync(SettingKeys.CalendarWorkWeek);
+        ShownDays = int.TryParse(await settings.GetAsync(SettingKeys.CalendarDays), out var days) && days is 7 or 5 or 1 ? days
+            : await settings.GetBoolAsync(SettingKeys.CalendarWorkWeek) ? 5 : 7;
         IsPlanning = await settings.GetBoolAsync(SettingKeys.CalendarPlanning);
         PlanningPeopleText = await settings.GetAsync(SettingKeys.CalendarPlanningPeople) ?? string.Empty;
         _loadingSettings = false;
@@ -311,21 +368,21 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     [RelayCommand]
     private Task PreviousWeekAsync()
     {
-        WeekStart = WeekStart.AddDays(-7);
+        WeekStart = WeekStart.AddDays(IsSingleDay ? -1 : -7);
         return LoadWeekAsync();
     }
 
     [RelayCommand]
     private Task NextWeekAsync()
     {
-        WeekStart = WeekStart.AddDays(7);
+        WeekStart = WeekStart.AddDays(IsSingleDay ? 1 : 7);
         return LoadWeekAsync();
     }
 
     [RelayCommand]
     private Task TodayAsync()
     {
-        WeekStart = StartOfWeek(DateTime.Today);
+        WeekStart = IsSingleDay ? DateTime.Today : StartOfWeek(DateTime.Today);
         return LoadWeekAsync();
     }
 
@@ -343,11 +400,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         return RefreshNavigatorAsync();
     }
 
-    /// <summary>Clicking a day (or a week number) in the navigator shows that week.</summary>
+    /// <summary>Clicking a day (or a week number) in the navigator shows that week – or, showing one day, that day.</summary>
     [RelayCommand]
     private Task SelectDayAsync(DateTime date)
     {
-        WeekStart = StartOfWeek(date);
+        WeekStart = IsSingleDay ? date.Date : StartOfWeek(date);
         return LoadWeekAsync();
     }
 
@@ -551,7 +608,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
         for (var i = 0; i < count; i++)
         {
-            MiniMonths[i].Show(NavigatorMonth.AddMonths(i), i == 0, WeekStart, _busyDays);
+            MiniMonths[i].Show(NavigatorMonth.AddMonths(i), i == 0, StartOfWeek(WeekStart), _busyDays);
         }
     }
 
@@ -591,7 +648,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         BuildNavigator(Math.Clamp(NavigatorMonthCount, 1, 2));
     }
 
-    private static DateTime StartOfWeek(DateTime date) => date.Date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
+    internal static DateTime StartOfWeek(DateTime date) => date.Date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
 }
 
 /// <summary>The calendars of one account in "Meine Kalender", under the account's name.</summary>

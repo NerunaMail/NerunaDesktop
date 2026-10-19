@@ -205,6 +205,22 @@ internal sealed partial class MailViewModel(
     // The folder a message is in: its own (search results), otherwise the open folder.
     private MailFolderNode? FolderOf(MessageItemViewModel message) => message.Folder ?? CurrentFolder;
 
+    /// <summary>The messages as they are, e.g. to attach them to a mail being written (dragged there from the list).</summary>
+    public async Task<IReadOnlyList<MimeKit.MimeMessage>> LoadMessagesAsync(IEnumerable<MessageItemViewModel> messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        var result = new List<MimeKit.MimeMessage>();
+        foreach (var message in messages)
+        {
+            if (FolderOf(message) is { } folder)
+            {
+                result.Add(await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId));
+            }
+        }
+
+        return result;
+    }
+
     public void Dispose()
     {
         _readingCts?.Dispose();

@@ -56,6 +56,14 @@ internal sealed partial class ComposeView : UserControl
 
     private void OnDragOver(object? sender, DragEventArgs e)
     {
+        // Messages from the mail list: attached (not over the text itself – the editor there only takes files).
+        if (e.DataTransfer.Contains(MailView.MessageContentFormat))
+        {
+            e.DragEffects = DragDropEffects.Copy;
+            e.Handled = true;
+            return;
+        }
+
         if (e.DataTransfer.Contains(DataFormat.File))
         {
             e.DragEffects = DragDropEffects.Copy;
@@ -68,6 +76,17 @@ internal sealed partial class ComposeView : UserControl
     {
         var ask = _secondaryDrag;
         _secondaryDrag = false;
+        if (e.DataTransfer.TryGetValue(MailView.MessageContentFormat) is { } load)
+        {
+            e.Handled = true;
+            if (DataContext is ComposeViewModel compose)
+            {
+                _ = compose.AttachMessagesAsync(load);
+            }
+
+            return;
+        }
+
         if (e.DataTransfer.TryGetFiles() is not { Length: > 0 } items)
         {
             return;

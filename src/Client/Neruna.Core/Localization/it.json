@@ -2298,5 +2298,8 @@
  "Überschneidet sich mit: ": "Si sovrappone a: ",
  "über der Spam-Schwelle": "sopra la soglia di spam",
  "– nie in der Neruna-Datenbank und nie in den Protokolldateien.": "– mai nel database di Neruna e mai nei file di log.",
- "← Zur Nachricht": "← Torna al messaggio"
+ "← Zur Nachricht": "← Torna al messaggio",
+ "Vorheriger Tag": "Giorno precedente",
+ "Nächster Tag": "Giorno successivo",
+ "Nur einen Tag anzeigen": "Mostra un solo giorno"
 }

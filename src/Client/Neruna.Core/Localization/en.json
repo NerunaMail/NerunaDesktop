@@ -2298,5 +2298,8 @@
  "Überschneidet sich mit: ": "Overlaps with: ",
  "über der Spam-Schwelle": "above the spam threshold",
  "– nie in der Neruna-Datenbank und nie in den Protokolldateien.": "– never in the Neruna database and never in the log files.",
- "← Zur Nachricht": "← Back to message"
+ "← Zur Nachricht": "← Back to message",
+ "Vorheriger Tag": "Previous day",
+ "Nächster Tag": "Next day",
+ "Nur einen Tag anzeigen": "Show one day only"
 }

@@ -24,10 +24,10 @@
             </StackPanel>
           </Button>
           <Button Classes="command" Command="{Binding TodayCommand}" Content="{l:T 'Heute'}" />
-          <Button Classes="command" Command="{Binding PreviousWeekCommand}" ToolTip.Tip="{l:T 'Vorherige Woche'}">
+          <Button Classes="command" Command="{Binding PreviousWeekCommand}" ToolTip.Tip="{Binding PreviousTip}">
             <PathIcon Data="{StaticResource IconChevronLeft}" Width="14" Height="14" Margin="0" />
           </Button>
-          <Button Classes="command" Command="{Binding NextWeekCommand}" ToolTip.Tip="{l:T 'Nächste Woche'}">
+          <Button Classes="command" Command="{Binding NextWeekCommand}" ToolTip.Tip="{Binding NextTip}">
             <PathIcon Data="{StaticResource IconChevronRight}" Width="14" Height="14" Margin="0" />
           </Button>
           <TextBlock Text="{Binding RangeTitle}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" />
@@ -41,10 +41,11 @@
               <TextBlock Text="{l:T 'Planung'}" />
             </StackPanel>
           </ToggleButton>
-          <!-- Days shown: full week or Monday–Friday -->
+          <!-- Days shown: full week, Monday–Friday or one day -->
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
             <ToggleButton Content="{l:T '7 Tage'}" IsChecked="{Binding IsFullWeek}" Padding="10,5" CornerRadius="4,0,0,4" ToolTip.Tip="{l:T 'Ganze Woche anzeigen'}" />
-            <ToggleButton Content="{l:T 'Mo–Fr'}" IsChecked="{Binding IsWorkWeek}" Padding="10,5" CornerRadius="0,4,4,0" ToolTip.Tip="{l:T 'Nur Arbeitstage anzeigen'}" />
+            <ToggleButton Content="{l:T 'Mo–Fr'}" IsChecked="{Binding IsWorkWeek}" Padding="10,5" CornerRadius="0" ToolTip.Tip="{l:T 'Nur Arbeitstage anzeigen'}" />
+            <ToggleButton Content="{l:T '1 Tag'}" IsChecked="{Binding IsSingleDay}" Padding="10,5" CornerRadius="0,4,4,0" ToolTip.Tip="{l:T 'Nur einen Tag anzeigen'}" />
           </StackPanel>
           <Button Classes="command" Command="{Binding ManageCommand}" ToolTip.Tip="{l:T 'Server erneut nach Kalendern fragen (auch im Webmail abonnierte) und auswählen'}">
             <StackPanel Orientation="Horizontal">
