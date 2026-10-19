@@ -201,6 +201,19 @@ public class PstTests
         Assert.Equal(role, PstArchive.RoleOf(name, null));
 
     [Fact]
+    public void The_top_is_the_folder_with_outlooks_own_folders_not_a_persons_folder_with_more_subfolders()
+    {
+        // A PST: the top with inbox, sent and "Ferien"; "Ferien" itself has more subfolders than the top.
+        string[] top = ["Posteingang", "Gesendete Elemente", "Gelöschte Elemente", "Ferien", "Kunden"];
+        string[] ferien = ["2019", "2020", "2021", "2022", "2023", "2024", "2025"];
+        Assert.Equal(1, PstArchive.BestTop([[], top, ferien, ["2019 Fotos"]]));
+
+        // Without Outlook's own folders the one with the most mail folders still wins; with none at all, none.
+        Assert.Equal(1, PstArchive.BestTop([["Projekte"], ["A", "B", "C"]]));
+        Assert.Equal(-1, PstArchive.BestTop([[], []]));
+    }
+
+    [Fact]
     public void Outlooks_sync_issues_are_not_mail()
     {
         Assert.True(PstArchive.IsSyncIssues("Sync Issues (This computer only)"));

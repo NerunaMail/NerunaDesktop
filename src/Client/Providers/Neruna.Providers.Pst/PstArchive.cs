@@ -150,20 +150,33 @@ internal sealed class PstArchive : IDisposable
 
     /// <summary>
     /// The folders a person sees in Outlook ("Top of Personal Folders" / "IPM_SUBTREE"), not the store's own ones
-    /// (views, search, free/busy). Their names differ by Outlook language: the one with the most mail folders wins.
+    /// (views, search, free/busy). Their names differ by Outlook language, so the top is told by what it holds.
     /// </summary>
     private XstFolder Top() => _top ??= FindTop(_file.RootFolder);
 
     private static XstFolder FindTop(XstFolder root)
     {
+        // The top's own children and their children are both candidates (a PST has the top below the root, an OST
+        // one level deeper) – so a person's own folder like "Ferien" is one too.
         var candidates = root.Folders.Concat(root.Folders.SelectMany(f => f.Folders)).ToList();
-        var best = candidates
-            .Select(f => (Folder: f, MailFolders: f.Folders.Count(IsMailFolder)))
-            .Where(c => c.MailFolders > 0)
-            .OrderByDescending(c => c.MailFolders)
-            .FirstOrDefault();
-        return best.Folder ?? root;
+        var best = BestTop([.. candidates.Select(f => (IReadOnlyList<string>)[.. f.Folders.Where(IsMailFolder).Select(c => c.DisplayName)])]);
+        return best < 0 ? root : candidates[best];
     }
+
+    /// <summary>
+    /// Of the candidates (the names of their mail folders), the one that is the top: the one holding Outlook's own
+    /// folders (inbox, sent, deleted …) – a person's folder with many subfolders must not win over it; between
+    /// equals, the one with more mail folders. -1: none has mail folders.
+    /// </summary>
+    internal static int BestTop(IReadOnlyList<IReadOnlyList<string>> candidates) =>
+        candidates
+            .Select((names, index) => (Index: index, Roles: names.Select(n => RoleOf(n, null)).Where(r => r != FolderRole.None).Distinct().Count(), names.Count))
+            .Where(c => c.Count > 0)
+            .OrderByDescending(c => c.Roles)
+            .ThenByDescending(c => c.Count)
+            .Select(c => c.Index)
+            .DefaultIfEmpty(-1)
+            .First();
 
     // Calendar, contacts, tasks, notes, journal and Outlook's own folders hold no mail; neither do "Sync Issues"
     // (an OST's conflict logs, often thousands of them, with their subfolders).

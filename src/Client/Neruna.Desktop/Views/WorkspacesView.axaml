@@ -85,8 +85,17 @@
                       <ItemsControl ItemsSource="{Binding Folders}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:WorkspaceFolderItem">
-                            <CheckBox Margin="{Binding Indent}" IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanChange}" ToolTip.Tip="{Binding Hint}"
-                                      Content="{Binding Name}" MinHeight="26" Padding="6,0" />
+                            <Grid ColumnDefinitions="24,*" Margin="{Binding Indent}" IsVisible="{Binding IsListed}">
+                              <Button Classes="nav" IsVisible="{Binding HasChildren}" Command="{Binding ToggleExpandedCommand}"
+                                      ToolTip.Tip="{l:T 'Unterordner ein- oder ausklappen'}">
+                                <Panel>
+                                  <PathIcon Data="{StaticResource IconChevronRight}" Width="10" Height="10" IsVisible="{Binding !IsExpanded}" />
+                                  <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10" IsVisible="{Binding IsExpanded}" />
+                                </Panel>
+                              </Button>
+                              <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanChange}" ToolTip.Tip="{Binding Hint}"
+                                        Content="{Binding Name}" MinHeight="26" Padding="6,0" />
+                            </Grid>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>

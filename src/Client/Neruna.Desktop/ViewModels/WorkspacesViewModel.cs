@@ -272,7 +272,8 @@ internal sealed partial class WorkspaceAccountItem : ObservableObject
 
 /// <summary>
 /// A mail folder in the editor. System folders are always ticked; a subfolder can only be chosen while the folder it
-/// is in shows – one cannot see a subfolder without its parent.
+/// is in shows – one cannot see a subfolder without its parent. Folded like a tree: a subfolder is listed only while
+/// every folder above it is unfolded (all folded at first, so a long folder list stays short).
 /// </summary>
 internal sealed partial class WorkspaceFolderItem : ObservableObject
 {
@@ -297,6 +298,29 @@ internal sealed partial class WorkspaceFolderItem : ObservableObject
     public string Name => Folder.Name;
 
     public Avalonia.Thickness Indent { get; }
+
+    public bool HasChildren => Children.Count > 0;
+
+    /// <summary>Whether its subfolders are listed.</summary>
+    [ObservableProperty]
+    public partial bool IsExpanded { get; set; }
+
+    /// <summary>Listed: everything above it is unfolded.</summary>
+    public bool IsListed => Parent is null || (Parent.IsExpanded && Parent.IsListed);
+
+    [RelayCommand]
+    private void ToggleExpanded() => IsExpanded = !IsExpanded;
+
+    partial void OnIsExpandedChanged(bool value) => RefreshListed(this);
+
+    private static void RefreshListed(WorkspaceFolderItem item)
+    {
+        foreach (var child in item.Children)
+        {
+            child.OnPropertyChanged(nameof(IsListed));
+            RefreshListed(child);
+        }
+    }
 
     public bool IsSystem => Workspace.IsSystemFolder(Folder);
 
