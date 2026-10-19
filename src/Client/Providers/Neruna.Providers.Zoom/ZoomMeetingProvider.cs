@@ -18,8 +18,12 @@ namespace Neruna.Providers.Zoom;
 /// </summary>
 public static class ZoomAccount
 {
-    /// <summary>The app's public client id from marketplace.zoom.us → Manage → the app → App Credentials.</summary>
-    public const string ClientId = "JSgW_4jaSaSeDoMXjqkGtg";
+    /// <summary>
+    /// The app's public client id (marketplace.zoom.us → the app → Basic Information → App Credentials → "Use Public
+    /// Client OAuth") – not the development or production client id, which go with a secret. Its loopback redirect
+    /// must be in the app's OAuth allow list; Zoom ignores the port.
+    /// </summary>
+    public const string ClientId = "Ci2RHjG4SGm7t1pdaBg2OA";
 
     public static OAuthEndpoints Endpoints { get; } = new(
         new Uri("https://zoom.us/oauth/authorize"),
