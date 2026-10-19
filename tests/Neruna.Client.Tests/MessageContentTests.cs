@@ -122,16 +122,20 @@ public class MessageContentTests
             <img src="https://example.com/logo.jpg" width="150px" style="margin:10px auto;">
             <img src="https://example.com/banner.jpg" width="600" height="200">
             <img src="https://example.com/box.jpg" style="height: 80px">
+            <img src="https
+             ://example.com/broken-over-lines.jpg" width="100%">
             """;
         var content = MessageContent.From(Message(new TextPart("html") { Text = html }));
 
         var pictures = System.Text.RegularExpressions.Regex.Matches(content.Html, "<img[^>]*>").Select(m => m.Value).ToList();
-        Assert.Equal(4, pictures.Count);
+        Assert.Equal(5, pictures.Count);
         Assert.Contains("height: 1px", pictures[0], StringComparison.Ordinal);
         Assert.Contains("margin:10px auto; height: 1px", pictures[1], StringComparison.Ordinal);
         Assert.Contains("height: 200px", pictures[2], StringComparison.Ordinal);
         Assert.DoesNotContain("height: 1px", pictures[3], StringComparison.Ordinal);
         Assert.Contains("80px", pictures[3], StringComparison.Ordinal);
+        Assert.Contains("height: 1px", pictures[4], StringComparison.Ordinal);
+        Assert.DoesNotContain("example.com", content.Html, StringComparison.Ordinal);
     }
 
     [Fact]

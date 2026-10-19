@@ -688,10 +688,15 @@ public sealed partial class MessageContent
         return BackgroundShorthandColor().Replace(css, m => m.Value.TrimEnd(';') + "; background-color: " + m.Groups[1].Value + ";");
     }
 
-    private static bool IsRemote(string url) =>
-        url.StartsWith("http:", StringComparison.OrdinalIgnoreCase)
-        || url.StartsWith("https:", StringComparison.OrdinalIgnoreCase)
-        || url.StartsWith("//", StringComparison.Ordinal);
+    // Also a remote address broken over lines in the mail's source ("https\n ://…") counts – kept as it is, it would
+    // be a broken picture of full size instead of the small placeholder.
+    private static bool IsRemote(string url)
+    {
+        url = string.Concat(url.Where(c => !char.IsWhiteSpace(c)));
+        return url.StartsWith("http:", StringComparison.OrdinalIgnoreCase)
+               || url.StartsWith("https:", StringComparison.OrdinalIgnoreCase)
+               || url.StartsWith("//", StringComparison.Ordinal);
+    }
 
     private static bool IsScriptUrl(string value)
     {
