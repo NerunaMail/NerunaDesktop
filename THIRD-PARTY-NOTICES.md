@@ -7,6 +7,7 @@ project pages and in the NuGet packages.
 | Component | Version | License | Authors | Project |
 |---|---|---|---|---|
 | Avalonia | 12.1.3 | MIT | Avalonia Team | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| AngleSharp | 1.8.3 | MIT | AngleSharp | https://anglesharp.github.io/ |
 | Avalonia.Angle.Windows.Natives | 2.1.27548.20260419 | BSD-3-Clause (ANGLE) | Avalonia Team | https://avaloniaui.net/ |
 | Avalonia.BuildServices | 11.3.2 | MIT | Avalonia Team | https://avaloniaui.net/ |
 | Avalonia.Controls.WebView | 12.1.0 | MIT | AvaloniaUI OÜ | https://avaloniaui.net/ |

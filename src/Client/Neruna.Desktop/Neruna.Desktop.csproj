@@ -28,6 +28,8 @@
     <!-- QR code for pairing a phone (Einstellungen → Cloud) -->
     <PackageReference Include="QRCoder" />
     <PackageReference Include="Avalonia.HtmlRenderer" />
+    <!-- HTML parser with CSS selectors: flexbox in mails rewritten for the renderer (Infrastructure/FlexLayout.cs) -->
+    <PackageReference Include="AngleSharp" />
     <PackageReference Include="Avalonia.Controls.WebView" />
     <!-- Only the managed wrapper of WebView2 (Windows): the paths of files dropped into the mail editor. The WebView
          itself comes from Avalonia.Controls.WebView; no loader, WinForms or WPF parts. -->
