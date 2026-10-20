@@ -124,11 +124,12 @@ public class MessageContentTests
             <img src="https://example.com/box.jpg" style="height: 80px">
             <img src="https
              ://example.com/broken-over-lines.jpg" width="100%">
+            <img src="https://example.com/chart.png" width="580" height="auto" style="width:100%;height:auto">
             """;
         var content = MessageContent.From(Message(new TextPart("html") { Text = html }));
 
         var pictures = System.Text.RegularExpressions.Regex.Matches(content.Html, "<img[^>]*>").Select(m => m.Value).ToList();
-        Assert.Equal(5, pictures.Count);
+        Assert.Equal(6, pictures.Count);
         Assert.Contains("height: 1px", pictures[0], StringComparison.Ordinal);
         Assert.DoesNotContain("width", pictures[0], StringComparison.Ordinal);
         Assert.Contains("height=\"1\"", pictures[0], StringComparison.Ordinal);
@@ -138,6 +139,9 @@ public class MessageContentTests
         Assert.DoesNotContain("height: 1px", pictures[3], StringComparison.Ordinal);
         Assert.Contains("80px", pictures[3], StringComparison.Ordinal);
         Assert.Contains("height: 1px", pictures[4], StringComparison.Ordinal);
+        Assert.DoesNotContain("width=", pictures[5], StringComparison.Ordinal);
+        Assert.DoesNotContain("height=\"auto\"", pictures[5], StringComparison.Ordinal);
+        Assert.Contains("height=\"1\"", pictures[5], StringComparison.Ordinal);
         Assert.DoesNotContain("example.com", content.Html, StringComparison.Ordinal);
     }
 

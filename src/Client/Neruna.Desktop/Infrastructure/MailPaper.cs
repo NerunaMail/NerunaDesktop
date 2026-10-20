@@ -47,7 +47,9 @@ internal static partial class MailPaper
         html = Neruna.Core.Mail.StyleBlocks.CloseOpenBraces(html);
 
         // The renderer knows no media queries and applies their rules always: a phone's "@media (max-width: 480px)
-        // { td { width: 100% } }" made five cells side by side five screens wide. The reading pane is no phone.
+        // { td { width: 100% } }" made five cells side by side five screens wide, and a dark mode's rules showed the
+        // dark variant (pictures, colours) on the light page. The reading pane is no phone, and mails are shown as
+        // designed for a light page (see below).
         html = SmallScreenRules().Replace(html, string.Empty);
 
         // The renderer knows no flexbox or grid (laid out as something else, a mail grew to many screens of empty
@@ -72,8 +74,8 @@ internal static partial class MailPaper
     [GeneratedRegex(@"(?<![-\w])display\s*:\s*(inline-)?(flex|grid)\s*(!\s*important)?\s*;?", RegexOptions.IgnoreCase)]
     private static partial Regex FlexOrGrid();
 
-    // "@media … max-width …" with its rules (one level of braces inside).
-    [GeneratedRegex(@"@media[^{;]*max-(device-)?width[^{;]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", RegexOptions.IgnoreCase)]
+    // "@media … max-width …" or "… prefers-color-scheme: dark …" with its rules (one level of braces inside).
+    [GeneratedRegex(@"@media[^{;]*(max-(device-)?width|prefers-color-scheme\s*:\s*dark)[^{;]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", RegexOptions.IgnoreCase)]
     private static partial Regex SmallScreenRules();
 
     [GeneratedRegex(@"(?<open><p\b[^>]*>)(?:\s|&nbsp;|&#160;|\u00a0|</?o:p>|<span\b[^>]*>|</span>)*(?<close></p>)", RegexOptions.IgnoreCase)]

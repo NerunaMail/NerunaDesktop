@@ -288,7 +288,8 @@ public sealed partial class MessageContent
 
                 // A blocked picture without a height of its own keeps no width either: the desktop renderer makes the
                 // transparent pixel a square of that width ("100%": screen-high empty areas), whatever height it gets.
-                var hasHeight = context.Attributes.Any(a => a.Name.Equals("height", StringComparison.OrdinalIgnoreCase));
+                // Only a height in pixels counts ("auto", "100%" give the renderer no height).
+                var hasHeight = PixelHeight(context.Attributes) is not null;
                 var dropWidth = !hasHeight && name.Equals("img", StringComparison.OrdinalIgnoreCase)
                                 && context.Attributes.FirstOrDefault(a => a.Name.Equals("src", StringComparison.OrdinalIgnoreCase))?.Value is { } source
                                 && IsRemote(source) && (!allowRemote || (tracker && blockTrackers));
@@ -324,7 +325,7 @@ public sealed partial class MessageContent
                         }
                     }
 
-                    if (dropWidth && attributeName.Equals("width", StringComparison.OrdinalIgnoreCase))
+                    if (dropWidth && (attributeName.Equals("width", StringComparison.OrdinalIgnoreCase) || attributeName.Equals("height", StringComparison.OrdinalIgnoreCase)))
                     {
                         continue;
                     }
@@ -421,11 +422,16 @@ public sealed partial class MessageContent
             return style;
         }
 
-        var height = attributes.FirstOrDefault(a => a.Name.Equals("height", StringComparison.OrdinalIgnoreCase))?.Value?.Trim();
-        var pixels = int.TryParse(height?.Replace("px", string.Empty, StringComparison.OrdinalIgnoreCase), System.Globalization.NumberStyles.Integer,
-            System.Globalization.CultureInfo.InvariantCulture, out var n) && n > 0 ? n : 1;
-        var rule = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"height: {pixels}px");
+        var rule = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"height: {PixelHeight(attributes) ?? 1}px");
         return string.IsNullOrWhiteSpace(style) ? rule : style.TrimEnd().TrimEnd(';') + "; " + rule;
+    }
+
+    /// <summary>The height attribute in pixels ("200", "200px"), or null ("auto", "100%", none).</summary>
+    private static int? PixelHeight(HtmlAttributeCollection attributes)
+    {
+        var height = attributes.FirstOrDefault(a => a.Name.Equals("height", StringComparison.OrdinalIgnoreCase))?.Value?.Trim();
+        return int.TryParse(height?.Replace("px", string.Empty, StringComparison.OrdinalIgnoreCase), System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var n) && n > 0 ? n : null;
     }
 
     /// <summary>
