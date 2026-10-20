@@ -284,6 +284,14 @@ public sealed partial class MessageContent
                 var centered = false;
                 var styled = false;
                 var placeholder = false;
+                var picture = false;
+
+                // A blocked picture without a height of its own keeps no width either: the desktop renderer makes the
+                // transparent pixel a square of that width ("100%": screen-high empty areas), whatever height it gets.
+                var hasHeight = context.Attributes.Any(a => a.Name.Equals("height", StringComparison.OrdinalIgnoreCase));
+                var dropWidth = !hasHeight && name.Equals("img", StringComparison.OrdinalIgnoreCase)
+                                && context.Attributes.FirstOrDefault(a => a.Name.Equals("src", StringComparison.OrdinalIgnoreCase))?.Value is { } source
+                                && IsRemote(source) && (!allowRemote || (tracker && blockTrackers));
                 foreach (var attribute in context.Attributes.OrderBy(a => a.Name.Equals("style", StringComparison.OrdinalIgnoreCase)))
                 {
                     var value = attribute.Value ?? string.Empty;
@@ -309,11 +317,16 @@ public sealed partial class MessageContent
                             if (attributeName.Equals("src", StringComparison.OrdinalIgnoreCase))
                             {
                                 writer.WriteAttribute("src", TransparentPixel);
-                                placeholder = name.Equals("img", StringComparison.OrdinalIgnoreCase);
+                                placeholder = picture = name.Equals("img", StringComparison.OrdinalIgnoreCase);
                             }
 
                             continue;
                         }
+                    }
+
+                    if (dropWidth && attributeName.Equals("width", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
                     }
 
                     var isTable = name.Equals("table", StringComparison.OrdinalIgnoreCase);
@@ -355,6 +368,13 @@ public sealed partial class MessageContent
                 if (placeholder)
                 {
                     writer.WriteAttribute("style", PlaceholderStyle(string.Empty, context.Attributes));
+                }
+
+                // The desktop renderer sizes a picture by its attributes only (not its style): without a height it keeps
+                // the pixel's square shape at the given width.
+                if (picture && !hasHeight)
+                {
+                    writer.WriteAttribute("height", "1");
                 }
 
                 if (centered && !styled)

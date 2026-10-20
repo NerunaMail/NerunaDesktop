@@ -46,6 +46,16 @@ internal static partial class MailPaper
         ArgumentNullException.ThrowIfNull(html);
         html = Neruna.Core.Mail.StyleBlocks.CloseOpenBraces(html);
 
+        // The renderer knows no media queries and applies their rules always: a phone's "@media (max-width: 480px)
+        // { td { width: 100% } }" made five cells side by side five screens wide. The reading pane is no phone.
+        html = SmallScreenRules().Replace(html, string.Empty);
+
+        // The renderer knows no flexbox or grid: such an element was laid out as something it is not, and the whole
+        // mail grew to many screens of empty space (a newsletter's centred icon row). Without the declaration each
+        // element keeps its own display – the list a list, the row a table row; a column ("flex-direction: column",
+        // steps one below the other) becomes a block, so its parts stay one below the other.
+        html = Declarations().Replace(html, ForRenderer);
+
         // An empty paragraph (Outlook: <p><o:p>&nbsp;</o:p></p>) is a blank line; the renderer let it collapse.
         html = EmptyParagraph().Replace(html, "${open}<br>${close}") + ParagraphSpacing;
         if (!darkTheme || OwnBackground().IsMatch(html))
@@ -58,6 +68,40 @@ internal static partial class MailPaper
         var light = TextColor().Replace(html, m => ForDarkPage(m.Value, m.Groups["value"].Value));
         return ("<div style=\"color: #E6E6E6\">" + light + "</div>", true);
     }
+
+    [GeneratedRegex(@"(?<![-\w])display\s*:\s*(inline-)?(flex|grid)\s*(!\s*important)?\s*;?", RegexOptions.IgnoreCase)]
+    private static partial Regex FlexOrGrid();
+
+    // A flexbox or grid rule without its display; a column becomes a block – and in a style block its children too
+    // (table cells in a row "display: flex; flex-direction: column" would otherwise stay side by side).
+    private static string ForRenderer(Match block)
+    {
+        if (!FlexOrGrid().IsMatch(block.Value))
+        {
+            return block.Value;
+        }
+
+        if (!ColumnDirection().IsMatch(block.Value))
+        {
+            return FlexOrGrid().Replace(block.Value, string.Empty);
+        }
+
+        var result = FlexOrGrid().Replace(block.Value, "display: block;");
+        return block.Groups["selector"].Value is { Length: > 0 } selector && !selector.TrimStart().StartsWith('@')
+            ? result + " " + string.Join(", ", selector.Split(',').Select(part => part.Trim() + " > *")) + " { display: block; }"
+            : result;
+    }
+
+    // "@media … max-width …" with its rules (one level of braces inside).
+    [GeneratedRegex(@"@media[^{;]*max-(device-)?width[^{;]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", RegexOptions.IgnoreCase)]
+    private static partial Regex SmallScreenRules();
+
+    // A rule (selector and { … } in a style block) or a style attribute.
+    [GeneratedRegex(@"(?<selector>[^{};]*)\{[^{}]*\}|\bstyle\s*=\s*(""[^""]*""|'[^']*')", RegexOptions.IgnoreCase)]
+    private static partial Regex Declarations();
+
+    [GeneratedRegex(@"flex-direction\s*:\s*column", RegexOptions.IgnoreCase)]
+    private static partial Regex ColumnDirection();
 
     [GeneratedRegex(@"(?<open><p\b[^>]*>)(?:\s|&nbsp;|&#160;|\u00a0|</?o:p>|<span\b[^>]*>|</span>)*(?<close></p>)", RegexOptions.IgnoreCase)]
     private static partial Regex EmptyParagraph();

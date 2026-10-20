@@ -130,6 +130,9 @@ public class MessageContentTests
         var pictures = System.Text.RegularExpressions.Regex.Matches(content.Html, "<img[^>]*>").Select(m => m.Value).ToList();
         Assert.Equal(5, pictures.Count);
         Assert.Contains("height: 1px", pictures[0], StringComparison.Ordinal);
+        Assert.DoesNotContain("width", pictures[0], StringComparison.Ordinal);
+        Assert.Contains("height=\"1\"", pictures[0], StringComparison.Ordinal);
+        Assert.Contains("width=\"600\"", pictures[2], StringComparison.Ordinal);
         Assert.Contains("margin:10px auto; height: 1px", pictures[1], StringComparison.Ordinal);
         Assert.Contains("height: 200px", pictures[2], StringComparison.Ordinal);
         Assert.DoesNotContain("height: 1px", pictures[3], StringComparison.Ordinal);
