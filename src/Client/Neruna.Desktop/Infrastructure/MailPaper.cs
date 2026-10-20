@@ -71,6 +71,39 @@ internal static partial class MailPaper
         return ("<div style=\"color: #E6E6E6\">" + light + "</div>", true);
     }
 
+    /// <summary>
+    /// The mail as a page for the system web view (the reading pane): the sender's HTML as it is – the browser engine
+    /// lays out flexbox, media queries and the rest itself –, with Neruna's base style first (so the mail's own rules
+    /// win), embedded pictures as data: addresses, and a Content Security Policy that allows no scripts at all and
+    /// nothing from the network unless the user allowed remote content for this message. Dark as in <see cref="Prepare"/>.
+    /// </summary>
+    public static (string Html, bool Dark) ForBrowser(string html, bool darkTheme, bool allowRemote, Func<string, string?> inlinePicture)
+    {
+        ArgumentNullException.ThrowIfNull(html);
+        ArgumentNullException.ThrowIfNull(inlinePicture);
+        html = Neruna.Core.Mail.StyleBlocks.CloseOpenBraces(html);
+        html = CidSource().Replace(html, m => m.Groups["before"].Value + (inlinePicture(Uri.UnescapeDataString(m.Groups["id"].Value)) ?? "data:,"));
+        var dark = darkTheme && !OwnBackground().IsMatch(html);
+        if (dark)
+        {
+            html = TextColor().Replace(html, m => ForDarkPage(m.Value, m.Groups["value"].Value));
+        }
+
+        var remote = allowRemote ? " https: http:" : string.Empty;
+        var head = "<meta charset=\"utf-8\">"
+                   + $"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'none'; img-src data:{remote}; "
+                   + $"style-src 'unsafe-inline'{remote}; font-src data:{remote}; media-src data:\">"
+                   + $"<meta name=\"color-scheme\" content=\"{(dark ? "dark" : "light")}\">"
+                   + "<style>" + (dark ? DarkStylesheet + " html { background: #292929; }" : LightStylesheet + " html { background: #ffffff; }")
+                   + " body { margin: 0; overflow-wrap: break-word; } img { max-width: 100%; height: auto; }</style>";
+        var at = html.IndexOf("<head>", StringComparison.OrdinalIgnoreCase);
+        return (at >= 0 ? html.Insert(at + "<head>".Length, head) : "<!DOCTYPE html><html><head>" + head + "</head><body>" + html + "</body></html>", dark);
+    }
+
+    // src="cid:…", background="cid:…" and url(cid:…), with what comes before the address.
+    [GeneratedRegex(@"(?<before>(?:src|background)\s*=\s*[""']?|url\(\s*[""']?)cid:(?<id>[^""')\s>]+)", RegexOptions.IgnoreCase)]
+    private static partial Regex CidSource();
+
     [GeneratedRegex(@"(?<![-\w])display\s*:\s*(inline-)?(flex|grid)\s*(!\s*important)?\s*;?", RegexOptions.IgnoreCase)]
     private static partial Regex FlexOrGrid();
 

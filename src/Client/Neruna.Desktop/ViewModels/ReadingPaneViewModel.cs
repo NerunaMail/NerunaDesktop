@@ -618,6 +618,19 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         };
     }
 
+    /// <summary>An embedded picture (cid:) as a data: address for the web view, or null if the message has none by that id.</summary>
+    public string? InlinePictureDataUri(string contentId)
+    {
+        if (_content is null || !_content.InlineParts.TryGetValue(contentId, out var part) || part.Content is not { } inline)
+        {
+            return null;
+        }
+
+        using var buffer = new MemoryStream();
+        inline.DecodeTo(buffer);
+        return "data:" + part.ContentType.MimeType + ";base64," + Convert.ToBase64String(buffer.GetBuffer(), 0, (int)buffer.Length);
+    }
+
     /// <summary>Called by the HTML view for every image; returns null for blocked or unreadable images.</summary>
     public async Task<Bitmap?> LoadImageAsync(string source)
     {

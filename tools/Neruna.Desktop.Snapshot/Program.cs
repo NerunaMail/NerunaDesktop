@@ -43,6 +43,7 @@ Application.Current!.RequestedThemeVariant = theme;
 
 // Headless rendering has no native WebView: compose uses its plain-text fallback.
 HtmlEditor.ForcePlainText = true;
+MessageBodyView.UseRenderer = true;
 
 var done = new CancellationTokenSource();
 var exitCode = 0;
@@ -1257,6 +1258,13 @@ internal static class Snapshots
         Directory.Delete(dataDir, recursive: true);
     }
 
+    private static string DataUri(string type, MimeKit.IMimeContent content)
+    {
+        using var stream = new MemoryStream();
+        content.DecodeTo(stream);
+        return "data:" + type + ";base64," + Convert.ToBase64String(stream.ToArray());
+    }
+
     /// <summary>Renders .eml files through the real reading-pane pipeline (debugging display issues of single mails).</summary>
     public static async Task RenderMailsAsync(string output, IEnumerable<string> files)
     {
@@ -1281,6 +1289,14 @@ internal static class Snapshots
                 e.Event.Callback(new Avalonia.Media.Imaging.Bitmap(stream));
             };
             view.Text = Neruna.Desktop.Infrastructure.MailPaper.Prepare(content.Html, darkTheme: false).Html;
+            // The page the reading pane gives the web view (open it in a browser to see the mail as on Windows/macOS).
+            var page = Neruna.Desktop.Infrastructure.MailPaper.ForBrowser(content.Html, darkTheme: false, allowRemote: false, id =>
+                message.BodyParts.OfType<MimeKit.MimePart>().FirstOrDefault(p => p.ContentId == id) is { Content: { } part } picture
+                    ? DataUri(picture.ContentType.MimeType, part)
+                    : null).Html;
+            await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".browser.html"), page);
+            await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".browser-dark.html"),
+                Neruna.Desktop.Infrastructure.MailPaper.ForBrowser(content.Html, darkTheme: true, allowRemote: false, _ => null).Html);
             // What the renderer got, next to the picture (to see why a mail looks wrong).
             await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".html"), view.Text);
             // And as PDF ("Speichern unter … PDF", attachments as pages), to check the print layout.

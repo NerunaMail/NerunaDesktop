@@ -121,15 +121,21 @@ IMailStore      ICalendarStore      IContactStore            ← SQLite (Neruna.
   eingebettete Bilder (`cid:`-Referenzen) und **alle** echten Anhänge – auch PDFs mit `Content-Disposition: inline`,
   Kalender-Einladungen, angehängte Mails und `winmail.dat` (TNEF, wird entpackt).
 - HTML wird per Whitelist-Callback bereinigt (keine Skripte, Event-Handler, Formulare, Frames, `<meta>/<link>/<base>`)
-  und mit **Avalonia.HtmlRenderer** dargestellt (rein managed, kein JavaScript). Externe Bilder und Stylesheets werden
-  standardmässig nicht geladen («Bilder laden» pro Nachricht); blockierte Bilder werden durch ein transparentes Pixel ersetzt.
+  und in der **System-WebView** dargestellt (dieselbe wie beim Verfassen: WebView2 unter Windows, WebKit unter macOS/Linux;
+  `MessageBodyView`, Seite aus `MailPaper.ForBrowser`). Die Seite trägt eine Content Security Policy: keine Skripte, nichts
+  aus dem Netz – Bilder, Stylesheets und Schriften erst nach «Bilder laden» pro Nachricht; eingebettete Bilder (`cid:`) als
+  `data:`-Adressen. Die WebView läuft ohne gespeicherte Daten (InPrivate/ephemer), navigiert nie selbst – Links gehen durch
+  die Linkprüfung und öffnen ausserhalb; ein von Neruna eingespieltes Skript reicht nur Tastenkürzel (Entf, Ctrl+R …) an
+  das Fenster weiter. Blockierte Bilder werden durch ein transparentes Pixel ersetzt.
+- Ohne WebView (keine Laufzeit, Snapshot-Werkzeug, Druck/PDF) zeichnet **Avalonia.HtmlRenderer** (rein managed, etwa CSS 2);
+  dafür baut `MailPaper.Prepare` Flexbox/Grid in Tabellen um (`FlexLayout`) und entfernt Media Queries.
 - Reiner Text wird als ein `<div>` pro Zeile dargestellt (Leerzeichenfolgen in `white-space: pre`-Spans, Links
   anklickbar), bewusst ohne `white-space: pre-wrap` – HtmlRenderer setzt das uneinheitlich um (unter Windows landeten
   ganze Mails auf einer Zeile). format=flowed wird vorher zusammengefügt, die Signaturtrennlinie `-- ` bleibt erhalten.
 - Ebenso werden `<pre>`-Blöcke in HTML-Mails (Thunderbird: Text-Signatur `pre.moz-signature`, Zitate `pre.moz-quote-pre`)
   in explizite Zeilen umgewandelt.
-- Grenzen: CSS-Unterstützung etwa CSS 2 (moderne Newsletter mit Flexbox werden einfacher dargestellt). Option für später:
-  dieselbe native WebView wie beim Verfassen, mit dediziertem Sanitizer und CSP.
+- Die Text-Regeln oben (eine Zeile pro `<div>`, explizite Zeilen statt `<pre>`) stammen aus der HtmlRenderer-Zeit und gelten
+  für beide Darstellungen.
 
 ### Datenschutz und Phishing-Schutz
 
@@ -724,6 +730,6 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 | 3 | Admin-Escrow für Tresor | Für S/MIME-Zertifikate ✔ Organisationsschlüssel (6b); Config-Tresor ✔ ohne Escrow |
 | 4 | Preismodell | pro User · pro Domain · Staffeln |
 | 5 | UI-Sprachen | ✔ de/en/fr/it: deutscher Text als Schlüssel, Kataloge `Neruna.Core/Localization/*.json`, Wahl unter Design (Neustart) |
-| 6 | HTML-Darstellung von Mails | ✔ Lesen: Avalonia.HtmlRenderer; Verfassen: native WebView (WebView2/WebKit). Avalonias RichTextEditor ist kommerziell → nicht verwendet |
+| 6 | HTML-Darstellung von Mails | ✔ Lesen und Verfassen: native WebView (WebView2/WebKit); Avalonia.HtmlRenderer als Rückfall und für Druck/PDF. Avalonias RichTextEditor ist kommerziell → nicht verwendet |
 | 7 | Admin-UI Server | ✔ Filament 5 |
 | 8 | Produkt-Domain | ✔ neruna.org |

@@ -12,15 +12,32 @@ using TheArtOfDev.HtmlRenderer.Core.Entities;
 namespace Neruna.Desktop.Views;
 
 /// <summary>
-/// Renders the sanitized message HTML. Images are resolved by the view model (inline parts; remote only when allowed),
-/// external stylesheets are never loaded, links open outside the app.
+/// Shows the sanitized message HTML in the system web view (WebView2 on Windows, WebKit on macOS and Linux) – the
+/// same engine as the editor, so a mail looks as its sender laid it out. No scripts, nothing from the network unless
+/// allowed for the message (Content Security Policy, <see cref="MailPaper.ForBrowser"/>); the page never navigates
+/// itself – links go through Neruna's check and open outside the app. Where no web view works (and in the headless
+/// snapshot tool), the HTML renderer shows the mail instead.
 /// </summary>
 internal sealed partial class MessageBodyView : UserControl
 {
     internal const string BaseStylesheet = MailPaper.LightStylesheet;
 
+    /// <summary>Snapshot tool and tests: no web view headless – the HTML renderer shows the mail.</summary>
+    public static bool UseRenderer { get; set; }
+
+    // A web view that did not show a page within this time counts as missing (no runtime): the renderer takes over.
+    private static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(10);
+    private static bool _webUnavailable;
+
     private readonly Border _host;
     private string? _shown;
+    private NativeWebView? _web;
+    private bool _webWorks;
+
+    // Pages Neruna gave the web view that have not started loading yet (one per message shown); every other
+    // navigation is a link.
+    private int _expectedLoads;
+    private MainWindowViewModel? _window;
 
     public MessageBodyView()
     {
@@ -41,17 +58,220 @@ internal sealed partial class MessageBodyView : UserControl
         };
     }
 
-    // The panel scrolls itself. Given its text while hidden (during "Wird geladen …", size 0), it kept a wrong
-    // offset and cut off the top of a freshly downloaded mail. So: a fresh panel per message, filled once visible.
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _window = TopLevel.GetTopLevel(this)?.DataContext as MainWindowViewModel;
+        if (_window is not null)
+        {
+            _window.PropertyChanged += OnWindowChanged;
+            FollowOverlay();
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_window is not null)
+        {
+            _window.PropertyChanged -= OnWindowChanged;
+            _window = null;
+        }
+    }
+
+    private void OnWindowChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.HasOverlay))
+        {
+            FollowOverlay();
+        }
+    }
+
+    // The system draws the web view above everything of the window, the dimmed dialog included: while a dialog is
+    // open it steps aside (as the editor does).
+    private void FollowOverlay()
+    {
+        if (_web is not null && _window is not null)
+        {
+            _web.IsVisible = !_window.HasOverlay;
+        }
+    }
+
     private void ShowWhenVisible()
     {
-        var html = (DataContext as ReadingPaneViewModel)?.Html ?? string.Empty;
+        var pane = DataContext as ReadingPaneViewModel;
+        var html = pane?.Html ?? string.Empty;
         if (!IsEffectivelyVisible || Bounds.Width <= 0 || ReferenceEquals(html, _shown))
         {
             return;
         }
 
         _shown = html;
+        if (!UseRenderer && !_webUnavailable && pane is not null && ShowInWebView(pane, html))
+        {
+            return;
+        }
+
+        ShowWithRenderer(html);
+    }
+
+    private bool ShowInWebView(ReadingPaneViewModel pane, string html)
+    {
+        try
+        {
+            var (page, dark) = MailPaper.ForBrowser(html, MailPaper.IsDarkTheme, pane.AllowsRemoteContent, pane.InlinePictureDataUri);
+            _host.Background = dark ? MailPaper.DarkBrush : Brushes.White;
+            if (_web is null)
+            {
+                _web = new NativeWebView();
+                _web.EnvironmentRequested += OnEnvironmentRequested;
+                _web.NavigationStarted += OnNavigationStarting;
+                _web.NavigationCompleted += OnNavigationCompleted;
+                _web.WebMessageReceived += OnWebMessage;
+                _web.NewWindowRequested += OnNewWindowRequested;
+                DispatcherTimer.RunOnce(() =>
+                {
+                    if (!_webWorks)
+                    {
+                        _webUnavailable = true;
+                        _web = null;
+                        var shown = _shown;
+                        _shown = null;
+                        if (shown is not null)
+                        {
+                            ShowWhenVisible();
+                        }
+                    }
+                }, LoadTimeout);
+            }
+
+            if (!ReferenceEquals(_host.Child, _web))
+            {
+                _host.Child = _web;
+                FollowOverlay();
+            }
+
+            _web.Background = _host.Background;
+            _expectedLoads++;
+            _web.NavigateToString(page);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // No web view on this system (Windows without WebView2, Linux without WebKitGTK).
+            _webUnavailable = true;
+            _web = null;
+            return false;
+        }
+    }
+
+    // Nothing of a mail stays behind: no cookies or storage from pictures loaded off the internet.
+    private static void OnEnvironmentRequested(object? sender, WebViewEnvironmentRequestedEventArgs e)
+    {
+        e.EnableDevTools = false;
+        switch (e)
+        {
+            case Avalonia.Platform.WindowsWebView2EnvironmentRequestedEventArgs windows:
+                windows.IsInPrivateModeEnabled = true;
+                break;
+            case Avalonia.Platform.AppleWKWebViewEnvironmentRequestedEventArgs apple:
+                apple.NonPersistentDataStore = true;
+                break;
+            case Avalonia.Platform.GtkWebViewEnvironmentRequestedEventArgs gtk:
+                gtk.EphemeralDataManager = true;
+                break;
+        }
+    }
+
+    // The page itself runs no scripts (its policy forbids them); Neruna adds one that hands the mail program's keys
+    // (Delete, Ctrl+R …) to the window, which the web view would otherwise keep once clicked into.
+    private const string KeyScript = """
+        (function () {
+          if (window.__nerunaKeys) return;
+          window.__nerunaKeys = true;
+          document.addEventListener("keydown", function (e) {
+            var command = e.ctrlKey || e.metaKey;
+            var key = e.key || "";
+            if (/^(Control|Shift|Alt|Meta)$/.test(key)) return;
+            if (command && (key === "c" || key === "C" || key === "a" || key === "A")) return;
+            if (!command && !e.altKey && !/^(Delete|Escape|F\d+)$/.test(key)) return;
+            e.preventDefault();
+            var message = JSON.stringify({ type: "key", key: key, ctrl: command, shift: e.shiftKey, alt: e.altKey });
+            if (typeof window.invokeCSharpAction === "function") window.invokeCSharpAction(message);
+          }, true);
+        })();
+        """;
+
+    private void OnNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
+    {
+        _webWorks = true;
+        _ = _web?.InvokeScript(KeyScript);
+    }
+
+    private void OnWebMessage(object? sender, WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            var body = e.Body ?? "{}";
+            if (body.StartsWith('"'))
+            {
+                body = System.Text.Json.JsonSerializer.Deserialize<string>(body) ?? "{}";
+            }
+
+            var message = System.Text.Json.JsonDocument.Parse(body).RootElement;
+            if (message.TryGetProperty("type", out var type) && type.GetString() == "key"
+                && message.TryGetProperty("key", out var name) && name.GetString() is { Length: > 0 } text
+                && Enum.TryParse<Avalonia.Input.Key>(text.Length == 1 ? text.ToUpperInvariant() : text, ignoreCase: true, out var key))
+            {
+                var modifiers = Avalonia.Input.KeyModifiers.None;
+                modifiers |= message.TryGetProperty("ctrl", out var ctrl) && ctrl.ValueKind == System.Text.Json.JsonValueKind.True ? Avalonia.Input.KeyModifiers.Control : 0;
+                modifiers |= message.TryGetProperty("shift", out var shift) && shift.ValueKind == System.Text.Json.JsonValueKind.True ? Avalonia.Input.KeyModifiers.Shift : 0;
+                modifiers |= message.TryGetProperty("alt", out var alt) && alt.ValueKind == System.Text.Json.JsonValueKind.True ? Avalonia.Input.KeyModifiers.Alt : 0;
+                Dispatcher.UIThread.Post(() => RaiseEvent(new Avalonia.Input.KeyEventArgs
+                {
+                    RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent,
+                    Key = key,
+                    KeyModifiers = modifiers,
+                }));
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Not a message of Neruna's script.
+        }
+    }
+
+    // NavigateToString arrives as about:blank or a data: address; anything else is a click on a link.
+    private void OnNavigationStarting(object? sender, WebViewNavigationStartingEventArgs e)
+    {
+        if (_expectedLoads > 0 && (e.Request is null || e.Request.Scheme is "about" or "data"))
+        {
+            _expectedLoads--;
+            return;
+        }
+
+        e.Cancel = true;
+        if (e.Request is { } link)
+        {
+            Dispatcher.UIThread.Post(() => OpenLink(link.OriginalString));
+        }
+    }
+
+    // Links in mails carry target="_blank": the web view asks for a new window instead of navigating.
+    private void OnNewWindowRequested(object? sender, WebViewNewWindowRequestedEventArgs e)
+    {
+        e.Handled = true;
+        if (e.Request is { } link)
+        {
+            Dispatcher.UIThread.Post(() => OpenLink(link.OriginalString));
+        }
+    }
+
+    // Without a web view: the HTML renderer. The panel scrolls itself; given its text while hidden (during "Wird
+    // geladen …", size 0), it kept a wrong offset and cut off the top of a freshly downloaded mail. So: a fresh panel
+    // per message, filled once visible.
+    private void ShowWithRenderer(string html)
+    {
         var (shown, dark) = MailPaper.Prepare(html, MailPaper.IsDarkTheme);
         _host.Background = dark ? MailPaper.DarkBrush : Brushes.White;
         var panel = new HtmlPanel
@@ -108,7 +328,11 @@ internal sealed partial class MessageBodyView : UserControl
     private void OnLinkClicked(object? sender, HtmlRendererRoutedEventArgs<HtmlLinkClickedEventArgs> e)
     {
         e.Event.Handled = true;
-        var link = e.Event.Link;
+        OpenLink(e.Event.Link);
+    }
+
+    private void OpenLink(string link)
+    {
         if (link.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
         {
             var address = Uri.UnescapeDataString(link[7..].Split('?')[0]);
@@ -125,6 +349,12 @@ internal sealed partial class MessageBodyView : UserControl
                 _ = OpenFileAsync(owner, safe, path);
             }
 
+            return;
+        }
+
+        // Only web links leave the mail (an anchor within it, "about:", "data:" stay where they are).
+        if (!Uri.TryCreate(link, UriKind.Absolute, out var web) || web.Scheme is not ("https" or "http"))
+        {
             return;
         }
 
