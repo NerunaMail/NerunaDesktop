@@ -88,7 +88,11 @@ public sealed partial class MessageContent
     /// <param name="blockTrackers">Tracking pixels stay out even then.</param>
     /// <param name="plainTextOnly">The body as plain text only (no layout, nothing from the internet).</param>
     /// <param name="fileLinks">Links to files stay links (a safe sender); otherwise they are shown as text.</param>
-    public static MessageContent From(MimeMessage message, bool allowRemoteContent = false, bool blockTrackers = true, bool plainTextOnly = false, bool fileLinks = false)
+    /// <param name="forRenderer">
+    /// For the desktop's HTML renderer (PDF export), which knows about CSS 2 only: tables, lengths and preformatted
+    /// text are rewritten into what it can draw. Web views (reading pane, editor, Android) get the mail as it is.
+    /// </param>
+    public static MessageContent From(MimeMessage message, bool allowRemoteContent = false, bool blockTrackers = true, bool plainTextOnly = false, bool fileLinks = false, bool forRenderer = false)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -112,15 +116,15 @@ public sealed partial class MessageContent
         else if (walker.HtmlBody is { } htmlPart)
         {
             var source0 = htmlPart.Text ?? string.Empty;
-            html = Sanitize(fileLinks ? source0 : FileLinks.AsText(source0), allowRemoteContent, blockTrackers, referencedIds, ref blocked, ref trackers);
+            html = Sanitize(fileLinks ? source0 : FileLinks.AsText(source0), allowRemoteContent, blockTrackers, forRenderer, referencedIds, ref blocked, ref trackers);
             foreach (var extra in walker.ExtraBodies)
             {
-                html += TextToHtmlFragment(extra);
+                html += TextToHtmlFragment(extra, forRenderer);
             }
         }
         else if (walker.TextBody is { } textPart)
         {
-            html = "<html><body>" + TextToHtmlFragment(textPart) + string.Concat(walker.ExtraBodies.Select(TextToHtmlFragment)) + "</body></html>";
+            html = "<html><body>" + TextToHtmlFragment(textPart, forRenderer) + string.Concat(walker.ExtraBodies.Select(b => TextToHtmlFragment(b, forRenderer))) + "</body></html>";
         }
         else
         {
@@ -167,14 +171,14 @@ public sealed partial class MessageContent
         _ => "anhang",
     };
 
-    private static string TextToHtmlFragment(TextPart part)
+    private static string TextToHtmlFragment(TextPart part, bool forRenderer)
     {
         if (part.IsHtml)
         {
             var ignored = new HashSet<string>(StringComparer.Ordinal);
             var blocked = false;
             var trackers = 0;
-            return "<hr/>" + Sanitize(FileLinks.AsText(part.Text ?? string.Empty), false, true, ignored, ref blocked, ref trackers);
+            return "<hr/>" + Sanitize(FileLinks.AsText(part.Text ?? string.Empty), false, true, forRenderer, ignored, ref blocked, ref trackers);
         }
 
         // format=flowed (Thunderbird) is first unwrapped to plain text: MimeKit's FlowedToHtml turns every line into
@@ -242,7 +246,7 @@ public sealed partial class MessageContent
     private static bool IsValidAttributeName(string name) =>
         name.Length > 0 && char.IsAsciiLetter(name[0]) && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or ':' or '.');
 
-    private static string Sanitize(string html, bool allowRemote, bool blockTrackers, HashSet<string> referencedIds, ref bool blocked, ref int trackers)
+    private static string Sanitize(string html, bool allowRemote, bool blockTrackers, bool forRenderer, HashSet<string> referencedIds, ref bool blocked, ref int trackers)
     {
         var blockedLocal = false;
         var trackersLocal = 0;
@@ -331,7 +335,7 @@ public sealed partial class MessageContent
                     }
 
                     var isTable = name.Equals("table", StringComparison.OrdinalIgnoreCase);
-                    if (isTable && attributeName.Equals("align", StringComparison.OrdinalIgnoreCase) && value.Trim().Equals("center", StringComparison.OrdinalIgnoreCase))
+                    if (forRenderer && isTable && attributeName.Equals("align", StringComparison.OrdinalIgnoreCase) && value.Trim().Equals("center", StringComparison.OrdinalIgnoreCase))
                     {
                         // The renderer centers a table wider than its space to the left, out of view; auto margins
                         // center it as well and keep it inside (see TableStyle).
@@ -341,14 +345,14 @@ public sealed partial class MessageContent
 
                     if (attributeName.Equals("style", StringComparison.OrdinalIgnoreCase))
                     {
-                        value = SanitizeCss(value, allowRemote, referencedIds, ref blockedLocal);
+                        value = SanitizeCss(value, allowRemote, forRenderer, referencedIds, ref blockedLocal);
                         if (placeholder)
                         {
                             value = PlaceholderStyle(value, context.Attributes);
                             placeholder = false;
                         }
 
-                        if (isTable)
+                        if (forRenderer && isTable)
                         {
                             value = TableStyle(value, centered);
                             styled = true;
@@ -356,7 +360,7 @@ public sealed partial class MessageContent
 
                         // Newsletter builders lay out <div>s as table and cells (display: table / table-cell); the
                         // renderer then shows nothing at all. As blocks the content is there (columns one below the other).
-                        if (!TableTags.Contains(name))
+                        if (forRenderer && !TableTags.Contains(name))
                         {
                             value = DisplayTable().Replace(value, "display: block");
                         }
@@ -391,7 +395,11 @@ public sealed partial class MessageContent
             },
         };
 
-        var result = CarryRowBackgrounds(LimitColspans(DropStrayTableContent(ExpandPreformatted(converter.Convert(html)))));
+        var result = converter.Convert(html);
+        if (forRenderer)
+        {
+            result = CarryRowBackgrounds(LimitColspans(DropStrayTableContent(ExpandPreformatted(result))));
+        }
 
         // CSS in <style> blocks is passed through; remote URLs there are blocked when rendering, but report them.
         if (!allowRemote && RemoteCssUrl().IsMatch(result))
@@ -673,7 +681,7 @@ public sealed partial class MessageContent
             return "<div" + pre.Groups[1].Value + " style=\"font-family: Consolas, 'Cascadia Mono', 'DejaVu Sans Mono', monospace\">" + lines + "</div>";
         });
 
-    private static string SanitizeCss(string css, bool allowRemote, HashSet<string> referencedIds, ref bool blocked)
+    private static string SanitizeCss(string css, bool allowRemote, bool forRenderer, HashSet<string> referencedIds, ref bool blocked)
     {
         if (css.Contains("expression(", StringComparison.OrdinalIgnoreCase) || css.Contains("javascript:", StringComparison.OrdinalIgnoreCase))
         {
@@ -689,6 +697,11 @@ public sealed partial class MessageContent
         {
             blocked = true;
             css = RemoteCssUrl().Replace(css, "none");
+        }
+
+        if (!forRenderer)
+        {
+            return css;
         }
 
         // The renderer ignores inches, centimetres and millimetres – Outlook sizes pictures in signatures that way

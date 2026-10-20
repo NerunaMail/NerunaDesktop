@@ -51,7 +51,7 @@ public class MessageContentTests
                    + "<img style=\"width:34pt; max-height:1.2cm\" src=\"cid:a@x\"><p style=\"font-size:11.0pt\">Text</p>",
         });
 
-        var html = MessageContent.From(message).Html;
+        var html = MessageContent.From(message, forRenderer: true).Html;
 
         Assert.Contains("style=\"width:45px;height:66px\"", html, StringComparison.Ordinal);
         Assert.Contains("width:45.3px; max-height:45.4px", html, StringComparison.Ordinal);
@@ -68,7 +68,7 @@ public class MessageContentTests
                    + "<table style=\"display: table\"><tr><td style=\"display:table-cell\">Zelle</td></tr></table>",
         });
 
-        var html = MessageContent.From(message).Html;
+        var html = MessageContent.From(message, forRenderer: true).Html;
 
         Assert.Contains("<div style=\"display: block;width: 100%\">", html, StringComparison.Ordinal);
         Assert.Contains("min-width: 600px;display: block;vertical-align: top;", html, StringComparison.Ordinal);
@@ -207,7 +207,7 @@ public class MessageContentTests
     {
         var html = "<html><body><p>Hallo Anna</p><pre class=\"moz-signature\" cols=\"72\">-- \r\nAnna Muster\r\nExample AG    Tel. 044 123 45 67\r\n</pre></body></html>";
 
-        var content = MessageContent.From(Message(new TextPart("html") { Text = html }));
+        var content = MessageContent.From(Message(new TextPart("html") { Text = html }), forRenderer: true);
 
         Assert.DoesNotContain("<pre", content.Html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("class=\"moz-signature\"", content.Html, StringComparison.Ordinal);
@@ -285,11 +285,15 @@ public class MailPreviewTests
     private static string HtmlOf(string html) =>
         MessageContent.From(new MimeMessage { Body = new TextPart("html") { Text = html } }).Html;
 
+    // As for the PDF export's renderer, which needs the tables rewritten.
+    private static string RendererHtmlOf(string html) =>
+        MessageContent.From(new MimeMessage { Body = new TextPart("html") { Text = html } }, forRenderer: true).Html;
+
     [Fact]
     public void Colspan_beyond_the_columns_of_the_table_is_cut_down()
     {
         // Newsletter: colspan="3" in a one-column table – the renderer showed nothing at all.
-        var html = HtmlOf("<table><tr><td colspan=\"3\">a</td></tr><tr><td>b</td></tr></table>"
+        var html = RendererHtmlOf("<table><tr><td colspan=\"3\">a</td></tr><tr><td>b</td></tr></table>"
             + "<table><tr><td>x</td><td>y</td><td>z</td></tr><tr><td colspan=\"3\">w</td></tr></table>");
 
         Assert.Contains("colspan=\"1\">a", html);
@@ -297,9 +301,20 @@ public class MailPreviewTests
     }
 
     [Fact]
+    public void Web_views_get_the_layout_as_the_sender_wrote_it()
+    {
+        var html = HtmlOf("<table align=\"center\" style=\"max-width: 500px\"><tr><td>a</td></tr></table>"
+            + "<div style=\"display: table-cell; width: 1in\">b</div>");
+
+        Assert.Contains("align=\"center\"", html);
+        Assert.Contains("max-width: 500px", html);
+        Assert.Contains("display: table-cell; width: 1in", html);
+    }
+
+    [Fact]
     public void Tables_lose_max_width_and_centering_becomes_auto_margins()
     {
-        var html = HtmlOf("<table align=\"center\" width=\"600\"><tr><td>a</td></tr></table>"
+        var html = RendererHtmlOf("<table align=\"center\" width=\"600\"><tr><td>a</td></tr></table>"
             + "<table style=\"width: 90%; max-width: 500px; margin: auto;\"><tr><td>b</td></tr></table>");
 
         Assert.DoesNotContain("align=", html);
@@ -311,7 +326,7 @@ public class MailPreviewTests
     [Fact]
     public void Cells_get_the_background_of_their_row()
     {
-        var html = HtmlOf("<table><tr style=\"background-color: #7FA8DF\"><td style=\"color: white\">Ticket</td><td bgcolor=\"#fff\">own</td></tr>"
+        var html = RendererHtmlOf("<table><tr style=\"background-color: #7FA8DF\"><td style=\"color: white\">Ticket</td><td bgcolor=\"#fff\">own</td></tr>"
             + "<tr><td>plain</td></tr></table>");
 
         Assert.Contains("<td style=\"background-color: #7FA8DF; color: white\">Ticket", html);
@@ -323,7 +338,7 @@ public class MailPreviewTests
     public void Content_between_table_cells_is_dropped()
     {
         // Outlook: empty bookmark spans between the cells of a row – the renderer took them for cells.
-        var html = HtmlOf("<table><tr><td>a</td><span style=\"mso-bookmark:_Hlk1\"><span>x</span></span><td>b</td></tr></table>"
+        var html = RendererHtmlOf("<table><tr><td>a</td><span style=\"mso-bookmark:_Hlk1\"><span>x</span></span><td>b</td></tr></table>"
             + "<table><tr><td><table><tr><td>inner</td></tr></table><span>kept</span></td></tr></table>");
 
         Assert.Contains("<td>a</td><td>b</td>", html);

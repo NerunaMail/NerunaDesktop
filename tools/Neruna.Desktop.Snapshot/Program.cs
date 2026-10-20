@@ -1271,7 +1271,8 @@ internal static class Snapshots
         foreach (var file in files)
         {
             var message = await MimeKit.MimeMessage.LoadAsync(file);
-            var content = Neruna.Core.Mail.MessageContent.From(message);
+            var content = Neruna.Core.Mail.MessageContent.From(message, forRenderer: true);
+            var browser = Neruna.Core.Mail.MessageContent.From(message);
             var view = new TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel { BaseStylesheet = MessageBodyView.BaseStylesheet, Background = Brushes.White };
             // Embedded pictures (cid:) from the message itself, as in the reading pane.
             view.ImageLoad += (_, e) =>
@@ -1290,13 +1291,14 @@ internal static class Snapshots
             };
             view.Text = Neruna.Desktop.Infrastructure.MailPaper.Prepare(content.Html, darkTheme: false).Html;
             // The page the reading pane gives the web view (open it in a browser to see the mail as on Windows/macOS).
-            var page = Neruna.Desktop.Infrastructure.MailPaper.ForBrowser(content.Html, darkTheme: false, allowRemote: false, id =>
+            var page = Neruna.Desktop.Infrastructure.MailPaper.ForBrowser(browser.Html, darkTheme: false, allowRemote: false, id =>
                 message.BodyParts.OfType<MimeKit.MimePart>().FirstOrDefault(p => p.ContentId == id) is { Content: { } part } picture
                     ? DataUri(picture.ContentType.MimeType, part)
                     : null).Html;
             await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".browser.html"), page);
+            await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".shell.html"), Neruna.Desktop.Infrastructure.MailPaper.BrowserShell(false, false, 7));
             await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".browser-dark.html"),
-                Neruna.Desktop.Infrastructure.MailPaper.ForBrowser(content.Html, darkTheme: true, allowRemote: false, _ => null).Html);
+                Neruna.Desktop.Infrastructure.MailPaper.ForBrowser(browser.Html, darkTheme: true, allowRemote: false, _ => null).Html);
             // What the renderer got, next to the picture (to see why a mail looks wrong).
             await File.WriteAllTextAsync(Path.Combine(output, Path.GetFileNameWithoutExtension(file) + ".html"), view.Text);
             // And as PDF ("Speichern unter … PDF", attachments as pages), to check the print layout.

@@ -89,15 +89,37 @@ internal static partial class MailPaper
             html = TextColor().Replace(html, m => ForDarkPage(m.Value, m.Groups["value"].Value));
         }
 
-        var remote = allowRemote ? " https: http:" : string.Empty;
-        var head = "<meta charset=\"utf-8\">"
-                   + $"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'none'; img-src data:{remote}; "
-                   + $"style-src 'unsafe-inline'{remote}; font-src data:{remote}; media-src data:\">"
+        var head = "<meta charset=\"utf-8\">" + Policy(allowRemote)
                    + $"<meta name=\"color-scheme\" content=\"{(dark ? "dark" : "light")}\">"
                    + "<style>" + (dark ? DarkStylesheet + " html { background: #292929; }" : LightStylesheet + " html { background: #ffffff; }")
                    + " body { margin: 0; overflow-wrap: break-word; } img { max-width: 100%; height: auto; }</style>";
         var at = html.IndexOf("<head>", StringComparison.OrdinalIgnoreCase);
         return (at >= 0 ? html.Insert(at + "<head>".Length, head) : "<!DOCTYPE html><html><head>" + head + "</head><body>" + html + "</body></html>", dark);
+    }
+
+    /// <summary>
+    /// The empty page the web view loads before each mail, carrying the mail's policy (it holds for the document the
+    /// mail is then written into – WebView2 loads no page over 2 MB from a string, mails with pictures easily are).
+    /// </summary>
+    /// <remarks>
+    /// Its one script reports "ready" with <paramref name="load"/> (not every web view reports a finished
+    /// NavigateToString); it runs by a random nonce, which no mail can know – the mail's own policy then forbids every script.
+    /// </remarks>
+    public static string BrowserShell(bool allowRemote, bool dark, int load)
+    {
+        var nonce = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+        var ready = "{\\\"type\\\":\\\"ready\\\",\\\"load\\\":" + load.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}";
+        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" + Policy(allowRemote, $"'nonce-{nonce}'")
+               + $"<style>html {{ background: {(dark ? "#292929" : "#ffffff")}; }}</style></head><body>"
+               + $"<script nonce=\"{nonce}\">if (typeof window.invokeCSharpAction === \"function\") window.invokeCSharpAction(\"{ready}\");</script>"
+               + "</body></html>";
+    }
+
+    private static string Policy(bool allowRemote, string scripts = "'none'")
+    {
+        var remote = allowRemote ? " https: http:" : string.Empty;
+        return $"<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src {scripts}; img-src data:{remote}; "
+               + $"style-src 'unsafe-inline'{remote}; font-src data:{remote}; media-src data:\">";
     }
 
     // src="cid:…", background="cid:…" and url(cid:…), with what comes before the address.

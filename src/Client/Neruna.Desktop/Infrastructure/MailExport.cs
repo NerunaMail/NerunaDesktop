@@ -119,7 +119,7 @@ internal static partial class MailExport
     public static byte[] ToPdf(MimeMessage message, bool attachments)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var content = MessageContent.From(message);
+        var content = MessageContent.From(message, forRenderer: true);
         var images = new Dictionary<string, Bitmap>(StringComparer.Ordinal);
         foreach (Match match in ImageSource().Matches(content.Html))
         {

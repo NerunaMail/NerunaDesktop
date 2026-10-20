@@ -127,15 +127,19 @@ IMailStore      ICalendarStore      IContactStore            ← SQLite (Neruna.
   `data:`-Adressen. Die WebView läuft ohne gespeicherte Daten (InPrivate/ephemer), navigiert nie selbst – Links gehen durch
   die Linkprüfung und öffnen ausserhalb; ein von Neruna eingespieltes Skript reicht nur Tastenkürzel (Entf, Ctrl+R …) an
   das Fenster weiter. Blockierte Bilder werden durch ein transparentes Pixel ersetzt.
-- Ohne WebView (keine Laufzeit, Snapshot-Werkzeug, Druck/PDF) zeichnet **Avalonia.HtmlRenderer** (rein managed, etwa CSS 2);
-  dafür baut `MailPaper.Prepare` Flexbox/Grid in Tabellen um (`FlexLayout`) und entfernt Media Queries.
+- Die WebView lädt pro Mail eine leere Seite mit der Richtlinie (`MailPaper.BrowserShell`; ihr einziges Skript meldet
+  «bereit», per Zufalls-Nonce) und bekommt die Mail per `document.write` – WebView2 lädt aus einem String höchstens 2 MB.
+- Ohne WebView-Laufzeit zeigt der Lesebereich den Text der Mail. **Avalonia.HtmlRenderer** (rein managed, etwa CSS 2)
+  zeichnet nur noch den PDF-Export, die Vorschauen von Signaturen/Textbausteinen und das Snapshot-Werkzeug; nur dafür
+  baut `MessageContent.From(…, forRenderer: true)` Tabellen, Längen und `<pre>` um und `MailPaper.Prepare` Flexbox/Grid
+  (`FlexLayout`) und Media Queries. WebViews (Lesebereich, Editor, Android) bekommen das HTML, wie der Absender es schrieb.
 - Reiner Text wird als ein `<div>` pro Zeile dargestellt (Leerzeichenfolgen in `white-space: pre`-Spans, Links
   anklickbar), bewusst ohne `white-space: pre-wrap` – HtmlRenderer setzt das uneinheitlich um (unter Windows landeten
   ganze Mails auf einer Zeile). format=flowed wird vorher zusammengefügt, die Signaturtrennlinie `-- ` bleibt erhalten.
 - Ebenso werden `<pre>`-Blöcke in HTML-Mails (Thunderbird: Text-Signatur `pre.moz-signature`, Zitate `pre.moz-quote-pre`)
   in explizite Zeilen umgewandelt.
-- Die Text-Regeln oben (eine Zeile pro `<div>`, explizite Zeilen statt `<pre>`) stammen aus der HtmlRenderer-Zeit und gelten
-  für beide Darstellungen.
+- Die Text-Regel oben (eine Zeile pro `<div>`) stammt aus der HtmlRenderer-Zeit und gilt für beide Darstellungen; `<pre>`
+  wird nur für den Renderer in Zeilen umgewandelt.
 
 ### Datenschutz und Phishing-Schutz
 
@@ -730,6 +734,6 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 | 3 | Admin-Escrow für Tresor | Für S/MIME-Zertifikate ✔ Organisationsschlüssel (6b); Config-Tresor ✔ ohne Escrow |
 | 4 | Preismodell | pro User · pro Domain · Staffeln |
 | 5 | UI-Sprachen | ✔ de/en/fr/it: deutscher Text als Schlüssel, Kataloge `Neruna.Core/Localization/*.json`, Wahl unter Design (Neustart) |
-| 6 | HTML-Darstellung von Mails | ✔ Lesen und Verfassen: native WebView (WebView2/WebKit); Avalonia.HtmlRenderer als Rückfall und für Druck/PDF. Avalonias RichTextEditor ist kommerziell → nicht verwendet |
+| 6 | HTML-Darstellung von Mails | ✔ Lesen und Verfassen: native WebView (WebView2/WebKit); Avalonia.HtmlRenderer nur für PDF-Export und Vorschauen. Avalonias RichTextEditor ist kommerziell → nicht verwendet |
 | 7 | Admin-UI Server | ✔ Filament 5 |
 | 8 | Produkt-Domain | ✔ neruna.org |

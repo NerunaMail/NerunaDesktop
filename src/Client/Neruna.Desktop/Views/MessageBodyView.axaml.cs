@@ -15,28 +15,33 @@ namespace Neruna.Desktop.Views;
 /// Shows the sanitized message HTML in the system web view (WebView2 on Windows, WebKit on macOS and Linux) – the
 /// same engine as the editor, so a mail looks as its sender laid it out. No scripts, nothing from the network unless
 /// allowed for the message (Content Security Policy, <see cref="MailPaper.ForBrowser"/>); the page never navigates
-/// itself – links go through Neruna's check and open outside the app. Where no web view works (and in the headless
-/// snapshot tool), the HTML renderer shows the mail instead.
+/// itself – links go through Neruna's check and open outside the app. Where no web view exists (Windows without
+/// WebView2, Linux without WebKitGTK) the mail's text is shown, as in the editor's plain-text fallback.
 /// </summary>
 internal sealed partial class MessageBodyView : UserControl
 {
     internal const string BaseStylesheet = MailPaper.LightStylesheet;
 
-    /// <summary>Snapshot tool and tests: no web view headless – the HTML renderer shows the mail.</summary>
+    /// <summary>
+    /// Snapshot tool only: no web view headless – the HTML renderer draws the mail, so screenshots show it formatted.
+    /// Never used in the app.
+    /// </summary>
     public static bool UseRenderer { get; set; }
 
-    // A web view that did not show a page within this time counts as missing (no runtime): the renderer takes over.
-    private static readonly TimeSpan LoadTimeout = TimeSpan.FromSeconds(10);
     private static bool _webUnavailable;
 
     private readonly Border _host;
     private string? _shown;
     private NativeWebView? _web;
-    private bool _webWorks;
 
     // Pages Neruna gave the web view that have not started loading yet (one per message shown); every other
     // navigation is a link.
     private int _expectedLoads;
+
+    // The mail to write into the empty page once it has loaded; which load that is, and whether it is written.
+    private string? _page;
+    private int _load;
+    private bool _written;
     private MainWindowViewModel? _window;
 
     public MessageBodyView()
@@ -56,6 +61,43 @@ internal sealed partial class MessageBodyView : UserControl
                 ShowWhenVisible();
             }
         };
+    }
+
+    // WebView2 hands Ctrl+C/Ctrl+A to the window as accelerator keys instead of copying: done here, with the text
+    // marked in the mail (Cmd on macOS).
+    protected override void OnKeyDown(Avalonia.Input.KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || _web is null || !ReferenceEquals(_host.Child, _web)
+            || (e.KeyModifiers & ~Avalonia.Input.KeyModifiers.Shift) is not (Avalonia.Input.KeyModifiers.Control or Avalonia.Input.KeyModifiers.Meta))
+        {
+            return;
+        }
+
+        if (e.Key == Avalonia.Input.Key.C)
+        {
+            e.Handled = true;
+            _ = CopySelectionAsync(_web);
+        }
+        else if (e.Key == Avalonia.Input.Key.A)
+        {
+            e.Handled = true;
+            _ = _web.InvokeScript("(function(){var s=window.getSelection();s.removeAllRanges();var r=document.createRange();r.selectNodeContents(document.body);s.addRange(r);})()");
+        }
+    }
+
+    private async Task CopySelectionAsync(NativeWebView web)
+    {
+        var text = await web.InvokeScript("window.getSelection().toString()");
+        if (text is { Length: >= 2 } && text[0] == '"')
+        {
+            text = System.Text.Json.JsonSerializer.Deserialize<string>(text);
+        }
+
+        if (!string.IsNullOrEmpty(text) && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            await Avalonia.Input.Platform.ClipboardExtensions.SetTextAsync(clipboard, text);
+        }
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -107,12 +149,24 @@ internal sealed partial class MessageBodyView : UserControl
         }
 
         _shown = html;
-        if (!UseRenderer && !_webUnavailable && pane is not null && ShowInWebView(pane, html))
+        if (UseRenderer)
         {
-            return;
+            ShowWithRenderer(html);
         }
+        else if (_webUnavailable || pane is null || !ShowInWebView(pane, html))
+        {
+            ShowText(pane?.PlainText ?? string.Empty);
+        }
+    }
 
-        ShowWithRenderer(html);
+    // No web view on this system: the mail's text, selectable.
+    private void ShowText(string text)
+    {
+        _host.Background = Brushes.Transparent;
+        _host.Child = new ScrollViewer
+        {
+            Content = new SelectableTextBlock { Text = text, TextWrapping = TextWrapping.Wrap },
+        };
     }
 
     private bool ShowInWebView(ReadingPaneViewModel pane, string html)
@@ -129,20 +183,6 @@ internal sealed partial class MessageBodyView : UserControl
                 _web.NavigationCompleted += OnNavigationCompleted;
                 _web.WebMessageReceived += OnWebMessage;
                 _web.NewWindowRequested += OnNewWindowRequested;
-                DispatcherTimer.RunOnce(() =>
-                {
-                    if (!_webWorks)
-                    {
-                        _webUnavailable = true;
-                        _web = null;
-                        var shown = _shown;
-                        _shown = null;
-                        if (shown is not null)
-                        {
-                            ShowWhenVisible();
-                        }
-                    }
-                }, LoadTimeout);
             }
 
             if (!ReferenceEquals(_host.Child, _web))
@@ -152,8 +192,10 @@ internal sealed partial class MessageBodyView : UserControl
             }
 
             _web.Background = _host.Background;
+            _page = page;
+            _written = false;
             _expectedLoads++;
-            _web.NavigateToString(page);
+            _web.NavigateToString(MailPaper.BrowserShell(pane.AllowsRemoteContent, dark, ++_load));
             return true;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -184,11 +226,15 @@ internal sealed partial class MessageBodyView : UserControl
     }
 
     // The page itself runs no scripts (its policy forbids them); Neruna adds one that hands the mail program's keys
-    // (Delete, Ctrl+R …) to the window, which the web view would otherwise keep once clicked into.
+    // (Delete, Ctrl+R …) to the window, which the web view would otherwise keep once clicked into, and reports clicks
+    // (the web view then takes the keyboard focus from the message list). Added after every mail written into the
+    // page: document.open() drops the listeners.
     private const string KeyScript = """
         (function () {
-          if (window.__nerunaKeys) return;
-          window.__nerunaKeys = true;
+          function post(message) {
+            if (typeof window.invokeCSharpAction === "function") window.invokeCSharpAction(JSON.stringify(message));
+          }
+          document.addEventListener("mousedown", function () { post({ type: "focus" }); }, true);
           document.addEventListener("keydown", function (e) {
             var command = e.ctrlKey || e.metaKey;
             var key = e.key || "";
@@ -196,16 +242,29 @@ internal sealed partial class MessageBodyView : UserControl
             if (command && (key === "c" || key === "C" || key === "a" || key === "A")) return;
             if (!command && !e.altKey && !/^(Delete|Escape|F\d+)$/.test(key)) return;
             e.preventDefault();
-            var message = JSON.stringify({ type: "key", key: key, ctrl: command, shift: e.shiftKey, alt: e.altKey });
-            if (typeof window.invokeCSharpAction === "function") window.invokeCSharpAction(message);
+            post({ type: "key", key: key, ctrl: command, shift: e.shiftKey, alt: e.altKey });
           }, true);
         })();
         """;
 
     private void OnNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
     {
-        _webWorks = true;
-        _ = _web?.InvokeScript(KeyScript);
+        if (e.IsSuccess)
+        {
+            WritePage(_load);
+        }
+    }
+
+    // The empty page has loaded (its "ready", or the web view's report – whichever comes first): the mail goes in.
+    private void WritePage(int load)
+    {
+        if (load != _load || _written || _web is null || _page is not { } page)
+        {
+            return;
+        }
+
+        _written = true;
+        _ = _web.InvokeScript("document.open();document.write(" + System.Text.Json.JsonSerializer.Serialize(page) + ");document.close();" + KeyScript);
     }
 
     private void OnWebMessage(object? sender, WebMessageReceivedEventArgs e)
@@ -219,6 +278,20 @@ internal sealed partial class MessageBodyView : UserControl
             }
 
             var message = System.Text.Json.JsonDocument.Parse(body).RootElement;
+            if (message.TryGetProperty("type", out var ready) && ready.GetString() == "ready"
+                && message.TryGetProperty("load", out var load) && load.TryGetInt32(out var number))
+            {
+                Dispatcher.UIThread.Post(() => WritePage(number));
+                return;
+            }
+
+            if (message.TryGetProperty("type", out var kind) && kind.GetString() == "focus")
+            {
+                // A click into the mail: the window's keys (Ctrl+A, Ctrl+C …) now belong to the mail, not to the list.
+                Dispatcher.UIThread.Post(() => _web?.Focus());
+                return;
+            }
+
             if (message.TryGetProperty("type", out var type) && type.GetString() == "key"
                 && message.TryGetProperty("key", out var name) && name.GetString() is { Length: > 0 } text
                 && Enum.TryParse<Avalonia.Input.Key>(text.Length == 1 ? text.ToUpperInvariant() : text, ignoreCase: true, out var key))
@@ -267,7 +340,7 @@ internal sealed partial class MessageBodyView : UserControl
         }
     }
 
-    // Without a web view: the HTML renderer. The panel scrolls itself; given its text while hidden (during "Wird
+    // Snapshot tool: the HTML renderer. The panel scrolls itself; given its text while hidden (during "Wird
     // geladen …", size 0), it kept a wrong offset and cut off the top of a freshly downloaded mail. So: a fresh panel
     // per message, filled once visible.
     private void ShowWithRenderer(string html)
