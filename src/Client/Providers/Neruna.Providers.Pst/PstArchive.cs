@@ -14,9 +14,9 @@ namespace Neruna.Providers.Pst;
 internal sealed record PstFolderInfo(string RemoteId, string Name, string? ParentRemoteId, FolderRole Role, int Total, int Unread);
 
 /// <summary>
-/// One open data file (.pst/.ost), read with XstReader. The file is never written. Ids are positions in the file
-/// (folders: "2/0", messages: "17.ab12cd34" with a fingerprint) – stable while the file stays the same; a changed file
-/// gets a new <see cref="Stamp"/> and everything is read again.
+/// One open data file (.pst/.ost), read with XstReader. The file is never written. Folders are known by their node id
+/// ("n8354"), messages by their position with a fingerprint ("17.ab12cd34"). A changed file gets a new <see cref="Stamp"/>
+/// and is opened again; a folder is read again only when its counts or modification time changed (see StateOf).
 /// </summary>
 internal sealed class PstArchive : IDisposable
 {
@@ -113,13 +113,16 @@ internal sealed class PstArchive : IDisposable
             var index = 0;
             foreach (var child in folder.Folders)
             {
-                var id = parentId is null ? index.ToString(CultureInfo.InvariantCulture) : $"{parentId}/{index}";
+                // The folder's node id: fixed for the life of the file. Not the position – XstReader lists folders by
+                // name, so a folder added or renamed in Outlook moved the others, and their mail showed under another name.
+                var id = IdOf(child) ?? (parentId is null ? index.ToString(CultureInfo.InvariantCulture) : $"{parentId}/{index}");
                 index++;
                 if (!IsMailFolder(child))
                 {
                     continue;
                 }
 
+                _folders.TryAdd(id, child); // the first object stays: its contents table is cached (see All)
                 result.Add(new PstFolderInfo(id, child.DisplayName, parentId, RoleOf(child.DisplayName, parentId), child.ContentCount, child.ContentUnreadCount));
                 Add(child, id);
             }
@@ -131,21 +134,28 @@ internal sealed class PstArchive : IDisposable
 
     public XstFolder Folder(string remoteId)
     {
-        if (_folders.TryGetValue(remoteId, out var known))
+        if (!_folders.ContainsKey(remoteId))
         {
-            return known;
+            Folders();
         }
 
-        var folder = Top();
-        foreach (var part in remoteId.Split('/'))
-        {
-            folder = int.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out var index) && folder.Folders.ElementAtOrDefault(index) is { } child
-                ? child
-                : throw new PstException(Neruna.Core.Localization.Texts.T("Der Ordner ist in der Outlook-Datendatei nicht mehr vorhanden."));
-        }
+        return _folders.TryGetValue(remoteId, out var folder)
+            ? folder
+            : throw new PstException(Neruna.Core.Localization.Texts.T("Der Ordner ist in der Outlook-Datendatei nicht mehr vorhanden."));
+    }
 
-        _folders[remoteId] = folder;
-        return folder;
+    /// <summary>What changes with the folder's mail: its counts and its modification time.</summary>
+    public static string StateOf(XstFolder folder) =>
+        string.Create(CultureInfo.InvariantCulture, $"{folder.ContentCount}:{folder.ContentUnreadCount}:{folder.LastModificationTime?.Ticks}");
+
+    // Internal API of XstReader.Api 1.0.6 (pinned, see ReadContents); null with another version (then: the position).
+    private static string? IdOf(XstFolder folder)
+    {
+        const BindingFlags Any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        var nid = typeof(XstElement).GetProperty("Nid", Any)?.GetValue(folder);
+        return nid?.GetType().GetField("dwValue", Any)?.GetValue(nid) is uint value
+            ? "n" + value.ToString(CultureInfo.InvariantCulture)
+            : null;
     }
 
     /// <summary>

@@ -105,7 +105,7 @@ public sealed class ReminderService(ICalendarStore calendars, IReminderStore sta
     /// <summary>Each occurrence in the window with the time of its earliest user alarm.</summary>
     internal static IEnumerable<(CalendarOccurrence Occurrence, DateTimeOffset AlarmAt)> AlarmsOf(CalendarInfo calendar, CalendarObject item, DateTimeOffset from, DateTimeOffset to)
     {
-        var ical = Ical.Net.Calendar.Load(item.ICalendarData) ?? throw new FormatException("Empty iCalendar data.");
+        var ical = ICalendarLoader.Load(item.ICalendarData) ?? throw new FormatException("Empty iCalendar data.");
         var windowStart = new CalDateTime((from - CalendarController.MaxEventLength).UtcDateTime, "UTC");
         var windowEnd = new CalDateTime(to.UtcDateTime, "UTC");
 

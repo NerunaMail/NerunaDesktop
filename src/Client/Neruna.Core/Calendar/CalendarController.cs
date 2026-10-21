@@ -454,7 +454,7 @@ public sealed class CalendarController(
 
     internal static IEnumerable<CalendarOccurrence> Expand(CalendarInfo calendar, CalendarObject item, DateTimeOffset from, DateTimeOffset to)
     {
-        var ical = Ical.Net.Calendar.Load(item.ICalendarData)
+        var ical = ICalendarLoader.Load(item.ICalendarData)
             ?? throw new FormatException("Empty iCalendar data.");
 
         var windowStart = new CalDateTime((from - MaxEventLength).UtcDateTime, "UTC");

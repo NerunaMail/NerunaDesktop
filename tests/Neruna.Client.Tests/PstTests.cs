@@ -129,6 +129,27 @@ public class PstTests
     }
 
     [Fact]
+    public async Task Folders_are_known_by_their_node_id_not_their_position()
+    {
+        Assert.SkipWhen(File is null, "NERUNA_TEST_PST not set");
+        var ct = TestContext.Current.CancellationToken;
+
+        // XstReader lists folders by name: a position changed with every folder added in Outlook, and the mail of one
+        // folder showed under the name of another.
+        var archive = PstArchive.For(File!);
+        var folders = await archive.ReadAsync(a => a.Folders(), ct);
+        Assert.NotEmpty(folders);
+        Assert.All(folders, f => Assert.StartsWith("n", f.RemoteId, StringComparison.Ordinal));
+        Assert.Equal(folders.Count, folders.Select(f => f.RemoteId).Distinct(StringComparer.Ordinal).Count());
+        foreach (var folder in folders)
+        {
+            Assert.Equal(folder.Name, await archive.ReadAsync(a => a.Folder(folder.RemoteId).DisplayName, ct));
+        }
+
+        await Assert.ThrowsAsync<PstException>(() => archive.ReadAsync(a => a.Folder("0/3"), ct));
+    }
+
+    [Fact]
     public async Task A_real_data_file_is_read_as_an_account_that_does_not_change()
     {
         Assert.SkipWhen(File is null, "NERUNA_TEST_PST not set");

@@ -393,7 +393,7 @@ public sealed record EventDraft(
     }
 
     private static ICalendar Load(string data) =>
-        ICalendar.Load(data) ?? throw new FormatException("Empty iCalendar data.");
+        ICalendarLoader.Load(data) ?? throw new FormatException("Empty iCalendar data.");
 
     // The series master is the event without RECURRENCE-ID; overrides of single occurrences stay untouched.
     private static CalendarEvent MasterOf(ICalendar calendar) =>

@@ -2164,6 +2164,7 @@
  "{0:0.#} Punkte (ohne bekannte Schwelle)": "{0:0.#} punti (soglia sconosciuta)",
  "{0:0.#} von {1:0.#} Punkten ({2}) – {3}": "{0:0.#} su {1:0.#} punti ({2}) – {3}",
  "{0:N0} von {1:N0} Nachrichten": "{0:N0} di {1:N0} messaggi",
+ "Nur ungelesene: {0:N0} von {1:N0} Nachrichten": "Solo non letti: {0:N0} di {1:N0} messaggi",
  "{0:N0} von {1:N0} Nachrichten im Index, davon {2:N0} mit Text.": "{0:N0} di {1:N0} messaggi nell'indice, di cui {2:N0} con testo.",
  "{0:N1} MB": "{0:N1} MB",
  "{0} % Spamwahrscheinlichkeit ({1})": "{0} % di probabilità di spam ({1})",

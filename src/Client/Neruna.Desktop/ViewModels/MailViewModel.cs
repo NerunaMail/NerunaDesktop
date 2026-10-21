@@ -1443,8 +1443,18 @@ internal sealed partial class MailViewModel(
         var total = (await mail.GetFoldersAsync(folder.Folder.ConnectionId)).FirstOrDefault(f => f.RemoteId == folder.Folder.RemoteId)?.TotalCount ?? 0;
         total = Math.Max(total, _storedCount);
         HasMore = !IsSearchMode && (_allMessages.Count < _storedCount || _storedCount < total);
-        LoadedText = IsSearchMode || total == 0 ? null : F("{0:N0} von {1:N0} Nachrichten", _allMessages.Count, total);
+        _totalCount = IsSearchMode ? 0 : total;
+        UpdateLoadedText();
     }
+
+    private int _totalCount;
+    private int _shownCount;
+
+    // With "nur ungelesene" on, the line says so: the filter is easily overlooked, and mail seemed to be missing.
+    private void UpdateLoadedText() =>
+        LoadedText = _totalCount == 0 ? null
+            : ShowUnreadOnly ? F("Nur ungelesene: {0:N0} von {1:N0} Nachrichten", _shownCount, _totalCount)
+            : F("{0:N0} von {1:N0} Nachrichten", _allMessages.Count, _totalCount);
 
     /// <summary>The next messages: from the local store first, then older ones from the server.</summary>
     [RelayCommand(CanExecute = nameof(CanLoadMore))]
@@ -1558,6 +1568,7 @@ internal sealed partial class MailViewModel(
         }
 
         HasMore = false;
+        _totalCount = 0;
         LoadedText = null;
     }
 
@@ -1795,6 +1806,12 @@ internal sealed partial class MailViewModel(
         {
             // The message being read stays, even though opening it marked it read.
             messages = [.. messages.Where(m => m.IsUnread || m == open)];
+        }
+
+        _shownCount = messages.Count;
+        if (_totalCount > 0)
+        {
+            UpdateLoadedText();
         }
 
         // By date: grouped ("Heute", "Gestern" …); by sender, subject or size: one sorted list.

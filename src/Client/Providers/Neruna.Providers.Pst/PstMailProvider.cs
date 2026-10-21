@@ -35,17 +35,20 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
         ArgumentNullException.ThrowIfNull(knownRemoteIds);
         var archive = PstArchive.For(FilePath);
 
-        // The same file as at the last sync: nothing changed (and read/flagged set here stay as they are).
-        if (folder.SyncState == archive.Stamp)
+        // The folder as at the last sync: nothing changed (and read/flagged set here stay as they are). The folder's own
+        // counts and time, not the file's: Outlook writes to the file whenever it opens it, and every folder of a large
+        // archive was read again for nothing.
+        var state = "f:" + await archive.ReadAsync(a => PstArchive.StateOf(a.Folder(folder.RemoteId)), cancellationToken);
+        if (folder.SyncState == state)
         {
-            return new FolderSyncResult(archive.Stamp, false, [], new Dictionary<string, MessageFlags>(), [], folder.TotalCount, folder.UnreadCount);
+            return new FolderSyncResult(state, false, [], new Dictionary<string, MessageFlags>(), [], folder.TotalCount, folder.UnreadCount);
         }
 
         // Second pass after a quick first one: the flags Outlook set (flagged, answered, forwarded).
-        if (folder.SyncState == archive.Stamp + QuickPass)
+        if (folder.SyncState == state + QuickPass)
         {
             var flagged = await OutlookFlagsAsync(archive, folder, cancellationToken);
-            return new FolderSyncResult(archive.Stamp, false, [], flagged, [], folder.TotalCount, folder.UnreadCount);
+            return new FolderSyncResult(state, false, [], flagged, [], folder.TotalCount, folder.UnreadCount);
         }
 
         // First pass: what the folder's contents table holds, so the mail shows at once (a few ms a message instead
@@ -73,7 +76,7 @@ public sealed class PstMailProvider(ServiceConnection connection) : IMailProvide
 
         // Known ones keep what was set here; only the new ones (a newer copy of the file) come in.
         var added = summaries.Where(s => !knownRemoteIds.Contains(s.RemoteId)).ToList();
-        return new FolderSyncResult(archive.Stamp + QuickPass, false, added, new Dictionary<string, MessageFlags>(),
+        return new FolderSyncResult(state + QuickPass, false, added, new Dictionary<string, MessageFlags>(),
             [.. knownRemoteIds.Where(k => !present.Contains(k))], summaries.Count, summaries.Count(s => !s.Flags.HasFlag(MessageFlags.Seen)));
     }
 

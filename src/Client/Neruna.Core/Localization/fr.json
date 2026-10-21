@@ -2164,6 +2164,7 @@
  "{0:0.#} Punkte (ohne bekannte Schwelle)": "{0:0.#} points (seuil inconnu)",
  "{0:0.#} von {1:0.#} Punkten ({2}) – {3}": "{0:0.#} sur {1:0.#} points ({2}) – {3}",
  "{0:N0} von {1:N0} Nachrichten": "{0:N0} sur {1:N0} messages",
+ "Nur ungelesene: {0:N0} von {1:N0} Nachrichten": "Non lus seulement : {0:N0} sur {1:N0} messages",
  "{0:N0} von {1:N0} Nachrichten im Index, davon {2:N0} mit Text.": "{0:N0} sur {1:N0} messages dans l'index, dont {2:N0} avec texte.",
  "{0:N1} MB": "{0:N1} Mo",
  "{0} % Spamwahrscheinlichkeit ({1})": "{0} % de probabilité de spam ({1})",

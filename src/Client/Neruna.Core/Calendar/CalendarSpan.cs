@@ -21,7 +21,7 @@ public static class CalendarSpan
     {
         try
         {
-            var ical = Ical.Net.Calendar.Load(iCalendarData);
+            var ical = ICalendarLoader.Load(iCalendarData);
             var events = ical?.Events.ToList() ?? [];
             if (ical is null || events.Count == 0 || events.Any(e => e.DtStart is null))
             {

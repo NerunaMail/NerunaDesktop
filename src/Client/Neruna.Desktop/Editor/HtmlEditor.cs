@@ -298,8 +298,19 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             return null;
         }
 
-        return Unwrap(await _web.InvokeScript("neruna.getHtml()"));
+        try
+        {
+            return _lastHtml = Unwrap(await _web.InvokeScript("neruna.getHtml()"));
+        }
+        catch (InvalidOperationException)
+        {
+            // The web view lost its page (unloaded while the draft is captured, e.g. "in eigenem Fenster"): the last
+            // state read; null lets the caller take the prepared content.
+            return _lastHtml;
+        }
     }
+
+    private string? _lastHtml;
 
     public async Task<string?> GetBodyHtmlAsync()
     {

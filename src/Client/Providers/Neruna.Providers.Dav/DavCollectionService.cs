@@ -184,9 +184,21 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
     {
         if (state is null || state.StartsWith("sync:", StringComparison.Ordinal))
         {
+            // "sync:<token>", followed by the collection's CTag where the server has one.
+            var parts = state?[5..].Split(CTagSeparator, 2);
+            var token = parts?[0];
             try
             {
-                return await SyncCollectionAsync(collection, state?[5..], known, cancellationToken);
+                // A sync-collection REPORT can take long (SOGo: up to a minute on large calendars, then the proxy gives
+                // up). Unchanged token or CTag: nothing happened, and one cheap PROPFIND tells.
+                var current = string.IsNullOrEmpty(token) ? null : await CollectionTagsAsync(collection, cancellationToken);
+                if (current is not null && ((current.Value.Token is { } t && t == token) || (current.Value.CTag is { } c && parts!.Length > 1 && c == parts[1])))
+                {
+                    return new DavSyncResult(state!, [], []);
+                }
+
+                var result = await SyncCollectionAsync(collection, token, known, cancellationToken);
+                return current?.CTag is { } ctag ? result with { State = result.State + CTagSeparator + ctag } : result;
             }
             catch (DavException ex) when (ex.Status is HttpStatusCode.Forbidden or HttpStatusCode.Conflict or HttpStatusCode.BadRequest
                                               or HttpStatusCode.NotImplemented or HttpStatusCode.MethodNotAllowed or HttpStatusCode.UnsupportedMediaType
@@ -379,6 +391,23 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
                 IsReadOnly(r),
                 ContentOf(r)))
             .ToList();
+    }
+
+    private const char CTagSeparator = '\n';
+
+    /// <summary>The collection's current sync token and CTag; null if the server does not answer the PROPFIND.</summary>
+    private async Task<(string? Token, string? CTag)?> CollectionTagsAsync(Uri collection, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var self = (await client.PropfindAsync(collection, 0, [SyncToken, CTag], cancellationToken)).Resources.FirstOrDefault();
+            return self is null ? null : (self.Text(SyncToken), self.Text(CTag));
+        }
+        catch (DavException ex)
+        {
+            logger.LogDebug("PROPFIND sync-token on {Url} failed ({Status})", collection, (int)ex.Status);
+            return null;
+        }
     }
 
     private async Task<DavSyncResult> SyncCollectionAsync(Uri collection, string? token, IReadOnlyDictionary<string, string?> known, CancellationToken cancellationToken)

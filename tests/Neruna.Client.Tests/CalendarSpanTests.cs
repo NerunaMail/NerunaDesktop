@@ -1,4 +1,4 @@
-using Neruna.Core.Calendar;
+﻿using Neruna.Core.Calendar;
 
 namespace Neruna.Client.Tests;
 
@@ -36,6 +36,38 @@ public class CalendarSpanTests
         Assert.Null(endless.End);
 
         Assert.Equal(CalendarSpan.Always, CalendarSpan.Of("not iCalendar"));
+    }
+
+    [Fact]
+    public void An_all_day_series_with_an_exact_duration_is_shown_and_reminds()
+    {
+        // As SOGo stored old birthdays: a DATE start with "PT24H" – Ical.Net refuses to evaluate that.
+        var data = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Test//EN
+            BEGIN:VEVENT
+            UID:birthday@example.com
+            DTSTAMP:20130801T000000Z
+            DTSTART;VALUE=DATE:20130830
+            DURATION:PT24H
+            RRULE:FREQ=YEARLY
+            SUMMARY:Geburtstag
+            BEGIN:VALARM
+            ACTION:DISPLAY
+            TRIGGER:-PT15M
+            END:VALARM
+            END:VEVENT
+            END:VCALENDAR
+            """;
+        var calendar = new CalendarInfo(Guid.NewGuid(), "cal", "Kalender", null, false);
+        var item = new CalendarObject("birthday", null, data);
+
+        var occurrence = Assert.Single(CalendarController.Expand(calendar, item, At("2026-08-29T00:00Z"), At("2026-09-01T00:00Z")));
+        Assert.Equal(new DateTime(2026, 8, 30), occurrence.Start.Date);
+        Assert.Equal(new DateTime(2026, 8, 31), occurrence.End.Date);
+        Assert.Single(ReminderService.AlarmsOf(calendar, item, At("2026-08-29T00:00Z"), At("2026-09-01T00:00Z")));
+        Assert.Null(CalendarSpan.Of(data).End);
     }
 
     [Fact]

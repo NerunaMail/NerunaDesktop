@@ -2164,6 +2164,7 @@
  "{0:0.#} Punkte (ohne bekannte Schwelle)": "{0:0.#} points (threshold unknown)",
  "{0:0.#} von {1:0.#} Punkten ({2}) – {3}": "{0:0.#} of {1:0.#} points ({2}) – {3}",
  "{0:N0} von {1:N0} Nachrichten": "{0:N0} of {1:N0} messages",
+ "Nur ungelesene: {0:N0} von {1:N0} Nachrichten": "Unread only: {0:N0} of {1:N0} messages",
  "{0:N0} von {1:N0} Nachrichten im Index, davon {2:N0} mit Text.": "{0:N0} of {1:N0} messages in the index, {2:N0} of them with text.",
  "{0:N1} MB": "{0:N1} MB",
  "{0} % Spamwahrscheinlichkeit ({1})": "{0} % spam probability ({1})",
