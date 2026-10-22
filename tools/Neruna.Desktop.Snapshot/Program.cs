@@ -1016,6 +1016,12 @@ internal static class Snapshots
         await SaveAsync(window, output, "settings-accounts-color.png");
         Console.WriteLine($"Account color choices: {vm.SettingsPage.Accounts.Items[0].ColorChoices.Count}");
         vm.SettingsPage.Accounts.Items[0].ColorChoices[0].ChooseCommand.Execute(null);
+
+        // Einstellungen → Serverregeln: accounts with their number of rules, the chosen one's rules beside them.
+        await vm.SettingsPage.ShowServerRulesAsync(vm.SettingsPage.Accounts.Items[0].Account.Id);
+        await Task.Delay(1500);
+        await SaveAsync(window, output, "settings-server-rules.png");
+        vm.SettingsPage.SelectedTab = 0;
         // "⋯" of the first account, with "Offline verfügbar" opened.
         if (window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Flyout is MenuFlyout && b.Content is TextBlock { Text: "⋯" }) is { Flyout: MenuFlyout accountMenu } moreButton)
         {

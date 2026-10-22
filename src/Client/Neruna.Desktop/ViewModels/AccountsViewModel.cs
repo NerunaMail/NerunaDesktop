@@ -58,6 +58,25 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
     /// <summary>"Abwesenheit" on an account with mail.</summary>
     public event EventHandler<Neruna.Core.Accounts.Account>? AutoReplyRequested;
 
+    /// <summary>The colors as stored (also after one was chosen in the folder list).</summary>
+    public async Task RefreshColorsAsync()
+    {
+        foreach (var item in Items)
+        {
+            await ShowColorAsync(item);
+        }
+    }
+
+    private async Task ShowColorAsync(AccountItem item)
+    {
+        var accountId = item.Account.Id;
+        item.SetColor(await AccountColors.GetAsync(settings, accountId), async color =>
+        {
+            await AccountColors.SetAsync(settings, accountId, color);
+            ColorsChanged?.Invoke(this, EventArgs.Empty);
+        });
+    }
+
     /// <summary>An account got another color: the folder list takes it.</summary>
     public event EventHandler? ColorsChanged;
 
@@ -103,12 +122,7 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
             }
 
             item.SetOffline(await mail.GetOfflinePeriodAsync(account.Id), period => _ = mail.SetOfflinePeriodAsync(account.Id, period));
-            var accountId = account.Id;
-            item.SetColor(await AccountColors.GetAsync(settings, accountId), async color =>
-            {
-                await AccountColors.SetAsync(settings, accountId, color);
-                ColorsChanged?.Invoke(this, EventArgs.Empty);
-            });
+            await ShowColorAsync(item);
             Items.Add(item);
         }
 
@@ -267,13 +281,33 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
                 }
 
                 ColorStrip = choice.Swatch;
+                HasColor = choice.HasColor;
                 _ = save(choice.Color);
             };
         }
 
         ColorStrip = choices.First(c => c.IsChecked is true || c.Color == color).Swatch;
+        HasColor = color is not null;
         ColorChoices = choices;
         OnPropertyChanged(nameof(ColorChoices));
+    }
+
+    /// <summary>A color is chosen (otherwise the card shows an empty swatch to click).</summary>
+    [ObservableProperty]
+    public partial bool HasColor { get; set; }
+
+    /// <summary>The offline period shown – and chosen – right on the card.</summary>
+    [ObservableProperty]
+    public partial OfflineChoice? SelectedOffline { get; set; }
+
+    private bool _settingOffline;
+
+    partial void OnSelectedOfflineChanged(OfflineChoice? value)
+    {
+        if (!_settingOffline && value is not null)
+        {
+            value.Chosen?.Invoke();
+        }
     }
 
     internal void SetOffline(Neruna.Core.Mail.OfflinePeriod period, Action<Neruna.Core.Mail.OfflinePeriod> save)
@@ -296,6 +330,9 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
         OfflineText = F("Offline: {0}", Neruna.Core.Mail.OfflinePeriods.Label(period));
         OfflineChoices = choices;
         OnPropertyChanged(nameof(OfflineChoices));
+        _settingOffline = true;
+        SelectedOffline = choices.FirstOrDefault(c => c.IsChecked);
+        _settingOffline = false;
     }
 
     /// <summary>The app can take the account over (own account with IMAP, CalDAV or CardDAV).</summary>

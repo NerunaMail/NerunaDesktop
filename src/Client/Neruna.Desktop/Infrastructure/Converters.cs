@@ -31,6 +31,9 @@ internal static class Converters
 
     public static FuncValueConverter<bool, FontWeight> BoldIf { get; } = new(bold => bold ? FontWeight.SemiBold : FontWeight.Normal);
 
+    /// <summary>A ring around the chosen one (e.g. the account color in its picker).</summary>
+    public static FuncValueConverter<bool, Avalonia.Thickness> ThicknessIf { get; } = new(chosen => chosen ? new Avalonia.Thickness(3) : new Avalonia.Thickness(0));
+
     /// <summary>Shown or only taking its place (a table column keeps its icons aligned).</summary>
     public static FuncValueConverter<bool, double> OpaqueIf { get; } = new(shown => shown ? 1 : 0);
 

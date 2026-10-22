@@ -22,6 +22,7 @@ internal sealed class ViewLocator : IDataTemplate
         SearchIndexViewModel => new SearchIndexView(),
         LocalDataViewModel => new LocalDataView(),
         ServerRulesViewModel => new ServerRulesView(),
+        ServerRulesPageViewModel => new ServerRulesPageView(),
         SpecialCalendarViewModel => new SpecialCalendarView(),
         CloudAccountPasswordViewModel => new CloudAccountPasswordView(),
         CrashReportViewModel => new CrashReportView(),

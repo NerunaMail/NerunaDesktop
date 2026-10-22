@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:acc="using:Neruna.Core.Accounts"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:app="using:Neruna.Desktop"
              xmlns:views="using:Neruna.Desktop.Views"
              x:Class="Neruna.Desktop.Views.AccountsView"
              x:DataType="vm:AccountsViewModel">
@@ -42,18 +43,62 @@
               <!-- Compact: who and which services; servers, offline and the rest under "Bearbeiten" and "⋯" -->
               <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,0,0,8">
                 <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
-                  <!-- The account's color in the folder list -->
-                  <Border Width="4" CornerRadius="2" Margin="-8,0,10,0" Background="{Binding ColorStrip}" />
+                  <!-- The account's color in the folder list: click to choose; without one an empty, dashed swatch with a
+                       palette invites to pick one (mail accounts only) -->
+                  <Button Grid.RowSpan="1" Padding="0" Margin="-6,0,12,0" VerticalAlignment="Top" Background="Transparent" BorderThickness="0"
+                          IsVisible="{Binding HasMail}" ToolTip.Tip="{l:T 'Farbe in der Ordnerliste wählen'}">
+                    <Panel Width="26" Height="26">
+                      <Border CornerRadius="13" Background="{Binding ColorStrip}" IsVisible="{Binding HasColor}" />
+                      <Panel IsVisible="{Binding !HasColor}">
+                        <Ellipse Stroke="{DynamicResource SubtleTextBrush}" StrokeThickness="1" StrokeDashArray="3,2" />
+                        <PathIcon Data="{StaticResource IconPalette}" Width="13" Height="13" Foreground="{DynamicResource SubtleTextBrush}" />
+                      </Panel>
+                    </Panel>
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedLeft">
+                        <StackPanel Spacing="8" Width="196">
+                          <TextBlock Text="{l:T 'Farbe in der Ordnerliste'}" FontWeight="SemiBold" />
+                          <ItemsControl ItemsSource="{Binding ColorChoices}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <WrapPanel />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:AccountColorChoice">
+                                <Panel>
+                                  <Button Width="30" Height="30" Margin="0,0,6,6" Padding="0" CornerRadius="15" Background="{Binding Swatch}"
+                                          BorderBrush="{DynamicResource AccentTextBrush}" BorderThickness="{Binding IsChecked, Converter={x:Static app:Converters.ThicknessIf}}"
+                                          IsVisible="{Binding HasColor}" Command="{Binding ChooseCommand}" Click="OnColorPicked" />
+                                  <Button Margin="0,0,6,6" Content="{Binding Label}" IsVisible="{Binding !HasColor}" Command="{Binding ChooseCommand}" Click="OnColorPicked" />
+                                </Panel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
                   <StackPanel Grid.Column="1">
                     <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding Sender}" Classes="subtle" TextTrimming="CharacterEllipsis" />
-                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
-                      <TextBlock Text="{Binding Services}" FontSize="12" Classes="subtle" />
-                      <TextBlock Text="{Binding OfflineText}" FontSize="12" Classes="subtle" IsVisible="{Binding HasServerMail}"
-                                 ToolTip.Tip="{l:T 'Wie weit zurück die Mails samt Anhängen auf diesem Computer liegen – ändern unter ⋯ → Offline verfügbar'}" />
-                      <TextBlock Text="{Binding ManagedBy}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" />
-                      <TextBlock Text="{l:T 'Abwesenheit aktiv'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding HasAutoReply}" />
-                    </StackPanel>
+                    <WrapPanel Margin="0,4,0,0">
+                      <TextBlock Text="{Binding Services}" FontSize="12" Classes="subtle" VerticalAlignment="Center" Margin="0,0,10,0" />
+                      <!-- How far back mail is complete on this computer: chosen right here -->
+                      <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasServerMail}" Margin="0,0,10,0"
+                                  ToolTip.Tip="{l:T 'Wie weit zurück die Mails samt Anhängen auf diesem Computer liegen'}">
+                        <TextBlock Text="{l:T 'Offline:'}" FontSize="12" Classes="subtle" VerticalAlignment="Center" />
+                        <ComboBox ItemsSource="{Binding OfflineChoices}" SelectedItem="{Binding SelectedOffline}" FontSize="12" Padding="6,2" MinHeight="0">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OfflineChoice">
+                              <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                      </StackPanel>
+                      <TextBlock Text="{Binding ManagedBy}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                      <TextBlock Text="{l:T 'Abwesenheit aktiv'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding HasAutoReply}" VerticalAlignment="Center" />
+                    </WrapPanel>
                     <!-- Webmail, instructions and support of the provider -->
                     <ItemsControl ItemsSource="{Binding Links}" IsVisible="{Binding HasLinks}" Margin="0,2,0,0">
                       <ItemsControl.ItemsPanel>
@@ -69,7 +114,16 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
-                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <!-- The main actions in sight: order, edit, more, remove -->
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <Button Classes="command" Padding="6" ToolTip.Tip="{l:T 'Nach oben'}" IsEnabled="{Binding CanMoveUp}"
+                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
+                      <PathIcon Data="{StaticResource IconChevronUp}" Width="12" Height="12" Margin="0" />
+                    </Button>
+                    <Button Classes="command" Padding="6" ToolTip.Tip="{l:T 'Nach unten'}" IsEnabled="{Binding CanMoveDown}" Margin="0,0,6,0"
+                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
+                      <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" Margin="0" />
+                    </Button>
                     <Button Content="{l:T 'Bearbeiten'}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
                     <Button Padding="8,6" ToolTip.Tip="{l:T 'Weitere Aktionen'}">
@@ -80,45 +134,14 @@
                                     Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).AutoReplyCommand}" CommandParameter="{Binding}" />
                           <MenuItem Header="{l:T 'Serverregeln …'}" IsVisible="{Binding HasServerMail}"
                                     Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).ServerRulesCommand}" CommandParameter="{Binding}" />
-                          <MenuItem Header="{l:T 'Offline verfügbar'}" IsVisible="{Binding HasServerMail}" ItemsSource="{Binding OfflineChoices}">
-                            <MenuItem.Styles>
-                              <Style Selector="MenuItem > MenuItem" x:DataType="vm:OfflineChoice">
-                                <Setter Property="Header" Value="{Binding Label}" />
-                                <Setter Property="ToggleType" Value="Radio" />
-                                <Setter Property="IsChecked" Value="{Binding IsChecked}" />
-                                <Setter Property="Command" Value="{Binding ChooseCommand}" />
-                              </Style>
-                            </MenuItem.Styles>
-                          </MenuItem>
-                          <MenuItem Header="{l:T 'Farbe in der Ordnerliste'}" IsVisible="{Binding HasMail}" ItemsSource="{Binding ColorChoices}">
-                            <MenuItem.Styles>
-                              <Style Selector="MenuItem > MenuItem" x:DataType="vm:AccountColorChoice">
-                                <Setter Property="ToggleType" Value="Radio" />
-                                <Setter Property="IsChecked" Value="{Binding IsChecked}" />
-                                <Setter Property="Command" Value="{Binding ChooseCommand}" />
-                                <Setter Property="Header">
-                                  <Template>
-                                    <Panel>
-                                      <TextBlock Text="{Binding Label}" IsVisible="{Binding !HasColor}" />
-                                      <Border Width="48" Height="14" CornerRadius="3" Background="{Binding Swatch}" IsVisible="{Binding HasColor}" />
-                                    </Panel>
-                                  </Template>
-                                </Setter>
-                              </Style>
-                            </MenuItem.Styles>
-                          </MenuItem>
                           <MenuItem Header="{l:T 'Aufs Handy übertragen'}" IsVisible="{Binding CanTransfer}"
                                     Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).TransferCommand}" CommandParameter="{Binding}" />
-                          <Separator />
-                          <MenuItem Header="{l:T 'Nach oben'}" IsEnabled="{Binding CanMoveUp}"
-                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
-                          <MenuItem Header="{l:T 'Nach unten'}" IsEnabled="{Binding CanMoveDown}"
-                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}" />
-                          <Separator IsVisible="{Binding !IsFromCloud}" />
-                          <MenuItem Header="{l:T 'Entfernen …'}" IsVisible="{Binding !IsFromCloud}"
-                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
                         </MenuFlyout>
                       </Button.Flyout>
+                    </Button>
+                    <Button Classes="command" Padding="6" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Konto entfernen …'}" IsVisible="{Binding !IsFromCloud}"
+                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
+                      <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15" Margin="0" />
                     </Button>
                   </StackPanel>
                   <!-- "Entfernen …": asked once more, right in the card -->

@@ -872,6 +872,12 @@ internal sealed partial class MailViewModel(
         }
     }
 
+    /// <summary>Right-click on an account → "Serverregeln …": Einstellungen → Serverregeln on this account.</summary>
+    public event EventHandler<Account>? ServerRulesRequested;
+
+    [RelayCommand]
+    private void OpenServerRules(MailAccountNode node) => ServerRulesRequested?.Invoke(this, node.Account);
+
     /// <summary>A contact was saved or changed: completion and the sender check read the address books again.</summary>
     public void ContactsChanged() => recipients.Forget();
 
@@ -1962,6 +1968,9 @@ internal sealed partial class MailAccountNode : ObservableObject
     public partial bool IsExpanded { get; set; } = true;
 
     public string ExpansionKey => "account:" + Connection.Id.ToString("N");
+
+    /// <summary>Right-click on the account → Farbe: the same choices as in Einstellungen → Konten.</summary>
+    public IReadOnlyList<AccountColorChoice> ColorChoices { get; set; } = [];
 
     /// <summary>The account's color as a light tint behind it and its folders (none: null).</summary>
     [ObservableProperty]

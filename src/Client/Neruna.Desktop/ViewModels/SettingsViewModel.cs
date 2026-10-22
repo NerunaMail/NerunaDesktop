@@ -4,8 +4,27 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf, ServerRulesPageViewModel serverRules) : ViewModelBase
 {
+    /// <summary>Settings → Serverregeln: the rules of every mail account in one place.</summary>
+    public ServerRulesPageViewModel ServerRules => serverRules;
+
+    public const int ServerRulesTab = 20;
+
+    /// <summary>Opens Einstellungen → Serverregeln on this account.</summary>
+    public async Task ShowServerRulesAsync(Guid accountId)
+    {
+        _ruleAccount = accountId;
+        SelectedTab = ServerRulesTab;
+        if (_ruleAccount is { } id)
+        {
+            _ruleAccount = null;
+            await ServerRules.ShowAsync(id);
+        }
+    }
+
+    private Guid? _ruleAccount;
+
     /// <summary>Settings → Programm → News: the devblog.</summary>
     public NewsViewModel News => news;
 
@@ -97,6 +116,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     [
         new(-1, T("Konten"), null, IsHeading: true),
         new(0, T("Konten"), "IconPeople"),
+        new(ServerRulesTab, T("Serverregeln"), "IconInbox"),
         new(7, T("Neruna Cloud"), "IconCloud"),
         new(-1, T("E-Mail"), null, IsHeading: true),
         new(1, T("Allgemein"), "IconMail"),
@@ -145,6 +165,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             else if (item.Tab == 13)
             {
                 LocalData.ShowDatabaseSize();
+            }
+            else if (item.Tab == ServerRulesTab && _ruleAccount is null)
+            {
+                _ = ServerRules.LoadAsync();
             }
             else if (item.Tab == PdfTab)
             {

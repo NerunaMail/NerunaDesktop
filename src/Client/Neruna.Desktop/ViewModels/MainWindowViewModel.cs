@@ -243,6 +243,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             MailPage.ContactsChanged(); // a sender just saved as a contact loses its "+"
         });
         MailPage.AddContactRequested += (_, sender) => ContactsPage.NewContactFrom(sender);
+        MailPage.ServerRulesRequested += async (_, account) =>
+        {
+            Navigate(Section.Settings);
+            await SettingsPage.ShowServerRulesAsync(account.Id);
+        };
+        MailPage.Tree.ColorChanged += async (_, _) => await SettingsPage.Accounts.RefreshColorsAsync();
         ContactsPage.ManageRequested += (_, _) => ShowAddressBookSelection();
         ContactsPage.MailRequested += async (_, recipients) =>
         {
@@ -322,18 +328,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         };
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         accountsPage.PstRequested += (_, _) => ShowPstAccount();
-        accountsPage.ServerRulesRequested += async (_, account) =>
-        {
-            if (account.ConnectionsOf(Neruna.Core.Accounts.ServiceKind.Mail).FirstOrDefault() is not { } connection)
-            {
-                return;
-            }
-
-            var rules = new ServerRulesViewModel(_mail, account, connection);
-            rules.Finished += (_, _) => Overlay = null;
-            Overlay = rules;
-            await rules.LoadAsync();
-        };
+        // "Serverregeln …" of an account: their own settings page, on this account.
+        accountsPage.ServerRulesRequested += async (_, account) => await SettingsPage.ShowServerRulesAsync(account.Id);
         accountsPage.TransferRequested += async (_, dialog) =>
         {
             dialog.Finished += (_, _) => Overlay = null;

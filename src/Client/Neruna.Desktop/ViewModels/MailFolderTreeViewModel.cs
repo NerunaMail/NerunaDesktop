@@ -102,11 +102,13 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
             foreach (var connection in account.ConnectionsOf(ServiceKind.Mail))
             {
                 var folders = workspaces.Current.FoldersOf(account.Id, await mail.GetFoldersAsync(connection.Id));
+                var color = await AccountColors.GetAsync(settings, account.Id);
                 var node = new MailAccountNode(account, connection, BuildTree(folders))
                 {
                     IsSettingUp = _settingUp.Contains(connection.Id),
-                    Tint = AccountColors.Tint(await AccountColors.GetAsync(settings, account.Id)),
+                    Tint = AccountColors.Tint(color),
                 };
+                node.ColorChoices = ColorChoicesFor(node, color);
                 TrackExpansion(node, node.ExpansionKey);
                 foreach (var folder in node.AllFolders())
                 {
@@ -128,8 +130,32 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
     {
         foreach (var node in Accounts)
         {
-            node.Tint = AccountColors.Tint(await AccountColors.GetAsync(settings, node.Account.Id));
+            var color = await AccountColors.GetAsync(settings, node.Account.Id);
+            node.Tint = AccountColors.Tint(color);
+            foreach (var choice in node.ColorChoices)
+            {
+                choice.IsChecked = choice.Color == color;
+            }
         }
+    }
+
+    /// <summary>A color was chosen in the folder list (the settings show it too).</summary>
+    public event EventHandler? ColorChanged;
+
+    private List<AccountColorChoice> ColorChoicesFor(MailAccountNode node, string? color)
+    {
+        var choices = new[] { (string?)null }.Concat(AccountColors.Choices).Select(c => new AccountColorChoice(c) { IsChecked = c == color }).ToList();
+        foreach (var choice in choices)
+        {
+            choice.Chosen = async () =>
+            {
+                await AccountColors.SetAsync(settings, node.Account.Id, choice.Color);
+                await UpdateColorsAsync();
+                ColorChanged?.Invoke(this, EventArgs.Empty);
+            };
+        }
+
+        return choices;
     }
 
     public async Task<bool> UpdateCountsAsync()

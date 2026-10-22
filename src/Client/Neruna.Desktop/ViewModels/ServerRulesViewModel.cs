@@ -89,6 +89,7 @@ internal sealed partial class ServerRulesViewModel(MailController mail, Account 
             }
 
             OnPropertyChanged(nameof(HasOthers));
+            OnPropertyChanged(nameof(Count));
             IsLoaded = true;
             IsDirty = false;
             OnPropertyChanged(nameof(IsEmpty));
@@ -200,6 +201,18 @@ internal sealed partial class ServerRulesViewModel(MailController mail, Account 
 
     [RelayCommand]
     private void Close() => Finished?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>On the settings page (Einstellungen → Serverregeln) instead of a dialog: no "Schliessen", but "Verwerfen".</summary>
+    public bool IsEmbedded { get; init; }
+
+    public bool IsDialog => !IsEmbedded;
+
+    /// <summary>"Verwerfen": the rules as the server has them again.</summary>
+    [RelayCommand]
+    private Task DiscardAsync() => LoadAsync();
+
+    /// <summary>The rules of this account (Neruna's and those made elsewhere), for the counter on the settings page.</summary>
+    public int Count => Rules.Count + Others.Count;
 
     internal static string FieldName(RuleField field) => field switch
     {

@@ -73,7 +73,8 @@
 
       <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,8,0,0">
         <Button Content="{l:T '+ Neue Regel'}" Command="{Binding NewRuleCommand}" IsEnabled="{Binding IsReady}" />
-        <Button Grid.Column="2" Content="{l:T 'Schliessen'}" Command="{Binding CloseCommand}" Margin="0,0,8,0" />
+        <Button Grid.Column="2" Content="{l:T 'Schliessen'}" Command="{Binding CloseCommand}" Margin="0,0,8,0" IsVisible="{Binding IsDialog}" />
+        <Button Grid.Column="2" Content="{l:T 'Verwerfen'}" Command="{Binding DiscardCommand}" Margin="0,0,8,0" IsVisible="{Binding IsEmbedded}" IsEnabled="{Binding IsDirty}" />
         <Button Grid.Column="3" Classes="accent" Content="{l:T 'Auf dem Server speichern'}" Command="{Binding SaveCommand}" />
       </Grid>
     </StackPanel>

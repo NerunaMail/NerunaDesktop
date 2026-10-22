@@ -50,6 +50,7 @@
         <ContentControl Content="{Binding News}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=16}" />
         <ContentControl Content="{Binding Meetings}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=18}" />
         <ContentControl Content="{Binding Pdf}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=19}" />
+        <ContentControl Content="{Binding ServerRules}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=20}" />
         <views:ComposeOptionsView DataContext="{Binding MailOptions}" IsVisible="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=17}" />
         <views:AboutView IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=9}" />
       </Panel>

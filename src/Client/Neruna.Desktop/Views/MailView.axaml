@@ -58,6 +58,26 @@
                       <MenuItem Header="{l:T 'Neuer Ordner …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).NewFolderCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="{l:T 'Ordner abonnieren …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).Tree.SubscribeFoldersCommand}" CommandParameter="{Binding}" />
                       <MenuItem Header="{l:T 'Abwesenheitsnotiz …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).Tree.AutoReplyCommand}" CommandParameter="{Binding}" />
+                      <MenuItem Header="{l:T 'Serverregeln …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).OpenServerRulesCommand}" CommandParameter="{Binding}"
+                                IsVisible="{Binding !IsReadOnly}" />
+                      <Separator />
+                      <MenuItem Header="{l:T 'Farbe in der Ordnerliste'}" ItemsSource="{Binding ColorChoices}">
+                        <MenuItem.Styles>
+                          <Style Selector="MenuItem > MenuItem" x:DataType="vm:AccountColorChoice">
+                            <Setter Property="ToggleType" Value="Radio" />
+                            <Setter Property="IsChecked" Value="{Binding IsChecked}" />
+                            <Setter Property="Command" Value="{Binding ChooseCommand}" />
+                            <Setter Property="Header">
+                              <Template>
+                                <Panel>
+                                  <TextBlock Text="{Binding Label}" IsVisible="{Binding !HasColor}" />
+                                  <Border Width="48" Height="14" CornerRadius="3" Background="{Binding Swatch}" IsVisible="{Binding HasColor}" />
+                                </Panel>
+                              </Template>
+                            </Setter>
+                          </Style>
+                        </MenuItem.Styles>
+                      </MenuItem>
                     </ContextMenu>
                   </TextBlock.ContextMenu>
                 </TextBlock>

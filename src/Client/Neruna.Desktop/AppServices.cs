@@ -79,6 +79,7 @@ internal static class AppServices
         services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Special.HolidayProviderFactory>();
         services.AddSingleton<IProviderFactory<IContactProvider>, Neruna.Providers.Special.LocalAddressBookProviderFactory>();
         services.AddSingleton<AddressCollector>();
+        services.AddSingleton<ServerRulesPageViewModel>();
         // Microsoft 365 / Outlook.com: one sign-in for mail, calendar and contacts (see MicrosoftAccount for the app id).
         services.AddSingleton(sp => new Neruna.Providers.Graph.GraphConnectionFactory(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>()));
         services.AddSingleton<IAccountSignIn, Neruna.Providers.Graph.MicrosoftSignIn>();
