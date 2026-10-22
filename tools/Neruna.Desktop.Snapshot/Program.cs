@@ -623,6 +623,17 @@ internal static class Snapshots
         vm.CalendarPage.PlanningPeopleText = string.Empty;
         vm.CalendarPage.IsPlanning = false;
 
+        // "Termine suchen": the hits instead of the week, coming ones first.
+        vm.CalendarPage.SearchText = "e";
+        for (var i = 0; i < 50 && vm.CalendarPage.SearchStatus is null or "Suche …"; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await SaveAsync(window, output, "calendar-search.png");
+        Console.WriteLine($"Calendar search: {vm.CalendarPage.SearchStatus}");
+        vm.CalendarPage.SearchText = string.Empty;
+
         // "Drucken": the print dialog with the week, the month and the list as pages.
         vm.CalendarPage.PrintCommand.Execute(null);
         if (vm.Overlay is CalendarPrintViewModel print)

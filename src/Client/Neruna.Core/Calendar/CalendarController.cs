@@ -452,6 +452,93 @@ public sealed class CalendarController(
         return result;
     }
 
+    /// <summary>
+    /// Events of the given calendars whose title, place, description, categories, organizer or attendees contain all
+    /// words of <paramref name="query"/>. Each event once: a series with its next occurrence (or, when it is over, its
+    /// last); ordered by start.
+    /// </summary>
+    public async Task<IReadOnlyList<CalendarOccurrence>> SearchAsync(
+        IEnumerable<CalendarInfo> calendars,
+        string query,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendars);
+        var words = Words(query);
+        var result = new List<CalendarOccurrence>();
+        if (words.Count == 0)
+        {
+            return result;
+        }
+
+        foreach (var calendar in calendars)
+        {
+            foreach (var item in await store.GetObjectsAsync(calendar.ConnectionId, calendar.RemoteId, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Cheap first: the raw text must hold every word somewhere (most events are out here, without parsing).
+                if (!ContainsAll(item.ICalendarData, words) && !ContainsAll(Unfolded(item.ICalendarData), words))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (Found(calendar, item, words, now) is { } occurrence)
+                    {
+                        result.Add(occurrence);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Skipping unparsable calendar object {RemoteId}", item.RemoteId);
+                }
+            }
+        }
+
+        result.Sort((a, b) => a.Start.CompareTo(b.Start));
+        return result;
+    }
+
+    // How far a series is followed to find its next or last occurrence.
+    private static readonly TimeSpan SearchBack = TimeSpan.FromDays(365 * 10);
+    private static readonly TimeSpan SearchAhead = TimeSpan.FromDays(365 * 5);
+
+    private static List<string> Words(string query) =>
+        [.. (query ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+
+    private static bool ContainsAll(string text, IReadOnlyList<string> words) => words.All(w => text.Contains(w, StringComparison.CurrentCultureIgnoreCase));
+
+    // Long lines are folded (CRLF + space) and commas escaped: undone for the quick check.
+    private static string Unfolded(string data) =>
+        data.Replace("\r\n ", string.Empty, StringComparison.Ordinal).Replace("\r\n\t", string.Empty, StringComparison.Ordinal)
+            .Replace("\n ", string.Empty, StringComparison.Ordinal).Replace("\\,", ",", StringComparison.Ordinal).Replace("\\;", ";", StringComparison.Ordinal);
+
+    internal static CalendarOccurrence? Found(CalendarInfo calendar, CalendarObject item, IReadOnlyList<string> words, DateTimeOffset now)
+    {
+        var ical = ICalendarLoader.Load(item.ICalendarData) ?? throw new FormatException("Empty iCalendar data.");
+        var master = ical.Events.FirstOrDefault(e => e.RecurrenceIdentifier is null) ?? ical.Events.FirstOrDefault();
+        if (master is null || !ical.Events.Any(e => Matches(e, words)))
+        {
+            return null;
+        }
+
+        // The next occurrence from today, else the last one before; a single event long ago: itself.
+        return Expand(calendar, item, now.Date, now + SearchAhead).FirstOrDefault()
+               ?? Expand(calendar, item, now - SearchBack, now.Date).LastOrDefault()
+               ?? (master.RecurrenceRule is null ? Expand(calendar, item, DateTimeOffset.MinValue.AddYears(1), now.Date).LastOrDefault() : null);
+    }
+
+    private static bool Matches(Ical.Net.CalendarComponents.CalendarEvent evt, IReadOnlyList<string> words)
+    {
+        var text = string.Join('\n', new[] { evt.Summary, evt.Location, evt.Description, evt.Organizer?.CommonName, evt.Organizer?.Value?.ToString() }
+            .Concat(evt.Categories ?? [])
+            .Concat(evt.Attendees.SelectMany(a => new[] { a.CommonName, a.Value?.ToString() }))
+            .Where(t => !string.IsNullOrEmpty(t)));
+        return words.All(w => text.Contains(w, StringComparison.CurrentCultureIgnoreCase));
+    }
+
     internal static IEnumerable<CalendarOccurrence> Expand(CalendarInfo calendar, CalendarObject item, DateTimeOffset from, DateTimeOffset to)
     {
         var ical = ICalendarLoader.Load(item.ICalendarData)

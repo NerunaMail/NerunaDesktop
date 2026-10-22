@@ -21,6 +21,16 @@ internal sealed partial class CalendarView : UserControl
         ColumnMemory.Attach(this, "columns.calendar", 0);
         _nowTimer.Tick += (_, _) => (DataContext as CalendarViewModel)?.RefreshNow();
 
+        // Ctrl+E: into "Termine suchen" (as in the mail list).
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.E && e.KeyModifiers == KeyModifiers.Control)
+            {
+                this.FindControl<TextBox>("EventSearch")?.Focus();
+                e.Handled = true;
+            }
+        };
+
         // The chosen hours (Einstellungen → Kalender, 07:00–21:00) fill the view; the time grid opens at their start.
         // Afterwards the user's scroll position stays – also when the window is resized.
         var scroll = this.FindControl<ScrollViewer>("TimeScroll")!;

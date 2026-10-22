@@ -81,6 +81,21 @@
       <Border Classes="pane" Padding="12,10">
         <!-- Months stay; the calendar list scrolls when it is longer than the window -->
         <DockPanel>
+          <!-- Termine suchen: the hits replace the week until the search is cleared -->
+          <TextBox x:Name="EventSearch" Text="{Binding SearchText}" PlaceholderText="{l:T 'Termine suchen (Ctrl+E)'}"
+                   DockPanel.Dock="Top" Margin="0,0,0,10">
+            <TextBox.InnerLeftContent>
+              <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
+            </TextBox.InnerLeftContent>
+            <TextBox.InnerRightContent>
+              <Button Classes="command" Padding="6" Margin="0,0,2,0" Command="{Binding CloseSearchCommand}" IsVisible="{Binding IsSearching}" ToolTip.Tip="{l:T 'Suche schliessen (Esc)'}">
+                <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
+              </Button>
+            </TextBox.InnerRightContent>
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Escape" Command="{Binding CloseSearchCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
           <ItemsControl DockPanel.Dock="Top" Margin="0,0,0,6" ItemsSource="{Binding MiniMonths}">
             <ItemsControl.Styles>
               <Style Selector="Button.day">
@@ -605,6 +620,49 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- Search hits over the week: coming events, then past ones -->
+        <DockPanel IsVisible="{Binding IsSearching}" Background="{DynamicResource PaneBackgroundBrush}">
+          <TextBlock DockPanel.Dock="Top" Text="{Binding SearchStatus}" Classes="subtle" Margin="14,10,14,4" />
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding SearchResults}" Margin="8,0,8,12">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CalendarSearchGroup">
+                  <StackPanel Spacing="4" Margin="0,8,0,0">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="6,0,0,2" />
+                    <ItemsControl ItemsSource="{Binding Hits}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CalendarSearchHit">
+                          <Button Padding="0" Margin="0,0,0,4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                  Background="Transparent" BorderThickness="0"
+                                  Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).OpenSearchHitCommand}" CommandParameter="{Binding}"
+                                  ToolTip.Tip="{Binding Item.Tooltip}">
+                            <Border Background="{Binding Item.Background}" BorderBrush="{Binding Item.Brush}" BorderThickness="3,0,0,0" CornerRadius="3" Padding="10,6">
+                              <Grid ColumnDefinitions="260,*,Auto">
+                                <StackPanel Spacing="1">
+                                  <TextBlock Text="{Binding DateText}" FontSize="13" />
+                                  <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="{Binding Item.TimeText}" FontSize="11" Classes="subtle" />
+                                    <PathIcon Data="{StaticResource IconSync}" Width="9" Height="9" IsVisible="{Binding Item.IsRecurring}" ToolTip.Tip="{l:T 'Serie'}" />
+                                  </StackPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="1" Margin="12,0">
+                                  <TextBlock Text="{Binding Item.Title}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                  <TextBlock Text="{Binding Item.Location}" FontSize="11" Classes="subtle" IsVisible="{Binding Item.HasLocation}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Text="{Binding CalendarName}" FontSize="11" Classes="subtle" VerticalAlignment="Center" />
+                              </Grid>
+                            </Border>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
         </Panel>
       </Border>
     </Grid>
