@@ -905,6 +905,7 @@ internal sealed partial class MailViewModel(
             var (current, sign, encryptCurrent) = await compose.CaptureAsync();
             var window = CreateCompose(compose.Account, compose.Connection, current, compose.Kind, encryptCurrent, inWindow: true);
             window.AfterSent = compose.AfterSent;
+            window.Formatting.SpellLanguage = compose.Formatting.SpellLanguage; // the popped-out draft keeps its spell check
             if (dirty)
             {
                 window.MarkChanged();
@@ -1204,6 +1205,13 @@ internal sealed partial class MailViewModel(
     }
 
     /// <returns>True if the operation succeeded.</returns>
+    // Moved or deleted messages leave the list at once; the server work follows one operation at a time (each opens a
+    // connection, moves, then syncs the target – a second or two). Until it is done, a refresh must not bring them back.
+    private readonly SemaphoreSlim _serverOperations = new(1, 1);
+    private readonly HashSet<string> _leaving = new(StringComparer.Ordinal);
+
+    private static string LeavingKey(MailFolder folder, string remoteId) => $"{FolderKey(folder)}|{remoteId}";
+
     private async Task<bool> RunOnMessagesAsync(IReadOnlyList<MessageItemViewModel> messages, string action, Func<ServiceConnection, MailFolder, IReadOnlyCollection<string>, Task> operation, bool removesMessages)
     {
         if (messages.Count == 0 || messages.Any(m => FolderOf(m) is null))
@@ -1211,23 +1219,17 @@ internal sealed partial class MailViewModel(
             return false;
         }
 
-        try
+        var groups = messages.GroupBy(m => FolderOf(m)!).ToList();
+        var leaving = removesMessages ? groups.SelectMany(g => g.Select(m => LeavingKey(g.Key.Folder, m.Summary.RemoteId))).ToList() : [];
+        if (removesMessages)
         {
+            _leaving.UnionWith(leaving);
+            foreach (var group in groups)
+            {
+                group.Key.UnreadCount -= group.Count(m => m.IsUnread);
+            }
+
             var index = messages.Select(m => Entries.IndexOf(m)).Where(i => i >= 0).DefaultIfEmpty(0).Min();
-            foreach (var group in messages.GroupBy(m => FolderOf(m)!))
-            {
-                await operation(group.Key.Account.Connection, group.Key.Folder, group.Select(m => m.Summary.RemoteId).ToList());
-                if (removesMessages)
-                {
-                    group.Key.UnreadCount -= group.Count(m => m.IsUnread);
-                }
-            }
-
-            if (!removesMessages)
-            {
-                return true;
-            }
-
             var wasSelected = SelectedMessage is { } open && messages.Contains(open);
             var removed = messages.ToHashSet();
             _allMessages = _allMessages.Where(m => !removed.Contains(m)).ToList();
@@ -1241,19 +1243,38 @@ internal sealed partial class MailViewModel(
                 SelectedEntry = Entries.Skip(Math.Max(0, index)).OfType<MessageItemViewModel>().FirstOrDefault()
                                 ?? Entries.OfType<MessageItemViewModel>().LastOrDefault();
             }
+        }
+
+        await _serverOperations.WaitAsync();
+        try
+        {
+            foreach (var group in groups)
+            {
+                await operation(group.Key.Account.Connection, group.Key.Folder, group.Select(m => m.Summary.RemoteId).ToList());
+            }
 
             return true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Report($"{action} fehlgeschlagen", ex);
-            if (removesMessages && !IsSearchMode && CurrentFolder is { } folder)
+            if (removesMessages)
             {
                 // Part of a multi-message move may have succeeded: show what is really there now.
-                await LoadFolderAsync(folder, SelectedMessage?.Summary.RemoteId);
+                _leaving.ExceptWith(leaving);
+                await Tree.UpdateCountsAsync();
+                if (!IsSearchMode && CurrentFolder is { } folder)
+                {
+                    await LoadFolderAsync(folder, SelectedMessage?.Summary.RemoteId);
+                }
             }
 
             return false;
+        }
+        finally
+        {
+            _leaving.ExceptWith(leaving);
+            _serverOperations.Release();
         }
     }
 
@@ -1357,6 +1378,11 @@ internal sealed partial class MailViewModel(
         var items = new List<MessageItemViewModel>(summaries.Count);
         foreach (var summary in summaries)
         {
+            if (_leaving.Contains(LeavingKey(folder.Folder, summary.RemoteId)))
+            {
+                continue;
+            }
+
             if (existing.TryGetValue(summary.RemoteId, out var item))
             {
                 item.IsUnread = !summary.Flags.HasFlag(MessageFlags.Seen);
@@ -1406,7 +1432,7 @@ internal sealed partial class MailViewModel(
 
         CurrentFolder = folder;
         var summaries = await Task.Run(() => mail.GetMessagesAsync(folder.Folder, take: PageSize));
-        _allMessages = summaries.Select(s => new MessageItemViewModel(s, folder)).ToList();
+        _allMessages = summaries.Where(s => !_leaving.Contains(LeavingKey(folder.Folder, s.RemoteId))).Select(s => new MessageItemViewModel(s, folder)).ToList();
         RebuildEntries();
         await UpdateCountsAsync(folder);
 
