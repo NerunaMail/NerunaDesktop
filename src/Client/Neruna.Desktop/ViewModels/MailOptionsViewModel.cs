@@ -131,6 +131,7 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         {
             ComposeInWindow = await _settings.GetBoolAsync(SettingKeys.ComposeInWindow);
             AutoLists = await _settings.GetBoolAsync(SettingKeys.ComposeAutoLists, fallback: true);
+            SpellLanguage = SpellLanguages.Find(await _settings.GetAsync(SettingKeys.ComposeSpellLanguage));
             var pdfAttachments = await _settings.GetAsync(SettingKeys.MailPdfAttachments);
             PdfAttachments = pdfAttachments is "beside" or "none" ? pdfAttachments : "inside";
             FormatPlainText = await _settings.GetBoolAsync(SettingKeys.ComposePlainText);
@@ -211,6 +212,25 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
     partial void OnPdfAttachmentsChanged(string value) => Save(SettingKeys.MailPdfAttachments, value);
 
     partial void OnAutoListsChanged(bool value) => Save(SettingKeys.ComposeAutoLists, value.ToString(CultureInfo.InvariantCulture));
+
+    public static IReadOnlyList<SpellLanguage> SpellLanguageChoices => SpellLanguages.All;
+
+    public static bool CanChooseSpellLanguage => SpellLanguages.CanChoose;
+
+    /// <summary>Einstellungen → Schreiben: the language new mails are checked in (one can switch while writing).</summary>
+    [ObservableProperty]
+    public partial SpellLanguage SpellLanguage { get; set; } = SpellLanguages.All[0];
+
+    partial void OnSpellLanguageChanged(SpellLanguage value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        HtmlEditor.DefaultSpellLanguage = value.Code;
+        Save(SettingKeys.ComposeSpellLanguage, value.Code ?? string.Empty);
+    }
 
     partial void OnFormatPlainTextChanged(bool value)
     {

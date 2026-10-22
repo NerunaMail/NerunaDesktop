@@ -200,6 +200,7 @@ internal static class AppServices
             typeof(AppServices).Assembly.GetName().Version, options.DataDirectory, options.Demo, options.ProtocolLog);
         // Crashes: logged and kept for a report (CrashHandler, installed in Main).
         CrashHandler.Logger = logger;
+        Editor.HtmlEditor.WebViewDataFolder = Path.Combine(options.DataDirectory, "WebView2");
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
             logger.LogError(e.Exception, "Unobserved task exception");

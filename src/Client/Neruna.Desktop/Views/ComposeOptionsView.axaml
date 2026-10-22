@@ -24,6 +24,11 @@
         <CheckBox IsChecked="{Binding AutoLists}" Content="{l:T 'Automatische Listen'}" IsEnabled="{Binding FormatHtml}" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
                    Text="{l:T '«- » oder «* » am Zeilenanfang beginnt eine Aufzählung, «1. » eine nummerierte Liste. Ctrl+Z macht es rückgängig.'}" />
+        <TextBlock Classes="subtle" Text="{l:T 'Rechtschreibprüfung'}" Margin="0,8,0,0" IsVisible="{x:Static vm:MailOptionsViewModel.CanChooseSpellLanguage}" />
+        <ComboBox ItemsSource="{x:Static vm:MailOptionsViewModel.SpellLanguageChoices}" SelectedItem="{Binding SpellLanguage}" Width="240"
+                  IsVisible="{x:Static vm:MailOptionsViewModel.CanChooseSpellLanguage}" IsEnabled="{Binding FormatHtml}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{x:Static vm:MailOptionsViewModel.CanChooseSpellLanguage}"
+                   Text="{l:T 'Falsch geschriebene Wörter werden rot unterstrichen, ein Rechtsklick zeigt Vorschläge. Beim Schreiben lässt sich die Sprache für eine Nachricht umschalten. Unter Windows braucht die Sprache eine installierte Rechtschreibprüfung (Einstellungen → Zeit und Sprache).'}" />
       </StackPanel>
 
       <StackPanel Spacing="8">

@@ -460,6 +460,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     {
         // The workspace first: every page shows what it filters.
         await InitWorkspacesAsync(_workspacesToLoad);
+        Editor.HtmlEditor.DefaultSpellLanguage = await _settings.GetAsync(SettingKeys.ComposeSpellLanguage) is { Length: > 0 } spellLanguage ? spellLanguage : null;
         // Neruna opens with the first button of the rail (E-Mail unless hidden or moved).
         Navigate(MailPage.Preferences.StartSection);
         await RefreshPagesAsync();

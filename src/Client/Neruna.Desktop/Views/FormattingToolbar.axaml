@@ -66,6 +66,10 @@
       </ComboBox>
       <ComboBox ItemsSource="{x:Static ed:FontCatalog.Sizes}" SelectedItem="{Binding SelectedSize}" PlaceholderText="{Binding CurrentSizeText}"
                 Width="72" MaxDropDownHeight="360" ToolTip.Tip="{l:T 'Schriftgrad'}" />
+      <!-- The spell check's language for this text (not on macOS: the system picks it) -->
+      <ComboBox ItemsSource="{x:Static ed:FormattingViewModel.SpellLanguageChoices}" SelectedItem="{Binding SpellLanguage}"
+                IsVisible="{x:Static ed:FormattingViewModel.CanChooseSpellLanguage}" Width="150" Margin="4,0,0,0"
+                ToolTip.Tip="{l:T 'Sprache der Rechtschreibprüfung für diese Nachricht'}" />
 
       <Border Classes="group-separator" />
       <ToggleButton Classes="fmt" IsChecked="{Binding IsBold, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="bold" ToolTip.Tip="{l:T 'Fett (Ctrl+B)'}">

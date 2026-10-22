@@ -219,6 +219,9 @@ public static class SettingKeys
     /// <summary>Einstellungen → Schreiben: "- " and "1. " at the start of a line become a list (default on).</summary>
     public const string ComposeAutoLists = "compose.autoLists";
 
+    /// <summary>Einstellungen → Schreiben: the language of the spell check, e.g. "de-CH" (empty: the system's).</summary>
+    public const string ComposeSpellLanguage = "compose.spellLanguage";
+
     /// <summary>Einstellungen → Schreiben: new mails and answers as plain text, with the simple text editor (default off).</summary>
     public const string ComposePlainText = "compose.plainText";
 

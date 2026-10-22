@@ -77,6 +77,9 @@ internal interface IHtmlEditor
 
     void FocusEditor();
 
+    /// <summary>The language of the spell check (null: the system's); the editor starts again with it, keeping the text.</summary>
+    Task SetSpellLanguageAsync(string? code);
+
     /// <summary>For the AI: the own text (above signature and quote), the quoted message and the marked text.</summary>
     Task<EditorTexts> GetTextsAsync();
 
@@ -125,6 +128,15 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     private bool _ready;
     private bool _navigated;
     private (string Html, string Font, double Size, string Placeholder)? _content;
+
+    /// <summary>Einstellungen → Schreiben: the language new editors check (null: the system's).</summary>
+    public static string? DefaultSpellLanguage { get; set; }
+
+    // WebView2 environments are per language: a language needs its own data folder, the browser refuses a second set
+    // of options for the same one (the reading pane keeps the default folder).
+    public static string WebViewDataFolder { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NerunaData", "WebView2");
+
+    private string? _spellLanguage = DefaultSpellLanguage;
 
     public HtmlEditor()
     {
@@ -525,7 +537,16 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         try
         {
             _web = new NativeWebView();
-            _web.AdapterCreated += (_, args) => HookNativeFiles(args.TryGetPlatformHandle());
+            _web.EnvironmentRequested += OnEnvironmentRequested;
+            _web.AdapterCreated += (_, args) =>
+            {
+                var handle = args.TryGetPlatformHandle();
+                HookNativeFiles(handle);
+                if (OperatingSystem.IsLinux() && handle is { HandleDescriptor: "WebKitWebView" } gtk)
+                {
+                    SpellLanguages.ApplyGtk(gtk.Handle, _spellLanguage);
+                }
+            };
             _web.WebMessageReceived += OnWebMessage;
             _web.NavigationStarted += OnNavigationStarting;
             _web.NewWindowRequested += (_, args) => args.Handled = true;
@@ -545,6 +566,43 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             // No WebView runtime (e.g. Windows without WebView2, Linux without WebKitGTK).
             UseFallback();
         }
+    }
+
+    private void OnEnvironmentRequested(object? sender, WebViewEnvironmentRequestedEventArgs e)
+    {
+        if (e is Avalonia.Platform.WindowsWebView2EnvironmentRequestedEventArgs windows && _spellLanguage is { } language)
+        {
+            windows.Language = language;
+            windows.UserDataFolder = Path.Combine(WebViewDataFolder, "editor-" + language);
+        }
+    }
+
+    public async Task SetSpellLanguageAsync(string? code)
+    {
+        if (code == _spellLanguage)
+        {
+            return;
+        }
+
+        _spellLanguage = code;
+        if (_web is null)
+        {
+            // Not started yet (or the plain-text box): the language applies when the web view comes.
+            return;
+        }
+
+        // The written text goes over into the new web view; the caret and Ctrl+Z history do not.
+        if (_ready && await GetBodyHtmlAsync() is { } html && _content is { } content)
+        {
+            _content = (html, content.Font, content.Size, content.Placeholder);
+        }
+
+        _host.Children.Remove(_web);
+        _web = null;
+        _ready = false;
+        _navigated = false;
+        _nativeFiles = null;
+        Start();
     }
 
     // Only the editor page itself; never follow links or redirects inside the editor.

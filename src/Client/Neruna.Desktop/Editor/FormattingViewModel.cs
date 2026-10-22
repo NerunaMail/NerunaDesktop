@@ -87,10 +87,27 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
     public IHtmlEditor? Editor => _editor;
 
     /// <summary>Connects the toolbar to an editor and loads the content with the given default font.</summary>
+    public static IReadOnlyList<SpellLanguage> SpellLanguageChoices => SpellLanguages.All;
+
+    public static bool CanChooseSpellLanguage => SpellLanguages.CanChoose;
+
+    /// <summary>The spell check of this text: the default from Einstellungen → Schreiben, switched here for one mail.</summary>
+    [ObservableProperty]
+    public partial SpellLanguage SpellLanguage { get; set; } = SpellLanguages.Find(HtmlEditor.DefaultSpellLanguage);
+
+    partial void OnSpellLanguageChanged(SpellLanguage value)
+    {
+        if (value is not null && _editor is { } editor)
+        {
+            _ = editor.SetSpellLanguageAsync(value.Code);
+        }
+    }
+
     public void Attach(IHtmlEditor editor, string html, string font, double sizePt, string placeholder)
     {
         ArgumentNullException.ThrowIfNull(editor);
         _editor = editor;
+        _ = editor.SetSpellLanguageAsync(SpellLanguage.Code); // e.g. a popped-out draft: the language it had
         editor.StateChanged += (_, state) => ApplyState(state);
         editor.ImagePasted += async (_, dataUrl) =>
         {
