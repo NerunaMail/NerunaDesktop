@@ -78,8 +78,11 @@ public static class SecureMimeAlgorithms
     };
 }
 
-public sealed class SecureMimeService(CertificateManager certificates, ISettingsStore settings, TimeProvider clock, ILogger<SecureMimeService> logger)
+/// <param name="http">Fetches intermediate certificates a signature leaves out (null: none are fetched).</param>
+public sealed class SecureMimeService(CertificateManager certificates, ISettingsStore settings, TimeProvider clock, ILogger<SecureMimeService> logger, HttpClient? http = null)
 {
+    private readonly IssuerDownloader? _issuers = http is null ? null : new IssuerDownloader(http);
+
     public async Task<SecureMimeCapabilities> GetCapabilitiesAsync(string fromAddress, IEnumerable<string> recipients, CancellationToken cancellationToken = default)
     {
         var infos = await certificates.GetAllAsync(cancellationToken);
@@ -110,6 +113,7 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         {
             var signer = context.FindSigner(from.Address)
                          ?? throw new SecureMimeException(F("Kein gültiges eigenes S/MIME-Zertifikat für {0} vorhanden.", from.Address));
+            signer = await WithFullChainAsync(signer, context.Material.Certificates, cancellationToken);
             body = await MultipartSigned.CreateAsync(context, signer, body, cancellationToken);
         }
 
@@ -166,6 +170,11 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             if (entity is MultipartSigned signed)
             {
                 var collection = await signed.VerifyAsync(context, cancellationToken);
+                if (await AddMissingIssuersAsync(collection, context, cancellationToken))
+                {
+                    collection = await signed.VerifyAsync(context, cancellationToken);
+                }
+
                 signatures.AddRange(await EvaluateAsync(collection, sender, cancellationToken));
                 entity = signed.Count > 0 ? signed[0] : null;
             }
@@ -188,6 +197,11 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             else if (entity is ApplicationPkcs7Mime opaque && opaque.SecureMimeType == SecureMimeType.SignedData)
             {
                 var collection = opaque.Verify(context, out var inner, cancellationToken);
+                if (await AddMissingIssuersAsync(collection, context, cancellationToken))
+                {
+                    collection = opaque.Verify(context, out inner, cancellationToken);
+                }
+
                 signatures.AddRange(await EvaluateAsync(collection, sender, cancellationToken));
                 entity = inner;
             }
@@ -216,6 +230,117 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         var copy = MimeMessage.Load(buffer);
         copy.Body = body;
         return copy;
+    }
+
+    /// <summary>
+    /// The signer's chain up to (not including) the root: a .p12 exported without "all certificates in the path" holds
+    /// only the own certificate, and recipients could not tell who issued it. Missing issuers come from the imported
+    /// certificates, else from the address the certificate names.
+    /// </summary>
+    private async Task<CmsSigner> WithFullChainAsync(CmsSigner signer, IReadOnlyList<BcCertificate> known, CancellationToken cancellationToken)
+    {
+        var given = signer.CertificateChain.Select(c => c).ToList();
+        var chain = new List<BcCertificate> { signer.Certificate };
+        for (var hop = 0; hop < 4 && !IsSelfIssued(chain[^1]); hop++)
+        {
+            var last = chain[^1];
+            var issuer = given.Concat(known).FirstOrDefault(c => Issued(c, last));
+            if (issuer is null && _issuers is not null)
+            {
+                issuer = (await FetchIssuersAsync(last, cancellationToken)).FirstOrDefault(c => Issued(c, last));
+            }
+
+            // The root only where the .p12 had it: recipients must trust it themselves anyway.
+            if (issuer is null || (IsSelfIssued(issuer) && !given.Contains(issuer)))
+            {
+                break;
+            }
+
+            chain.Add(issuer);
+        }
+
+        return chain.Count > given.Count || !chain.SequenceEqual(given.Take(chain.Count))
+            ? new CmsSigner(chain, signer.PrivateKey) { DigestAlgorithm = signer.DigestAlgorithm }
+            : signer;
+    }
+
+    // Fetched once, then kept with the certificates: the next mail and every signature find them there.
+    private async Task<IReadOnlyList<BcCertificate>> FetchIssuersAsync(BcCertificate certificate, CancellationToken cancellationToken)
+    {
+        var issuers = await _issuers!.FetchAsync(certificate, cancellationToken);
+        foreach (var issuer in issuers.Where(i => !IsSelfIssued(i)))
+        {
+            await certificates.KeepIntermediateAsync(issuer, cancellationToken);
+        }
+
+        return issuers;
+    }
+
+    private static bool IsSelfIssued(BcCertificate certificate) => certificate.IssuerDN.Equivalent(certificate.SubjectDN);
+
+    private static bool Issued(BcCertificate issuer, BcCertificate certificate)
+    {
+        if (!issuer.SubjectDN.Equivalent(certificate.IssuerDN))
+        {
+            return false;
+        }
+
+        try
+        {
+            certificate.Verify(issuer.GetPublicKey());
+            return true;
+        }
+        catch (Exception ex) when (ex is Org.BouncyCastle.Security.GeneralSecurityException or Org.BouncyCastle.Security.InvalidKeyException or Org.BouncyCastle.Security.Certificates.CertificateException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// A signature whose chain does not reach a trusted root: the issuers its certificate names are fetched and added.
+    /// </summary>
+    /// <returns>True when something was added – then the signatures are verified again.</returns>
+    private async Task<bool> AddMissingIssuersAsync(DigitalSignatureCollection signatures, NerunaSecureMimeContext context, CancellationToken cancellationToken)
+    {
+        if (_issuers is null)
+        {
+            return false;
+        }
+
+        var added = false;
+        foreach (var signature in signatures)
+        {
+            if (signature.SignerCertificate is not SecureMimeDigitalCertificate { Certificate: { } certificate } || ChainIsTrusted(signature))
+            {
+                continue;
+            }
+
+            foreach (var issuer in await FetchIssuersAsync(certificate, cancellationToken))
+            {
+                context.Import(issuer, cancellationToken);
+                added = true;
+            }
+
+            if (added)
+            {
+                logger.LogInformation("Fetched the issuer certificates of {Subject}", certificate.SubjectDN);
+            }
+        }
+
+        return added;
+    }
+
+    private static bool ChainIsTrusted(IDigitalSignature signature)
+    {
+        try
+        {
+            signature.Verify();
+            return true;
+        }
+        catch (DigitalSignatureVerifyException)
+        {
+            return false;
+        }
     }
 
     private async Task<List<SignatureInfo>> EvaluateAsync(DigitalSignatureCollection signatures, string? sender, CancellationToken cancellationToken)
@@ -294,6 +419,8 @@ internal sealed class NerunaSecureMimeContext : TemporarySecureMimeContext
             Import(certificate);
         }
     }
+
+    public SecureMimeMaterial Material => _material;
 
     public CmsSigner? FindSigner(string address)
     {

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using MimeKit;
 using MimeKit.Cryptography;
 using Neruna.Core.Mail;
@@ -197,6 +198,63 @@ public class SecureMimeTests
 
         Assert.Empty(await manager.GetAllAsync(ct));
         Assert.Empty((await manager.LoadMaterialAsync(ct)).PrivateKeys);
+    }
+
+    [Fact]
+    public async Task A_signature_without_its_intermediate_certificate_is_trusted_after_fetching_it()
+    {
+        // Only the signer's certificate in the mail (as from some mail programs); the intermediate CA is named by its address.
+        var (intermediate, certificate, key) = TestPki.UserBelowIntermediate("Clara Keller", "clara@example.com", "http://aia.example.com/ica.cer");
+        var requests = new List<string>();
+        await using var claraEnv = await TestEnvironment.CreateAsync();
+        await using var bobEnv = await TestEnvironment.CreateAsync(services => services.AddSingleton(new HttpClient(new FakeAia(intermediate, requests))));
+        var ct = TestContext.Current.CancellationToken;
+        await claraEnv.Get<CertificateManager>().ImportAsync(TestPki.Pkcs12((certificate, key), "c"), "c", cancellationToken: ct);
+        await bobEnv.Get<CertificateManager>().ImportAsync(TestPki.Ca.GetEncoded(), null, cancellationToken: ct);
+
+        var signed = Message("Signiert", "Hallo Bob");
+        signed.From.Clear();
+        signed.From.Add(new MailboxAddress("Clara Keller", "clara@example.com"));
+        await claraEnv.Get<SecureMimeService>().ProtectAsync(signed, sign: true, encrypt: false, ct);
+
+        var signature = Assert.Single((await bobEnv.Get<SecureMimeService>().OpenAsync(Reparse(signed), ct)).Security.Signatures);
+        Assert.Equal(SignatureStatus.Valid, signature.Status);
+        Assert.Equal(["http://aia.example.com/ica.cer"], requests);
+
+        // Kept: the next mail needs no download (a new run of Neruna starts with an empty download cache) – and the
+        // intermediate is no trusted authority of its own.
+        var kept = Assert.Single(await bobEnv.Get<CertificateManager>().GetAllAsync(ct), c => c.Source == CertificateSource.Intermediate);
+        Assert.Equal("Neruna Test ICA", kept.SubjectName);
+        Assert.DoesNotContain(await bobEnv.Get<CertificateManager>().LoadMaterialAsync(ct) is var material ? material.Authorities : [], a => a.SubjectDN.Equivalent(intermediate.SubjectDN));
+        await using (var fresh = await TestEnvironment.CreateAsync())
+        {
+            await fresh.Get<CertificateManager>().ImportAsync(TestPki.Ca.GetEncoded(), null, cancellationToken: ct);
+            await fresh.Get<CertificateManager>().KeepIntermediateAsync(intermediate, ct);
+            Assert.Equal(SignatureStatus.Valid, Assert.Single((await fresh.Get<SecureMimeService>().OpenAsync(Reparse(signed), ct)).Security.Signatures).Status);
+        }
+
+        // Without anyone to fetch it: the signature is intact, the issuer unknown.
+        await using var offlineEnv = await TestEnvironment.CreateAsync();
+        await offlineEnv.Get<CertificateManager>().ImportAsync(TestPki.Ca.GetEncoded(), null, cancellationToken: ct);
+        Assert.Equal(SignatureStatus.ValidUntrusted, Assert.Single((await offlineEnv.Get<SecureMimeService>().OpenAsync(Reparse(signed), ct)).Security.Signatures).Status);
+
+        // Neruna signing with such a .p12 completes the chain itself: then nobody has to fetch anything.
+        await using var nerunaEnv = await TestEnvironment.CreateAsync(services => services.AddSingleton(new HttpClient(new FakeAia(intermediate, requests))));
+        await nerunaEnv.Get<CertificateManager>().ImportAsync(TestPki.Pkcs12((certificate, key), "c"), "c", cancellationToken: ct);
+        var complete = Message("Signiert", "Hallo Bob");
+        complete.From.Clear();
+        complete.From.Add(new MailboxAddress("Clara Keller", "clara@example.com"));
+        await nerunaEnv.Get<SecureMimeService>().ProtectAsync(complete, sign: true, encrypt: false, ct);
+        Assert.Equal(SignatureStatus.Valid, Assert.Single((await offlineEnv.Get<SecureMimeService>().OpenAsync(Reparse(complete), ct)).Security.Signatures).Status);
+    }
+
+    private sealed class FakeAia(Org.BouncyCastle.X509.X509Certificate certificate, List<string> requests) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            requests.Add(request.RequestUri!.AbsoluteUri);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(certificate.GetEncoded()) });
+        }
     }
 
     private static MimeMessage Message(string subject, string text)

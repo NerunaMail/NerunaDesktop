@@ -303,6 +303,11 @@ internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffs
     {
         get
         {
+            if (Info.Source == CertificateSource.Intermediate)
+            {
+                return T("Zwischenzertifikat (vervollständigt Zertifikatsketten)");
+            }
+
             if (Info.IsAuthority)
             {
                 return T("Zertifizierungsstelle (vertrauenswürdig)");
@@ -328,6 +333,7 @@ internal sealed partial class CertificateItem(CertificateInfo info, DateTimeOffs
         CertificateSource.CollectedFromMail or CertificateSource.CollectedVerified => T("Aus signierter Nachricht übernommen am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
         CertificateSource.Cloud => T("Cloud – von der Organisation bereitgestellt am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
         CertificateSource.Contact => T("Beim Kontakt im Adressbuch gespeichert"),
+        CertificateSource.Intermediate => T("Automatisch beim Aussteller geladen am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
         _ => T("Importiert am ") + Info.AddedAt.LocalDateTime.ToString("d", CultureInfo.CurrentCulture),
     };
 

@@ -30,6 +30,12 @@ public enum CertificateSource
     /// self-made certificate, and a shared address book must not take it.
     /// </summary>
     CollectedVerified,
+
+    /// <summary>
+    /// An intermediate CA fetched once from the address a certificate names for its issuer, so chains are complete
+    /// (when verifying and when signing). Never trusted for itself: trust still has to come from a root.
+    /// </summary>
+    Intermediate,
 }
 
 public enum CertificateStatus
@@ -325,6 +331,17 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
     /// Keeps the signer certificate of a valid signature so the user can encrypt to that person later: on this device,
     /// or – if <paramref name="verified"/> (trusted issuer, certificate of the sender) – with the sender's contact.
     /// </summary>
+    /// <summary>Keeps a fetched intermediate CA (see <see cref="CertificateSource.Intermediate"/>), once.</summary>
+    public async Task KeepIntermediateAsync(X509Certificate certificate, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(certificate);
+        var thumbprint = CertificateParser.Thumbprint(certificate);
+        if ((await store.GetAllAsync(cancellationToken)).All(c => c.Thumbprint != thumbprint))
+        {
+            await store.SaveAsync(new StoredCertificate(thumbprint, certificate.GetEncoded(), null, CertificateSource.Intermediate, clock.GetUtcNow()), cancellationToken);
+        }
+    }
+
     public async Task<bool> CollectAsync(X509Certificate certificate, bool verified = false, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(certificate);
@@ -444,7 +461,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
             var info = CertificateParser.Describe(certificate, item.Pkcs12 is not null, item.Source, item.AddedAt);
             infos.Add(info);
             certificates.Add(certificate);
-            if (info.IsAuthority)
+            if (info.IsAuthority && item.Source != CertificateSource.Intermediate)
             {
                 authorities.Add(certificate);
             }

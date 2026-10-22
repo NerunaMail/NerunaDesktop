@@ -37,6 +37,27 @@ internal static class TestPki
         return (generator.Generate(new Asn1SignatureFactory("SHA256WITHRSA", LazyCa.Value.Keys.Private)), keys.Private);
     }
 
+    /// <summary>An intermediate CA below the test CA, and a user it issued that names it at <paramref name="issuerUrl"/>.</summary>
+    public static (X509Certificate Intermediate, X509Certificate Certificate, AsymmetricKeyParameter PrivateKey) UserBelowIntermediate(string name, string email, string issuerUrl)
+    {
+        var caKeys = NewKeys();
+        var caName = new X509Name("CN=Neruna Test ICA, O=Neruna");
+        var ca = Generator(Ca.SubjectDN, caName, caKeys.Public, DateTime.UtcNow.AddYears(-1), DateTime.UtcNow.AddYears(5));
+        ca.AddExtension(X509Extensions.BasicConstraints, true, new BasicConstraints(0));
+        ca.AddExtension(X509Extensions.KeyUsage, true, new KeyUsage(KeyUsage.KeyCertSign | KeyUsage.CrlSign));
+        var intermediate = ca.Generate(new Asn1SignatureFactory("SHA256WITHRSA", LazyCa.Value.Keys.Private));
+
+        var keys = NewKeys();
+        var generator = Generator(caName, new X509Name($"CN={name}"), keys.Public, DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddYears(2));
+        generator.AddExtension(X509Extensions.BasicConstraints, true, new BasicConstraints(false));
+        generator.AddExtension(X509Extensions.KeyUsage, true, new KeyUsage(KeyUsage.DigitalSignature | KeyUsage.NonRepudiation | KeyUsage.KeyEncipherment));
+        generator.AddExtension(X509Extensions.ExtendedKeyUsage, false, new ExtendedKeyUsage(KeyPurposeID.id_kp_emailProtection));
+        generator.AddExtension(X509Extensions.SubjectAlternativeName, false, new GeneralNames(new GeneralName(GeneralName.Rfc822Name, email)));
+        generator.AddExtension(X509Extensions.AuthorityInfoAccess, false,
+            new AuthorityInformationAccess(new AccessDescription(AccessDescription.IdADCAIssuers, new GeneralName(GeneralName.UniformResourceIdentifier, issuerUrl))));
+        return (intermediate, generator.Generate(new Asn1SignatureFactory("SHA256WITHRSA", caKeys.Private)), keys.Private);
+    }
+
     public static byte[] Pkcs12((X509Certificate Certificate, AsymmetricKeyParameter PrivateKey) user, string password)
     {
         var store = new Pkcs12StoreBuilder().Build();
