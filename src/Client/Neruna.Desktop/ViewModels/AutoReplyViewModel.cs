@@ -18,7 +18,7 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
     /// <summary>What was stored on the server (set before <see cref="Finished"/> with true).</summary>
     public AutoReply? Saved { get; private set; }
 
-    public AutoReplyFeatures Features => (CanSchedule ? AutoReplyFeatures.Schedule : AutoReplyFeatures.None) | (CanSetSubject ? AutoReplyFeatures.Subject : AutoReplyFeatures.None);
+    public AutoReplyFeatures Features { get; private set; }
 
     public string Title => F("Abwesenheitsnotiz · {0}", account.Title);
 
@@ -64,6 +64,34 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
     [ObservableProperty]
     public partial string Subject { get; set; } = string.Empty;
 
+    // ---- Series ("jeden Freitag"): defined in a template, or here -------------------------------------------------
+
+    /// <summary>The server can send on certain weekdays: by itself (Sieve) or with Neruna setting the next day.</summary>
+    public bool CanSeries => Features.HasFlag(AutoReplyFeatures.Weekly) || Features.HasFlag(AutoReplyFeatures.Schedule);
+
+    /// <summary>Neruna sets the next day of the series on the server (Exchange, Microsoft 365).</summary>
+    public bool IsSeriesRenewed => !Features.HasFlag(AutoReplyFeatures.Weekly);
+
+    /// <summary>"Jede Woche an bestimmten Tagen" instead of a period.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsPeriod))]
+    public partial bool IsSeries { get; set; }
+
+    public bool ShowsPeriod => CanSchedule && !IsSeries;
+
+    public IReadOnlyList<WeekdayChoice> Weekdays { get; } = WeekdayChoice.Week();
+
+    private IReadOnlyList<DayOfWeek> ChosenDays => [.. Weekdays.Where(d => d.IsChecked).Select(d => d.Day)];
+
+    private void ShowDays(IReadOnlyCollection<DayOfWeek>? days)
+    {
+        IsSeries = days is { Count: > 0 };
+        foreach (var choice in Weekdays)
+        {
+            choice.IsChecked = days?.Contains(choice.Day) == true;
+        }
+    }
+
     // ---- Named texts ("Ferien", "Bei Kunden"): for all accounts --------------------------------------------------
 
     public System.Collections.ObjectModel.ObservableCollection<AutoReplyTemplate> Templates { get; } = [];
@@ -90,6 +118,7 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
         Message = value.Text;
         Subject = value.Subject ?? string.Empty;
         TemplateName = value.Name;
+        ShowDays(CanSeries ? value.Weekdays : null);
     }
 
     private async Task LoadTemplatesAsync(string? select)
@@ -123,8 +152,15 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
             return;
         }
 
+        if (IsSeries && ChosenDays.Count == 0)
+        {
+            Error = T("Bitte mindestens einen Tag für die Serie wählen.");
+            return;
+        }
+
         var name = TemplateName.Trim();
-        await AutoReplyText.SaveTemplateAsync(settings, new AutoReplyTemplate(name, Message.Trim(), CanSetSubject && Subject.Trim().Length > 0 ? Subject.Trim() : null));
+        await AutoReplyText.SaveTemplateAsync(settings, new AutoReplyTemplate(name, Message.Trim(), CanSetSubject && Subject.Trim().Length > 0 ? Subject.Trim() : null,
+            IsSeries ? ChosenDays : null));
         await LoadTemplatesAsync(name);
         Error = null;
     }
@@ -145,15 +181,19 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
         try
         {
             var (reply, features) = await Task.Run(() => mail.GetAutoReplyAsync(connection));
+            Features = features;
+            OnPropertyChanged(nameof(CanSeries));
+            OnPropertyChanged(nameof(IsSeriesRenewed));
             CanSchedule = features.HasFlag(AutoReplyFeatures.Schedule);
             CanSetSubject = features.HasFlag(AutoReplyFeatures.Subject);
             IsEnabled = reply.IsEnabled;
             var template = await AutoReplyText.TemplateForAsync(settings, connection.Id, reply);
             Message = template.Length > 0 ? template : AutoReplyText.Default(account.DisplayName);
             Subject = reply.Subject ?? string.Empty;
-            IsScheduled = reply.IsScheduled && CanSchedule;
+            IsScheduled = reply.IsScheduled && CanSchedule && !reply.IsRecurring;
+            ShowDays(reply.Weekdays);
             await LoadTemplatesAsync(null);
-            if (reply.IsScheduled)
+            if (reply.IsScheduled && !reply.IsRecurring)
             {
                 FirstDay = reply.Start!.Value.LocalDateTime.Date;
                 LastDay = reply.End!.Value.LocalDateTime.Date.AddDays(-1);
@@ -186,7 +226,13 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
         }
 
         DateTimeOffset? start = null, end = null;
-        if (IsScheduled && CanSchedule)
+        if (IsSeries && ChosenDays.Count == 0)
+        {
+            Error = T("Bitte mindestens einen Tag für die Serie wählen.");
+            return;
+        }
+
+        if (!IsSeries && IsScheduled && CanSchedule)
         {
             if (FirstDay is not { } first || LastDay is not { } last || last.Date < first.Date)
             {
@@ -202,7 +248,8 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
         AutoReply reply;
         try
         {
-            reply = new AutoReply(IsEnabled, AutoReplyText.ForServer(Message, IsEnabled, start, end), start, end, CanSetSubject && Subject.Trim().Length > 0 ? Subject.Trim() : null);
+            reply = new AutoReply(IsEnabled, AutoReplyText.ForServer(Message, IsEnabled, start, end), start, end, CanSetSubject && Subject.Trim().Length > 0 ? Subject.Trim() : null,
+                IsSeries ? ChosenDays : null);
         }
         catch (ArgumentException ex)
         {
@@ -230,4 +277,19 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, false);
+}
+
+/// <summary>A day of the week in a series ("Mo", "Di" …), as a toggle.</summary>
+internal sealed partial class WeekdayChoice(DayOfWeek day) : ObservableObject
+{
+    public DayOfWeek Day { get; } = day;
+
+    public string Label { get; } = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(day);
+
+    public string Name { get; } = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(day);
+
+    [ObservableProperty]
+    public partial bool IsChecked { get; set; }
+
+    public static List<WeekdayChoice> Week() => [.. AutoReplySeries.Week.Select(d => new WeekdayChoice(d))];
 }

@@ -74,14 +74,46 @@ internal sealed partial class AutoRepliesViewModel(MailController mail, ISetting
         [property: System.Text.Json.Serialization.JsonPropertyName("end")] DateTimeOffset? End,
         [property: System.Text.Json.Serialization.JsonPropertyName("subject")] string? Subject,
         [property: System.Text.Json.Serialization.JsonPropertyName("features")] AutoReplyFeatures Features,
-        [property: System.Text.Json.Serialization.JsonPropertyName("checked")] DateTimeOffset Checked);
+        [property: System.Text.Json.Serialization.JsonPropertyName("checked")] DateTimeOffset Checked,
+        [property: System.Text.Json.Serialization.JsonPropertyName("weekdays")] IReadOnlyList<DayOfWeek>? Weekdays = null);
 
     private Dictionary<Guid, Cached> _cache = [];
+
+    // A series is "Abwesend" on its days only: at midnight the button, the folder list and the status follow.
+    private Avalonia.Threading.DispatcherTimer? _dayTimer;
+    private DateTime _day = DateTime.Today;
+
+    private void WatchDay()
+    {
+        if (_dayTimer is not null)
+        {
+            return;
+        }
+
+        _dayTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
+        _dayTimer.Tick += (_, _) =>
+        {
+            if (DateTime.Today == _day)
+            {
+                return;
+            }
+
+            _day = DateTime.Today;
+            foreach (var row in Accounts)
+            {
+                row.DayChanged();
+            }
+
+            OnChanged();
+        };
+        _dayTimer.Start();
+    }
 
     /// <summary>At the start: the accounts known to support it, as last seen – no server asked yet.</summary>
     public async Task LoadKnownAsync(IReadOnlyList<(Account Account, ServiceConnection Connection)> mailAccounts)
     {
         ArgumentNullException.ThrowIfNull(mailAccounts);
+        WatchDay();
         await ReloadTemplatesAsync();
         try
         {
@@ -98,7 +130,7 @@ internal sealed partial class AutoRepliesViewModel(MailController mail, ISetting
             if (_cache.TryGetValue(connection.Id, out var known))
             {
                 var row = new AutoReplyAccountViewModel(this, mail, settings, account, connection);
-                row.Show(new AutoReply(known.Enabled, string.Empty, known.Start, known.End, known.Subject), known.Features,
+                row.Show(new AutoReply(known.Enabled, string.Empty, known.Start, known.End, known.Subject, known.Weekdays), known.Features,
                     await AutoReplyText.TemplateForAsync(settings, connection.Id, AutoReply.Off));
                 row.ShowChecked(known.Checked, reachable: null);
                 Accounts.Add(row);
@@ -147,7 +179,7 @@ internal sealed partial class AutoRepliesViewModel(MailController mail, ISetting
             }
 
             row.ShowChecked(DateTimeOffset.Now, reachable: true);
-            _cache[connection.Id] = new Cached(reply.IsEnabled, reply.Start, reply.End, reply.Subject, features, DateTimeOffset.Now);
+            _cache[connection.Id] = new Cached(reply.IsEnabled, reply.Start, reply.End, reply.Subject, features, DateTimeOffset.Now, reply.Weekdays);
         }
         catch (AutoReplyUnavailableException ex) when (ex.InnerException is not (System.Net.Sockets.SocketException or IOException or OperationCanceledException or System.Security.Authentication.AuthenticationException))
         {
@@ -175,7 +207,7 @@ internal sealed partial class AutoRepliesViewModel(MailController mail, ISetting
     /// <summary>A switch in the list changed what the server has: remembered for the next start.</summary>
     internal void Remember(AutoReplyAccountViewModel row)
     {
-        _cache[row.Connection.Id] = new Cached(row.Reply.IsEnabled, row.Reply.Start, row.Reply.End, row.Reply.Subject, row.Features, DateTimeOffset.Now);
+        _cache[row.Connection.Id] = new Cached(row.Reply.IsEnabled, row.Reply.Start, row.Reply.End, row.Reply.Subject, row.Features, DateTimeOffset.Now, row.Reply.Weekdays);
         _ = SaveCacheAsync();
     }
 
@@ -223,6 +255,21 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
     public AutoReplyFeatures Features { get; private set; }
 
     public bool CanSchedule => Features.HasFlag(AutoReplyFeatures.Schedule);
+
+    /// <summary>The days of a series (from the server's reply or a chosen series template); null: an ordinary reply.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSeries), nameof(SeriesText), nameof(ShowsPeriod), nameof(IsSeriesRenewed))]
+    public partial IReadOnlyList<DayOfWeek>? SeriesDays { get; set; }
+
+    public bool IsSeries => SeriesDays is { Count: > 0 };
+
+    public string SeriesText => IsSeries ? AutoReplySeries.Describe(SeriesDays!) : string.Empty;
+
+    /// <summary>The period controls: only for an ordinary reply on a server that knows periods.</summary>
+    public bool ShowsPeriod => CanSchedule && !IsSeries;
+
+    /// <summary>Neruna sets the next day of the series on the server (no weekdays there): the hint shows.</summary>
+    public bool IsSeriesRenewed => IsSeries && !Features.HasFlag(AutoReplyFeatures.Weekly);
 
     /// <summary>What the server has now.</summary>
     public AutoReply Reply { get; private set; } = AutoReply.Off;
@@ -299,6 +346,7 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
 
         Template = value.Text;
         _subject = value.Subject;
+        SeriesDays = value.IsSeries ? value.Weekdays : null;
         if (IsEnabled)
         {
             _ = SaveAsync();
@@ -321,6 +369,8 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
     private string KnownStatus => Reply switch
     {
         { IsEnabled: false } => T("aus"),
+        { IsRecurring: true } when Reply.IsActive(DateTimeOffset.Now) => F("Serie: {0} – heute aktiv", AutoReplySeries.Describe(Reply.Weekdays!)),
+        { IsRecurring: true } => F("Serie: {0}", AutoReplySeries.Describe(Reply.Weekdays!)),
         { End: { } end } when end <= DateTimeOffset.Now => T("abgelaufen"),
         { End: { } end } => F("aktiv, bis und mit {0:d}", end.LocalDateTime.Date.AddDays(-1)),
         _ => T("aktiv"),
@@ -337,9 +387,10 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
             Template = template.Length > 0 ? template : AutoReplyText.Default(Account.DisplayName);
             _subject = reply.Subject;
             SelectedTemplate = Templates.FirstOrDefault(t => t.Text.Trim() == Template.Trim());
+            SeriesDays = reply.Weekdays;
             IsEnabled = reply.IsEnabled;
-            IsScheduled = reply.IsScheduled && CanSchedule;
-            if (reply.IsScheduled)
+            IsScheduled = reply.IsScheduled && CanSchedule && !reply.IsRecurring;
+            if (reply.IsScheduled && !reply.IsRecurring)
             {
                 FirstDay = reply.Start!.Value.LocalDateTime.Date;
                 LastDay = reply.End!.Value.LocalDateTime.Date.AddDays(-1);
@@ -347,6 +398,8 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
 
             Error = null;
             OnPropertyChanged(nameof(CanSchedule));
+            OnPropertyChanged(nameof(ShowsPeriod));
+            OnPropertyChanged(nameof(IsSeriesRenewed));
             OnPropertyChanged(nameof(IsActive));
             OnPropertyChanged(nameof(Status));
         }
@@ -385,6 +438,13 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
     [RelayCommand]
     private void MoreOptions() => owner.RequestEdit(this);
 
+    /// <summary>Midnight: a series may start or stop being active today.</summary>
+    internal void DayChanged()
+    {
+        OnPropertyChanged(nameof(IsActive));
+        OnPropertyChanged(nameof(Status));
+    }
+
     private async Task SaveAsync()
     {
         if (_showing)
@@ -394,7 +454,13 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
 
         Error = null;
         DateTimeOffset? start = null, end = null;
-        if (IsScheduled && CanSchedule)
+        if (IsSeries && !Features.HasFlag(AutoReplyFeatures.Weekly) && !CanSchedule)
+        {
+            Error = T("Dieser Mailserver kann die Abwesenheitsnotiz nicht nur an bestimmten Tagen senden.");
+            return;
+        }
+
+        if (!IsSeries && IsScheduled && CanSchedule)
         {
             if (FirstDay is not { } first || LastDay is not { } last || last.Date < first.Date)
             {
@@ -409,7 +475,8 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
         var previous = Reply;
         try
         {
-            var reply = new AutoReply(IsEnabled, AutoReplyText.ForServer(Template, IsEnabled, start, end), start, end, Features.HasFlag(AutoReplyFeatures.Subject) ? _subject : null);
+            var reply = new AutoReply(IsEnabled, AutoReplyText.ForServer(Template, IsEnabled, start, end), start, end, Features.HasFlag(AutoReplyFeatures.Subject) ? _subject : null,
+                IsSeries ? SeriesDays : null);
             IsBusy = true;
             await Task.Run(() => mail.SetAutoReplyAsync(Account, Connection, reply));
             await AutoReplyText.RememberAsync(settings, Connection.Id, Template);

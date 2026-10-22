@@ -134,19 +134,76 @@ public sealed class MailController(
 
     /// <summary>The account's out-of-office reply as its server has it, and what the server can do.</summary>
     /// <exception cref="AutoReplyUnavailableException">Not offered by this account's server (the message says why).</exception>
+    /// <remarks>
+    /// A series on a server without weekdays (see <see cref="AutoReplySeries"/>): returned as the series, and its next
+    /// period set on the server once the last one has passed – this is where Neruna renews it.
+    /// </remarks>
     public async Task<(AutoReply Reply, AutoReplyFeatures Features)> GetAutoReplyAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(connection);
         await using var provider = providers.CreateMail(connection);
-        return provider is IAutoReplyProvider replies
-            ? await replies.GetAutoReplyAsync(cancellationToken)
-            : throw new AutoReplyUnavailableException(T("Für dieses Konto kann Neruna keine Abwesenheitsnotiz einrichten."));
+        if (provider is not IAutoReplyProvider replies)
+        {
+            throw new AutoReplyUnavailableException(T("Für dieses Konto kann Neruna keine Abwesenheitsnotiz einrichten."));
+        }
+
+        var (reply, features) = await replies.GetAutoReplyAsync(cancellationToken);
+        if (features.HasFlag(AutoReplyFeatures.Weekly) || settings is null
+            || await AutoReplySeries.GetAsync(settings, connection.Id, cancellationToken) is not { } days)
+        {
+            return (reply, features);
+        }
+
+        // Switched off or set to something else elsewhere (webmail, another program): the series is over.
+        if (!reply.IsEnabled || !reply.IsScheduled || !IsSeriesPeriod(reply, days))
+        {
+            await AutoReplySeries.SetAsync(settings, connection.Id, null, cancellationToken);
+            return (reply, features);
+        }
+
+        var now = DateTimeOffset.Now;
+        if (reply.End <= now && await accounts.GetAccountsAsync(cancellationToken) is var all
+            && all.FirstOrDefault(a => a.Connections.Any(c => c.Id == connection.Id)) is { } account)
+        {
+            var (start, end) = AutoReplySeries.NextPeriod(days, now);
+            reply = reply with { Start = start, End = end };
+            await replies.SetAutoReplyAsync(reply, OwnAddresses(account), cancellationToken);
+            logger.LogInformation("Out-of-office series of {Account} renewed for {Start:d}", account.Title, start);
+        }
+
+        return (reply with { Weekdays = days }, features);
     }
 
+    // A period that the series set: whole local days, all of them days of the series.
+    private static bool IsSeriesPeriod(AutoReply reply, IReadOnlyList<DayOfWeek> days)
+    {
+        var first = reply.Start!.Value.ToLocalTime();
+        var end = reply.End!.Value.ToLocalTime();
+        if (first.TimeOfDay != TimeSpan.Zero || end.TimeOfDay != TimeSpan.Zero || end <= first)
+        {
+            return false;
+        }
+
+        for (var day = first.Date; day < end.Date; day = day.AddDays(1))
+        {
+            if (!days.Contains(day.DayOfWeek))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string[] OwnAddresses(Account account) => [.. account.Identities.Select(i => i.Email).Distinct(StringComparer.OrdinalIgnoreCase)];
+
     /// <summary>Stores the out-of-office reply on the server; mail to any of the account's addresses is answered.</summary>
+    /// <remarks>A series where the server has no weekdays: its next period goes to the server, the days stay here.</remarks>
     /// <exception cref="AutoReplyUnavailableException">Not offered by this account's server (the message says why).</exception>
     public async Task SetAutoReplyAsync(Account account, ServiceConnection connection, AutoReply reply, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(account);
+        ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(reply);
         await using var provider = providers.CreateMail(connection);
         if (provider is not IAutoReplyProvider replies)
@@ -154,7 +211,28 @@ public sealed class MailController(
             throw new AutoReplyUnavailableException(T("Für dieses Konto kann Neruna keine Abwesenheitsnotiz einrichten."));
         }
 
-        await replies.SetAutoReplyAsync(reply, [.. account.Identities.Select(i => i.Email).Distinct(StringComparer.OrdinalIgnoreCase)], cancellationToken);
+        if (reply.IsRecurring && reply.IsEnabled)
+        {
+            var (_, features) = await replies.GetAutoReplyAsync(cancellationToken);
+            if (!features.HasFlag(AutoReplyFeatures.Weekly))
+            {
+                if (!features.HasFlag(AutoReplyFeatures.Schedule) || settings is null)
+                {
+                    throw new AutoReplyUnavailableException(T("Dieser Mailserver kann die Abwesenheitsnotiz nicht nur an bestimmten Tagen senden."));
+                }
+
+                var (start, end) = AutoReplySeries.NextPeriod(reply.Weekdays!, DateTimeOffset.Now);
+                await replies.SetAutoReplyAsync(reply with { Start = start, End = end, Weekdays = null }, OwnAddresses(account), cancellationToken);
+                await AutoReplySeries.SetAsync(settings, connection.Id, reply.Weekdays, cancellationToken);
+                return;
+            }
+        }
+
+        await replies.SetAutoReplyAsync(reply, OwnAddresses(account), cancellationToken);
+        if (settings is not null)
+        {
+            await AutoReplySeries.SetAsync(settings, connection.Id, null, cancellationToken);
+        }
     }
 
     /// <summary>The account's server rules for incoming mail ("Serverregeln").</summary>

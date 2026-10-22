@@ -109,7 +109,17 @@ public static partial class AutoReplyText
 }
 
 /// <summary>A named out-of-office text, e.g. "Ferien" or "Bei Kunden"; may use {{start}} and {{end}}.</summary>
+/// <param name="Weekdays">A series template ("Freitags"): sent only on these days of every week; null for an ordinary one.</param>
 public sealed record AutoReplyTemplate(
     [property: System.Text.Json.Serialization.JsonPropertyName("name")] string Name,
     [property: System.Text.Json.Serialization.JsonPropertyName("text")] string Text,
-    [property: System.Text.Json.Serialization.JsonPropertyName("subject")] string? Subject = null);
+    [property: System.Text.Json.Serialization.JsonPropertyName("subject")] string? Subject = null,
+    [property: System.Text.Json.Serialization.JsonPropertyName("weekdays")] IReadOnlyList<DayOfWeek>? Weekdays = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsSeries => Weekdays is { Count: > 0 };
+
+    /// <summary>In the choice: the name, for a series with its days ("Freitags · Jeden Freitag").</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Label => IsSeries ? Name + " · " + AutoReplySeries.Describe(Weekdays!) : Name;
+}

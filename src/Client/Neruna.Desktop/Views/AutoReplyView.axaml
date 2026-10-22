@@ -18,7 +18,29 @@
       <ToggleSwitch IsChecked="{Binding IsEnabled}" OnContent="{l:T 'Automatische Antworten senden'}" OffContent="{l:T 'Automatische Antworten senden'}" />
 
       <StackPanel Spacing="6" IsEnabled="{Binding IsEnabled}">
-        <StackPanel IsVisible="{Binding CanSchedule}" Spacing="6">
+        <!-- Series: every week on certain days (e.g. every Friday, all day) instead of a period -->
+        <StackPanel IsVisible="{Binding CanSeries}" Spacing="6">
+          <CheckBox Content="{l:T 'Serie: jede Woche an bestimmten Tagen'}" IsChecked="{Binding IsSeries}" />
+          <StackPanel IsVisible="{Binding IsSeries}" Spacing="6" Margin="28,0,0,0">
+            <ItemsControl ItemsSource="{Binding Weekdays}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="4" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:WeekdayChoice">
+                  <ToggleButton Content="{Binding Label}" IsChecked="{Binding IsChecked}" MinWidth="44" ToolTip.Tip="{Binding Name}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Die Notiz wird an diesen Tagen von 0 bis 24 Uhr gesendet.'}" />
+            <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding IsSeriesRenewed}"
+                       Text="{l:T 'Dieser Server kennt keine Serien: Neruna trägt jeweils den nächsten Tag ein. Die automatische Neuplanung findet nur statt, wenn Neruna nach dem Serientermin mindestens einmal gestartet wird.'}" />
+          </StackPanel>
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding ShowsPeriod}" Spacing="6">
           <CheckBox Content="{l:T 'Nur in diesem Zeitraum'}" IsChecked="{Binding IsScheduled}" />
           <Grid ColumnDefinitions="Auto,*,16,Auto,*" IsEnabled="{Binding IsScheduled}" Margin="28,0,0,0">
             <TextBlock Text="{l:T 'Vom'}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -33,7 +55,7 @@
           <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}" HorizontalAlignment="Stretch" PlaceholderText="{l:T 'eigener Text'}">
             <ComboBox.ItemTemplate>
               <DataTemplate x:DataType="core:AutoReplyTemplate">
-                <TextBlock Text="{Binding Name}" />
+                <TextBlock Text="{Binding Label}" />
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>

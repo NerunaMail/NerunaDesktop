@@ -16,6 +16,13 @@ internal sealed class FakeMailServer
     /// <summary>Added to what the fake provider can do (e.g. LocalContent, as an Outlook data file).</summary>
     public MailProviderCapabilities ExtraCapabilities { get; set; }
 
+    /// <summary>The out-of-office reply as the server has it, and what the server can do with it (like Exchange: a period, no weekdays).</summary>
+    public AutoReply AutoReply { get; set; } = AutoReply.Off;
+
+    public AutoReplyFeatures AutoReplyFeatures { get; set; } = AutoReplyFeatures.Schedule;
+
+    public int AutoReplyWrites { get; set; }
+
     /// <summary>Changing it simulates an IMAP UIDVALIDITY reset.</summary>
     public int Validity { get; set; } = 1;
 
@@ -100,8 +107,18 @@ internal sealed class FakeMailProviderFactory(FakeMailServer server) : IProvider
     public IMailProvider Create(ServiceConnection connection) => new FakeMailProvider(connection.Id, server);
 }
 
-internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server) : IMailProvider
+internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server) : IMailProvider, IAutoReplyProvider
 {
+    public Task<(AutoReply Reply, AutoReplyFeatures Features)> GetAutoReplyAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult((server.AutoReply, server.AutoReplyFeatures));
+
+    public Task SetAutoReplyAsync(AutoReply reply, IReadOnlyList<string> ownAddresses, CancellationToken cancellationToken = default)
+    {
+        server.AutoReply = reply;
+        server.AutoReplyWrites++;
+        return Task.CompletedTask;
+    }
+
     public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags | MailProviderCapabilities.Send | MailProviderCapabilities.Append | MailProviderCapabilities.ServerSearch | MailProviderCapabilities.SearchText | server.ExtraCapabilities;
 
     // The text only, as IMAP gives it for the index: no download counted.

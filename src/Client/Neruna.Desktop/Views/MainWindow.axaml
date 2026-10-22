@@ -66,7 +66,13 @@
                               </StackPanel>
                               <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" IsEnabled="{Binding CanChange}" VerticalAlignment="Center" />
                             </Grid>
-                            <StackPanel IsVisible="{Binding CanSchedule}" IsEnabled="{Binding CanChange}" Spacing="4">
+                            <!-- A series template: the rule instead of the period -->
+                            <StackPanel IsVisible="{Binding IsSeries}" Spacing="2">
+                              <TextBlock Text="{Binding SeriesText}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                              <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding IsSeriesRenewed}"
+                                         Text="{l:T 'Die automatische Neuplanung findet nur statt, wenn Neruna nach dem Serientermin mindestens einmal gestartet wird.'}" />
+                            </StackPanel>
+                            <StackPanel IsVisible="{Binding ShowsPeriod}" IsEnabled="{Binding CanChange}" Spacing="4">
                               <CheckBox Content="{l:T 'Nur in diesem Zeitraum'}" IsChecked="{Binding IsScheduled}" FontSize="12" />
                               <Grid ColumnDefinitions="*,8,Auto,8,*" IsEnabled="{Binding IsScheduled}">
                                 <CalendarDatePicker SelectedDate="{Binding FirstDay}" HorizontalAlignment="Stretch" />
@@ -80,7 +86,7 @@
                                         PlaceholderText="{l:T 'eigener Text'}" FontSize="12">
                                 <ComboBox.ItemTemplate>
                                   <DataTemplate x:DataType="core:AutoReplyTemplate">
-                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Text="{Binding Label}" />
                                   </DataTemplate>
                                 </ComboBox.ItemTemplate>
                               </ComboBox>

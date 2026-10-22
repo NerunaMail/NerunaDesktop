@@ -30,8 +30,15 @@ public sealed partial class ImapMailProvider
     {
         ArgumentNullException.ThrowIfNull(reply);
         await using var sieve = await OpenSieveAsync(cancellationToken);
-        var withDates = FeaturesOf(sieve).HasFlag(AutoReplyFeatures.Schedule);
-        if (reply.IsEnabled && reply.IsScheduled && !withDates)
+        var features = FeaturesOf(sieve);
+        var withDates = features.HasFlag(AutoReplyFeatures.Schedule);
+        var withWeekdays = features.HasFlag(AutoReplyFeatures.Weekly);
+        if (reply.IsEnabled && reply.IsRecurring && !withWeekdays)
+        {
+            throw new AutoReplyUnavailableException(T("Dieser Mailserver kann die Abwesenheitsnotiz nicht nur an bestimmten Tagen senden."));
+        }
+
+        if (reply.IsEnabled && !reply.IsRecurring && reply.IsScheduled && !withDates)
         {
             throw new AutoReplyUnavailableException(T("Dieser Server kann die Abwesenheitsnotiz nicht auf einen Zeitraum beschränken. Bitte ohne Zeitraum einschalten und danach wieder ausschalten."));
         }
@@ -41,7 +48,7 @@ public sealed partial class ImapMailProvider
         try
         {
             // Into the active script (the user's filters stay), or a new one of our own.
-            await sieve.PutScriptAsync(active ?? OwnScript, SieveVacation.Write(script, reply, ownAddresses, withDates), cancellationToken);
+            await sieve.PutScriptAsync(active ?? OwnScript, SieveVacation.Write(script, reply, ownAddresses, withDates, withWeekdays), cancellationToken);
             if (active is null)
             {
                 await sieve.SetActiveAsync(OwnScript, cancellationToken);
@@ -55,7 +62,8 @@ public sealed partial class ImapMailProvider
 
     private static AutoReplyFeatures FeaturesOf(ManageSieveClient sieve) =>
         AutoReplyFeatures.Subject
-        | (sieve.Extensions.Contains("date") && sieve.Extensions.Contains("relational") ? AutoReplyFeatures.Schedule : AutoReplyFeatures.None);
+        | (sieve.Extensions.Contains("date") && sieve.Extensions.Contains("relational") ? AutoReplyFeatures.Schedule : AutoReplyFeatures.None)
+        | (sieve.Extensions.Contains("date") ? AutoReplyFeatures.Weekly : AutoReplyFeatures.None);
 
     private Task<ManageSieveClient> OpenSieveAsync(CancellationToken cancellationToken) =>
         OpenSieveAsync(forRules: false, cancellationToken);

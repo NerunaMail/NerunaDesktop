@@ -22,7 +22,8 @@ internal static class SieveVacation
         [property: JsonPropertyName("message")] string Message,
         [property: JsonPropertyName("start")] string? Start,
         [property: JsonPropertyName("end")] string? End,
-        [property: JsonPropertyName("subject")] string? Subject);
+        [property: JsonPropertyName("subject")] string? Subject,
+        [property: JsonPropertyName("weekdays")] int[]? Weekdays = null);
 
     /// <summary>What Neruna wrote into the script; off when there is no block.</summary>
     public static AutoReply Read(string? script)
@@ -36,7 +37,9 @@ internal static class SieveVacation
                     var stored = JsonSerializer.Deserialize<Stored>(line[Begin.Length..].Trim());
                     if (stored is not null)
                     {
-                        return new AutoReply(stored.Enabled, stored.Message, DateOf(stored.Start), DateOf(stored.End), stored.Subject);
+                        var weekdays = stored.Weekdays?.Where(d => d is >= 0 and <= 6).Select(d => (DayOfWeek)d).Distinct().ToList();
+                        return new AutoReply(stored.Enabled, stored.Message, DateOf(stored.Start), DateOf(stored.End), stored.Subject,
+                            weekdays is { Count: > 0 } ? weekdays : null);
                     }
                 }
                 catch (JsonException)
@@ -52,18 +55,20 @@ internal static class SieveVacation
     /// <summary>The script with Neruna's block for <paramref name="reply"/> (or without one, if there was no script and it is off).</summary>
     /// <param name="addresses">Mail to these addresses is answered (the account and its aliases).</param>
     /// <param name="withDates">The server has the "date" and "relational" extensions (needed for a period).</param>
-    public static string Write(string? script, AutoReply reply, IReadOnlyList<string> addresses, bool withDates)
+    /// <param name="withWeekdays">The server has the "date" extension (needed for a series).</param>
+    public static string Write(string? script, AutoReply reply, IReadOnlyList<string> addresses, bool withDates, bool withWeekdays = false)
     {
         ArgumentNullException.ThrowIfNull(reply);
         ArgumentNullException.ThrowIfNull(addresses);
-        if (reply.IsEnabled && reply.IsScheduled && !withDates)
+        if (reply.IsEnabled && reply.IsRecurring ? !withWeekdays : reply.IsEnabled && reply.IsScheduled && !withDates)
         {
-            throw new ArgumentException("A period needs the Sieve extensions \"date\" and \"relational\".", nameof(reply));
+            throw new ArgumentException("A period needs the Sieve extensions \"date\" and \"relational\", a series \"date\".", nameof(reply));
         }
 
         var rest = Remove(script ?? string.Empty);
         var block = new StringBuilder();
-        var stored = new Stored(reply.IsEnabled, reply.Message, DateText(reply.Start), DateText(reply.End), reply.Subject);
+        var stored = new Stored(reply.IsEnabled, reply.Message, reply.IsRecurring ? null : DateText(reply.Start), reply.IsRecurring ? null : DateText(reply.End), reply.Subject,
+            reply.IsRecurring ? [.. reply.Weekdays!.Select(d => (int)d).Order()] : null);
         block.Append(Begin).Append(' ').Append(JsonSerializer.Serialize(stored)).Append("\r\n");
         if (reply.IsEnabled)
         {
@@ -79,7 +84,15 @@ internal static class SieveVacation
             }
 
             vacation.Append(' ').Append(Quote(reply.Message)).Append(';');
-            if (reply.IsScheduled)
+            if (reply.IsRecurring)
+            {
+                // Every week on these days, in the user's time zone as it is now ("weekday": 0 = Sunday … 6 = Saturday).
+                var zone = Zone(TimeZoneInfo.Local.GetUtcOffset(DateTime.Now));
+                var days = string.Join(", ", reply.Weekdays!.Select(d => (int)d).Order().Select(d => Quote(d.ToString(CultureInfo.InvariantCulture))));
+                block.Append(CultureInfo.InvariantCulture, $"if currentdate :zone \"{zone}\" :is \"weekday\" [{days}] {{\r\n")
+                    .Append("  ").Append(vacation).Append("\r\n}\r\n");
+            }
+            else if (reply.IsScheduled)
             {
                 // Days in the user's time zone; the end is exclusive (the first day back).
                 var zone = Zone(reply.Start!.Value.Offset);
@@ -100,7 +113,8 @@ internal static class SieveVacation
         var result = new StringBuilder();
         if (reply.IsEnabled)
         {
-            var extensions = reply.IsScheduled ? "\"vacation\", \"date\", \"relational\"" : "\"vacation\"";
+            var extensions = reply.IsRecurring ? "\"vacation\", \"date\""
+                : reply.IsScheduled ? "\"vacation\", \"date\", \"relational\"" : "\"vacation\"";
             result.Append("require [").Append(extensions).Append("]; ").Append(RequireTag).Append("\r\n");
         }
 

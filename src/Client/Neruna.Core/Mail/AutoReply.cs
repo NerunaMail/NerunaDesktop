@@ -6,14 +6,21 @@ namespace Neruna.Core.Mail;
 /// </summary>
 /// <param name="Start">With <paramref name="End"/>: only answered in this period (dates, the provider rounds to days if it must).</param>
 /// <param name="Subject">Subject of the reply; null for the server's default ("Abwesend: …").</param>
-public sealed record AutoReply(bool IsEnabled, string Message, DateTimeOffset? Start = null, DateTimeOffset? End = null, string? Subject = null)
+/// <param name="Weekdays">A series: answered only on these days of every week (e.g. every Friday, all day). A server
+/// that cannot do it itself gets the next of these days as its period, renewed by Neruna (see <see cref="AutoReplySeries"/>).</param>
+public sealed record AutoReply(bool IsEnabled, string Message, DateTimeOffset? Start = null, DateTimeOffset? End = null, string? Subject = null,
+    IReadOnlyList<DayOfWeek>? Weekdays = null)
 {
     public static AutoReply Off { get; } = new(false, string.Empty);
 
     public bool IsScheduled => Start is not null && End is not null;
 
-    /// <summary>Switched on and – if scheduled – the period has not ended yet.</summary>
-    public bool IsActive(DateTimeOffset now) => IsEnabled && (!IsScheduled || End > now);
+    public bool IsRecurring => Weekdays is { Count: > 0 };
+
+    /// <summary>Switched on and – in a series – today is one of its days, or – scheduled – the period has not ended yet.</summary>
+    public bool IsActive(DateTimeOffset now) => IsEnabled && (IsRecurring
+        ? Weekdays!.Contains(now.ToLocalTime().DayOfWeek)
+        : !IsScheduled || End > now);
 }
 
 /// <summary>What the account's server can do beyond on/off and a message.</summary>
@@ -27,6 +34,10 @@ public enum AutoReplyFeatures
 
     /// <summary>An own subject for the reply (Sieve).</summary>
     Subject = 2,
+
+    /// <summary>Answers on certain weekdays by itself (Sieve with the "date" extension); otherwise a series needs Neruna
+    /// to set the next of its days as the period again and again.</summary>
+    Weekly = 4,
 }
 
 /// <summary>A mail provider whose server can answer while the user is away (Graph, IMAP via ManageSieve).</summary>
