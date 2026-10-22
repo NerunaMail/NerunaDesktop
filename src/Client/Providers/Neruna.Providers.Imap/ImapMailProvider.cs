@@ -126,6 +126,29 @@ public sealed partial class ImapMailProvider(
             }
         }
 
+        // One special folder per kind: a mailbox used by several programs has "Drafts" and "DRAFTS", "Sent" and "Sent
+        // Items" … Each would be shown as "Entwürfe" or "Gesendete Elemente", and drafts and sent mail went to whichever
+        // came first. The others are ordinary folders under their own names (and can be deleted).
+        var counts = new Dictionary<IMailFolder, int>();
+        foreach (var group in all.Where(f => f.Role != FolderRole.None && !IsMarked(f.Folder, f.Role)).GroupBy(f => f.Role).Where(g => g.Count() > 1 && !all.Any(a => a.Role == g.Key && IsMarked(a.Folder, a.Role))))
+        {
+            foreach (var (folder, _) in group)
+            {
+                try
+                {
+                    await folder.StatusAsync(StatusItems.Count, cancellationToken);
+                    counts[folder] = folder.Count;
+                }
+                catch (ImapCommandException)
+                {
+                    counts[folder] = 0;
+                }
+            }
+        }
+
+        var roles = UniqueRoles([.. all.Select(f => new RoleCandidate(f.Role, IsMarked(f.Folder, f.Role), counts.GetValueOrDefault(f.Folder)))]);
+        all = [.. all.Select((f, i) => (f.Folder, roles[i]))];
+
         var everything = subscribed.Count == 0;
         return [.. all.Select(f =>
         {
@@ -717,6 +740,39 @@ public sealed partial class ImapMailProvider(
         var a when a.HasFlag(FolderAttributes.Archive) => FolderRole.Archive,
         _ => RoleOfName(folder.ParentFolder is { FullName.Length: > 0 } ? null : folder.Name),
     };
+
+    // Marked by the server (SPECIAL-USE, RFC 6154) – not just recognised by its name.
+    private static bool IsMarked(IMailFolder folder, FolderRole role) => role switch
+    {
+        FolderRole.Inbox => true,
+        FolderRole.Sent => folder.Attributes.HasFlag(FolderAttributes.Sent),
+        FolderRole.Drafts => folder.Attributes.HasFlag(FolderAttributes.Drafts),
+        FolderRole.Trash => folder.Attributes.HasFlag(FolderAttributes.Trash),
+        FolderRole.Junk => folder.Attributes.HasFlag(FolderAttributes.Junk),
+        FolderRole.Archive => folder.Attributes.HasFlag(FolderAttributes.Archive),
+        _ => false,
+    };
+
+    internal readonly record struct RoleCandidate(FolderRole Role, bool Marked, int Count);
+
+    /// <summary>
+    /// The role of each folder with only one folder per role: the one the server marks; else of those recognised by
+    /// name the one with the most mail (the one the other programs use), the first on a tie. The rest: no role.
+    /// </summary>
+    internal static IReadOnlyList<FolderRole> UniqueRoles(IReadOnlyList<RoleCandidate> folders)
+    {
+        var result = folders.Select(f => f.Role).ToArray();
+        foreach (var group in folders.Select((f, i) => (Folder: f, Index: i)).Where(f => f.Folder.Role != FolderRole.None).GroupBy(f => f.Folder.Role))
+        {
+            var keep = group.OrderByDescending(f => f.Folder.Marked).ThenByDescending(f => f.Folder.Count).ThenBy(f => f.Index).First().Index;
+            foreach (var (_, index) in group.Where(f => f.Index != keep))
+            {
+                result[index] = FolderRole.None;
+            }
+        }
+
+        return result;
+    }
 
     // Servers without SPECIAL-USE (RFC 6154): recognise the usual top-level names.
     internal static FolderRole RoleOfName(string? name) => name?.ToLowerInvariant() switch
