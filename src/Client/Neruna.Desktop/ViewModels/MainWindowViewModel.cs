@@ -237,7 +237,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private void WireContacts()
     {
-        ContactsPage.EditorRequested += (_, editor) => ShowEditor(editor, ContactsPage.ReloadAsync);
+        ContactsPage.EditorRequested += (_, editor) => ShowEditor(editor, async () =>
+        {
+            await ContactsPage.ReloadAsync();
+            MailPage.ContactsChanged(); // a sender just saved as a contact loses its "+"
+        });
+        MailPage.AddContactRequested += (_, sender) => ContactsPage.NewContactFrom(sender);
         ContactsPage.ManageRequested += (_, _) => ShowAddressBookSelection();
         ContactsPage.MailRequested += async (_, recipients) =>
         {
@@ -335,6 +340,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             Overlay = dialog;
             await dialog.StartAsync();
         };
+        accountsPage.ColorsChanged += async (_, _) => await MailPage.Tree.UpdateColorsAsync();
         accountsPage.AccountsChanged += async (_, _) =>
         {
             await RefreshPagesAsync();

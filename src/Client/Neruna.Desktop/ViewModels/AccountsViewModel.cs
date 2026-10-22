@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core;
@@ -15,7 +16,8 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
     Neruna.Core.Cloud.AccountTransferService transfer,
     Neruna.Core.Cloud.CloudController cloud,
     Neruna.Core.Mail.MailController mail,
-    Neruna.Core.Auth.IBrowserLauncher browser) : ViewModelBase
+    Neruna.Core.Auth.IBrowserLauncher browser,
+    Neruna.Core.ISettingsStore settings) : ViewModelBase
 {
     /// <summary>Webmail, instructions or support of an account's provider, in the browser.</summary>
     [RelayCommand]
@@ -55,6 +57,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
     /// <summary>"Abwesenheit" on an account with mail.</summary>
     public event EventHandler<Neruna.Core.Accounts.Account>? AutoReplyRequested;
+
+    /// <summary>An account got another color: the folder list takes it.</summary>
+    public event EventHandler? ColorsChanged;
 
     /// <summary>Raised after an account was removed, so the other pages reload.</summary>
     public event EventHandler? AccountsChanged;
@@ -98,6 +103,12 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
             }
 
             item.SetOffline(await mail.GetOfflinePeriodAsync(account.Id), period => _ = mail.SetOfflinePeriodAsync(account.Id, period));
+            var accountId = account.Id;
+            item.SetColor(await AccountColors.GetAsync(settings, accountId), async color =>
+            {
+                await AccountColors.SetAsync(settings, accountId, color);
+                ColorsChanged?.Invoke(this, EventArgs.Empty);
+            });
             Items.Add(item);
         }
 
@@ -235,6 +246,35 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     /// <summary>On the card: "Offline: 3 Monate" – the choice, without opening the menu.</summary>
     [ObservableProperty]
     public partial string? OfflineText { get; set; }
+
+    /// <summary>"⋯ → Farbe in der Ordnerliste": none or one of <see cref="AccountColors.Choices"/>.</summary>
+    public IReadOnlyList<AccountColorChoice> ColorChoices { get; private set; } = [];
+
+    /// <summary>The chosen color as a strip on the card (transparent without one).</summary>
+    [ObservableProperty]
+    public partial IBrush ColorStrip { get; set; } = Brushes.Transparent;
+
+    internal void SetColor(string? color, Func<string?, Task> save)
+    {
+        var choices = new[] { (string?)null }.Concat(AccountColors.Choices).Select(c => new AccountColorChoice(c) { IsChecked = c == color }).ToList();
+        foreach (var choice in choices)
+        {
+            choice.Chosen = () =>
+            {
+                foreach (var other in choices)
+                {
+                    other.IsChecked = other == choice;
+                }
+
+                ColorStrip = choice.Swatch;
+                _ = save(choice.Color);
+            };
+        }
+
+        ColorStrip = choices.First(c => c.IsChecked is true || c.Color == color).Swatch;
+        ColorChoices = choices;
+        OnPropertyChanged(nameof(ColorChoices));
+    }
 
     internal void SetOffline(Neruna.Core.Mail.OfflinePeriod period, Action<Neruna.Core.Mail.OfflinePeriod> save)
     {

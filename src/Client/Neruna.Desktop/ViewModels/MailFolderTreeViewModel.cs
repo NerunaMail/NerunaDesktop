@@ -102,7 +102,11 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
             foreach (var connection in account.ConnectionsOf(ServiceKind.Mail))
             {
                 var folders = workspaces.Current.FoldersOf(account.Id, await mail.GetFoldersAsync(connection.Id));
-                var node = new MailAccountNode(account, connection, BuildTree(folders)) { IsSettingUp = _settingUp.Contains(connection.Id) };
+                var node = new MailAccountNode(account, connection, BuildTree(folders))
+                {
+                    IsSettingUp = _settingUp.Contains(connection.Id),
+                    Tint = AccountColors.Tint(await AccountColors.GetAsync(settings, account.Id)),
+                };
                 TrackExpansion(node, node.ExpansionKey);
                 foreach (var folder in node.AllFolders())
                 {
@@ -119,6 +123,15 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
 
     /// <summary>After a sync: the unread counts, if no folder came or went.</summary>
     /// <returns>False when folders or accounts changed – then the tree has to be loaded again.</returns>
+    /// <summary>The account colors were changed in the settings: applied to the tree as it is.</summary>
+    public async Task UpdateColorsAsync()
+    {
+        foreach (var node in Accounts)
+        {
+            node.Tint = AccountColors.Tint(await AccountColors.GetAsync(settings, node.Account.Id));
+        }
+    }
+
     public async Task<bool> UpdateCountsAsync()
     {
         var structure = new List<(MailAccountNode? Node, IReadOnlyList<MailFolder> Folders)>();

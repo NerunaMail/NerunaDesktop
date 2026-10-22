@@ -7,6 +7,7 @@ using MimeKit;
 using Neruna.Core;
 using Neruna.Core.Accounts;
 using Neruna.Core.Calendar;
+using Neruna.Core.Contacts;
 using Neruna.Core.Mail;
 using Neruna.Core.Privacy;
 using Neruna.Core.Security;
@@ -39,6 +40,7 @@ internal sealed partial class MailViewModel(
     Neruna.Core.Workspaces.WorkspaceService workspaces,
     Neruna.Core.Meetings.MeetingController meetings,
     PdfProtectionService pdfSecurity,
+    AddressCollector addressCollector,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
@@ -701,7 +703,7 @@ internal sealed partial class MailViewModel(
                 CanDelete = false,
             };
             void Show(MessageView view) =>
-                window.Pane = ReadingPaneViewModel.ForMessage(summary, opened, view, files, _imageClient, Show, privacy.TrustAsync, privacy.HideSpamNoteAsync);
+                window.Pane = OfferContact(ReadingPaneViewModel.ForMessage(summary, opened, view, files, _imageClient, Show, privacy.TrustAsync, privacy.HideSpamNoteAsync));
             Show(await ViewForAsync(summary, opened, loadedBefore: false));
             windows.ShowMessage(window);
         }
@@ -870,6 +872,54 @@ internal sealed partial class MailViewModel(
         }
     }
 
+    /// <summary>A contact was saved or changed: completion and the sender check read the address books again.</summary>
+    public void ContactsChanged() => recipients.Forget();
+
+    /// <summary>"+" beside a sender that is no contact yet: the contact editor opens with name and address.</summary>
+    public event EventHandler<MailAddress>? AddContactRequested;
+
+    // The "+" beside the sender shows when the sender is in no address book and is no own address.
+    private ReadingPaneViewModel OfferContact(ReadingPaneViewModel pane)
+    {
+        if (pane.Sender is { } sender && !Accounts.Any(a => a.Account.Owns(sender.Address)))
+        {
+            pane.AddSender = () => AddContactRequested?.Invoke(this, sender);
+            _ = CheckSenderAsync(pane, sender.Address);
+        }
+
+        return pane;
+    }
+
+    private async Task CheckSenderAsync(ReadingPaneViewModel pane, string address)
+    {
+        try
+        {
+            pane.CanAddSender = await recipients.FindContactAsync(address) is null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Contacts not readable for the sender check");
+        }
+    }
+
+    // Recipients without a contact go to "Verwendete Adressen": suggested when typing next time.
+    private async Task CollectAddressesAsync(MimeMessage message)
+    {
+        try
+        {
+            var addresses = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes)
+                .Select(m => new MailAddress(m.Name, m.Address)).ToList();
+            if (await Task.Run(() => addressCollector.CollectAsync(addresses)) > 0)
+            {
+                recipients.Forget();
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Recipients not kept in \"Verwendete Adressen\"");
+        }
+    }
+
     private ComposeViewModel CreateCompose(Account account, ServiceConnection connection, ComposeDraft draft, ComposeKind kind, bool encrypt, bool inWindow)
     {
         var compose = new ComposeViewModel(mail, account, connection, draft, files, secureMime, settings, signatures, kind, encrypt, inWindow,
@@ -882,6 +932,7 @@ internal sealed partial class MailViewModel(
             PdfSecurity = pdfSecurity,
         };
         compose.Ai = new ComposeAiViewModel(ai, compose);
+        compose.Sent += (_, message) => _ = CollectAddressesAsync(message);
         compose.Closed += async (_, sent) =>
         {
             if (Compose == compose)
@@ -986,7 +1037,7 @@ internal sealed partial class MailViewModel(
             async Task ShowAsync(MessageView view)
             {
                 var shown = view;
-                var pane = window.Pane = ReadingPaneViewModel.ForMessage(message.Summary, opened, view, files, _imageClient, next =>
+                var pane = window.Pane = OfferContact(ReadingPaneViewModel.ForMessage(message.Summary, opened, view, files, _imageClient, next =>
                 {
                     if (next.AllowRemoteContent && !shown.AllowRemoteContent)
                     {
@@ -994,7 +1045,7 @@ internal sealed partial class MailViewModel(
                     }
 
                     _ = ShowAsync(next);
-                }, privacy.TrustAsync, privacy.HideSpamNoteAsync);
+                }, privacy.TrustAsync, privacy.HideSpamNoteAsync));
                 // The quick actions and the PDF stamps work here, for this mail (replies in their own window too).
                 var context = new QuickActionContext(pane, message, folder, InWindow: true, opened.Security.WasEncrypted, () => window.Pane == pane);
                 pane.AttachmentActions = AttachmentActionsFor(context);
@@ -1749,7 +1800,7 @@ internal sealed partial class MailViewModel(
             return;
         }
 
-        ReadingPane = ReadingPaneViewModel.ForMessage(summary, opened, view, files, _imageClient, next =>
+        ReadingPane = OfferContact(ReadingPaneViewModel.ForMessage(summary, opened, view, files, _imageClient, next =>
         {
             if (next.AllowRemoteContent && !view.AllowRemoteContent)
             {
@@ -1757,7 +1808,7 @@ internal sealed partial class MailViewModel(
             }
 
             ShowOpened(summary, next);
-        }, privacy.TrustAsync, privacy.HideSpamNoteAsync);
+        }, privacy.TrustAsync, privacy.HideSpamNoteAsync));
         if (view.Assessment is { } assessment && Neruna.Core.Privacy.PrivacyStatistics.Current is { } statistics)
         {
             // Einstellungen → Datenschutz → Statistik: each mail once.
@@ -1912,6 +1963,21 @@ internal sealed partial class MailAccountNode : ObservableObject
 
     public string ExpansionKey => "account:" + Connection.Id.ToString("N");
 
+    /// <summary>The account's color as a light tint behind it and its folders (none: null).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccountTint))]
+    public partial Avalonia.Media.IBrush? Tint { get; set; }
+
+    public Avalonia.Media.IBrush? AccountTint => Tint;
+
+    partial void OnTintChanged(Avalonia.Media.IBrush? value)
+    {
+        foreach (var folder in AllFolders())
+        {
+            folder.TintChanged();
+        }
+    }
+
     /// <summary>Just added, first sync still running.</summary>
     [ObservableProperty]
     public partial bool IsSettingUp { get; set; }
@@ -1978,6 +2044,11 @@ internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObje
 
     /// <summary>Set by <see cref="MailAccountNode"/> when the tree is attached.</summary>
     public MailAccountNode Account { get; set; } = null!;
+
+    /// <summary>The account's color behind the folder (Einstellungen → Konten → ⋯ → Farbe in der Ordnerliste).</summary>
+    public Avalonia.Media.IBrush? AccountTint => Account?.Tint;
+
+    internal void TintChanged() => OnPropertyChanged(nameof(AccountTint));
 
     public MailFolder Folder { get; } = folder;
 

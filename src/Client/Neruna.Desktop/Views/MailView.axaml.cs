@@ -197,7 +197,15 @@ internal sealed partial class MailView : UserControl
         foreach (var tree in new[] { this.FindControl<TreeView>("FolderTree")!, this.FindControl<TreeView>("FavoritesTree")! })
         {
             DragDrop.AddDragOverHandler(tree, OnTreeDragOver);
-            DragDrop.AddDragLeaveHandler(tree, (_, _) => Highlight(null));
+            DragDrop.AddDragLeaveHandler(tree, (_, e) =>
+            {
+                // DragLeave also comes when the pointer only moves from one part of a row to another (icon, name):
+                // the highlight goes only when the pointer has really left the tree.
+                if (!new Rect(tree.Bounds.Size).Contains(e.GetPosition(tree)))
+                {
+                    Highlight(null);
+                }
+            });
             DragDrop.AddDropHandler(tree, OnTreeDrop);
         }
     }

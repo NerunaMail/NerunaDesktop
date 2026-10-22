@@ -138,6 +138,40 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
 
+        // An account on its color in the folder list (Einstellungen → Konten → ⋯ → Farbe in der Ordnerliste).
+        var colorSettings = services.GetRequiredService<ISettingsStore>();
+        foreach (var node in vm.MailPage.Accounts)
+        {
+            await Neruna.Desktop.ViewModels.AccountColors.SetAsync(colorSettings, node.Account.Id, "#0B6A0B");
+        }
+
+        await vm.MailPage.Tree.UpdateColorsAsync();
+        // A second account below: the line between the accounts.
+        var accountStore = services.GetRequiredService<Neruna.Core.IAccountStore>();
+        var second = new Neruna.Core.Accounts.Account(Guid.NewGuid(), "Zweites Konto", "zweit@example.com",
+            [new Neruna.Core.Accounts.ServiceConnection(Guid.NewGuid(), Neruna.Core.Accounts.ServiceKind.Mail, "demo", new Dictionary<string, string>())]);
+        await accountStore.SaveAccountAsync(second);
+        await vm.MailPage.ReloadAsync();
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-account-color.png");
+        await accountStore.DeleteAccountAsync(second.Id);
+        await vm.MailPage.ReloadAsync();
+        foreach (var node in vm.MailPage.Accounts)
+        {
+            await Neruna.Desktop.ViewModels.AccountColors.SetAsync(colorSettings, node.Account.Id, null);
+        }
+
+        await vm.MailPage.Tree.UpdateColorsAsync();
+        Console.WriteLine($"Sender of the open mail can be saved as a contact: {vm.MailPage.ReadingPane?.CanAddSender}");
+
+        // A sender who is no contact: "+" beside the name saves them as one.
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First(m => m.Sender == "Swisscom");
+        await Task.Delay(800);
+        Console.WriteLine($"Swisscom can be saved as a contact: {vm.MailPage.ReadingPane?.CanAddSender}");
+        await SaveAsync(window, output, "mail-add-sender.png");
+        vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+        await Task.Delay(300);
+
         // The list as a table (one line per mail, in columns), sorted by sender; back to cards afterwards.
         vm.MailPage.ListLayout.IsTable = true;
         vm.MailPage.ListLayout.SetWidths(170, 115, 60);
