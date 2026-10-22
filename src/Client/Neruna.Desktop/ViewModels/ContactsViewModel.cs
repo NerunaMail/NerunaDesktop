@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Core;
 using Neruna.Core.Contacts;
+using Neruna.Core.Mail;
 using Neruna.Desktop.Infrastructure;
 using static Neruna.Core.Localization.Texts;
 
@@ -114,6 +115,15 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     private void NewContact() =>
         EditorRequested?.Invoke(this, new ContactEditorViewModel(contacts, files, Writable(), ContactDraft.Empty, null));
 
+    /// <summary>A new contact for someone a mail came from (the "+" beside the sender).</summary>
+    public void NewContactFrom(MailAddress address)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        var (given, family) = AddressCollector.SplitName(address.Name);
+        EditorRequested?.Invoke(this, new ContactEditorViewModel(contacts, files, Writable(),
+            ContactDraft.Empty with { GivenName = given, FamilyName = family, Emails = [new ContactField(address.Address)] }, null));
+    }
+
     [RelayCommand(CanExecute = nameof(HasAddressBooks))]
     private void NewGroup() =>
         EditorRequested?.Invoke(this, new GroupEditorViewModel(contacts, Writable(), _all, new GroupDraft(string.Empty, []), null));
@@ -152,7 +162,9 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     // A contact without an address (only a phone number) or an empty group: nothing to write to.
     private bool CanWriteMail() => Selected?.Entry.Card is { } card && (card.IsGroup ? card.Members.Count > 0 : card.EmailAddresses.Count > 0);
 
-    private List<AddressBookInfo> Writable() => AddressBooks.Select(b => b.Info).Where(b => !b.IsReadOnly).ToList();
+    // "Verwendete Adressen" last: a new contact belongs into a real address book.
+    private List<AddressBookInfo> Writable() =>
+        AddressBooks.Select(b => b.Info).Where(b => !b.IsReadOnly).OrderBy(b => b.RemoteId == AddressCollector.AddressBookId).ToList();
 
     private void Filter()
     {

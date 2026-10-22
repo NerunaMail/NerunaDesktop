@@ -38,7 +38,14 @@
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
-          <SelectableTextBlock Text="{Binding From}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <SelectableTextBlock Text="{Binding From}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <!-- The sender is in no address book: save as a contact in one click -->
+            <Button Classes="command" Padding="5,2" VerticalAlignment="Center" Command="{Binding AddSenderContactCommand}" IsVisible="{Binding CanAddSender}"
+                    ToolTip.Tip="{l:T 'Absender als Kontakt speichern'}">
+              <PathIcon Data="{StaticResource IconAccountAdd}" Width="15" Height="15" Margin="0" />
+            </Button>
+          </StackPanel>
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding To, Converter={x:Static l:Fmt.Instance}, ConverterParameter='An: {0}'}" TextTrimming="CharacterEllipsis" />
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding Cc, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding Date}" />

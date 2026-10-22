@@ -205,7 +205,32 @@ public sealed class ContactController(
             await DeleteContactAsync(existing!.Value.AddressBook, current.RemoteId, cancellationToken);
         }
 
+        // An address that is a real contact now leaves "Verwendete Adressen".
+        if (target.RemoteId != AddressCollector.AddressBookId)
+        {
+            await ForgetCollectedAsync(VCardReader.Read(data).EmailAddresses, cancellationToken);
+        }
+
         return saved;
+    }
+
+    private async Task ForgetCollectedAsync(IReadOnlyCollection<string> addresses, CancellationToken cancellationToken)
+    {
+        if (addresses.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var book in (await store.GetAddressBooksAsync(null, cancellationToken)).Where(b => b.RemoteId == AddressCollector.AddressBookId))
+        {
+            foreach (var contact in await store.GetContactsAsync(book.ConnectionId, book.RemoteId, cancellationToken))
+            {
+                if (VCardReader.Read(contact.VCardData).EmailAddresses.Any(a => addresses.Contains(a, StringComparer.OrdinalIgnoreCase)))
+                {
+                    await DeleteContactAsync(book, contact.RemoteId, cancellationToken);
+                }
+            }
+        }
     }
 
     /// <exception cref="RemoteConflictException">Someone changed the contact on the server; sync and retry.</exception>

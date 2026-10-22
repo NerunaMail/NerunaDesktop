@@ -23,7 +23,8 @@ internal sealed class RecipientDirectory(ContactController contacts)
             _cards = Task.Run(async () =>
             {
                 var byAddress = new Dictionary<string, ContactCard>(StringComparer.OrdinalIgnoreCase);
-                foreach (var entry in await contacts.SearchAsync(null))
+                // "Verwendete Adressen" are no contacts of their own (see AddressCollector).
+                foreach (var entry in (await contacts.SearchAsync(null)).Where(e => e.AddressBook.RemoteId != AddressCollector.AddressBookId))
                 {
                     foreach (var address in entry.Card.IsGroup ? [] : entry.Card.EmailAddresses)
                     {
@@ -36,6 +37,13 @@ internal sealed class RecipientDirectory(ContactController contacts)
         }
 
         return (await _cards).GetValueOrDefault(email);
+    }
+
+    /// <summary>The address books changed (e.g. addresses kept after sending): read them again next time.</summary>
+    public void Forget()
+    {
+        _load = null;
+        _cards = null;
     }
 
     public Task<IReadOnlyList<RecipientEntry>> GetAllAsync()

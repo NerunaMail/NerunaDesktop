@@ -18,6 +18,9 @@ public static class ProviderIds
     public const string Birthdays = "birthdays";
     public const string Holidays = "holidays";
     public const string Pst = "pst";
+
+    /// <summary>"Verwendete Adressen": an address book kept on this device only (see <see cref="Contacts.AddressCollector"/>).</summary>
+    public const string LocalContacts = "local-contacts";
 }
 
 /// <summary>Describes a provider and creates instances bound to one connection.</summary>

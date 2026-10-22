@@ -375,6 +375,23 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     /// <summary>Keeps "Ausblenden" of the spam note for all mails.</summary>
     private Func<Task>? HideSpamNoteAction { get; init; }
 
+    /// <summary>Who the mail is from, for "Als Kontakt speichern".</summary>
+    public Neruna.Core.Mail.MailAddress? Sender { get; init; }
+
+    /// <summary>The sender is in no address book (and is no own address): the "+" beside the name shows.</summary>
+    [ObservableProperty]
+    public partial bool CanAddSender { get; set; }
+
+    /// <summary>Opens the contact editor with name and address of the sender.</summary>
+    public Action? AddSender { get; set; }
+
+    [RelayCommand]
+    private void AddSenderContact()
+    {
+        CanAddSender = false;
+        AddSender?.Invoke();
+    }
+
     /// <summary>The note "kein Spamfilter" in the check; hidden, an "i" next to the title shows it again.</summary>
     [ObservableProperty]
     public partial bool IsSpamNoteShown { get; set; } = true;
@@ -613,6 +630,7 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             Reshow = reshow,
             Trust = trust,
             HideSpamNoteAction = hideSpamNote,
+            Sender = message.From.Mailboxes.FirstOrDefault() is { } sender ? new Neruna.Core.Mail.MailAddress(string.IsNullOrWhiteSpace(sender.Name) ? null : sender.Name, sender.Address) : null,
             IsSpamNoteShown = !view.Privacy.HideSpamNote,
             ExportFiles = files,
         };
