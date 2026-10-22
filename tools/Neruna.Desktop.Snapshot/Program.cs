@@ -1010,6 +1010,12 @@ internal static class Snapshots
         vm.SettingsPage.SelectedTab = 0;
         await vm.SettingsPage.Accounts.ReloadAsync();
         await SaveAsync(window, output, "settings-accounts.png");
+        // A color chosen for the account: a strip on its card, buttons stay on the right.
+        vm.SettingsPage.Accounts.Items[0].ColorChoices[3].ChooseCommand.Execute(null);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "settings-accounts-color.png");
+        Console.WriteLine($"Account color choices: {vm.SettingsPage.Accounts.Items[0].ColorChoices.Count}");
+        vm.SettingsPage.Accounts.Items[0].ColorChoices[0].ChooseCommand.Execute(null);
         // "⋯" of the first account, with "Offline verfügbar" opened.
         if (window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Flyout is MenuFlyout && b.Content is TextBlock { Text: "⋯" }) is { Flyout: MenuFlyout accountMenu } moreButton)
         {

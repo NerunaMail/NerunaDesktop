@@ -69,7 +69,7 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <Button Content="{l:T 'Bearbeiten'}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
                     <Button Padding="8,6" ToolTip.Tip="{l:T 'Weitere Aktionen'}">
@@ -90,6 +90,23 @@
                               </Style>
                             </MenuItem.Styles>
                           </MenuItem>
+                          <MenuItem Header="{l:T 'Farbe in der Ordnerliste'}" IsVisible="{Binding HasMail}" ItemsSource="{Binding ColorChoices}">
+                            <MenuItem.Styles>
+                              <Style Selector="MenuItem > MenuItem" x:DataType="vm:AccountColorChoice">
+                                <Setter Property="ToggleType" Value="Radio" />
+                                <Setter Property="IsChecked" Value="{Binding IsChecked}" />
+                                <Setter Property="Command" Value="{Binding ChooseCommand}" />
+                                <Setter Property="Header">
+                                  <Template>
+                                    <Panel>
+                                      <TextBlock Text="{Binding Label}" IsVisible="{Binding !HasColor}" />
+                                      <Border Width="48" Height="14" CornerRadius="3" Background="{Binding Swatch}" IsVisible="{Binding HasColor}" />
+                                    </Panel>
+                                  </Template>
+                                </Setter>
+                              </Style>
+                            </MenuItem.Styles>
+                          </MenuItem>
                           <MenuItem Header="{l:T 'Aufs Handy übertragen'}" IsVisible="{Binding CanTransfer}"
                                     Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).TransferCommand}" CommandParameter="{Binding}" />
                           <Separator />
@@ -105,7 +122,7 @@
                     </Button>
                   </StackPanel>
                   <!-- "Entfernen …": asked once more, right in the card -->
-                  <Border Grid.Row="1" Grid.ColumnSpan="2" IsVisible="{Binding ConfirmRemove}" Margin="0,10,0,0" Padding="10,8" CornerRadius="4"
+                  <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" IsVisible="{Binding ConfirmRemove}" Margin="0,10,0,0" Padding="10,8" CornerRadius="4"
                           Background="{DynamicResource InfoBackgroundBrush}">
                     <Grid ColumnDefinitions="*,Auto,Auto">
                       <TextBlock Text="{l:T 'Dieses Konto samt seinen Daten auf diesem Computer entfernen? Auf dem Server bleibt alles.'}" TextWrapping="Wrap" VerticalAlignment="Center" />
