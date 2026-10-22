@@ -602,8 +602,10 @@ public sealed partial class ImapMailProvider(
     {
         ArgumentNullException.ThrowIfNull(message);
 
+        var deliveryReceipt = Receipts.TakeDeliveryRequest(message);
         using (var smtp = await ConnectSmtpAsync(cancellationToken))
         {
+            smtp.DeliveryReceipt = deliveryReceipt;
             await smtp.SendAsync(message, cancellationToken);
             await smtp.DisconnectAsync(true, cancellationToken);
         }
@@ -673,10 +675,20 @@ public sealed partial class ImapMailProvider(
         return imap;
     }
 
-    private async Task<SmtpClient> ConnectSmtpAsync(CancellationToken cancellationToken)
+    /// <summary>"Übermittlungsbestätigung": asks the server for a delivery status notification (DSN, RFC 3461) per
+    /// recipient – servers without DSN send the mail all the same, without the receipt.</summary>
+    private sealed class ReceiptSmtpClient(IProtocolLogger logger) : SmtpClient(logger)
+    {
+        public bool DeliveryReceipt { get; set; }
+
+        protected override DeliveryStatusNotification? GetDeliveryStatusNotifications(MimeMessage message, MailboxAddress mailbox) =>
+            DeliveryReceipt ? DeliveryStatusNotification.Success | DeliveryStatusNotification.Failure | DeliveryStatusNotification.Delay : null;
+    }
+
+    private async Task<ReceiptSmtpClient> ConnectSmtpAsync(CancellationToken cancellationToken)
     {
         var password = await GetPasswordAsync(cancellationToken);
-        var smtp = new SmtpClient(CreateProtocolLogger("smtp")) { ServerCertificateValidationCallback = settings.AcceptAnyCertificate ? TlsCertificates.For(acceptAny: true) : TlsCertificates.For(settings.Raw) };
+        var smtp = new ReceiptSmtpClient(CreateProtocolLogger("smtp")) { ServerCertificateValidationCallback = settings.AcceptAnyCertificate ? TlsCertificates.For(acceptAny: true) : TlsCertificates.For(settings.Raw) };
         try
         {
             await smtp.ConnectAsync(settings.SmtpHost, settings.SmtpPort, MapSecurity(settings.SmtpSecurity), cancellationToken);

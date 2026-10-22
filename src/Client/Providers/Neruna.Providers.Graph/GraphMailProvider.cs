@@ -240,7 +240,18 @@ internal sealed partial class GraphMailProvider(Guid connectionId, GraphClient g
     public async Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
-        await graph.PostMimeAsync("me/sendMail", await MimeBytesAsync(message, cancellationToken), cancellationToken);
+        if (!Receipts.TakeDeliveryRequest(message))
+        {
+            await graph.PostMimeAsync("me/sendMail", await MimeBytesAsync(message, cancellationToken), cancellationToken);
+            return;
+        }
+
+        // A delivery receipt is a flag of the message, not part of the MIME: made as a draft, flagged, then sent.
+        var draft = await graph.PostMimeAsync("me/messages", await MimeBytesAsync(message, cancellationToken), cancellationToken);
+        var id = draft.Str("id") ?? throw new InvalidOperationException("Microsoft 365 returned no message id.");
+        await graph.SendJsonAsync(HttpMethod.Patch, $"me/messages/{id}",
+            new { isDeliveryReceiptRequested = true, isReadReceiptRequested = Receipts.WantsReadReceipt(message) }, cancellationToken);
+        await graph.SendJsonAsync(HttpMethod.Post, $"me/messages/{id}/send", null, cancellationToken);
     }
 
     /// <summary>Graph keeps a message created from MIME as a draft – fine for "Entwürfe", the main use here.</summary>

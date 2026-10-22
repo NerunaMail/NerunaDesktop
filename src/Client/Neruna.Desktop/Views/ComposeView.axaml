@@ -82,6 +82,18 @@
         <ctl:ToolToggleButton Icon="{StaticResource IconAi}" Label="{l:T 'KI'}" Hint="{l:T 'Mit KI schreiben oder überarbeiten'}"
                               IsChecked="{Binding Ai.IsOpen, FallbackValue=False}" IsVisible="{Binding Ai.Available, FallbackValue=False}"
                               ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+        <!-- Optionen: delivery and read receipt for this mail -->
+        <ctl:ToolButton Icon="{StaticResource IconSettings}" Label="{l:T 'Optionen'}" Hint="{l:T 'Übermittlungs- und Lesebestätigung'}"
+                        ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
+          <ctl:ToolButton.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+              <MenuItem Header="{l:T 'Übermittlungsbestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestDeliveryReceipt}"
+                        ToolTip.Tip="{l:T 'Der Mailserver meldet, wenn die Nachricht zugestellt wurde – sofern er das unterstützt.'}" />
+              <MenuItem Header="{l:T 'Lesebestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestReadReceipt}"
+                        ToolTip.Tip="{l:T 'Das Mailprogramm des Empfängers fragt, ob es das Lesen bestätigen soll – der Empfänger entscheidet.'}" />
+            </MenuFlyout>
+          </ctl:ToolButton.Flyout>
+        </ctl:ToolButton>
         <ctl:ToolButton Icon="{StaticResource IconEdit}" Label="{l:T 'Speichern'}" Hint="{l:T 'Als Entwurf speichern (Ctrl+S) – geschieht auch automatisch'}"
                         Command="{Binding SaveDraftCommand}" HotKey="Ctrl+S" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{Binding DiscardLabel}" Hint="{l:T 'Nachricht verwerfen (auch den gespeicherten Entwurf)'}"

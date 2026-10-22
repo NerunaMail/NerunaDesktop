@@ -324,6 +324,7 @@ internal sealed partial class EwsMailProvider(ServiceConnection connection, EwsC
     {
         ArgumentNullException.ThrowIfNull(message);
         var client = await ClientAsync(cancellationToken);
+        var deliveryReceipt = Receipts.TakeDeliveryRequest(message);
 
         // Blind copies also as recipients of the item: a MIME header alone does not reliably reach them.
         var bcc = message.Bcc.Mailboxes.Select(b => X.Typ("Mailbox", X.Typ("Name", b.Name ?? string.Empty), X.Typ("EmailAddress", b.Address))).ToList();
@@ -331,7 +332,9 @@ internal sealed partial class EwsMailProvider(ServiceConnection connection, EwsC
             X.Msg("SavedItemFolderId", X.FolderId("sentitems")),
             X.Msg("Items", X.Typ("Message",
                 X.Typ("MimeContent", new XAttribute("CharacterSet", "UTF-8"), await MimeBase64Async(message, cancellationToken)),
-                bcc.Count > 0 ? X.Typ("BccRecipients", bcc) : null))), cancellationToken);
+                bcc.Count > 0 ? X.Typ("BccRecipients", bcc) : null,
+                Receipts.WantsReadReceipt(message) ? X.Typ("IsReadReceiptRequested", "true") : null,
+                deliveryReceipt ? X.Typ("IsDeliveryReceiptRequested", "true") : null))), cancellationToken);
     }
 
     /// <summary>Stores the message as it is: read or not, a draft only if it is one, with its received date.</summary>

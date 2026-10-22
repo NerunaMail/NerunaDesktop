@@ -210,6 +210,17 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>Raised with true after sending, false when discarded.</summary>
     public event EventHandler<bool>? Closed;
 
+    /// <summary>"Optionen → Übermittlungsbestätigung": the server reports when the mail was delivered (if it can).</summary>
+    [ObservableProperty]
+    public partial bool RequestDeliveryReceipt { get; set; }
+
+    /// <summary>"Optionen → Lesebestätigung": the recipient's program is asked to confirm reading (the recipient decides).</summary>
+    [ObservableProperty]
+    public partial bool RequestReadReceipt { get; set; }
+
+    /// <summary>The message went out (its recipients are kept in "Verwendete Adressen").</summary>
+    public event EventHandler<MimeMessage>? Sent;
+
     /// <summary>Runs once the message is sent (a reply or forward marks its original).</summary>
     public Func<Task>? AfterSent { get; set; }
 
@@ -757,8 +768,10 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             }
 
             var message = MessageComposer.Build(SenderAddress, await SnapshotAsync(), []);
+            Receipts.Request(message, RequestDeliveryReceipt, RequestReadReceipt);
             await _secureMime.ProtectAsync(message, Sign, Encrypt);
             await _mail.SendAsync(_connection, message);
+            Sent?.Invoke(this, message);
             if (AfterSent is { } afterSent)
             {
                 await afterSent();
