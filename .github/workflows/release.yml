@@ -108,11 +108,9 @@ jobs:
   # with a Developer ID yet: macOS asks once (right-click → Öffnen).
   macos:
     needs: linux
+    # One runner for both packages, one after the other: macOS runners are scarce, and two jobs waiting for two of
+    # them were cancelled again and again ("not acquired by Runner"); one that gets a runner now builds everything.
     runs-on: macos-14
-    strategy:
-      max-parallel: 1
-      matrix:
-        rid: [osx-arm64, osx-x64]
     env:
       DOTNET_NOLOGO: 1
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -129,27 +127,27 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.1.0-test" >> "$GITHUB_ENV"; fi
 
-      - name: Build
+      - name: Build, package and publish (Apple silicon, then Intel)
         run: |
-          dotnet publish src/Client/Neruna.Desktop -c Release -r ${{ matrix.rid }} --self-contained true \
-            -p:PublishReadyToRun=true -p:DebugType=none -p:Version="$VERSION" -o publish
-          cp LICENSE publish/LICENSE.txt
-          cp THIRD-PARTY-NOTICES.md publish/THIRD-PARTY-NOTICES.md
-          sed "s/__VERSION__/$VERSION/g" packaging/Info.plist > Info.plist
-
-      - name: Package
-        run: |
+          set -euo pipefail
           dotnet tool install -g vpk --version "$VPK_VERSION"
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
-              --channel ${{ matrix.rid }} --pre --outputDir releases || echo "No previous release."
-          fi
-          vpk pack --packId Neruna --packVersion "$VERSION" --packDir publish --mainExe neruna --packTitle Neruna \
-            --packAuthors Neruna --icon packaging/neruna.icns --plist Info.plist \
-            --channel ${{ matrix.rid }} --outputDir releases
-
-      - name: Publish
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          vpk upload github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
-            --channel ${{ matrix.rid }} --outputDir releases --merge --publish --pre --releaseName "Neruna $VERSION" --tag "v$VERSION"
+          sed "s/__VERSION__/$VERSION/g" packaging/Info.plist > Info.plist
+          for rid in osx-arm64 osx-x64; do
+            echo "::group::$rid"
+            dotnet publish src/Client/Neruna.Desktop -c Release -r "$rid" --self-contained true \
+              -p:PublishReadyToRun=true -p:DebugType=none -p:Version="$VERSION" -o "publish-$rid"
+            cp LICENSE "publish-$rid/LICENSE.txt"
+            cp THIRD-PARTY-NOTICES.md "publish-$rid/THIRD-PARTY-NOTICES.md"
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              vpk download github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+                --channel "$rid" --pre --outputDir "releases-$rid" || echo "No previous release."
+            fi
+            vpk pack --packId Neruna --packVersion "$VERSION" --packDir "publish-$rid" --mainExe neruna --packTitle Neruna \
+              --packAuthors Neruna --icon packaging/neruna.icns --plist Info.plist \
+              --channel "$rid" --outputDir "releases-$rid"
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              vpk upload github --repoUrl "https://github.com/$GITHUB_REPOSITORY" --token "${{ secrets.GITHUB_TOKEN }}" \
+                --channel "$rid" --outputDir "releases-$rid" --merge --publish --pre --releaseName "Neruna $VERSION" --tag "v$VERSION"
+            fi
+            echo "::endgroup::"
+          done
