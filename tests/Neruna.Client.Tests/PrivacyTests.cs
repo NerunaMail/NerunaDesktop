@@ -91,6 +91,19 @@ public class PrivacyTests
     }
 
     [Fact]
+    public void A_file_name_in_a_link_text_is_no_address()
+    {
+        // A link preview: the site's icon as a linked picture with the alt text "favicon.ico" – ".ico" is no top-level domain.
+        var html = """<a href="https://security.example.ch/advisory"><img src="cid:icon" alt="favicon.ico"></a>""";
+        var link = Assert.Single(HtmlScan.Of(html).Links);
+        Assert.False(LinkInspector.Inspect(link.Href, link.Text, link.Title).IsSuspicious);
+        Assert.False(LinkInspector.Inspect("https://www.shop.ch/x", "logo.png").IsSuspicious);
+
+        // A real top-level domain that looks like a file ending still counts: ".zip" exists.
+        Assert.True(LinkInspector.Inspect("https://evil.example/", "rechnung.zip").IsSuspicious);
+    }
+
+    [Fact]
     public void An_address_written_without_http_is_no_unencrypted_link_and_opens_with_https()
     {
         static bool Unencrypted(LinkCheck c) => c.Findings.Any(f => f.Title == Neruna.Core.Localization.Texts.T("Unverschlüsselt"));

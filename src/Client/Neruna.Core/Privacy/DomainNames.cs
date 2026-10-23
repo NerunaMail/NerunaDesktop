@@ -71,6 +71,14 @@ public static class DomainNames
         return suffix >= labels.Length || suffix == 0 ? null : string.Join('.', labels[^(suffix + 1)..]);
     }
 
+    /// <summary>
+    /// The name ends in a top-level domain that exists ("ch", "com" …). <see cref="Registrable"/> takes any last label
+    /// as one (the list's default rule) – right for link targets, but a file name like "favicon.ico" in a text is no
+    /// address.
+    /// </summary>
+    public static bool HasKnownTopLevel(string? host) =>
+        ToAscii(host) is { } ascii && !IsIpAddress(ascii) && Suffixes.Value.IsTopLevel(ascii.Split('.')[^1]);
+
     /// <summary>Both names belong to the same registrable domain (or are equal, if that cannot be determined).</summary>
     public static bool SameOwner(string? a, string? b)
     {
@@ -339,6 +347,8 @@ public static class DomainNames
         }
 
         /// <summary>How many labels at the end are the public suffix (an unknown TLD counts as one, as the list says).</summary>
+        public bool IsTopLevel(string label) => _rules.Contains(label) || _wildcards.Contains(label);
+
         public int SuffixLength(string[] labels)
         {
             for (var start = 0; start < labels.Length; start++)

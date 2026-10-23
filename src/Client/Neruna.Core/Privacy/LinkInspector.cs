@@ -174,8 +174,8 @@ public static partial class LinkInspector
 
         var value = match.Value;
         var host = value.Contains("://", StringComparison.Ordinal) ? value[(value.IndexOf("://", StringComparison.Ordinal) + 3)..] : value;
-        // Only a known public suffix makes it a domain ("Hallo.Welt" or "Version 2.0" are not).
-        return DomainNames.Registrable(host) is not null ? host.ToLowerInvariant() : null;
+        // Only an existing top-level domain makes it a domain ("Hallo.Welt", "Version 2.0" or a picture's "favicon.ico" are not).
+        return DomainNames.HasKnownTopLevel(host) && DomainNames.Registrable(host) is not null ? host.ToLowerInvariant() : null;
     }
 
     /// <summary>Skips redirect services that carry the real target in the link (Safe Links, Google, Facebook …).</summary>
