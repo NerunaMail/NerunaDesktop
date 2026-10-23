@@ -96,6 +96,12 @@
       <TextBox Text="{Binding Label}" PlaceholderText="{l:T 'z. B. Privat oder Firma – sonst steht die E-Mail-Adresse in der Ordnerliste'}" />
       <TextBlock Classes="label" Text="{l:T 'E-Mail-Adresse'}" IsVisible="{Binding !IsEditing}" />
       <TextBox Text="{Binding Email}" PlaceholderText="name@example.com" IsVisible="{Binding !IsEditing}" />
+      <StackPanel IsVisible="{Binding IsEditing}">
+        <TextBlock Classes="label" Text="{l:T 'Antwortadresse (optional)'}" />
+        <TextBox Text="{Binding ReplyTo}" IsEnabled="{Binding CanEditReplyTo}" PlaceholderText="{l:T 'z. B. die eigene Adresse, wenn Sie als info@ senden'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Antworten auf Mails aus diesem Konto gehen an diese Adresse.'}" IsVisible="{Binding CanEditReplyTo}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Von Ihrer Organisation festgelegt.'}" IsVisible="{Binding IsReplyToFromCloud}" />
+      </StackPanel>
       <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,10,0,0"
                  Text="{l:T 'Die Anmeldung öffnet sich im Browser. Neruna erhält dabei kein Passwort, nur eine Berechtigung für Mail, Kalender und Kontakte – sie liegt im Schlüsselbund dieses Computers.'}" />
       <Button Classes="accent" Margin="0,12,0,0" HorizontalAlignment="Left" Command="{Binding SignInMicrosoftCommand}"
@@ -106,7 +112,7 @@
 
     <!-- Accounts of the organisation: only the label (and a password typed in here) are the user's -->
     <Border IsVisible="{Binding IsCloud}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
-      <TextBlock TextWrapping="Wrap" Text="{l:T 'Von Ihrer Organisation verwaltet: Server, Absender und Aliase kommen aus Neruna Cloud. Hier lassen sich die Kontobezeichnung und – falls Sie es selbst eingegeben haben – das Passwort ändern.'}" />
+      <TextBlock TextWrapping="Wrap" Text="{l:T 'Von Ihrer Organisation verwaltet: Server, Absender und Aliase kommen aus Neruna Cloud. Hier lassen sich die Kontobezeichnung, die Antwortadresse (wenn die Organisation keine festgelegt hat) und – falls Sie es selbst eingegeben haben – das Passwort ändern.'}" />
     </Border>
     <!-- Exchange takes the sender name from its directory and always the primary address: neither asked for -->
     <TextBlock Classes="label" Text="{l:T 'Ihr Name (Absender)'}" IsVisible="{Binding !IsExchange}" />
@@ -117,6 +123,12 @@
 
     <TextBlock Classes="label" Text="{l:T 'E-Mail-Adresse'}" />
     <TextBox Text="{Binding Email}" PlaceholderText="{l:T 'anna.muster@example.com'}" IsEnabled="{Binding !IsCloud}" />
+
+    <!-- Antwortadresse: the organisation's (fixed here) or the user's own; also for accounts of the organisation without one -->
+    <TextBlock Classes="label" Text="{l:T 'Antwortadresse (optional)'}" />
+    <TextBox Text="{Binding ReplyTo}" IsEnabled="{Binding CanEditReplyTo}" PlaceholderText="{l:T 'z. B. die eigene Adresse, wenn Sie als info@ senden'}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Antworten auf Mails aus diesem Konto gehen an diese Adresse.'}" IsVisible="{Binding CanEditReplyTo}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Von Ihrer Organisation festgelegt.'}" IsVisible="{Binding IsReplyToFromCloud}" />
 
     <!-- Aliases: more sender addresses of the same mailbox (not with Exchange: it sends from the primary address) -->
     <StackPanel IsVisible="{Binding !IsExchange}">

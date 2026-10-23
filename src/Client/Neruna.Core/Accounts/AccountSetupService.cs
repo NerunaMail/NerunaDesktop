@@ -58,7 +58,11 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
             // Same service and provider as before: same id, so folders, mails and calendars stay.
             if (editable.FirstOrDefault(c => c.Kind == connection.Kind && c.ProviderId == connection.ProviderId) is { } existing)
             {
-                connections.Add(connection with { Id = existing.Id });
+                // The organisation's Antwortadresse stays with the connection until the next cloud sync sets it.
+                var kept = existing.Settings.GetValueOrDefault(Mail.ReplyAddress.CloudSetting) is { Length: > 0 } replyTo
+                    ? new Dictionary<string, string>(connection.Settings) { [Mail.ReplyAddress.CloudSetting] = replyTo }
+                    : connection.Settings;
+                connections.Add(connection with { Id = existing.Id, Settings = kept });
             }
             else
             {

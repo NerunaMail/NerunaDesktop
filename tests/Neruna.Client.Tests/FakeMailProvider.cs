@@ -23,6 +23,9 @@ internal sealed class FakeMailServer
 
     public int AutoReplyWrites { get; set; }
 
+    /// <summary>The messages sent through the fake provider.</summary>
+    public List<MimeMessage> Sent { get; } = [];
+
     /// <summary>Changing it simulates an IMAP UIDVALIDITY reset.</summary>
     public int Validity { get; set; } = 1;
 
@@ -215,7 +218,11 @@ internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server)
         return Task.CompletedTask;
     }
 
-    public Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default)
+    {
+        server.Sent.Add(message);
+        return Task.CompletedTask;
+    }
 
     public Task AppendAsync(MailFolder folder, MimeMessage message, MessageFlags flags, DateTimeOffset? receivedAt, CancellationToken cancellationToken = default)
     {

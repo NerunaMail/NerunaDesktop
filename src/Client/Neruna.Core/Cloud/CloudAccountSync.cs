@@ -243,6 +243,9 @@ public sealed class CloudAccountSync(
         var built = setup.BuildAccount(data.DisplayName, data.Email, config);
         var connections = built.Connections
             .Select(c => existing?.ConnectionsOf(c.Kind).FirstOrDefault(e => e.ProviderId == c.ProviderId) is { } kept ? c with { Id = kept.Id } : c)
+            .Select(c => c.Kind == ServiceKind.Mail && !string.IsNullOrWhiteSpace(data.ReplyTo)
+                ? c with { Settings = new Dictionary<string, string>(c.Settings) { [Mail.ReplyAddress.CloudSetting] = data.ReplyTo.Trim() } } // the organisation's: fixed here
+                : c)
             .ToList();
         return built with
         {
@@ -306,6 +309,7 @@ internal sealed record CloudAccountData(
     CloudServer Imap,
     CloudServer Smtp,
     string? CaldavUrl,
-    string? CarddavUrl);
+    string? CarddavUrl,
+    string? ReplyTo = null);
 
 internal sealed record CloudServer(string Host, int Port, string? Security);

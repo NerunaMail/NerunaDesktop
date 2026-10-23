@@ -24,6 +24,48 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     /// <summary>Set by the shell: TLS client certificates (Exchange behind a reverse proxy); without it none can be chosen.</summary>
     public ClientCertificates? Certificates { get; init; }
 
+    /// <summary>Set by the shell: where the user's own Antwortadresse of an account is kept.</summary>
+    public Neruna.Core.ISettingsStore? Settings { get; init; }
+
+    /// <summary>"Antwortadresse (Reply-To)": answers to mail from this account go there, e.g. sent as info@, answered to the own address.</summary>
+    [ObservableProperty]
+    public partial string ReplyTo { get; set; } = string.Empty;
+
+    /// <summary>Set by the organisation in Neruna Cloud: shown, not changeable here.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanEditReplyTo))]
+    public partial bool IsReplyToFromCloud { get; set; }
+
+    public bool CanEditReplyTo => !IsReplyToFromCloud;
+
+    private async Task LoadReplyToAsync(Account account)
+    {
+        var (address, fromCloud) = await Neruna.Core.Mail.ReplyAddress.GetAsync(Settings, account);
+        ReplyTo = address ?? string.Empty;
+        IsReplyToFromCloud = fromCloud;
+    }
+
+    /// <summary>The user's own Antwortadresse (not when the organisation set one).</summary>
+    /// <returns>False with <see cref="Error"/> set when it is no valid address.</returns>
+    private bool CheckReplyTo()
+    {
+        if (IsReplyToFromCloud || Neruna.Core.Mail.ReplyAddress.IsValid(ReplyTo))
+        {
+            return true;
+        }
+
+        Error = F("«{0}» ist keine gültige E-Mail-Adresse.", ReplyTo.Trim());
+        return false;
+    }
+
+    private async Task SaveReplyToAsync(Guid accountId)
+    {
+        if (!IsReplyToFromCloud && Settings is not null)
+        {
+            await Neruna.Core.Mail.ReplyAddress.SetAsync(Settings, accountId, ReplyTo);
+        }
+    }
+
     /// <summary>Set by the shell: picks a certificate file.</summary>
     public IFileService? Files { get; init; }
 
@@ -224,9 +266,10 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     [RelayCommand]
     private async Task SaveMicrosoftAsync()
     {
-        if (Editing is { } existing)
+        if (Editing is { } existing && CheckReplyTo())
         {
             await setup.RenameAsync(existing, string.IsNullOrWhiteSpace(DisplayName) ? existing.DisplayName : DisplayName.Trim(), Label);
+            await SaveReplyToAsync(existing.Id);
             Finished?.Invoke(this, true);
         }
     }
@@ -305,6 +348,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         _bridgeFingerprints = bridge?.Settings.GetValueOrDefault(TlsCertificates.PinnedCertificateKey)?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;
+        _ = LoadReplyToAsync(account);
         Aliases.Clear();
         foreach (var alias in account.Aliases ?? [])
         {
@@ -667,6 +711,11 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             options.TryAdd(key, value);
         }
 
+        if (!CheckReplyTo())
+        {
+            return;
+        }
+
         var account = setup.BuildAccount(name, email, config, AcceptAnyCertificate && !IsCloud, options) with { Label = label, Aliases = aliases.Count > 0 ? aliases : null };
         if (account.Connections.Count == 0)
         {
@@ -682,10 +731,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             {
                 await setup.UpdateAsync(existing with { Aliases = account.Aliases }, name, label, email, config, Password.Length > 0 && NeedsPassword ? Password : null,
                     acceptAnyCertificate: AcceptAnyCertificate && !IsCloud, options: options);
+                await SaveReplyToAsync(existing.Id);
             }
             else
             {
                 await setup.CreateAsync(account, NeedsPassword ? Password : null);
+                await SaveReplyToAsync(account.Id);
                 CreatedAccount = account;
             }
 

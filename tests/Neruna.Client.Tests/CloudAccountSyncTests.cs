@@ -79,6 +79,13 @@ public class CloudAccountSyncTests
         Assert.Empty(sync.Status.Pending);
         Assert.Equal(2, (await env.Accounts.GetAccountsAsync(ct)).Count);
 
+        // info@ answers to Anna: the organisation's Antwortadresse, fixed on this device; Anna's own account has none.
+        var info = (await env.Accounts.GetAccountsAsync(ct)).Single(a => a.EmailAddress == "info@example.com");
+        Assert.Equal(("anna@example.com", true), await Neruna.Core.Mail.ReplyAddress.GetAsync(settings, info, ct));
+        await Neruna.Core.Mail.ReplyAddress.SetAsync(settings, info.Id, "someone@example.com", ct);
+        Assert.Equal(("anna@example.com", true), await Neruna.Core.Mail.ReplyAddress.GetAsync(settings, info, ct));
+        Assert.Equal(((string?)null, false), await Neruna.Core.Mail.ReplyAddress.GetAsync(settings, again, ct));
+
         // That typed password goes into the personal backup; the organisation's accounts themselves do not.
         var backup = new SettingsBackupService(cloud, env.Accounts, credentials, settings, env.Get<Neruna.Core.Mail.ISignatureStore>(), env.Get<Neruna.Core.Mail.ITextTemplateStore>(),
             env.Get<CertificateManager>(), TimeProvider.System, NullLogger<SettingsBackupService>.Instance);

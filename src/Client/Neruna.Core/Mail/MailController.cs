@@ -645,6 +645,15 @@ public sealed class MailController(
         }
 
         Privacy.OutgoingMail.Prepare(message, settings is not null && await settings.GetBoolAsync(SettingKeys.PrivacyHideTimeZone, cancellationToken: cancellationToken));
+
+        // The account's Antwortadresse, unless the mail has its own Reply-To.
+        if (message.ReplyTo.Count == 0
+            && (await accounts.GetAccountsAsync(cancellationToken)).FirstOrDefault(a => a.Connections.Any(c => c.Id == connection.Id)) is { } account
+            && (await ReplyAddress.GetAsync(settings, account, cancellationToken)).Address is { } replyTo
+            && MailboxAddress.TryParse(replyTo, out var replyAddress))
+        {
+            message.ReplyTo.Add(replyAddress);
+        }
         await provider.SendAsync(message, cancellationToken);
     }
 
