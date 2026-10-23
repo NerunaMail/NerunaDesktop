@@ -1010,8 +1010,17 @@ internal static class Snapshots
         vm.SettingsPage.SelectedTab = 0;
         await vm.SettingsPage.Accounts.ReloadAsync();
         await SaveAsync(window, output, "settings-accounts.png");
-        // A color chosen for the account: a strip on its card, buttons stay on the right.
-        vm.SettingsPage.Accounts.Items[0].ColorChoices[3].ChooseCommand.Execute(null);
+        // A color chosen for the account the way a user does it: the round swatch opens the picker, a click on a color.
+        var swatch = window.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is Flyout && b.DataContext == vm.SettingsPage.Accounts.Items[0]);
+        swatch.Flyout!.ShowAt(swatch);
+        await Task.Delay(300);
+        var colorButton = TopLevel.GetTopLevel(window)!.GetVisualDescendants().OfType<Button>()
+            .Concat(Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(window)?.GetVisualDescendants().OfType<Button>() ?? [])
+            .Concat(swatch.Flyout is Flyout { } fly && fly.Content is Control content ? content.GetVisualDescendants().OfType<Button>() : [])
+            .FirstOrDefault(b => b.DataContext is Neruna.Desktop.ViewModels.AccountColorChoice { HasColor: true, Color: "#8CBD18" });
+        colorButton?.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        await Task.Delay(500);
+        Console.WriteLine($"Account color by click: button found {colorButton is not null}, has color {vm.SettingsPage.Accounts.Items[0].HasColor}");
         await Task.Delay(300);
         await SaveAsync(window, output, "settings-accounts-color.png");
         Console.WriteLine($"Account color choices: {vm.SettingsPage.Accounts.Items[0].ColorChoices.Count}");

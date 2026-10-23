@@ -69,8 +69,8 @@
                                 <Panel>
                                   <Button Width="30" Height="30" Margin="0,0,6,6" Padding="0" CornerRadius="15" Background="{Binding Swatch}"
                                           BorderBrush="{DynamicResource AccentTextBrush}" BorderThickness="{Binding IsChecked, Converter={x:Static app:Converters.ThicknessIf}}"
-                                          IsVisible="{Binding HasColor}" Command="{Binding ChooseCommand}" Click="OnColorPicked" />
-                                  <Button Margin="0,0,6,6" Content="{Binding Label}" IsVisible="{Binding !HasColor}" Command="{Binding ChooseCommand}" Click="OnColorPicked" />
+                                          IsVisible="{Binding HasColor}" Click="OnColorPicked" />
+                                  <Button Margin="0,0,6,6" Content="{Binding Label}" IsVisible="{Binding !HasColor}" Click="OnColorPicked" />
                                 </Panel>
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -139,7 +139,10 @@
                         </MenuFlyout>
                       </Button.Flyout>
                     </Button>
-                    <Button Classes="command" Padding="6" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Konto entfernen …'}" IsVisible="{Binding !IsFromCloud}"
+                    <!-- Accounts of the organisation cannot be removed here: the bin keeps its place (invisible), so the buttons
+                         of all cards stay in one line -->
+                    <Button Classes="command" Padding="6" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Konto entfernen …'}"
+                            Opacity="{Binding !IsFromCloud, Converter={x:Static app:Converters.OpaqueIf}}" IsHitTestVisible="{Binding !IsFromCloud}" Focusable="{Binding !IsFromCloud}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
                       <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15" Margin="0" />
                     </Button>
