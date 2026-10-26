@@ -51,10 +51,22 @@ internal static class CrashHandler
             }
 
             e.Handled = true;
+            if (IsAbortedWebViewStart(e.Exception))
+            {
+                Logger?.LogWarning(e.Exception, "WebView2 start aborted (its window or view was closed meanwhile)");
+                return;
+            }
+
             Logger?.LogError(e.Exception, "Unhandled exception on the UI thread (caught, Neruna keeps running)");
             Record(e.Exception, fatal: false);
             Caught?.Invoke(null, EventArgs.Empty);
         };
+
+    // WebView2 gives up starting (E_ABORT) when its window is closed or the view replaced before it is ready – e.g. a
+    // compose window closed right away. Avalonia starts it in an async void, so no caller can catch it; nothing is lost.
+    internal static bool IsAbortedWebViewStart(Exception exception) =>
+        exception is System.Runtime.InteropServices.COMException { HResult: unchecked((int)0x80004004) }
+        && exception.StackTrace?.Contains("WebView", StringComparison.Ordinal) == true;
 
     /// <summary>A failed background task nobody waited for: kept for the next offer, unless it is just the network.</summary>
     public static void RecordUnobserved(Exception exception)
