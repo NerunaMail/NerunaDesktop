@@ -50,7 +50,11 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
     public async Task<IReadOnlyDictionary<string, string?>> GetObjectVersionsAsync(Guid connectionId, string calendarRemoteId, CancellationToken cancellationToken = default)
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
-        var calendarId = await CalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken);
+        if (await FindCalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken) is not { } calendarId)
+        {
+            return new Dictionary<string, string?>();
+        }
+
         return await db.CalendarObjects.Where(o => o.CalendarId == calendarId)
             .ToDictionaryAsync(o => o.RemoteId, o => o.ETag, StringComparer.Ordinal, cancellationToken);
     }
@@ -127,7 +131,11 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
     public async Task<IReadOnlyList<CalendarObject>> GetObjectsAsync(Guid connectionId, string calendarRemoteId, CancellationToken cancellationToken = default)
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
-        var calendarId = await CalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken);
+        if (await FindCalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken) is not { } calendarId)
+        {
+            return [];
+        }
+
         return await db.CalendarObjects.AsNoTracking()
             .Where(o => o.CalendarId == calendarId)
             .Select(o => new CalendarObject(o.RemoteId, o.ETag, o.Data))
@@ -137,7 +145,11 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
     public async Task<IReadOnlyList<CalendarObject>> GetObjectsAsync(Guid connectionId, string calendarRemoteId, DateTimeOffset from, DateTimeOffset until, CancellationToken cancellationToken = default)
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
-        var calendarId = await CalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken);
+        if (await FindCalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken) is not { } calendarId)
+        {
+            return [];
+        }
+
         await FillSpansAsync(db, calendarId, cancellationToken);
         long start = from.ToUnixTimeMilliseconds(), end = until.ToUnixTimeMilliseconds();
         return await db.CalendarObjects.AsNoTracking()
@@ -149,7 +161,11 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
     public async Task<CalendarObject?> GetObjectAsync(Guid connectionId, string calendarRemoteId, string remoteId, CancellationToken cancellationToken = default)
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
-        var calendarId = await CalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken);
+        if (await FindCalendarIdAsync(db, connectionId, calendarRemoteId, cancellationToken) is not { } calendarId)
+        {
+            return null;
+        }
+
         return await db.CalendarObjects.AsNoTracking()
             .Where(o => o.CalendarId == calendarId && o.RemoteId == remoteId)
             .Select(o => new CalendarObject(o.RemoteId, o.ETag, o.Data))
@@ -179,8 +195,12 @@ public sealed class SqliteCalendarStore(IDbContextFactory<NerunaDbContext> conte
     }
 
     private static async Task<long> CalendarIdAsync(NerunaDbContext db, Guid connectionId, string remoteId, CancellationToken cancellationToken) =>
-        await db.Calendars.Where(c => c.ConnectionId == connectionId && c.RemoteId == remoteId).Select(c => (long?)c.Id).SingleOrDefaultAsync(cancellationToken)
+        await FindCalendarIdAsync(db, connectionId, remoteId, cancellationToken)
         ?? throw new InvalidOperationException($"Calendar '{remoteId}' is not known.");
+
+    // Reads of a calendar a sync just removed (the view still lists it until it reloads) find nothing instead of failing.
+    private static Task<long?> FindCalendarIdAsync(NerunaDbContext db, Guid connectionId, string remoteId, CancellationToken cancellationToken) =>
+        db.Calendars.Where(c => c.ConnectionId == connectionId && c.RemoteId == remoteId).Select(c => (long?)c.Id).SingleOrDefaultAsync(cancellationToken);
 
     private static CalendarInfo ToModel(CalendarEntity c) => new(c.ConnectionId, c.RemoteId, c.Name, c.Color, c.IsReadOnly, c.SyncState, Content: c.Content == 0 ? CalendarContent.Events : (CalendarContent)c.Content, IsDefault: c.IsDefault);
 }

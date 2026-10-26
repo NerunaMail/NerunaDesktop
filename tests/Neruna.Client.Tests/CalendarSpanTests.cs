@@ -96,6 +96,23 @@ public class CalendarSpanTests
     }
 
     [Fact]
+    public async Task A_calendar_a_sync_removed_meanwhile_reads_as_empty()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var store = env.Get<Neruna.Core.ICalendarStore>();
+        var connection = await env.AddAccountAsync(Neruna.Core.Accounts.ServiceKind.Calendar, Neruna.Core.Providers.ProviderIds.Ics);
+        var calendar = (await store.MergeCalendarsAsync(connection.Id, [new CalendarInfo(connection.Id, "cal", "Kalender", null, false, null)], ct)).Single();
+        await store.UpsertObjectAsync(calendar, new CalendarObject("now", null, Event("")), ct);
+
+        // The view still shows the calendar when the sync drops it (folder deleted on the server).
+        await store.MergeCalendarsAsync(connection.Id, [], ct);
+        Assert.Empty(await env.Calendar.GetOccurrencesAsync([calendar], At("2026-10-01T00:00Z"), At("2026-10-08T00:00Z"), ct));
+        Assert.Null(await store.GetObjectAsync(connection.Id, "cal", "now", ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.UpsertObjectAsync(calendar, new CalendarObject("new", null, Event("")), ct));
+    }
+
+    [Fact]
     public void A_feed_that_only_stamps_the_download_time_counts_as_unchanged()
     {
         var feed = Event("").Replace("DTSTAMP:20261001T000000Z", "DTSTAMP:20261015T120000Z", StringComparison.Ordinal);

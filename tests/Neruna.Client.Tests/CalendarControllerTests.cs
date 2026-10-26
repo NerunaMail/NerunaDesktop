@@ -160,6 +160,6 @@ public class CalendarControllerTests
 
         await env.Accounts.DeleteAccountAsync(account.Id, ct);
         Assert.Empty(await env.Calendar.GetCalendarsAsync(ct));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => store.GetObjectsAsync(connection.Id, "birthdays", ct)); // not even known any more
+        Assert.Empty(await store.GetObjectsAsync(connection.Id, "birthdays", ct)); // not even known any more
     }
 }
