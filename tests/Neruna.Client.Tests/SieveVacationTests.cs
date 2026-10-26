@@ -85,7 +85,7 @@ public class SieveVacationTests
 
         var (initial, features) = await provider.GetAutoReplyAsync(ct);
         Assert.False(initial.IsEnabled);
-        Assert.Equal(AutoReplyFeatures.Schedule | AutoReplyFeatures.Subject, features);
+        Assert.Equal(AutoReplyFeatures.Schedule | AutoReplyFeatures.Subject | AutoReplyFeatures.Weekly, features);
 
         // … switches the reply on for a period: the server checks the script's syntax when it is stored.
         var reply = new AutoReply(true, "Bin in den Ferien.\nGruss Anna", Monday, Monday.AddDays(5), "Abwesend");
