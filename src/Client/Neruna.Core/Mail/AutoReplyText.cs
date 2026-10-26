@@ -58,7 +58,7 @@ public static partial class AutoReplyText
         ArgumentNullException.ThrowIfNull(template);
         if (enabled && (start is null || end is null) && HasPlaceholders(template))
         {
-            throw new ArgumentException(T("Der Text enthält {{start}} oder {{end}} – dafür bitte einen Zeitraum wählen."), nameof(template));
+            throw new ArgumentException(T("Der Text enthält {{start}} oder {{end}} – dafür bitte einen Zeitraum wählen."));
         }
 
         return Render(template.Trim(), start, end);

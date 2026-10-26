@@ -407,6 +407,43 @@ internal static class Snapshots
             off.IsEnabled = false;
             await off.SaveCommand.ExecuteAsync(null);
             Console.WriteLine($"Out of office off: header '{vm.AutoReplies.HeaderText}' active={vm.AutoReplies.AnyActive}, settings button '{vm.SettingsPage.Accounts.Items[0].AutoReplyText}', tree badge={vm.MailPage.Accounts[0].HasAutoReply}");
+
+            // A series template ("Freitags") switched on, then back to "Ferien": the period comes back – in the dialog and in the list.
+            async Task<AutoReplyViewModel> OpenAutoReplyAsync()
+            {
+                vm.MailPage.Tree.AutoReplyCommand.Execute(vm.MailPage.Accounts[0]);
+                await Task.Delay(100);
+                for (var i = 0; i < 50 && (vm.Overlay as AutoReplyViewModel)?.IsBusy != false; i++)
+                {
+                    await Task.Delay(100);
+                }
+
+                return (AutoReplyViewModel)vm.Overlay!;
+            }
+
+            var series = await OpenAutoReplyAsync();
+            series.IsEnabled = true;
+            series.IsSeries = true;
+            series.Weekdays.Single(d => d.Day == DayOfWeek.Friday).IsChecked = true;
+            series.Message = "Freitags bin ich nicht im Büro.";
+            series.TemplateName = "Freitags";
+            await series.SaveTemplateCommand.ExecuteAsync(null);
+            await series.SaveCommand.ExecuteAsync(null);
+            var back = await OpenAutoReplyAsync();
+            Console.WriteLine($"Series dialog: series={back.IsSeries} period shown={back.ShowsPeriod} template={back.SelectedTemplate?.Name}");
+            back.SelectedTemplate = back.Templates.First(t => t.Name == "Ferien");
+            await Task.Delay(200);
+            Console.WriteLine($"Dialog back to Ferien: series={back.IsSeries} period shown={back.ShowsPeriod} can schedule={back.CanSchedule}");
+            await SaveAsync(window, output, "auto-reply-series-back.png");
+            vm.Overlay = null;
+            var row = vm.AutoReplies.Accounts[0];
+            Console.WriteLine($"List with series: series={row.IsSeries} period shown={row.ShowsPeriod}");
+            row.SelectedTemplate = row.Templates.First(t => t.Name == "Ferien");
+            await Task.Delay(500);
+            Console.WriteLine($"List back to Ferien: series={row.IsSeries} period shown={row.ShowsPeriod} error={row.Error}");
+            row.IsScheduled = true;
+            await Task.Delay(500);
+            Console.WriteLine($"List with a period: '{row.Status}', series={row.IsSeries} error={row.Error}");
         }
 
         // A freshly added account: in the tree at once, "Ordner werden geladen …" until its first sync is done.

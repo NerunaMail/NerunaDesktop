@@ -472,10 +472,23 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
             end = new DateTimeOffset(last.Date.AddDays(1), TimeZoneInfo.Local.GetUtcOffset(last.Date.AddDays(1)));
         }
 
+        // {{start}}/{{end}} without a period (e.g. from a series back to "Ferien"): nothing is sent, the choice stays so
+        // the period can be set.
+        string text;
+        try
+        {
+            text = AutoReplyText.ForServer(Template, IsEnabled, start, end);
+        }
+        catch (ArgumentException ex)
+        {
+            Error = ex.Message;
+            return;
+        }
+
         var previous = Reply;
         try
         {
-            var reply = new AutoReply(IsEnabled, AutoReplyText.ForServer(Template, IsEnabled, start, end), start, end, Features.HasFlag(AutoReplyFeatures.Subject) ? _subject : null,
+            var reply = new AutoReply(IsEnabled, text, start, end, Features.HasFlag(AutoReplyFeatures.Subject) ? _subject : null,
                 IsSeries ? SeriesDays : null);
             IsBusy = true;
             await Task.Run(() => mail.SetAutoReplyAsync(Account, Connection, reply));
@@ -491,7 +504,7 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
         {
             // Not saved: the switch shows the server's state again, the reason stays below it.
             Show(previous, Features, Template);
-            Error = ex is ArgumentException or AutoReplyUnavailableException ? ex.Message : F("Die Abwesenheitsnotiz konnte nicht gespeichert werden: {0}", ex.Message);
+            Error = ex is AutoReplyUnavailableException ? ex.Message : F("Die Abwesenheitsnotiz konnte nicht gespeichert werden: {0}", ex.Message);
         }
         finally
         {

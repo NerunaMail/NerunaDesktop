@@ -45,6 +45,7 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
     public partial string Message { get; set; } = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsPeriod))]
     public partial bool CanSchedule { get; set; }
 
     [ObservableProperty]
