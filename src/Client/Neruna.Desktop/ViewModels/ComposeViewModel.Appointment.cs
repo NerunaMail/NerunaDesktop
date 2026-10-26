@@ -77,10 +77,11 @@ internal sealed partial class ComposeViewModel
             };
             if (existing is null)
             {
-                // The default calendar (Einstellungen → Kalender), else one of the account the mail goes out from.
+                // The default calendar of the account the mail goes out from (Kalender verwalten, else the server's);
+                // the general one (Einstellungen → Kalender) where it is this account's or the account has none.
                 var preferred = await _settings.GetAsync(SettingKeys.CalendarDefaultCalendar);
-                editor.SelectedCalendar = writable.FirstOrDefault(cal => CalendarController.CalendarKey(cal) == preferred)
-                                          ?? writable.FirstOrDefault(cal => _account.Connections.Any(con => con.Id == cal.ConnectionId))
+                var best = (await c.Invitations.TargetCalendarsAsync(_account, preferred: preferred)).FirstOrDefault();
+                editor.SelectedCalendar = writable.FirstOrDefault(cal => best is not null && CalendarController.CalendarKey(cal) == CalendarController.CalendarKey(best))
                                           ?? editor.SelectedCalendar;
             }
 

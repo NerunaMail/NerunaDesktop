@@ -67,7 +67,7 @@ internal sealed class EwsCalendarProvider(ServiceConnection connection, EwsConne
         return [.. folders.Where(IsCalendar)
             .OrderBy(f => EwsOperations.FolderIdOf(f) != main)
             .Select(f => new CalendarInfo(connection.Id, EwsOperations.FolderIdOf(f), f.Val("DisplayName") ?? string.Empty, null,
-                f.Get("EffectiveRights") is { } rights && !rights.Bool("CreateContents")))];
+                f.Get("EffectiveRights") is { } rights && !rights.Bool("CreateContents"), IsDefault: EwsOperations.FolderIdOf(f) == main))];
     }
 
     internal static bool IsCalendar(XElement folder) =>

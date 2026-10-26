@@ -79,6 +79,8 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
     private static readonly XName ProxyWriteFor = DavNames.CalendarServer + "calendar-proxy-write-for";
     private static readonly XName ProxyRead = DavNames.CalendarServer + "calendar-proxy-read";
     private static readonly XName ProxyWrite = DavNames.CalendarServer + "calendar-proxy-write";
+    private static readonly XName ScheduleInbox = DavNames.CalDav + "schedule-inbox-URL";
+    private static readonly XName ScheduleDefaultCalendar = DavNames.CalDav + "schedule-default-calendar-URL";
 
     /// <summary>Other principals asked for delegated home sets, at most (groups can be large).</summary>
     private const int MaxRelatedPrincipals = 25;
@@ -92,6 +94,9 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
     /// </summary>
     /// <summary>The collection home that the last discovery listed (null: only the configured collection).</summary>
     public Uri? Home { get; private set; }
+
+    /// <summary>The user's default calendar as the server names it (RFC 6638 schedule-default-calendar-URL, e.g. Nextcloud); null if it does not.</summary>
+    public Uri? DefaultCalendar { get; private set; }
 
     /// <summary>The single collection at <paramref name="url"/>, or null if it is not one of our type.</summary>
     public async Task<DavCollection?> GetCollectionAsync(Uri url, CancellationToken cancellationToken)
@@ -110,6 +115,7 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
     public async Task<IReadOnlyList<DavCollection>> DiscoverAsync(CancellationToken cancellationToken)
     {
         Home = null;
+        DefaultCalendar = null;
         var answers = new List<string>();
         var blocked = false;
         foreach (var candidate in Candidates())
@@ -291,7 +297,7 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
         }
 
         XName[] properties = flavor == DavFlavor.CalDav
-            ? [flavor.HomeSet, DisplayName, ResourceType, GroupMembership, ProxyReadFor, ProxyWriteFor]
+            ? [flavor.HomeSet, DisplayName, ResourceType, GroupMembership, ProxyReadFor, ProxyWriteFor, ScheduleInbox]
             : [flavor.HomeSet, DisplayName, ResourceType, GroupMembership];
         var me = await PrincipalAsync(principal, properties, cancellationToken);
         if (me is null)
@@ -300,6 +306,11 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
         }
 
         Add(homes, me, null);
+        if (HrefOf(me, ScheduleInbox) is { } inbox && await PrincipalAsync(inbox, [ScheduleDefaultCalendar], cancellationToken) is { } box)
+        {
+            DefaultCalendar = HrefOf(box, ScheduleDefaultCalendar);
+        }
+
         var queried = new HashSet<string>(StringComparer.Ordinal) { principal.AbsolutePath.TrimEnd('/') };
         var pending = new Queue<(Uri Url, int Level)>(Related(me).Select(u => (u, 1)));
         while (pending.TryDequeue(out var next) && queried.Count <= MaxRelatedPrincipals)

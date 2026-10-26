@@ -221,6 +221,8 @@ internal sealed class CalendarEntity
 
     /// <summary>CalendarContent flags: 1 events, 2 tasks, 3 both.</summary>
     public int Content { get; set; } = 1;
+
+    public bool IsDefault { get; set; }
 }
 
 internal sealed class CalendarObjectEntity

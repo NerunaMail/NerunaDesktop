@@ -110,6 +110,12 @@ public class DavDiscoveryTests
         await env.Calendar.SetSelectionAsync(calendar, [.. found.Where(c => c.Calendar.Name != "Team-Termine").Select(c => c.Calendar.RemoteId)], [.. found.Select(c => c.Calendar.RemoteId)], ct);
         Assert.Equal(["Arbeit", "Lea privat", "Persönlich"], (await env.Calendar.GetCalendarsAsync(ct)).Select(c => c.Name).Order());
 
+        // The server names "Arbeit" as Anna's default calendar: new events and invitations of the account go there,
+        // though "Persönlich" lies in her home and is called like the usual default.
+        Assert.Equal(["Arbeit"], (await env.Calendar.GetCalendarsAsync(ct)).Where(c => c.IsDefault).Select(c => c.Name));
+        var account = Assert.Single(await env.Accounts.GetAccountsAsync(ct));
+        Assert.Equal("Arbeit", (await env.Get<InvitationService>().DefaultCalendarAsync(account, ct)).Name);
+
         // Each principal is asked once per discovery, even if reached twice (proxy group and proxy-for).
         dav.Asked.Clear();
         await env.Calendar.DiscoverAsync(calendar, ct);
@@ -228,7 +234,10 @@ public class DavDiscoveryTests
                     + "<C:calendar-home-set><D:href>/cal/anna/</D:href><D:href>/cal/anna-work/</D:href></C:calendar-home-set>"
                     + "<R:addressbook-home-set><D:href>/card/anna/</D:href></R:addressbook-home-set>"
                     + "<D:group-membership><D:href>/principals/lea/calendar-proxy-write/</D:href><D:href>/principals/team/</D:href></D:group-membership>"
-                    + "<S:calendar-proxy-read-for><D:href>/principals/lea/</D:href></S:calendar-proxy-read-for>"),
+                    + "<S:calendar-proxy-read-for><D:href>/principals/lea/</D:href></S:calendar-proxy-read-for>"
+                    + "<C:schedule-inbox-URL><D:href>/cal/anna/inbox/</D:href></C:schedule-inbox-URL>"),
+                ("/cal/anna/inbox/", "0") => Resource(path, "<D:resourcetype><D:collection/><C:schedule-inbox/></D:resourcetype>"
+                    + "<C:schedule-default-calendar-URL><D:href>/cal/anna-work/work/</D:href></C:schedule-default-calendar-URL>"),
                 ("/principals/lea/calendar-proxy-write/", _) => Resource(path, "<D:resourcetype><D:principal/><S:calendar-proxy-write/></D:resourcetype>"),
                 ("/principals/lea/", _) => Resource(path, "<D:resourcetype><D:principal/></D:resourcetype><D:displayname>Lea Keller</D:displayname><C:calendar-home-set><D:href>/cal/lea/</D:href></C:calendar-home-set>"),
                 ("/principals/team/", _) => Resource(path, "<D:resourcetype><D:principal/></D:resourcetype><D:displayname>Team</D:displayname>"

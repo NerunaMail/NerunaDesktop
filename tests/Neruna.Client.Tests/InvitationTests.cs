@@ -153,12 +153,12 @@ public class InvitationTests
         var ct = TestContext.Current.CancellationToken;
         var tag = Guid.NewGuid().ToString("N")[..8];
         await using var anna = await PersonAsync("anna@example.com", "Anna Muster", "d" + tag, ct);
-        var own = Assert.Single(await anna.Invitations.TargetCalendarsAsync(anna.Account, ct));
+        var own = Assert.Single(await anna.Invitations.TargetCalendarsAsync(anna.Account, cancellationToken: ct));
         var settings = anna.Env.Get<ISettingsStore>();
 
         // Set in "Kalender verwalten": that one; a calendar that no longer exists: one of the account's own again.
         await settings.SetAsync(InvitationService.DefaultCalendarKey(anna.Account.Id), CalendarController.CalendarKey(own), ct);
-        Assert.Equal(own, (await anna.Invitations.TargetCalendarsAsync(anna.Account, ct))[0]);
+        Assert.Equal(own, (await anna.Invitations.TargetCalendarsAsync(anna.Account, cancellationToken: ct))[0]);
         await settings.SetAsync(InvitationService.DefaultCalendarKey(anna.Account.Id), Guid.NewGuid().ToString("N") + "|/gone/", ct);
         Assert.Equal(own, await anna.Invitations.DefaultCalendarAsync(anna.Account, ct));
     }

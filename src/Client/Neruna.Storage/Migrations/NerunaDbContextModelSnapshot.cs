@@ -95,6 +95,9 @@ namespace Neruna.Storage.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(1);
 
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsReadOnly")
                         .HasColumnType("INTEGER");
 

@@ -146,9 +146,13 @@ internal sealed class CalDavCalendarProvider : DavProviderBase, ICalendarProvide
             : F("Nur die eingetragene Adresse {0} (kein Kalender-Ordner gefunden) · angemeldet als {1}", Settings.Url.AbsoluteUri, Settings.Username);
         return collections
             .Where(c => c.Content != CalendarContent.None)
-            .Select(c => new CalendarInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.Color, c.IsReadOnly, Content: c.Content, SharedBy: c.SharedBy))
+            .Select(c => new CalendarInfo(ConnectionId, c.Url.AbsoluteUri, c.Name, c.Color, c.IsReadOnly, Content: c.Content, SharedBy: c.SharedBy,
+                IsDefault: service.DefaultCalendar is { } standard && SamePath(c.Url, standard)))
             .ToList();
     }
+
+    private static bool SamePath(Uri a, Uri b) =>
+        string.Equals(Uri.UnescapeDataString(a.AbsolutePath).TrimEnd('/'), Uri.UnescapeDataString(b.AbsolutePath).TrimEnd('/'), StringComparison.Ordinal);
 
     public async Task<CalendarSyncResult> SyncCalendarAsync(CalendarInfo calendar, IReadOnlyDictionary<string, string?> knownVersions, CancellationToken cancellationToken = default)
     {

@@ -9,6 +9,7 @@ namespace Neruna.Core.Calendar;
 /// Found through delegation in another person's (or group's) calendar home: whose. Such calendars are offered under
 /// "Kalender verwalten" but only synchronized once chosen. Not stored – the provider reports it on each discovery.
 /// </param>
+/// <param name="IsDefault">The account's own default calendar as the server names it (CalDAV schedule-default-calendar-URL, Exchange's "Calendar").</param>
 public sealed record CalendarInfo(
     Guid ConnectionId,
     string RemoteId,
@@ -18,7 +19,8 @@ public sealed record CalendarInfo(
     string? SyncState = null,
     string? ServerName = null,
     CalendarContent Content = CalendarContent.Events,
-    string? SharedBy = null)
+    string? SharedBy = null,
+    bool IsDefault = false)
 {
     public bool HasEvents => Content.HasFlag(CalendarContent.Events);
 

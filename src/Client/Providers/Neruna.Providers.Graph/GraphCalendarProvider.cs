@@ -93,9 +93,9 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
 
     /// <summary>The calendars, and – with the Tasks permission – the Microsoft To Do lists as task lists.</summary>
     public async Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default) =>
-        [.. (await graph.GetAllAsync("me/calendars?$top=100&$select=id,name,hexColor,canEdit", cancellationToken))
+        [.. (await graph.GetAllAsync("me/calendars?$top=100&$select=id,name,hexColor,canEdit,isDefaultCalendar", cancellationToken))
             .Select(c => new CalendarInfo(connectionId, c.Str("id")!, c.Str("name") ?? string.Empty,
-                c.Str("hexColor") is { Length: > 0 } color ? color : null, !c.Bool("canEdit"))),
+                c.Str("hexColor") is { Length: > 0 } color ? color : null, !c.Bool("canEdit"), IsDefault: c.Bool("isDefaultCalendar"))),
          .. await GraphTasks.GetListsAsync(connectionId, graph, cancellationToken)];
 
     public async Task<CalendarSyncResult> SyncCalendarAsync(CalendarInfo calendar, IReadOnlyDictionary<string, string?> knownVersions, CancellationToken cancellationToken = default)

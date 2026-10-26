@@ -530,28 +530,49 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         (await accounts.GetAccountsAsync(cancellationToken)).FirstOrDefault(a => a.Connections.Any(c => c.Id == connectionId))
         ?? throw new InvalidOperationException(T("Das Konto dieses Kalenders existiert nicht mehr."));
 
-    /// <summary>Writable calendars an accepted invitation can go into, the best choice first.</summary>
-    public async Task<IReadOnlyList<CalendarInfo>> TargetCalendarsAsync(Account account, CancellationToken cancellationToken = default)
+    /// <summary>Writable calendars an accepted invitation – or a new event of this account – can go into, the best choice first.</summary>
+    /// <param name="preferred">
+    /// A calendar key (<see cref="CalendarController.CalendarKey"/>) to take among the account's own calendars before the
+    /// server's default, e.g. the general default calendar (Einstellungen → Kalender); also first among the others.
+    /// </param>
+    public async Task<IReadOnlyList<CalendarInfo>> TargetCalendarsAsync(Account account, string? preferred = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(account);
-        var writable = (await calendars.GetCalendarsAsync(cancellationToken)).Where(c => !c.IsReadOnly).ToList();
+        var writable = (await calendars.GetCalendarsAsync(cancellationToken)).Where(c => !c.IsReadOnly && c.HasEvents).ToList();
         var own = account.Connections.Select(c => c.Id).ToHashSet();
         var chosen = await settings.GetAsync(DefaultCalendarKey(account.Id), cancellationToken);
         var local = account.EmailAddress?.Split('@')[0];
 
-        // The one set in "Kalender verwalten"; else a calendar of this account in the user's own home (its address contains the
-        // user name – subscribed calendars of others live under their names); else any of this account; else any.
+        // The one set in "Kalender verwalten"; else the preferred one if it is the account's; else the account's default
+        // calendar as the server names it; else a calendar of this account in the user's own home (its address contains
+        // the user name – subscribed calendars of others live under their names); else any of this account; else any.
         int Rank(CalendarInfo c)
         {
-            if (chosen == c.ConnectionId.ToString("N") + "|" + c.RemoteId)
+            var key = CalendarController.CalendarKey(c);
+            if (chosen == key)
             {
                 return 0;
+            }
+
+            if (!own.Contains(c.ConnectionId))
+            {
+                return key == preferred ? 5 : 6;
+            }
+
+            if (key == preferred)
+            {
+                return 1;
+            }
+
+            if (c.IsDefault)
+            {
+                return 2;
             }
 
             var path = Uri.UnescapeDataString(c.RemoteId);
             var inOwnHome = (account.EmailAddress is { } email && path.Contains("/" + email + "/", StringComparison.OrdinalIgnoreCase))
                             || (local is not null && path.Contains("/" + local + "/", StringComparison.OrdinalIgnoreCase));
-            return own.Contains(c.ConnectionId) ? (inOwnHome ? 1 : 2) : 3;
+            return inOwnHome ? 3 : 4;
         }
 
         // Among equals, the usual default calendar ("personal" in SOGo and Nextcloud).
@@ -563,7 +584,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
     }
 
     public async Task<CalendarInfo> DefaultCalendarAsync(Account account, CancellationToken cancellationToken = default) =>
-        (await TargetCalendarsAsync(account, cancellationToken)).FirstOrDefault()
+        (await TargetCalendarsAsync(account, cancellationToken: cancellationToken)).FirstOrDefault()
         ?? throw new InvalidOperationException(T("Kein beschreibbarer Kalender vorhanden, in den der Termin eingetragen werden kann."));
 
     /// <summary>
