@@ -127,5 +127,7 @@ public class CrashReportTests
         Assert.Equal("desktop", body.App);
         Assert.True(body.Fatal);
         Assert.Equal("Auf «Senden» geklickt, Antwort an <email>", body.Comment);
+        // With its log a report is large: it must go with a Content-Length, or the hosting hands the server an empty body (422).
+        Assert.DoesNotContain(url, env.Http.Chunked);
     }
 }

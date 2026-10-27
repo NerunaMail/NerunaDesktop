@@ -669,6 +669,25 @@
       drawnCaret.id = "neruna-caret";
       document.body.appendChild(drawnCaret);
       editor.style.caretColor = "transparent";
+      // The view also moves the caret when the mouse only passes over the text, without a button down: such a move
+      // is undone, the caret stays where the last click, key or Neruna put it. (Before placeCaret: it draws the result.)
+      var hoverAt = 0, kept = null;
+      document.addEventListener("mousemove", function (e) { hoverAt = e.buttons ? 0 : Date.now(); }, true);
+      ["mousedown", "keydown", "compositionstart", "drop"].forEach(function (name) {
+        document.addEventListener(name, function () { hoverAt = 0; }, true);
+      });
+      document.addEventListener("selectionchange", function () {
+        var selection = window.getSelection();
+        var now = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        if (hoverAt && Date.now() - hoverAt < 200 && kept && editor.contains(kept.startContainer)) {
+          if (!now || now.compareBoundaryPoints(Range.START_TO_START, kept) !== 0 || now.compareBoundaryPoints(Range.END_TO_END, kept) !== 0) {
+            selection.removeAllRanges();
+            selection.addRange(kept.cloneRange());
+          }
+          return;
+        }
+        if (now) kept = now.cloneRange();
+      });
       ["selectionchange", "input", "focusin", "focusout"].forEach(function (name) { document.addEventListener(name, placeCaret); });
       window.addEventListener("scroll", placeCaret);
       window.addEventListener("resize", placeCaret);

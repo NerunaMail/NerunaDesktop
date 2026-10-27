@@ -227,7 +227,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         if (paths.Count == 0)
         {
             // No paths (WebKit without file:// URIs): the content only, to attach.
-            _ = _web?.InvokeScript($"neruna.readDroppedFiles({MaxDroppedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+            _ = ScriptAsync($"neruna.readDroppedFiles({MaxDroppedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
             return;
         }
 
@@ -312,7 +312,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
         try
         {
-            return _lastHtml = Unwrap(await _web.InvokeScript("neruna.getHtml()"));
+            return _lastHtml = Unwrap(await ScriptAsync("neruna.getHtml()"));
         }
         catch (InvalidOperationException)
         {
@@ -331,7 +331,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             return null;
         }
 
-        return Unwrap(await _web.InvokeScript("neruna.getBodyHtml()"));
+        return Unwrap(await ScriptAsync("neruna.getBodyHtml()"));
     }
 
     public string GetPlainText() => _fallback?.Text ?? string.Empty;
@@ -349,7 +349,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         if (_web is not null && _ready)
         {
             var map = System.Text.Json.JsonSerializer.Serialize(_shortcuts.ToDictionary(p => p.Key, p => p.Value.Html));
-            await _web.InvokeScript($"neruna.setShortcuts({map})");
+            await ScriptAsync($"neruna.setShortcuts({map})");
         }
     }
 
@@ -361,7 +361,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         _autoLists = enabled;
         if (_web is not null && _ready)
         {
-            _ = _web.InvokeScript($"neruna.setAutoLists({(enabled ? "true" : "false")})");
+            _ = ScriptAsync($"neruna.setAutoLists({(enabled ? "true" : "false")})");
         }
     }
 
@@ -413,7 +413,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             return new EditorTexts(string.Empty, string.Empty, string.Empty);
         }
 
-        var json = Unwrap(await _web.InvokeScript("neruna.texts()"));
+        var json = Unwrap(await ScriptAsync("neruna.texts()"));
         return json is null ? new EditorTexts(string.Empty, string.Empty, string.Empty)
             : JsonSerializer.Deserialize<EditorTexts>(json, WebJson) ?? new EditorTexts(string.Empty, string.Empty, string.Empty);
     }
@@ -444,14 +444,14 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         }
 
         return IsRich && _web is not null
-               && Unwrap(await _web.InvokeScript($"neruna.replaceText({FormattingViewModel.Js(html)}, {(selectionOnly ? "true" : "false")})")) == "ok";
+               && Unwrap(await ScriptAsync($"neruna.replaceText({FormattingViewModel.Js(html)}, {(selectionOnly ? "true" : "false")})")) == "ok";
     }
 
     public async Task RunAsync(string script)
     {
         if (IsRich && _web is not null)
         {
-            await _web.InvokeScript(script);
+            await ScriptAsync(script);
         }
     }
 
@@ -652,11 +652,11 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 HookNativeFiles(_web?.TryGetPlatformHandle());
                 _ = PushContentAsync();
                 _ = PushShortcutsAsync();
-                _ = _web?.InvokeScript($"neruna.setAutoLists({(_autoLists ? "true" : "false")})");
+                _ = ScriptAsync($"neruna.setAutoLists({(_autoLists ? "true" : "false")})");
                 if (OperatingSystem.IsLinux())
                 {
                     // WebKitGTK in the embedded view gets the keys but draws no caret: the page draws one.
-                    _ = _web?.InvokeScript("neruna.drawCaret(true)");
+                    _ = ScriptAsync("neruna.drawCaret(true)");
                 }
 
                 ModeChanged?.Invoke(this, true);
@@ -714,7 +714,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         }
 
         var script = $"neruna.setContent({Js(content.Html)}, {Js(content.Font)}, {content.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}, {Js(content.Placeholder)})";
-        await _web.InvokeScript(script);
+        await ScriptAsync(script);
         await ApplyThemeAsync();
     }
 
@@ -723,7 +723,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     {
         if (_web is not null && _ready)
         {
-            await _web.InvokeScript($"neruna.setDark({(Infrastructure.MailPaper.IsDarkTheme ? "true" : "false")})");
+            await ScriptAsync($"neruna.setDark({(Infrastructure.MailPaper.IsDarkTheme ? "true" : "false")})");
         }
     }
 
@@ -767,6 +767,12 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     }
 
     // Script results/messages may arrive JSON-encoded (WebView2) or raw, depending on the platform.
+    // WebKitGTK (Linux) fails a script whose result is undefined ("Unsupported result type", e.g. neruna.font(…)):
+    // every call into the page ends in a string ("" for nothing).
+    private Task<string?> ScriptAsync(string expression) => _web is null
+        ? Task.FromResult<string?>(null)
+        : _web.InvokeScript($"(function () {{ var r = ({expression}); return r == null ? \"\" : String(r); }})()");
+
     private static string? Unwrap(string? value)
     {
         if (value is { Length: >= 2 } && value[0] == '"' && value[^1] == '"')

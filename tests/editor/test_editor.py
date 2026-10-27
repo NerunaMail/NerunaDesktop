@@ -366,3 +366,25 @@ def test_linux_caret_is_drawn_where_the_text_goes(page):
     page.evaluate("document.activeElement.blur()")
     page.wait_for_timeout(50)
     assert caret_box(page) is None
+
+
+def test_linux_caret_stays_when_the_mouse_only_passes_over_the_text(page):
+    page.evaluate("neruna.drawCaret(true)")
+    page.evaluate("neruna.focus()")
+    page.keyboard.type("Hallo Anna, wie geht es dir?")
+    page.wait_for_timeout(50)
+    at_end = caret_box(page)
+
+    move_caret_to_start = """() => { const r = document.createRange(); r.setStart(document.getElementById('editor').firstChild.firstChild || document.getElementById('editor').firstChild, 0);
+                              r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }"""
+    # Hovering (no button) and the view moving the caret meanwhile: it goes back to where it was.
+    page.evaluate("document.getElementById('editor').dispatchEvent(new MouseEvent('mousemove', { bubbles: true, buttons: 0 }))")
+    page.evaluate(move_caret_to_start)
+    page.wait_for_timeout(80)
+    assert caret_box(page)["left"] == at_end["left"]
+
+    # A click (button down) moves it.
+    page.evaluate("document.getElementById('editor').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, buttons: 1 }))")
+    page.evaluate(move_caret_to_start)
+    page.wait_for_timeout(80)
+    assert caret_box(page)["left"] < at_end["left"] - 30

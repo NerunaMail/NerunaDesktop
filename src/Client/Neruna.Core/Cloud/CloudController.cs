@@ -363,6 +363,9 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
 
             if (response.StatusCode is HttpStatusCode.UnprocessableEntity or HttpStatusCode.BadRequest)
             {
+                // The server's reason (which fields) – the report itself is dropped, so this is all that is left of it.
+                var reason = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogWarning("Crash report refused by the server: {Reason}", reason.Length > 500 ? reason[..500] : reason);
                 throw new CloudException("invalid", F("Der Server antwortet mit Fehler {0}. Stimmt die Serveradresse?", (int)response.StatusCode));
             }
 
@@ -440,10 +443,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
                     var request = new HttpRequestMessage(method, new Uri(connection.Server, path));
                     if (body is not null)
                     {
-                        // Buffered, so it goes with a Content-Length: a chunked body larger than the hosting's post_max_size
-                        // would arrive empty, and the server could not tell why.
                         request.Content = JsonContent.Create(body, body.GetType(), options: NerunaJson.Options);
-                        await request.Content.LoadIntoBufferAsync(cancellationToken);
                     }
 
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -578,6 +578,13 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         using (request)
         {
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            if (request.Content is not null)
+            {
+                // Buffered, so it goes with a Content-Length: a chunked body larger than the hosting's post_max_size
+                // arrives empty, and the server answers 422 for every field (vault backups, crash reports with their log).
+                await request.Content.LoadIntoBufferAsync(cancellationToken);
+            }
+
             // The server answers in the language of the UI (German for now; later the UI culture).
             request.Headers.AcceptLanguage.Add(new StringWithQualityHeaderValue(UiLanguage));
             try

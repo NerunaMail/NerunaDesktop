@@ -109,6 +109,9 @@ internal sealed class StubHttpHandler : HttpMessageHandler
     /// <summary>Method, address and body of requests that had one (POST, PUT).</summary>
     public List<(string Method, string Url, string Body)> Sent { get; } = [];
 
+    /// <summary>Addresses whose body went without a Content-Length (chunked – the hosting drops large ones).</summary>
+    public List<string> Chunked { get; } = [];
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var url = request.RequestUri!.AbsoluteUri;
@@ -116,6 +119,11 @@ internal sealed class StubHttpHandler : HttpMessageHandler
         UserAgents.Add(request.Headers.UserAgent.ToString());
         if (request.Content is not null)
         {
+            if (request.Content.Headers.ContentLength is null)
+            {
+                Chunked.Add(url);
+            }
+
             Sent.Add((request.Method.Method, url, await request.Content.ReadAsStringAsync(cancellationToken)));
         }
 
