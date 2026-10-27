@@ -2347,5 +2347,9 @@
  "Vorheriger Tag": "Previous day",
  "Nächster Tag": "Next day",
  "Nur einen Tag anzeigen": "Show one day only",
- "Neruna für iPhone und iPad {0}": "Neruna for iPhone and iPad {0}"
+ "Neruna für iPhone und iPad {0}": "Neruna for iPhone and iPad {0}",
+ "Duplizieren": "Duplicate",
+ "Löschen fehlgeschlagen: ": "Deleting failed: ",
+ "Wiederkehrender Termin – es wird die ganze Serie gelöscht.": "Recurring event – the whole series will be deleted.",
+ "«{0}» gelöscht.": "“{0}” deleted."
 }

@@ -123,6 +123,9 @@ public static class SettingKeys
     /// <summary>Order of the account groups in "Meine Kalender" (JSON list of account ids); others follow in account order.</summary>
     public const string CalendarGroupOrder = "calendar.groupOrder";
 
+    /// <summary>The order of the calendars within their account group (JSON list of calendar keys); the others follow by name.</summary>
+    public const string CalendarOrder = "calendar.order";
+
     /// <summary>Reminder for new events and accepted invitations, minutes before the start; "none" for none. Default: 15.</summary>
     public const string CalendarDefaultReminder = "calendar.defaultReminder";
 

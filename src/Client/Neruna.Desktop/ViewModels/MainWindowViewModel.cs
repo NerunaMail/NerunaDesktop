@@ -223,6 +223,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
         CalendarPage.RemoveRequested += async (_, info) => await RemoveCalendarAccountAsync(info);
         CalendarPage.EditorRequested += (_, editor) => ShowEditor(editor, CalendarChangedAsync);
+        CalendarPage.StatusMessage += (_, message) => StatusText = message;
         CalendarPage.TaskListsChanged += async (_, _) => await TasksPage.ReloadAsync();
         CalendarPage.TaskOpenRequested += async (_, occurrence) =>
         {

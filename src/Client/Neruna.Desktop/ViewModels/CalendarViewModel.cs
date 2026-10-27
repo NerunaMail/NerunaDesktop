@@ -271,7 +271,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         foreach (var info in all.Where(c => c.HasEvents))
         {
             var color = colors[(info.ConnectionId, info.RemoteId)];
-            var item = new CalendarListItem(info, color)
+            var item = new CalendarListItem(this, info, color)
             {
                 IsVisible = !hidden.Contains(CalendarController.CalendarKey(info)),
                 ShowTasks = tasksShown.Contains(CalendarController.CalendarKey(info)),
@@ -306,9 +306,12 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var accountOf = sources.ToDictionary(s => s.Connection.Id, s => s.Account);
         var accountOrder = sources.Select(s => s.Account.Id).Distinct().ToList();
         var chosen = ParseOrder(await settings.GetAsync(SettingKeys.CalendarGroupOrder));
+        // Within a group: the order the user chose, the others after them as before (by name).
+        var calendarOrder = ParseKeys(await settings.GetAsync(SettingKeys.CalendarOrder));
         var groups = items
             .GroupBy(i => accountOf.TryGetValue(i.Info.ConnectionId, out var account) ? account : null)
-            .Select(g => new CalendarGroup(this, g.Key?.Id ?? Guid.Empty, g.Key?.Title ?? T("Weitere"), [.. g]))
+            .Select(g => new CalendarGroup(this, g.Key?.Id ?? Guid.Empty, g.Key?.Title ?? T("Weitere"),
+                new ObservableCollection<CalendarListItem>(g.OrderBy(i => calendarOrder.IndexOf(i.Key) is var at and >= 0 ? at : calendarOrder.Count))))
             .OrderBy(g => chosen.IndexOf(g.AccountId) is var at and >= 0 ? at : chosen.Count + accountOrder.IndexOf(g.AccountId))
             .ToList();
 
@@ -324,9 +327,63 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         }
 
         UpdateGroupMoves();
+        foreach (var group in CalendarGroups)
+        {
+            UpdateCalendarMoves(group);
+        }
 
         OnPropertyChanged(nameof(HasCalendars));
         await LoadWeekAsync(dataChanged: true);
+    }
+
+    private static List<string> ParseKeys(string? json)
+    {
+        try
+        {
+            return json is null ? [] : System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Moves a calendar up or down within its account group; the order of all groups is kept.</summary>
+    internal async Task MoveCalendarAsync(CalendarListItem item, int delta)
+    {
+        if (CalendarGroups.FirstOrDefault(g => g.Items.Contains(item)) is not { } group)
+        {
+            return;
+        }
+
+        var index = group.Items.IndexOf(item);
+        var target = index + delta;
+        if (target < 0 || target >= group.Items.Count)
+        {
+            return;
+        }
+
+        group.Items.Move(index, target);
+        UpdateCalendarMoves(group);
+        Calendars.Clear();
+        foreach (var calendarItem in CalendarGroups.SelectMany(g => g.Items))
+        {
+            Calendars.Add(calendarItem);
+        }
+
+        // Calendars of other workspaces keep their place: the shown ones are put in, the rest stays behind them.
+        var shown = CalendarGroups.SelectMany(g => g.Items).Select(i => i.Key).ToList();
+        var kept = ParseKeys(await settings.GetAsync(SettingKeys.CalendarOrder)).Where(k => !shown.Contains(k));
+        await settings.SetAsync(SettingKeys.CalendarOrder, System.Text.Json.JsonSerializer.Serialize(shown.Concat(kept)));
+    }
+
+    private static void UpdateCalendarMoves(CalendarGroup group)
+    {
+        for (var i = 0; i < group.Items.Count; i++)
+        {
+            group.Items[i].CanMoveUp = i > 0;
+            group.Items[i].CanMoveDown = i < group.Items.Count - 1;
+        }
     }
 
     private static List<Guid> ParseOrder(string? json)
@@ -506,7 +563,101 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         await ShowEditorAsync(EventDraft.FromICalendar(stored.ICalendarData), (occurrence.Calendar, occurrence.ObjectRemoteId));
     }
 
-    private async Task ShowEditorAsync(EventDraft draft, (CalendarInfo Calendar, string RemoteId)? existing)
+    // ---- Right-click on an event ---------------------------------------------------------------------------------
+
+    /// <summary>What the context menu of an event offers: its online meeting's link, and whether it may be deleted.</summary>
+    internal async Task<(string? MeetingUrl, bool CanChange)> EventMenuAsync(CalendarOccurrence occurrence)
+    {
+        if (occurrence.IsTask || await calendar.GetObjectAsync(occurrence.Calendar, occurrence.ObjectRemoteId) is not { } stored)
+        {
+            return (null, false);
+        }
+
+        return (EventDraft.FromICalendar(stored.ICalendarData).Meeting?.JoinUrl, !occurrence.Calendar.IsReadOnly);
+    }
+
+    /// <summary>A message for the status bar (deleted, invitations sent, an error).</summary>
+    public event EventHandler<string>? StatusMessage;
+
+    /// <summary>A new event with the same title, time, place and text, in the same calendar – without attendees or meeting.</summary>
+    [RelayCommand]
+    private async Task DuplicateEventAsync(CalendarEventItem item)
+    {
+        if (item.Occurrence.IsTask || await calendar.GetObjectAsync(item.Occurrence.Calendar, item.Occurrence.ObjectRemoteId) is not { } stored)
+        {
+            return;
+        }
+
+        var original = EventDraft.FromICalendar(stored.ICalendarData);
+        var description = original.Meeting is { } meeting ? Neruna.Core.Meetings.OnlineMeeting.RemoveFrom(original.Description, meeting.JoinUrl) : original.Description;
+        var copy = original with
+        {
+            Description = string.IsNullOrWhiteSpace(description) ? null : description,
+            Attendees = [],
+            Organizer = null,
+            Meeting = null,
+        };
+
+        // An occurrence of a series: a single event on that day.
+        if (item.Occurrence.IsRecurring)
+        {
+            var offset = item.Occurrence.IsAllDay ? item.Occurrence.Start.Date - original.Start.Date : item.Occurrence.Start.LocalDateTime - original.Start;
+            copy = copy with { Start = original.Start + offset, End = original.End + offset, Recurrence = RecurrenceKind.None };
+        }
+
+        await ShowEditorAsync(copy, null, item.Occurrence.Calendar.IsReadOnly ? null : item.Occurrence.Calendar);
+    }
+
+    /// <summary>Deletes the event (a series as a whole) after asking; attendees or the organizer are told as in the editor.</summary>
+    [RelayCommand]
+    private async Task DeleteEventAsync(CalendarEventItem item)
+    {
+        var occurrence = item.Occurrence;
+        if (occurrence.IsTask || occurrence.Calendar.IsReadOnly
+            || await calendar.GetObjectAsync(occurrence.Calendar, occurrence.ObjectRemoteId) is not { } stored)
+        {
+            return;
+        }
+
+        var draft = EventDraft.FromICalendar(stored.ICalendarData);
+        var me = (await calendar.GetSourcesAsync()).FirstOrDefault(s => s.Connection.Id == occurrence.Calendar.ConnectionId)?.Account.EmailAddress;
+        var isOrganizer = draft.Organizer is null || string.Equals(draft.Organizer, me, StringComparison.OrdinalIgnoreCase);
+        var question = !isOrganizer ? T("Löschen und absagen?")
+            : (draft.Attendees ?? []).Any(a => !string.Equals(a.Email, draft.Organizer, StringComparison.OrdinalIgnoreCase)) ? T("Löschen und Absage an alle?")
+            : T("Wirklich löschen?");
+        if (occurrence.IsRecurring)
+        {
+            question = T("Wiederkehrender Termin – es wird die ganze Serie gelöscht.") + "\n\n" + question;
+        }
+
+        if (!await Views.ChoiceDialog.ShowInFrontAsync(F("«{0}» löschen", string.IsNullOrWhiteSpace(item.Title) ? T("Termin") : item.Title), question,
+                (T("Löschen"), true, false), (T("Abbrechen"), false, true)))
+        {
+            return;
+        }
+
+        try
+        {
+            var message = await EventEditorViewModel.DeleteStoredAsync(calendar, invitations, occurrence.Calendar, occurrence.ObjectRemoteId, isOrganizer, draft.Organizer);
+            StatusMessage?.Invoke(this, message ?? F("«{0}» gelöscht.", item.Title));
+        }
+        catch (EventDeletionException ex)
+        {
+            StatusMessage?.Invoke(this, ex.Message);
+        }
+        catch (RemoteConflictException)
+        {
+            StatusMessage?.Invoke(this, T("Der Termin wurde inzwischen auf dem Server geändert. Bitte synchronisieren (F5) und erneut bearbeiten."));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            StatusMessage?.Invoke(this, T("Löschen fehlgeschlagen: ") + ex.Message);
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task ShowEditorAsync(EventDraft draft, (CalendarInfo Calendar, string RemoteId)? existing, CalendarInfo? target = null)
     {
         var writable = Calendars.Select(c => c.Info).Where(c => !c.IsReadOnly).ToList();
 
@@ -517,7 +668,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             Recipients = recipients,
             Meetings = meetings,
         };
-        if (existing is null && await settings.GetAsync(SettingKeys.CalendarDefaultCalendar) is { Length: > 0 } preferred
+        if (target is not null && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == CalendarController.CalendarKey(target)) is { } same)
+        {
+            editor.SelectedCalendar = same;
+        }
+        else if (existing is null && await settings.GetAsync(SettingKeys.CalendarDefaultCalendar) is { Length: > 0 } preferred
             && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == preferred) is { } standard)
         {
             editor.SelectedCalendar = standard;
@@ -652,13 +807,13 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 }
 
 /// <summary>The calendars of one account in "Meine Kalender", under the account's name.</summary>
-internal sealed partial class CalendarGroup(CalendarViewModel owner, Guid accountId, string title, IReadOnlyList<CalendarListItem> items) : ObservableObject
+internal sealed partial class CalendarGroup(CalendarViewModel owner, Guid accountId, string title, ObservableCollection<CalendarListItem> items) : ObservableObject
 {
     public Guid AccountId { get; } = accountId;
 
     public string Title { get; } = title;
 
-    public IReadOnlyList<CalendarListItem> Items { get; } = items;
+    public ObservableCollection<CalendarListItem> Items { get; } = items;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(MoveUpCommand))]
@@ -675,9 +830,24 @@ internal sealed partial class CalendarGroup(CalendarViewModel owner, Guid accoun
     private Task MoveDownAsync() => owner.MoveGroupAsync(this, +1);
 }
 
-internal sealed class CalendarListItem(CalendarInfo info, string color) : CollectionListItem(info, color)
+internal sealed partial class CalendarListItem(CalendarViewModel owner, CalendarInfo info, string color) : CollectionListItem(info, color)
 {
     public override string SoloTip => IsSolo ? T("Wieder alle ausgewählten Kalender anzeigen") : T("Nur diesen Kalender anzeigen");
+
+    /// <summary>Within its account group (arrows on hover).</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(MoveUpCommand))]
+    public partial bool CanMoveUp { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(MoveDownCommand))]
+    public partial bool CanMoveDown { get; set; }
+
+    [RelayCommand(CanExecute = nameof(CanMoveUp))]
+    private Task MoveUpAsync() => owner.MoveCalendarAsync(this, -1);
+
+    [RelayCommand(CanExecute = nameof(CanMoveDown))]
+    private Task MoveDownAsync() => owner.MoveCalendarAsync(this, +1);
 }
 
 internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem> events)

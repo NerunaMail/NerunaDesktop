@@ -2347,5 +2347,9 @@
  "Vorheriger Tag": "Jour précédent",
  "Nächster Tag": "Jour suivant",
  "Nur einen Tag anzeigen": "Afficher un seul jour",
- "Neruna für iPhone und iPad {0}": "Neruna pour iPhone et iPad {0}"
+ "Neruna für iPhone und iPad {0}": "Neruna pour iPhone et iPad {0}",
+ "Duplizieren": "Dupliquer",
+ "Löschen fehlgeschlagen: ": "La suppression a échoué : ",
+ "Wiederkehrender Termin – es wird die ganze Serie gelöscht.": "Rendez-vous périodique – toute la série sera supprimée.",
+ "«{0}» gelöscht.": "« {0} » supprimé."
 }

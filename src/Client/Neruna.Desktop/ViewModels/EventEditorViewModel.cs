@@ -579,40 +579,49 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
         await RunAsync(async () =>
         {
-            // An attendee who deletes a meeting tells the organizer "abgelehnt".
-            if (!IsOrganizer && (await _calendar.GetObjectAsync(existing.Calendar, existing.RemoteId)) is { } invited)
+            try
             {
-                try
-                {
-                    ResultMessage = await _invitations.SendDeclineAsync(existing.Calendar, invited.ICalendarData)
-                        ? F("Gelöscht – Absage an {0} gesendet.", Organizer)
-                        : null;
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    Error = T("Die Absage an den Organisator konnte nicht gesendet werden: ") + ex.Message;
-                    return false;
-                }
+                ResultMessage = await DeleteStoredAsync(_calendar, _invitations, existing.Calendar, existing.RemoteId, IsOrganizer, Organizer);
+                return true;
             }
-
-            // The organizer of a meeting tells the attendees it is cancelled.
-            if (IsOrganizer && (await _calendar.GetObjectAsync(existing.Calendar, existing.RemoteId)) is { } current)
+            catch (EventDeletionException ex)
             {
-                try
-                {
-                    var sent = await _invitations.SendCancellationAsync(existing.Calendar, current.ICalendarData);
-                    ResultMessage = sent > 0 ? F("Gelöscht – Absage an {0} Person(en) gesendet.", sent) : null;
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    Error = T("Die Absage konnte nicht gesendet werden: ") + ex.Message;
-                    return false;
-                }
+                Error = ex.Message;
+                return false;
             }
-
-            await _calendar.DeleteEventAsync(existing.Calendar, existing.RemoteId);
-            return true;
         });
+    }
+
+    /// <summary>
+    /// Deletes a stored event (a series as a whole): an attendee first tells the organizer "abgelehnt", the organizer
+    /// tells the attendees it is cancelled. Returns what was sent (null: nothing).
+    /// </summary>
+    /// <exception cref="EventDeletionException">The decline or cancellation could not be sent; nothing was deleted.</exception>
+    internal static async Task<string?> DeleteStoredAsync(CalendarController calendar, InvitationService invitations, CalendarInfo target, string remoteId, bool isOrganizer, string? organizer)
+    {
+        string? message = null;
+        if (await calendar.GetObjectAsync(target, remoteId) is { } stored)
+        {
+            try
+            {
+                if (isOrganizer)
+                {
+                    var sent = await invitations.SendCancellationAsync(target, stored.ICalendarData);
+                    message = sent > 0 ? F("Gelöscht – Absage an {0} Person(en) gesendet.", sent) : null;
+                }
+                else if (await invitations.SendDeclineAsync(target, stored.ICalendarData))
+                {
+                    message = F("Gelöscht – Absage an {0} gesendet.", organizer);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new EventDeletionException((isOrganizer ? T("Die Absage konnte nicht gesendet werden: ") : T("Die Absage an den Organisator konnte nicht gesendet werden: ")) + ex.Message, ex);
+            }
+        }
+
+        await calendar.DeleteEventAsync(target, remoteId);
+        return message;
     }
 
     [RelayCommand]
@@ -649,3 +658,6 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         }
     }
 }
+
+/// <summary>Deleting stopped before anything was deleted; the message says why (for the user).</summary>
+internal sealed class EventDeletionException(string message, Exception inner) : Exception(message, inner);

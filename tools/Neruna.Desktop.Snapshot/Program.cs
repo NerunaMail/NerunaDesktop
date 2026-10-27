@@ -687,6 +687,26 @@ internal static class Snapshots
         vm.CalendarPage.NavigatorMonthCount = 1;
         vm.CalendarPage.IsTimeGrid = true;
         await SaveAsync(window, output, "calendar-timegrid.png");
+
+        // A calendar moved within its account; then the right-click menu on an event.
+        var firstGroup = vm.CalendarPage.CalendarGroups.First(g => g.Items.Count > 1);
+        var before = string.Join(", ", firstGroup.Items.Select(i => i.Name));
+        await firstGroup.Items[0].MoveDownCommand.ExecuteAsync(null);
+        await vm.CalendarPage.ReloadAsync();
+        Console.WriteLine($"Calendar order: {before} -> {string.Join(", ", vm.CalendarPage.CalendarGroups.First(g => g.AccountId == firstGroup.AccountId).Items.Select(i => i.Name))}");
+        var eventButton = window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.DataContext is TimedEventItem && b.IsEffectivelyVisible);
+        if (eventButton is not null)
+        {
+            eventButton.RaiseEvent(new Avalonia.Input.ContextRequestedEventArgs());
+            await Task.Delay(500);
+            Dispatcher.UIThread.RunJobs();
+            await SaveAsync(window, output, "calendar-event-menu.png");
+            var shown = TopLevel.GetTopLevel(eventButton)!.GetVisualDescendants().OfType<ContextMenu>().FirstOrDefault()
+                        ?? Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(eventButton)?.GetVisualDescendants().OfType<ContextMenu>().FirstOrDefault();
+            var occurrence = ((TimedEventItem)eventButton.DataContext!).Item.Occurrence;
+            Console.WriteLine($"Event menu for '{occurrence.Summary}': {await vm.CalendarPage.EventMenuAsync(occurrence)}, open={shown is not null}: {string.Join(" | ", (shown?.Items.OfType<MenuItem>() ?? []).Select(m => $"{m.Header}{(m.IsEnabled ? "" : " (off)")}"))}");
+        }
+
         vm.CalendarPage.IsPlanning = true;
         vm.CalendarPage.PlanningPeopleText = "Lea Keller <lea.keller@example.com>, Marco Bernasconi <marco@bernasconi.example.com>, extern@other.org";
         await Task.Delay(1500);

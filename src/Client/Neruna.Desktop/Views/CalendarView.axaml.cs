@@ -109,6 +109,47 @@ internal sealed partial class CalendarView : UserControl
     // data context; the swatch itself carries the color in Tag.
     // "Übernehmen" / "Originalname" in the colour/name flyout.
     // Double-click on a free spot: new event at that time, rounded down to the grid (60/30/15 minutes).
+    // Right-click on an event: open, join its meeting or copy the link, duplicate, delete. The menu is built once the
+    // event is read (whether it has a meeting, whether its calendar may be changed).
+    private async void OnEventContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        if (sender is not Control { DataContext: var data } control || DataContext is not CalendarViewModel vm
+            || (data as CalendarEventItem ?? (data as TimedEventItem)?.Item) is not { } item)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        var (meetingUrl, canChange) = await vm.EventMenuAsync(item.Occurrence);
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem { Header = T("Öffnen"), Command = vm.EditEventCommand, CommandParameter = item });
+        if (meetingUrl is not null && Uri.TryCreate(meetingUrl, UriKind.Absolute, out var join) && join.Scheme is "https" or "http")
+        {
+            menu.Items.Add(new Separator());
+            var open = new MenuItem { Header = T("Teilnehmen") };
+            open.Click += async (_, _) => await TopLevel.GetTopLevel(this)!.Launcher.LaunchUriAsync(join);
+            menu.Items.Add(open);
+            var copy = new MenuItem { Header = T("Link kopieren") };
+            copy.Click += async (_, _) =>
+            {
+                if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+                {
+                    await Avalonia.Input.Platform.ClipboardExtensions.SetTextAsync(clipboard, meetingUrl);
+                }
+            };
+            menu.Items.Add(copy);
+        }
+
+        if (!item.Occurrence.IsTask)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(new MenuItem { Header = T("Duplizieren"), Command = vm.DuplicateEventCommand, CommandParameter = item });
+            menu.Items.Add(new MenuItem { Header = T("Löschen"), Command = vm.DeleteEventCommand, CommandParameter = item, IsEnabled = canChange });
+        }
+
+        menu.Open(control);
+    }
+
     // Planung: double-click on a block opens the event.
     private void OnPlanningBlockDoubleTapped(object? sender, TappedEventArgs e)
     {
