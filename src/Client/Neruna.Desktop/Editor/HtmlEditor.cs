@@ -653,6 +653,12 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 _ = PushContentAsync();
                 _ = PushShortcutsAsync();
                 _ = _web?.InvokeScript($"neruna.setAutoLists({(_autoLists ? "true" : "false")})");
+                if (OperatingSystem.IsLinux())
+                {
+                    // WebKitGTK in the embedded view gets the keys but draws no caret: the page draws one.
+                    _ = _web?.InvokeScript("neruna.drawCaret(true)");
+                }
+
                 ModeChanged?.Invoke(this, true);
                 break;
             case "send":

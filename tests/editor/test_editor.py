@@ -330,3 +330,39 @@ def test_dropped_files_without_path_are_read_for_attaching(page):
     page.wait_for_timeout(200)
     data = page.evaluate("window.__nerunaMessages.filter(m => m.type === 'filedata').slice(-1)[0]")
     assert data["name"] == "offerte.txt" and data["data"].startswith("data:")
+
+
+def caret_box(page):
+    return page.evaluate("""() => { const c = document.getElementById('neruna-caret');
+                     if (!c || getComputedStyle(c).display === 'none') return null;
+                     const r = c.getBoundingClientRect(); return { left: r.left, top: r.top, height: r.height }; }""")
+
+
+def test_linux_caret_is_drawn_where_the_text_goes(page):
+    page.evaluate("neruna.drawCaret(true)")
+    page.evaluate("neruna.focus()")
+    assert page.evaluate("getComputedStyle(document.getElementById('editor')).caretColor") == "rgba(0, 0, 0, 0)"
+
+    # An empty mail: the caret stands at the start of the first line.
+    empty = caret_box(page)
+    assert empty is not None and empty["height"] >= 10
+
+    page.keyboard.type("Hallo Anna")
+    after = caret_box(page)
+    assert after["left"] > empty["left"] + 30 and abs(after["top"] - empty["top"]) < 4
+
+    # A new (empty) line: further down, back at the left.
+    page.keyboard.press("Enter")
+    below = caret_box(page)
+    assert below["top"] > after["top"] + 8 and below["left"] < after["left"]
+
+    # Marked text shows as a selection, not with a caret; leaving the text hides it as well.
+    select_all(page)
+    page.wait_for_timeout(50)
+    assert caret_box(page) is None
+    page.keyboard.press("End")
+    page.wait_for_timeout(50)
+    assert caret_box(page) is not None
+    page.evaluate("document.activeElement.blur()")
+    page.wait_for_timeout(50)
+    assert caret_box(page) is None

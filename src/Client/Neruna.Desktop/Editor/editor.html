@@ -31,6 +31,9 @@
   #neruna-image-frame { position: absolute; display: none; pointer-events: none; border: 1px solid #0f6cbd; box-sizing: border-box; }
   #neruna-image-grip { position: absolute; display: none; width: 12px; height: 12px; background: #0f6cbd; border: 2px solid #ffffff;
                        box-sizing: border-box; cursor: nwse-resize; touch-action: none; }
+  /* Linux: the caret Neruna draws itself (see drawCaret) – outside #editor, never part of the mail. */
+  #neruna-caret { position: absolute; display: none; width: 1px; background: #000000; pointer-events: none; animation: neruna-blink 1s steps(1) infinite; }
+  @keyframes neruna-blink { 50% { opacity: 0; } }
   #neruna-image-size { position: absolute; display: none; padding: 1px 5px; background: #0f6cbd; color: #ffffff;
                        font: 11px sans-serif; border-radius: 3px; pointer-events: none; white-space: nowrap; }
 </style>
@@ -372,6 +375,44 @@
     }
   });
 
+  // The drawn caret (Linux, see neruna.drawCaret): a thin line where the collapsed selection is, blinking anew after
+  // each move. An empty line has no text to measure: then the line box of its element gives the place.
+  var drawnCaret = null;
+  function placeCaret() {
+    if (!drawnCaret) return;
+    var selection = window.getSelection();
+    var focused = document.activeElement === editor || editor.contains(document.activeElement);
+    if (!focused || !selection || selection.rangeCount === 0 || !selection.isCollapsed || !editor.contains(selection.anchorNode)) {
+      drawnCaret.style.display = "none";
+      return;
+    }
+
+    var range = selection.getRangeAt(0);
+    var rects = range.getClientRects();
+    var left, top, height;
+    if (rects.length > 0) {
+      var rect = rects[rects.length - 1];
+      left = rect.left; top = rect.top; height = rect.height;
+    } else {
+      var node = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.parentNode : range.startContainer;
+      if (node === editor && editor.childNodes[range.startOffset] && editor.childNodes[range.startOffset].nodeType === 1) node = editor.childNodes[range.startOffset];
+      var box = node.getBoundingClientRect();
+      var style = window.getComputedStyle(node);
+      var line = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.3;
+      left = box.left + (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.borderLeftWidth) || 0);
+      top = box.top + (parseFloat(style.paddingTop) || 0) + (parseFloat(style.borderTopWidth) || 0);
+      height = line;
+    }
+
+    drawnCaret.style.left = (left + window.scrollX) + "px";
+    drawnCaret.style.top = (top + window.scrollY) + "px";
+    drawnCaret.style.height = Math.max(height, 10) + "px";
+    drawnCaret.style.display = "block";
+    drawnCaret.style.animation = "none";
+    void drawnCaret.offsetWidth; // restart the blink: visible right after typing or moving
+    drawnCaret.style.animation = "";
+  }
+
   // Links are never followed inside the editor.
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest("a");
@@ -620,7 +661,20 @@
       }
       return "ok";
     },
-    state: function () { lastState = ""; reportState(); return "ok"; }
+    state: function () { lastState = ""; reportState(); return "ok"; },
+    /** Linux: WebKitGTK in the app's web view gets the keys but draws no caret – Neruna draws one itself. */
+    drawCaret: function (on) {
+      if (!on || drawnCaret) return "ok";
+      drawnCaret = document.createElement("div");
+      drawnCaret.id = "neruna-caret";
+      document.body.appendChild(drawnCaret);
+      editor.style.caretColor = "transparent";
+      ["selectionchange", "input", "focusin", "focusout"].forEach(function (name) { document.addEventListener(name, placeCaret); });
+      window.addEventListener("scroll", placeCaret);
+      window.addEventListener("resize", placeCaret);
+      placeCaret();
+      return "ok";
+    }
   };
 
   post({ type: "ready" });
