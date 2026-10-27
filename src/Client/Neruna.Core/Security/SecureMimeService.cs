@@ -143,10 +143,23 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
                 throw new SecureMimeException(T("Für folgende Empfänger ist kein gültiges Zertifikat vorhanden: ") + string.Join(", ", missing));
             }
 
-            body = await ApplicationPkcs7Mime.EncryptAsync(context, recipients, body, cancellationToken);
+            body = ToDer(await ApplicationPkcs7Mime.EncryptAsync(context, recipients, body, cancellationToken));
         }
 
         message.Body = body;
+    }
+
+    /// <summary>
+    /// BouncyCastle writes the enveloped data as BER (open lengths, the encrypted content as one primitive [0]) – valid,
+    /// but GnuPG's libksba (gpg4win/GpgOL, Kleopatra) stops with "Encoding problem". DER is read by everyone.
+    /// </summary>
+    internal static ApplicationPkcs7Mime ToDer(ApplicationPkcs7Mime encrypted)
+    {
+        using var ber = new MemoryStream();
+        (encrypted.Content ?? throw new SecureMimeException(T("Die Nachricht hat keinen Inhalt."))).DecodeTo(ber);
+        var der = Org.BouncyCastle.Asn1.Asn1Object.FromByteArray(ber.ToArray()).GetEncoded(Org.BouncyCastle.Asn1.Asn1Encodable.Der);
+        encrypted.Content = new MimeContent(new MemoryStream(der));
+        return encrypted;
     }
 
     /// <summary>Decrypts and verifies; signer certificates of good signatures are collected for later encryption.</summary>

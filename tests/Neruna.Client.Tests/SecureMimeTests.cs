@@ -116,6 +116,12 @@ public class SecureMimeTests
         Assert.IsType<ApplicationPkcs7Mime>(message.Body);
         Assert.DoesNotContain("Rabatt", Serialize(message), StringComparison.Ordinal);
 
+        // DER (fixed lengths): gpg4win's libksba cannot read BouncyCastle's BER ("Encoding problem").
+        using var cms = new MemoryStream();
+        ((ApplicationPkcs7Mime)message.Body).Content!.DecodeTo(cms, ct);
+        var bytes = cms.ToArray();
+        Assert.Equal(Org.BouncyCastle.Asn1.Asn1Object.FromByteArray(bytes).GetEncoded(Org.BouncyCastle.Asn1.Asn1Encodable.Der), bytes);
+
         var opened = await bobEnv.Get<SecureMimeService>().OpenAsync(Reparse(message), ct);
 
         Assert.True(opened.Security.WasEncrypted);
