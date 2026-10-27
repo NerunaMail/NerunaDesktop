@@ -110,7 +110,9 @@ jobs:
     needs: linux
     # One runner for both packages, one after the other: macOS runners are scarce, and two jobs waiting for two of
     # them were cancelled again and again ("not acquired by Runner"); one that gets a runner now builds everything.
-    runs-on: macos-14
+    # An Intel Mac: the arm64 runners were short ("capacity constraints") and cancelled almost every release; the
+    # Apple silicon package is cross-compiled here just like the Intel one.
+    runs-on: macos-15-intel
     env:
       DOTNET_NOLOGO: 1
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
