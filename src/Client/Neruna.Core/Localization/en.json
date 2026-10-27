@@ -2376,5 +2376,7 @@
  "Gmail, Google Kalender, Kontakte und Google Tasks – angemeldet wird im Browser.": "Gmail, Google Calendar, contacts and Google Tasks – you sign in in the browser.",
  "Mail, Kalender, Kontakte und Aufgaben mit Anmeldung bei Google.": "Mail, calendar, contacts and tasks with a Google sign-in.",
  "Testphase: Bei Google ist Neruna noch in der Prüfung. Bis dahin klappt die Anmeldung nur mit Gmail-Adressen, die als Tester eingetragen sind. Senden Sie Ihre Gmail-Adresse an info@neruna.org – sobald sie eingetragen ist, erhalten Sie Bescheid und können sich hier anmelden.": "Test phase: Neruna is still being reviewed by Google. Until then, sign-in only works with Gmail addresses registered as testers. Send your Gmail address to info@neruna.org – as soon as it is registered, you will be notified and can sign in here.",
- "Google hat den Zugriff auf Gmail nicht erlaubt. Bitte erneut anmelden und bei Google alle Häkchen setzen.": "Google did not allow access to Gmail. Please sign in again and tick all boxes at Google."
+ "Google hat den Zugriff auf Gmail nicht erlaubt. Bitte erneut anmelden und bei Google alle Häkchen setzen.": "Google did not allow access to Gmail. Please sign in again and tick all boxes at Google.",
+ "Nicht freigegeben: {0}. Um sie hinzuzufügen, erneut anmelden und bei Google alle Häkchen setzen – das Konto bleibt, wie es ist.": "Not allowed: {0}. To add them, sign in again and tick all boxes at Google – the account stays as it is.",
+ "Bitte mit dem Google-Konto {0} anmelden – für ein anderes ein eigenes Konto hinzufügen.": "Please sign in with the Google account {0} – add a separate account for another one."
 }

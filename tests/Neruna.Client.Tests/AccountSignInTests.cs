@@ -19,12 +19,19 @@ public class AccountSignInTests
 
         public Account? SignedInAgain { get; private set; }
 
+        /// <summary>A service the user allows on the next sign-in (one more connection).</summary>
+        public ServiceConnection? AllowedNext { get; set; }
+
         public Task<SignedInAccount> SignInAsync(Account? existing, string? loginHint, IBrowserLauncher browser, CancellationToken cancellationToken = default)
         {
             SignedInAgain = existing;
             var mail = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, FakeMailProviderFactory.Id, new Dictionary<string, string>());
-            return Task.FromResult(new SignedInAccount(loginHint ?? "eva@example.com", "Eva Muster", existing?.Connections ?? [mail]));
+            IReadOnlyList<ServiceConnection> connections = existing is null ? [mail] : AllowedNext is { } more ? [.. existing.Connections, more] : existing.Connections;
+            return Task.FromResult(new SignedInAccount(loginHint ?? "eva@example.com", "Eva Muster", connections));
         }
+
+        public Task<IReadOnlyList<string>> NotGrantedAsync(Account account, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(account.Connections.Count == 1 ? ["Kalender"] : []);
     }
 
     private sealed class NoBrowser : IBrowserLauncher
@@ -51,6 +58,14 @@ public class AccountSignInTests
         Assert.Same(account, signIn.SignedInAgain);
         Assert.Equal(account.Connections, renamed.Connections);
         Assert.Equal("Eva M.", Assert.Single(await env.Accounts.GetAccountsAsync(ct)).DisplayName);
+
+        // A service allowed only now: signing in again adds it to the account, the rest stays.
+        Assert.Equal(["Kalender"], await setup.NotGrantedAsync(renamed, ct));
+        signIn.AllowedNext = new ServiceConnection(Guid.NewGuid(), ServiceKind.Mail, FakeMailProviderFactory.Id, new Dictionary<string, string>());
+        var extended = await setup.SignInAgainAsync(renamed, "Eva M.", null, null, new NoBrowser(), ct);
+        Assert.Equal([.. renamed.Connections, signIn.AllowedNext], extended.Connections);
+        Assert.Equal(extended.Connections.Select(c => c.Id), Assert.Single(await env.Accounts.GetAccountsAsync(ct)).Connections.Select(c => c.Id));
+        Assert.Empty(await setup.NotGrantedAsync(extended, ct));
 
         // Without the app registration the choice is off.
         var off = new AccountSetupService(env.Get<ProviderRegistry>(), env.Accounts, env.Get<Neruna.Core.Security.ICredentialStore>(), [new FakeSignIn(available: false)]);

@@ -103,6 +103,10 @@
         <SelectableTextBlock TextWrapping="Wrap"
                              Text="{l:T 'Testphase: Bei Google ist Neruna noch in der Prüfung. Bis dahin klappt die Anmeldung nur mit Gmail-Adressen, die als Tester eingetragen sind. Senden Sie Ihre Gmail-Adresse an info@neruna.org – sobald sie eingetragen ist, erhalten Sie Bescheid und können sich hier anmelden.'}" />
       </Border>
+      <!-- Services not allowed at sign-in: signing in again adds them -->
+      <Border IsVisible="{Binding HasNotGranted}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8" Margin="0,0,0,6">
+        <SelectableTextBlock TextWrapping="Wrap" Text="{Binding NotGrantedNote}" />
+      </Border>
       <TextBlock Classes="label" Text="{l:T 'Ihr Name (Absender)'}" IsVisible="{Binding IsEditing}" />
       <TextBox Text="{Binding DisplayName}" IsVisible="{Binding IsEditing}" />
       <TextBlock Classes="label" Text="{l:T 'Kontobezeichnung (optional)'}" />

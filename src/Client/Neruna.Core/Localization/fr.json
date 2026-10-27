@@ -2376,5 +2376,7 @@
  "Gmail, Google Kalender, Kontakte und Google Tasks – angemeldet wird im Browser.": "Gmail, Google Agenda, contacts et Google Tasks – la connexion se fait dans le navigateur.",
  "Mail, Kalender, Kontakte und Aufgaben mit Anmeldung bei Google.": "E-mails, agenda, contacts et tâches avec connexion Google.",
  "Testphase: Bei Google ist Neruna noch in der Prüfung. Bis dahin klappt die Anmeldung nur mit Gmail-Adressen, die als Tester eingetragen sind. Senden Sie Ihre Gmail-Adresse an info@neruna.org – sobald sie eingetragen ist, erhalten Sie Bescheid und können sich hier anmelden.": "Phase de test : Neruna est encore en cours de vérification chez Google. D'ici là, la connexion ne fonctionne qu'avec les adresses Gmail inscrites comme testeurs. Envoyez votre adresse Gmail à info@neruna.org – dès qu'elle est inscrite, vous serez informé et pourrez vous connecter ici.",
- "Google hat den Zugriff auf Gmail nicht erlaubt. Bitte erneut anmelden und bei Google alle Häkchen setzen.": "Google n'a pas autorisé l'accès à Gmail. Veuillez vous reconnecter et cocher toutes les cases chez Google."
+ "Google hat den Zugriff auf Gmail nicht erlaubt. Bitte erneut anmelden und bei Google alle Häkchen setzen.": "Google n'a pas autorisé l'accès à Gmail. Veuillez vous reconnecter et cocher toutes les cases chez Google.",
+ "Nicht freigegeben: {0}. Um sie hinzuzufügen, erneut anmelden und bei Google alle Häkchen setzen – das Konto bleibt, wie es ist.": "Non autorisé : {0}. Pour les ajouter, reconnectez-vous et cochez toutes les cases chez Google – le compte reste tel quel.",
+ "Bitte mit dem Google-Konto {0} anmelden – für ein anderes ein eigenes Konto hinzufügen.": "Veuillez vous connecter avec le compte Google {0} – pour un autre, ajoutez un compte séparé."
 }

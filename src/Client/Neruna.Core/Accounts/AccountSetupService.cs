@@ -254,16 +254,44 @@ public sealed class AccountSetupService(ProviderRegistry providers, IAccountStor
         return account;
     }
 
-    /// <summary>Signs in again (password changed, new permissions) and keeps the account; then the names.</summary>
-    /// <exception cref="AccountSetupException">The sign-in failed.</exception>
+    /// <summary>
+    /// Signs in again (password changed, new permissions) and keeps the account; services allowed at the provider since
+    /// are added (tested first), withdrawn ones removed – the others keep their ids and offline data. Then the names.
+    /// </summary>
+    /// <exception cref="AccountSetupException">The sign-in failed, or a newly allowed service could not be reached.</exception>
     public async Task<Account> SignInAgainAsync(Account account, string displayName, string? label, string? loginHint, IBrowserLauncher browser, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(account);
-        var provider = signIns.FirstOrDefault(s => account.Connections.Any(c => c.ProviderId == s.ProviderId))
-                       ?? throw new AccountSetupException(T("Dieses Konto wird nicht über eine Anmeldung im Browser verbunden."));
-        await provider.SignInAsync(account, loginHint, browser, cancellationToken);
+        var provider = SignInOf(account) ?? throw new AccountSetupException(T("Dieses Konto wird nicht über eine Anmeldung im Browser verbunden."));
+        var who = await provider.SignInAsync(account, loginHint, browser, cancellationToken);
+        var added = who.Connections.Where(c => account.Connections.All(o => o.Id != c.Id)).ToList();
+        if (added.Count > 0 || account.Connections.Any(o => who.Connections.All(c => c.Id != o.Id)))
+        {
+            foreach (var connection in added)
+            {
+                try
+                {
+                    await TestAsync(connection, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    throw new AccountSetupException($"{KindName(connection.Kind)} ({connection.ProviderId}): {ex.Message}", ex);
+                }
+            }
+
+            account = account with { Connections = who.Connections };
+            await accounts.SaveAccountAsync(account, cancellationToken);
+        }
+
         return await RenameAsync(account, displayName, label, cancellationToken);
     }
+
+    /// <summary>Services of a signed-in account the user did not allow at the provider (names for the user); none if all are.</summary>
+    public async Task<IReadOnlyList<string>> NotGrantedAsync(Account account, CancellationToken cancellationToken = default) =>
+        SignInOf(account) is { } provider ? await provider.NotGrantedAsync(account, cancellationToken) : [];
+
+    private IAccountSignIn? SignInOf(Account account) =>
+        signIns.FirstOrDefault(s => account.Connections.Any(c => c.ProviderId == s.ProviderId));
 
     private IAccountSignIn SignIn(string providerId) =>
         signIns.FirstOrDefault(s => s.ProviderId == providerId && s.IsAvailable)

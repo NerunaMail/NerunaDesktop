@@ -17,7 +17,16 @@ public interface IAccountSignIn
     /// <summary>False when this build has no app registration for it (the choice stays off).</summary>
     bool IsAvailable { get; }
 
-    /// <param name="existing">Signing in again (password changed, new permissions): its tokens are replaced.</param>
+    /// <param name="existing">Signing in again (password changed, new permissions): its tokens are replaced, and the
+    /// result has the account's connections as they are to be now – services allowed since added (new ids), withdrawn
+    /// ones left out, the others unchanged.</param>
     /// <exception cref="AccountSetupException">The sign-in failed or was cancelled.</exception>
     Task<SignedInAccount> SignInAsync(Account? existing, string? loginHint, IBrowserLauncher browser, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Services of <paramref name="account"/> the user did not allow at the provider (names for the user, e.g.
+    /// "Kalender") – signing in again with them allowed adds them.
+    /// </summary>
+    Task<IReadOnlyList<string>> NotGrantedAsync(Account account, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<string>>([]);
 }

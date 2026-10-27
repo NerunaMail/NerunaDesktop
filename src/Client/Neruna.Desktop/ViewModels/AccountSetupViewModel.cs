@@ -180,6 +180,31 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     /// </summary>
     public bool ShowGoogleTesting => IsGoogle && !IsEditing && Neruna.Providers.Google.GoogleAccount.InTesting;
 
+    /// <summary>
+    /// A signed-in account whose services were not all allowed at the provider: which are missing and that signing in
+    /// again with them ticked adds them – no need to remove and set up the account again.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotGranted))]
+    public partial string? NotGrantedNote { get; set; }
+
+    public bool HasNotGranted => !string.IsNullOrEmpty(NotGrantedNote);
+
+    private async Task LoadNotGrantedAsync(Account account)
+    {
+        try
+        {
+            var missing = await setup.NotGrantedAsync(account);
+            NotGrantedNote = missing.Count == 0 ? null
+                : F("Nicht freigegeben: {0}. Um sie hinzuzufügen, erneut anmelden und bei Google alle Häkchen setzen – das Konto bleibt, wie es ist.", string.Join(", ", missing));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Without the stored permissions (keychain locked …) there is nothing to say.
+            NotGrantedNote = null;
+        }
+    }
+
     /// <summary>Back to the choice of kind: for a new account after choosing one.</summary>
     public bool CanGoBack => !IsChoosing && !IsEditing;
 
@@ -383,6 +408,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;
         _ = LoadReplyToAsync(account);
+        _ = LoadNotGrantedAsync(account);
         Aliases.Clear();
         foreach (var alias in account.Aliases ?? [])
         {

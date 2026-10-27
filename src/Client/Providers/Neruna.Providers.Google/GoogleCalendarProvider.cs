@@ -4,19 +4,29 @@ namespace Neruna.Providers.Google;
 
 /// <summary>
 /// Google Calendar over CalDAV, with the Google Tasks lists beside the calendars (as Microsoft 365 shows To Do): one
-/// connection, so the account has one calendar entry. Tasks only where the sign-in includes them.
+/// connection, so the account has one calendar entry. Calendars and tasks each only where the sign-in includes them.
 /// </summary>
-internal sealed class GoogleCalendarProvider(Guid connectionId, ICalendarProvider dav, GoogleTasks tasks, Func<CancellationToken, Task<bool>> grantsTasks)
+internal sealed class GoogleCalendarProvider(Guid connectionId, ICalendarProvider dav, GoogleTasks tasks, Func<string, CancellationToken, Task<bool>> grants)
     : ICalendarProvider, ICalendarScheduling
 {
     public CalendarProviderCapabilities Capabilities => dav.Capabilities;
 
-    public Task TestConnectionAsync(CancellationToken cancellationToken = default) => dav.TestConnectionAsync(cancellationToken);
+    public async Task TestConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        if (await grants(GoogleAccount.CalendarScope, cancellationToken))
+        {
+            await dav.TestConnectionAsync(cancellationToken);
+        }
+        else
+        {
+            await tasks.GetListsAsync(connectionId, cancellationToken);
+        }
+    }
 
     public async Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default)
     {
-        var calendars = await dav.GetCalendarsAsync(cancellationToken);
-        return await grantsTasks(cancellationToken) ? [.. calendars, .. await tasks.GetListsAsync(connectionId, cancellationToken)] : calendars;
+        IReadOnlyList<CalendarInfo> calendars = await grants(GoogleAccount.CalendarScope, cancellationToken) ? await dav.GetCalendarsAsync(cancellationToken) : [];
+        return await grants(GoogleAccount.TasksScope, cancellationToken) ? [.. calendars, .. await tasks.GetListsAsync(connectionId, cancellationToken)] : calendars;
     }
 
     public Task<CalendarSyncResult> SyncCalendarAsync(CalendarInfo calendar, IReadOnlyDictionary<string, string?> knownVersions, CancellationToken cancellationToken = default) =>

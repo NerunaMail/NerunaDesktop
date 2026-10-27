@@ -51,6 +51,29 @@ public sealed class GoogleConnectionFactory(HttpClient http, ICredentialStore cr
         return (Str("email") ?? string.Empty, Str("name") ?? string.Empty);
     }
 
+    /// <summary>
+    /// An existing account after signing in again: calendar and contacts follow what is granted now – kept (same id,
+    /// same offline data) or added or left out; mail and everything else stay as they are.
+    /// </summary>
+    public static IReadOnlyList<ServiceConnection> Adjust(IReadOnlyList<ServiceConnection> existing, string user, Guid tokenId, bool calendar, bool contacts)
+    {
+        ArgumentNullException.ThrowIfNull(existing);
+        var settings = new GoogleSettings(user, tokenId).ToDictionary();
+        var result = existing.Where(c => c.ProviderId is not (ProviderIds.GoogleCalendar or ProviderIds.GoogleContacts)
+                                         || (c.ProviderId == ProviderIds.GoogleCalendar ? calendar : contacts)).ToList();
+        if (calendar && result.All(c => c.ProviderId != ProviderIds.GoogleCalendar))
+        {
+            result.Add(new ServiceConnection(Guid.NewGuid(), ServiceKind.Calendar, ProviderIds.GoogleCalendar, settings));
+        }
+
+        if (contacts && result.All(c => c.ProviderId != ProviderIds.GoogleContacts))
+        {
+            result.Add(new ServiceConnection(Guid.NewGuid(), ServiceKind.Contacts, ProviderIds.GoogleContacts, settings));
+        }
+
+        return result;
+    }
+
     /// <summary>The connections of a Google account (mail, and calendar and contacts where granted), all with the same token.</summary>
     public static IReadOnlyList<ServiceConnection> Connections(string user, Guid tokenId, bool calendar = true, bool contacts = true)
     {
@@ -88,9 +111,22 @@ public sealed class GoogleSignIn(GoogleConnectionFactory google) : IAccountSignI
             }
 
             var (email, name) = await google.WhoAmIAsync(tokenId, cancellationToken);
-            return new SignedInAccount(email, name, existing?.Connections ?? GoogleConnectionFactory.Connections(email, tokenId,
-                calendar: await tokens.GrantsAsync(GoogleAccount.CalendarScope, cancellationToken),
-                contacts: await tokens.GrantsAsync(GoogleAccount.ContactsScope, cancellationToken)));
+            // One calendar entry carries Google Calendar and Google Tasks: there if either is allowed.
+            var calendar = await tokens.GrantsAsync(GoogleAccount.CalendarScope, cancellationToken) || await tokens.GrantsAsync(GoogleAccount.TasksScope, cancellationToken);
+            var contacts = await tokens.GrantsAsync(GoogleAccount.ContactsScope, cancellationToken);
+            if (existing is null)
+            {
+                return new SignedInAccount(email, name, GoogleConnectionFactory.Connections(email, tokenId, calendar, contacts));
+            }
+
+            // The token now belongs to whoever signed in: it must be the account's own Google account.
+            var user = existing.Connections.Where(c => c.ProviderId == ProviderIds.Google).Select(c => GoogleSettings.FromDictionary(c.Settings).User).FirstOrDefault();
+            if (user is { Length: > 0 } && !string.Equals(user, email, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new AccountSetupException(F("Bitte mit dem Google-Konto {0} anmelden – für ein anderes ein eigenes Konto hinzufügen.", user));
+            }
+
+            return new SignedInAccount(email, name, GoogleConnectionFactory.Adjust(existing.Connections, user ?? email, tokenId, calendar, contacts));
         }
         catch (OAuthException ex) when (ex.Message.Contains("access_denied", StringComparison.OrdinalIgnoreCase))
         {
@@ -101,6 +137,27 @@ public sealed class GoogleSignIn(GoogleConnectionFactory google) : IAccountSignI
         {
             throw new AccountSetupException(ex.Message, ex);
         }
+    }
+
+    public async Task<IReadOnlyList<string>> NotGrantedAsync(Account account, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        if (account.Connections.FirstOrDefault(c => c.ProviderId == ProviderIds.Google) is not { } mail)
+        {
+            return [];
+        }
+
+        var tokens = google.TokensFor(GoogleSettings.FromDictionary(mail.Settings).TokenId);
+        var missing = new List<string>();
+        foreach (var (scope, service) in new[] { (GoogleAccount.CalendarScope, T("Kalender")), (GoogleAccount.ContactsScope, T("Kontakte")), (GoogleAccount.TasksScope, T("Aufgaben")) })
+        {
+            if (!await tokens.GrantsAsync(scope, cancellationToken))
+            {
+                missing.Add(service);
+            }
+        }
+
+        return missing;
     }
 }
 
@@ -143,7 +200,7 @@ public sealed class GoogleCalendarProviderFactory(GoogleConnectionFactory google
         var token = google.AccessTokenFor(connection);
         var tokens = google.TokensFor(GoogleSettings.FromDictionary(connection.Settings).TokenId);
         var dav = DavOAuthProviders.Calendar(connection.Id, new DavSettings(GoogleAccount.CalDav(user), user), http, credentials, token, loggerFactory.CreateLogger<GoogleCalendarProvider>());
-        return new GoogleCalendarProvider(connection.Id, dav, new GoogleTasks(http, token), ct => tokens.GrantsAsync(GoogleAccount.TasksScope, ct));
+        return new GoogleCalendarProvider(connection.Id, dav, new GoogleTasks(http, token), tokens.GrantsAsync);
     }
 
     public string Summary(IReadOnlyDictionary<string, string> settings) => $"Google · {GoogleSettings.FromDictionary(settings).User}";

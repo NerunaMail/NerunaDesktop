@@ -55,6 +55,27 @@ public class GoogleTests
     }
 
     [Fact]
+    public void Signing_in_again_adds_newly_allowed_services_and_keeps_the_others()
+    {
+        var token = Guid.NewGuid();
+        var mailOnly = GoogleConnectionFactory.Connections("eva@gmail.com", token, calendar: false, contacts: false);
+        Assert.Equal([Neruna.Core.Accounts.ServiceKind.Mail], mailOnly.Select(c => c.Kind));
+
+        // Calendar allowed now: added; mail keeps its id (and so its mails).
+        var withCalendar = GoogleConnectionFactory.Adjust(mailOnly, "eva@gmail.com", token, calendar: true, contacts: false);
+        Assert.Equal(mailOnly[0], withCalendar[0]);
+        var calendar = Assert.Single(withCalendar, c => c.ProviderId == Neruna.Core.Providers.ProviderIds.GoogleCalendar);
+
+        // Contacts too: the calendar stays the same connection; then calendar withdrawn: it is gone, contacts stay.
+        var all = GoogleConnectionFactory.Adjust(withCalendar, "eva@gmail.com", token, calendar: true, contacts: true);
+        Assert.Contains(calendar, all);
+        Assert.Equal(3, all.Count);
+        var withoutCalendar = GoogleConnectionFactory.Adjust(all, "eva@gmail.com", token, calendar: false, contacts: true);
+        Assert.DoesNotContain(withoutCalendar, c => c.ProviderId == Neruna.Core.Providers.ProviderIds.GoogleCalendar);
+        Assert.Equal(all.Where(c => c.ProviderId != Neruna.Core.Providers.ProviderIds.GoogleCalendar), withoutCalendar);
+    }
+
+    [Fact]
     public void Gmail_is_imap_and_smtp_over_tls_and_files_sent_mail_itself()
     {
         var settings = GoogleMailProviderFactory.Settings(new GoogleSettings("anna@gmail.com", Guid.NewGuid()).ToDictionary());
