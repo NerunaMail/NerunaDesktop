@@ -158,7 +158,12 @@ internal sealed class DavClient(HttpClient http, Func<CancellationToken, Task<Au
             }
 
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (logger.IsEnabled(LogLevel.Trace))
+            if (status == HttpStatusCode.Forbidden)
+            {
+                // The server's reason (Google: a permission not granted, an API not enabled) – the message alone says little.
+                logger.LogWarning("DAV {Method} {Url} → 403: {Body}", method, current, body.Length > 500 ? body[..500] : body);
+            }
+            else if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace("DAV response body from {Url}:\n{Body}", current, body);
             }

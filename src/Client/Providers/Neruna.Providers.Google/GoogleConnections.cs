@@ -51,15 +51,15 @@ public sealed class GoogleConnectionFactory(HttpClient http, ICredentialStore cr
         return (Str("email") ?? string.Empty, Str("name") ?? string.Empty);
     }
 
-    /// <summary>The three connections of a Google account, all signed in with the same token.</summary>
-    public static IReadOnlyList<ServiceConnection> Connections(string user, Guid tokenId)
+    /// <summary>The connections of a Google account (mail, and calendar and contacts where granted), all with the same token.</summary>
+    public static IReadOnlyList<ServiceConnection> Connections(string user, Guid tokenId, bool calendar = true, bool contacts = true)
     {
         var settings = new GoogleSettings(user, tokenId).ToDictionary();
         return
         [
             new ServiceConnection(tokenId, ServiceKind.Mail, ProviderIds.Google, settings),
-            new ServiceConnection(Guid.NewGuid(), ServiceKind.Calendar, ProviderIds.GoogleCalendar, settings),
-            new ServiceConnection(Guid.NewGuid(), ServiceKind.Contacts, ProviderIds.GoogleContacts, settings),
+            .. calendar ? [new ServiceConnection(Guid.NewGuid(), ServiceKind.Calendar, ProviderIds.GoogleCalendar, settings)] : Array.Empty<ServiceConnection>(),
+            .. contacts ? [new ServiceConnection(Guid.NewGuid(), ServiceKind.Contacts, ProviderIds.GoogleContacts, settings)] : Array.Empty<ServiceConnection>(),
         ];
     }
 }
@@ -80,8 +80,17 @@ public sealed class GoogleSignIn(GoogleConnectionFactory google) : IAccountSignI
         try
         {
             await google.SignInAsync(tokenId, loginHint, browser, cancellationToken);
+            // Google lets the user untick single permissions: only what was granted is set up; mail is the account.
+            var tokens = google.TokensFor(tokenId);
+            if (!await tokens.GrantsAsync(GoogleAccount.MailScope, cancellationToken))
+            {
+                throw new AccountSetupException(T("Google hat den Zugriff auf Gmail nicht erlaubt. Bitte erneut anmelden und bei Google alle Häkchen setzen."));
+            }
+
             var (email, name) = await google.WhoAmIAsync(tokenId, cancellationToken);
-            return new SignedInAccount(email, name, existing?.Connections ?? GoogleConnectionFactory.Connections(email, tokenId));
+            return new SignedInAccount(email, name, existing?.Connections ?? GoogleConnectionFactory.Connections(email, tokenId,
+                calendar: await tokens.GrantsAsync(GoogleAccount.CalendarScope, cancellationToken),
+                contacts: await tokens.GrantsAsync(GoogleAccount.ContactsScope, cancellationToken)));
         }
         catch (OAuthException ex) when (ex.Message.Contains("access_denied", StringComparison.OrdinalIgnoreCase))
         {
