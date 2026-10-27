@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Google accounts (Gmail, Google Calendar, contacts, Google Tasks) for Neruna Desktop: sign-in in the browser, then IMAP/SMTP, CalDAV and CardDAV with the token.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Neruna.Core\Neruna.Core.csproj" />
+    <ProjectReference Include="..\Neruna.Providers.Imap\Neruna.Providers.Imap.csproj" />
+    <ProjectReference Include="..\Neruna.Providers.Dav\Neruna.Providers.Dav.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Neruna.Client.Tests" />
+    <!-- Google wants the client secret of a desktop app on the token request (see GoogleAccount.ClientSecret). It comes
+         from the build – the release workflow sets GoogleClientSecret from a repository secret – never from the code:
+         without it Google stays off, like Microsoft without a client id. -->
+    <AssemblyMetadata Include="GoogleClientSecret" Value="$(GoogleClientSecret)" />
+  </ItemGroup>
+</Project>

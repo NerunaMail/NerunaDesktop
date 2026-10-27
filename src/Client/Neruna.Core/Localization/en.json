@@ -2366,5 +2366,14 @@
  "Dieser Ordner auf dem Server speichert keine Schlagwörter.": "This folder on the server does not keep tags.",
  "Dieses Konto speichert keine Schlagwörter.": "This account does not keep tags.",
  "Mit Schlagwörtern markieren Sie E-Mails farbig – per Rechtsklick auf eine E-Mail. Sie werden auf dem Mailserver gespeichert und erscheinen so auch auf Ihren anderen Geräten und in anderen Mailprogrammen.": "Tags mark emails in colour – right-click an email. They are stored on the mail server, so they also appear on your other devices and in other mail programs.",
- "Beim Umbenennen bleiben bereits markierte E-Mails markiert – ausser bei Microsoft 365 und Exchange: Dort werden Schlagwörter als Kategorien mit ihrem Namen gespeichert.": "Renaming keeps emails tagged that already are – except with Microsoft 365 and Exchange, where tags are stored as categories with their name."
+ "Beim Umbenennen bleiben bereits markierte E-Mails markiert – ausser bei Microsoft 365 und Exchange: Dort werden Schlagwörter als Kategorien mit ihrem Namen gespeichert.": "Renaming keeps emails tagged that already are – except with Microsoft 365 and Exchange, where tags are stored as categories with their name.",
+ "Bei diesem Konto bietet der Mailserver keine Serverregeln an.": "This account's mail server offers no server rules.",
+ "Bei diesem Konto kann der Mailserver keine Abwesenheitsnotiz verschicken.": "This account's mail server cannot send an out-of-office reply.",
+ "Google Tasks antwortet mit Fehler {0}.": "Google Tasks answers with error {0}.",
+ "Google hat die Anmeldung abgelehnt. Solange Neruna bei Google in der Testphase ist, klappt sie nur mit freigeschalteten Adressen – senden Sie Ihre Gmail-Adresse an info@neruna.org.": "Google refused the sign-in. While Neruna is in its test phase at Google, it only works with approved addresses – send your Gmail address to info@neruna.org.",
+ "Bei Google anmelden": "Sign in with Google",
+ "Die Anmeldung öffnet sich im Browser. Neruna erhält dabei kein Passwort, nur eine Berechtigung für Mail, Kalender, Kontakte und Aufgaben – sie liegt im Schlüsselbund dieses Computers.": "The sign-in opens in the browser. Neruna does not get your password, only permission for mail, calendar, contacts and tasks – it is kept in this computer's keychain.",
+ "Gmail, Google Kalender, Kontakte und Google Tasks – angemeldet wird im Browser.": "Gmail, Google Calendar, contacts and Google Tasks – you sign in in the browser.",
+ "Mail, Kalender, Kontakte und Aufgaben mit Anmeldung bei Google.": "Mail, calendar, contacts and tasks with a Google sign-in.",
+ "Testphase: Bei Google ist Neruna noch in der Prüfung. Bis dahin klappt die Anmeldung nur mit Gmail-Adressen, die als Tester eingetragen sind. Senden Sie Ihre Gmail-Adresse an info@neruna.org – sobald sie eingetragen ist, erhalten Sie Bescheid und können sich hier anmelden.": "Test phase: Neruna is still being reviewed by Google. Until then, sign-in only works with Gmail addresses registered as testers. Send your Gmail address to info@neruna.org – as soon as it is registered, you will be notified and can sign in here."
 }

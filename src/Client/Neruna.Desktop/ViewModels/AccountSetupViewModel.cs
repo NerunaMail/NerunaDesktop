@@ -72,9 +72,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     // ── Step 1 for a new account: which kind. Everything with IMAP/CalDAV/CardDAV is one choice (found automatically);
     //    only providers that need their own sign-in are listed separately. ──
 
-    /// <summary>"choose", "imap", "exchange", "proton", "nextcloud" or "microsoft".</summary>
+    /// <summary>"choose", "imap", "exchange", "proton", "nextcloud", "microsoft" or "google".</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsNextcloud), nameof(IsMailForm), nameof(IsMicrosoft), nameof(CanGoBack),
+    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsNextcloud), nameof(IsMailForm), nameof(IsMicrosoft), nameof(IsGoogle), nameof(IsSignInStep), nameof(SignInText), nameof(SignInNote), nameof(ShowGoogleTesting), nameof(CanGoBack),
         nameof(Subtitle), nameof(NeedsPassword), nameof(PasswordLabel))]
     [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
     public partial string Step { get; set; } = "choose";
@@ -160,6 +160,26 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     public bool IsMicrosoft => Step == "microsoft";
 
+    public bool IsGoogle => Step == "google";
+
+    /// <summary>An account set up by signing in in the browser (Microsoft, Google): names only, the servers are the provider's.</summary>
+    public bool IsSignInStep => IsMicrosoft || IsGoogle;
+
+    public string SignInText => IsGoogle ? T("Bei Google anmelden") : T("Bei Microsoft anmelden");
+
+    public string SignInNote => IsGoogle
+        ? T("Die Anmeldung öffnet sich im Browser. Neruna erhält dabei kein Passwort, nur eine Berechtigung für Mail, Kalender, Kontakte und Aufgaben – sie liegt im Schlüsselbund dieses Computers.")
+        : T("Die Anmeldung öffnet sich im Browser. Neruna erhält dabei kein Passwort, nur eine Berechtigung für Mail, Kalender und Kontakte – sie liegt im Schlüsselbund dieses Computers.");
+
+    /// <summary>Google needs Neruna's app registration (client id and secret from the build); without it the choice stays off.</summary>
+    public bool GoogleAvailable => setup.CanSignIn(Neruna.Core.Providers.ProviderIds.Google);
+
+    /// <summary>
+    /// While Neruna's Google app is in testing, only addresses entered as testers at Google can sign in: the dialog says
+    /// how to become one.
+    /// </summary>
+    public bool ShowGoogleTesting => IsGoogle && !IsEditing && Neruna.Providers.Google.GoogleAccount.InTesting;
+
     /// <summary>Back to the choice of kind: for a new account after choosing one.</summary>
     public bool CanGoBack => !IsChoosing && !IsEditing;
 
@@ -212,6 +232,15 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     }
 
     [RelayCommand]
+    private void ChooseGoogle()
+    {
+        if (GoogleAvailable)
+        {
+            Step = "google";
+        }
+    }
+
+    [RelayCommand]
     private void Back()
     {
         Error = null;
@@ -221,10 +250,10 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     /// <summary>
     /// Sign-in in the browser; then the account (mail, calendar, contacts) is set up with the name and address
-    /// Microsoft reports. Editing: sign in again (e.g. after the password changed) and keep the account.
+    /// Microsoft or Google reports. Editing: sign in again (e.g. after the password changed) and keep the account.
     /// </summary>
     [RelayCommand]
-    private async Task SignInMicrosoftAsync()
+    private async Task SignInAsync()
     {
         if (Browser is null)
         {
@@ -243,7 +272,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             }
             else
             {
-                CreatedAccount = await setup.CreateBySignInAsync(Neruna.Core.Providers.ProviderIds.Graph, DisplayName, Label, loginHint, Browser);
+                CreatedAccount = await setup.CreateBySignInAsync(IsGoogle ? Neruna.Core.Providers.ProviderIds.Google : Neruna.Core.Providers.ProviderIds.Graph,
+                    DisplayName, Label, loginHint, Browser);
             }
 
             Finished?.Invoke(this, true);
@@ -262,7 +292,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
     }
 
-    /// <summary>Editing a Microsoft account: only the names (servers belong to Microsoft).</summary>
+    /// <summary>Editing a Microsoft or Google account: only the names (the servers are the provider's).</summary>
     [RelayCommand]
     private async Task SaveMicrosoftAsync()
     {
@@ -321,6 +351,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         ? T("Welche Art von Konto möchten Sie einrichten?")
         : IsMicrosoft
             ? T("Mail, Kalender und Kontakte Ihres Microsoft-Kontos – angemeldet wird im Browser.")
+            : IsGoogle
+            ? T("Gmail, Google Kalender, Kontakte und Google Tasks – angemeldet wird im Browser.")
             : IsNextcloud
             ? T("Kalender und Kontakte Ihrer Nextcloud – angemeldet wird im Browser, auch mit Zwei-Faktor-Anmeldung. Die E-Mail richten Sie als eigenes Konto ein.")
             : IsProton
@@ -344,7 +376,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         Editing = account;
         var ews = account.Connections.FirstOrDefault(c => c.ProviderId == Neruna.Core.Providers.ProviderIds.Ews);
         var bridge = account.Connections.FirstOrDefault(c => c.Settings.GetValueOrDefault(ImapSettings.KindKey) == ImapSettings.ProtonBridgeKind);
-        Step = setup.IsSignedIn(account) ? "microsoft" : ews is not null ? "exchange" : bridge is not null ? "proton" : "imap";
+        Step = setup.IsSignedIn(account)
+            ? account.Connections.Any(c => c.ProviderId == Neruna.Core.Providers.ProviderIds.Google) ? "google" : "microsoft"
+            : ews is not null ? "exchange" : bridge is not null ? "proton" : "imap";
         _bridgeFingerprints = bridge?.Settings.GetValueOrDefault(TlsCertificates.PinnedCertificateKey)?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;

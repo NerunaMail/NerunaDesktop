@@ -14,6 +14,11 @@ on:
 permissions:
   contents: write
 
+# Google's sign-in wants the desktop client's secret on the token request (not secret for an installed app, but it
+# stays out of this public repository). MSBuild reads it as the property GoogleClientSecret; without it Google is off.
+env:
+  GoogleClientSecret: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+
 jobs:
   windows:
     runs-on: ubuntu-latest

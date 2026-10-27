@@ -44,8 +44,23 @@ internal sealed record Multistatus(IReadOnlyList<DavResource> Resources, string?
 /// Follows redirects itself because HttpClient drops the Authorization header on redirects
 /// (and /.well-known/caldav nearly always redirects); credentials are only re-sent to the same host.
 /// </summary>
-internal sealed class DavClient(HttpClient http, string username, string password, ILogger logger)
+internal sealed class DavClient(HttpClient http, Func<CancellationToken, Task<AuthenticationHeaderValue>> authorization, ILogger logger)
 {
+    public DavClient(HttpClient http, string username, string password, ILogger logger)
+        : this(http, Basic(username, password), logger)
+    {
+    }
+
+    /// <summary>Signed in with OAuth (Google): a bearer token, fetched – and renewed when needed – for every request.</summary>
+    public static Func<CancellationToken, Task<AuthenticationHeaderValue>> Bearer(Func<CancellationToken, Task<string>> accessToken) =>
+        async cancellationToken => new AuthenticationHeaderValue("Bearer", await accessToken(cancellationToken));
+
+    private static Func<CancellationToken, Task<AuthenticationHeaderValue>> Basic(string username, string password)
+    {
+        var basic = Task.FromResult(new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"))));
+        return _ => basic;
+    }
+
     private const int MaxRedirects = 5;
     private const int MaxAttempts = 3;
 
@@ -57,8 +72,6 @@ internal sealed class DavClient(HttpClient http, string username, string passwor
     /// that identify as Thunderbird (verified against a SOGo server; without it only own calendars are listed).
     /// </summary>
     public const string ListingUserAgent = "Neruna/0.1 (compatible; Thunderbird/128.0)";
-
-    private readonly AuthenticationHeaderValue _auth = new("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}")));
 
     public async Task<Multistatus> PropfindAsync(Uri url, int depth, IEnumerable<XName> properties, CancellationToken cancellationToken, string? userAgent = null)
     {
@@ -110,7 +123,7 @@ internal sealed class DavClient(HttpClient http, string username, string passwor
             using var request = new HttpRequestMessage(method, current);
             if (current.Host.Equals(url.Host, StringComparison.OrdinalIgnoreCase))
             {
-                request.Headers.Authorization = _auth;
+                request.Headers.Authorization = await authorization(cancellationToken);
             }
 
             request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);

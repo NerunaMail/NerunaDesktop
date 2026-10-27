@@ -680,13 +680,13 @@ public sealed class SettingsBackupService(
 
     /// <summary>
     /// The content as compared for "Einstellungen geändert": without what changes by itself – certificates collected
-    /// from signed mail, and the sign-in tokens of Microsoft accounts (renewed every hour). Both stay in the backup.
+    /// from signed mail, and the sign-in tokens of Microsoft and Google accounts (renewed every hour). Both stay in the backup.
     /// </summary>
     private static BackupContent Comparable(BackupContent content) => content with
     {
         Accounts = [.. content.Accounts.Select(a => a with
         {
-            Connections = [.. a.Connections.Select(c => c.ProviderId.StartsWith(ProviderIds.Graph, StringComparison.Ordinal) ? c with { Secret = null } : c)],
+            Connections = [.. a.Connections.Select(c => c.ProviderId.StartsWith(ProviderIds.Graph, StringComparison.Ordinal) || c.ProviderId.StartsWith(ProviderIds.Google, StringComparison.Ordinal) ? c with { Secret = null } : c)],
         })],
         Certificates = [.. content.Certificates.Where(c => c.Source is not (CertificateSource.CollectedFromMail or CertificateSource.CollectedVerified))],
     };

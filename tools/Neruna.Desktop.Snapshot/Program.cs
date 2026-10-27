@@ -1389,6 +1389,10 @@ internal static class Snapshots
         vm.NavigateCommand.Execute(Section.Mail);
         vm.ShowAccountSetupCommand.Execute(null);
         await SaveAsync(window, output, "account-setup-kind.png");
+        // Google (only in a build with the client secret): the sign-in step with the note on the test phase.
+        ((AccountSetupViewModel)vm.Overlay!).Step = "google";
+        await SaveAsync(window, output, "account-setup-google.png");
+        vm.ShowAccountSetupCommand.Execute(null);
         ((AccountSetupViewModel)vm.Overlay!).ChooseImapCommand.Execute(null);
         await SaveAsync(window, output, "account-setup.png");
         vm.ShowAccountSetupCommand.Execute(null);

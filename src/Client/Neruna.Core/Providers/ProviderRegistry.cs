@@ -15,6 +15,11 @@ public static class ProviderIds
     public const string Ics = "ics";
     public const string Ews = "ews";
     public const string Graph = "graph";
+
+    /// <summary>A Google account: Gmail (IMAP/SMTP), Google Calendar with Google Tasks, contacts – one sign-in for all.</summary>
+    public const string Google = "google";
+    public const string GoogleCalendar = "google-calendar";
+    public const string GoogleContacts = "google-contacts";
     public const string Birthdays = "birthdays";
     public const string Holidays = "holidays";
     public const string Pst = "pst";

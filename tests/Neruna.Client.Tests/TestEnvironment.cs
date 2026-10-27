@@ -106,6 +106,9 @@ internal sealed class StubHttpHandler : HttpMessageHandler
 
     public List<string> UserAgents { get; } = [];
 
+    /// <summary>The Authorization header of each request ("" without one).</summary>
+    public List<string> Authorizations { get; } = [];
+
     /// <summary>Method, address and body of requests that had one (POST, PUT).</summary>
     public List<(string Method, string Url, string Body)> Sent { get; } = [];
 
@@ -117,6 +120,7 @@ internal sealed class StubHttpHandler : HttpMessageHandler
         var url = request.RequestUri!.AbsoluteUri;
         Requested.Add(url);
         UserAgents.Add(request.Headers.UserAgent.ToString());
+        Authorizations.Add(request.Headers.Authorization?.ToString() ?? string.Empty);
         if (request.Content is not null)
         {
             if (request.Content.Headers.ContentLength is null)

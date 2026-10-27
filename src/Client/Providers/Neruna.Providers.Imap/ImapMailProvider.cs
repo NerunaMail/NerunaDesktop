@@ -35,6 +35,12 @@ public sealed partial class ImapMailProvider(
     /// <summary>On first sync only the newest messages are fetched; older ones are loaded on demand (scrolling down).</summary>
     public const int DefaultMaxInitialMessages = 2000;
 
+    /// <summary>
+    /// Signed in with OAuth instead of a password (Google): IMAP and SMTP authenticate with XOAUTH2 and this token,
+    /// fetched (and renewed when needed) for every connection. Such a server offers no ManageSieve.
+    /// </summary>
+    public Func<CancellationToken, Task<string>>? AccessToken { get; init; }
+
     private const int FetchBatchSize = 250;
 
     private const MessageSummaryItems SummaryItems =
@@ -679,12 +685,11 @@ public sealed partial class ImapMailProvider(
             return _imap;
         }
 
-        var password = await GetPasswordAsync(cancellationToken);
         var imap = new ImapClient(CreateProtocolLogger("imap")) { ServerCertificateValidationCallback = settings.AcceptAnyCertificate ? TlsCertificates.For(acceptAny: true) : TlsCertificates.For(settings.Raw) };
         try
         {
             await imap.ConnectAsync(settings.ImapHost, settings.ImapPort, MapSecurity(settings.ImapSecurity), cancellationToken);
-            await imap.AuthenticateAsync(settings.Username, password, cancellationToken);
+            await AuthenticateAsync(imap, cancellationToken);
         }
         catch
         {
@@ -708,12 +713,11 @@ public sealed partial class ImapMailProvider(
 
     private async Task<ReceiptSmtpClient> ConnectSmtpAsync(CancellationToken cancellationToken)
     {
-        var password = await GetPasswordAsync(cancellationToken);
         var smtp = new ReceiptSmtpClient(CreateProtocolLogger("smtp")) { ServerCertificateValidationCallback = settings.AcceptAnyCertificate ? TlsCertificates.For(acceptAny: true) : TlsCertificates.For(settings.Raw) };
         try
         {
             await smtp.ConnectAsync(settings.SmtpHost, settings.SmtpPort, MapSecurity(settings.SmtpSecurity), cancellationToken);
-            await smtp.AuthenticateAsync(settings.Username, password, cancellationToken);
+            await AuthenticateAsync(smtp, cancellationToken);
             return smtp;
         }
         catch
@@ -735,6 +739,17 @@ public sealed partial class ImapMailProvider(
         var file = Path.Combine(protocolLogDirectory, string.Create(CultureInfo.InvariantCulture,
             $"{protocol}-{connectionId.ToString("N")[..8]}-{DateTime.Now:yyyyMMdd-HHmmss-fff}-{Environment.CurrentManagedThreadId}.log"));
         return new ProtocolLogger(file) { RedactSecrets = true };
+    }
+
+    private async Task AuthenticateAsync(MailService client, CancellationToken cancellationToken)
+    {
+        if (AccessToken is { } token)
+        {
+            await client.AuthenticateAsync(new SaslMechanismOAuth2(settings.Username, await token(cancellationToken)), cancellationToken);
+            return;
+        }
+
+        await client.AuthenticateAsync(settings.Username, await GetPasswordAsync(cancellationToken), cancellationToken);
     }
 
     private async Task<string> GetPasswordAsync(CancellationToken cancellationToken) =>

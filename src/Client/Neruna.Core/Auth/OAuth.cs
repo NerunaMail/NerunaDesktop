@@ -63,6 +63,12 @@ public sealed record OAuthEndpoints(Uri Authorize, Uri Token, string ClientId, I
     /// from the state ("{port}.{random}"); the code alone is of no use without the PKCE verifier, which stays here.
     /// </summary>
     public Uri? RelayRedirect { get; init; }
+
+    /// <summary>
+    /// Sent with the token requests where the provider insists on one even for a desktop app with PKCE (Google). Not a
+    /// secret there either: it ships with every copy of the app (Google: "not treated as a secret" for installed apps).
+    /// </summary>
+    public string? ClientSecret { get; init; }
 }
 
 /// <summary>What the sign-in yields; kept only in the system keychain (never in the database or logs).</summary>
@@ -261,6 +267,7 @@ public sealed class OAuthClient(HttpClient http)
     private async Task<OAuthTokens> RequestTokensAsync(OAuthEndpoints endpoints, string clientId, Dictionary<string, string?> grant, OAuthTokens? previous, string? nonce, CancellationToken cancellationToken)
     {
         grant["client_id"] = clientId;
+        grant["client_secret"] = endpoints.ClientSecret;
         grant["resource"] = endpoints.Resource;
         if (endpoints.ScopeOnTokenRequests)
         {

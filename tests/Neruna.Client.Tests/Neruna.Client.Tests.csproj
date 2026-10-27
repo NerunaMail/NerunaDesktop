@@ -3,6 +3,7 @@
     <ProjectReference Include="..\..\src\Client\Neruna.Core\Neruna.Core.csproj" />
     <ProjectReference Include="..\..\src\Client\Neruna.Storage\Neruna.Storage.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Imap\Neruna.Providers.Imap.csproj" />
+    <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Google\Neruna.Providers.Google.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Graph\Neruna.Providers.Graph.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.Ews\Neruna.Providers.Ews.csproj" />
     <ProjectReference Include="..\..\src\Client\Providers\Neruna.Providers.OpenAi\Neruna.Providers.OpenAi.csproj" />

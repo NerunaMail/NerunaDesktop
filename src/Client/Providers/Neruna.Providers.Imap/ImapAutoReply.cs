@@ -74,6 +74,12 @@ public sealed partial class ImapMailProvider
         Exception Fail(string message, Exception? inner) =>
             forRules ? new ServerRulesUnavailableException(message, inner) : new AutoReplyUnavailableException(message, inner);
 
+        if (AccessToken is not null)
+        {
+            // Google: no ManageSieve (the connection would only time out).
+            throw Fail(forRules ? T("Bei diesem Konto bietet der Mailserver keine Serverregeln an.") : T("Bei diesem Konto kann der Mailserver keine Abwesenheitsnotiz verschicken."), null);
+        }
+
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(20));
         ManageSieveClient? sieve = null;

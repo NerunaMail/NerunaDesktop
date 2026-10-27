@@ -86,6 +86,16 @@ internal static class AppServices
         services.AddSingleton<IProviderFactory<IMailProvider>, Neruna.Providers.Graph.GraphMailProviderFactory>();
         services.AddSingleton<IProviderFactory<ICalendarProvider>, Neruna.Providers.Graph.GraphCalendarProviderFactory>();
         services.AddSingleton<IProviderFactory<IContactProvider>, Neruna.Providers.Graph.GraphContactProviderFactory>();
+        // Google: one sign-in for Gmail (IMAP/SMTP), the calendar with Google Tasks (CalDAV + REST) and the contacts (CardDAV).
+        services.AddSingleton(sp => new Neruna.Providers.Google.GoogleConnectionFactory(sp.GetRequiredService<HttpClient>(), sp.GetRequiredService<ICredentialStore>()));
+        services.AddSingleton<IAccountSignIn, Neruna.Providers.Google.GoogleSignIn>();
+        services.AddSingleton<IProviderFactory<IMailProvider>, Neruna.Providers.Google.GoogleMailProviderFactory>();
+        services.AddSingleton<IProviderFactory<ICalendarProvider>>(sp => new Neruna.Providers.Google.GoogleCalendarProviderFactory(
+            sp.GetRequiredService<Neruna.Providers.Google.GoogleConnectionFactory>(), sp.GetRequiredService<IHttpClientFactory>().CreateClient("dav"),
+            sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ILoggerFactory>()));
+        services.AddSingleton<IProviderFactory<IContactProvider>>(sp => new Neruna.Providers.Google.GoogleContactProviderFactory(
+            sp.GetRequiredService<Neruna.Providers.Google.GoogleConnectionFactory>(), sp.GetRequiredService<IHttpClientFactory>().CreateClient("dav"),
+            sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ILoggerFactory>()));
         services.AddSingleton<Neruna.Core.Auth.IBrowserLauncher, Neruna.Desktop.Infrastructure.BrowserLauncher>();
         // Exchange on premises (EWS), also behind a reverse proxy with client certificates.
         services.AddSingleton<Neruna.Core.Security.ClientCertificates>();

@@ -61,6 +61,9 @@ internal abstract class DavProviderBase(
 {
     private DavCollectionService? _service;
 
+    /// <summary>Signed in with OAuth instead of a password (Google): the access token for every request.</summary>
+    public Func<CancellationToken, Task<string>>? AccessToken { get; init; }
+
     protected Guid ConnectionId => connectionId;
 
     protected DavSettings Settings => settings;
@@ -74,8 +77,10 @@ internal abstract class DavProviderBase(
     {
         if (_service is null)
         {
-            var password = await credentials.GetSecretAsync(connectionId, cancellationToken) ?? string.Empty;
-            _service = new DavCollectionService(new DavClient(http, settings.Username, password, logger), settings.Url, flavor, logger);
+            var client = AccessToken is { } token
+                ? new DavClient(http, DavClient.Bearer(token), logger)
+                : new DavClient(http, settings.Username, await credentials.GetSecretAsync(connectionId, cancellationToken) ?? string.Empty, logger);
+            _service = new DavCollectionService(client, settings.Url, flavor, logger);
         }
 
         return _service;
@@ -271,4 +276,14 @@ public sealed class CardDavProviderFactory(HttpClient http, ICredentialStore cre
         var dav = DavSettings.FromDictionary(settings);
         return $"{dav.Url} · {dav.Username}";
     }
+}
+
+/// <summary>CalDAV and CardDAV signed in with OAuth (Google): the same providers, a bearer token instead of the password.</summary>
+public static class DavOAuthProviders
+{
+    public static ICalendarProvider Calendar(Guid connectionId, DavSettings settings, HttpClient http, ICredentialStore credentials, Func<CancellationToken, Task<string>> accessToken, ILogger logger) =>
+        new CalDavCalendarProvider(connectionId, settings, http, credentials, logger) { AccessToken = accessToken };
+
+    public static IContactProvider Contacts(Guid connectionId, DavSettings settings, HttpClient http, ICredentialStore credentials, Func<CancellationToken, Task<string>> accessToken, ILogger logger) =>
+        new CardDavContactProvider(connectionId, settings, http, credentials, logger) { AccessToken = accessToken };
 }

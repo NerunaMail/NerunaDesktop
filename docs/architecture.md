@@ -632,7 +632,7 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 ## 6d. Anbieter mit eigener Anmeldung (OAuth2)
 
 - Kontodialog: zuerst die Art. «E-Mail-Konto» deckt alles mit IMAP/SMTP, CalDAV, CardDAV ab (automatische Erkennung);
-  eigene Einträge nur für Anbieter mit eigener Anmeldung – vorerst Microsoft 365 / Outlook.com (Graph).
+  eigene Einträge nur für Anbieter mit eigener Anmeldung – Microsoft 365 / Outlook.com (Graph) und Google.
 - OAuth2 im Kern (`Neruna.Core.Auth`): Public Client nach RFC 8252 – Anmeldung im Systembrowser, PKCE, Rückleitung an
   `http://localhost:{port}/`, Tokens nur im Schlüsselbund, Erneuern kurz vor Ablauf. Kein Client-Geheimnis.
 - Die Client-ID ist nicht geheim und steht an genau einer Stelle (`MicrosoftAccount.ClientId`); leer = Auswahl aus.
@@ -641,8 +641,15 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   Microsoft selbst in «Gesendet» ab; Kalender und Kontakte werden in iCalendar bzw. vCard umgewandelt, Exchange
   verschickt Einladungen selbst. Kein Push für Desktop-Apps (Abfrage jede Minute). Noch nicht: einzeln geänderte
   Termine einer Serie, Kontaktbilder.
-- Google später: OAuth über die bestehenden IMAP-/DAV-Provider; Mailzugriff ist bei Google ein «restricted scope»
-  (Verifizierung und jährliche Sicherheitsprüfung ab 100 Nutzern). Bis dahin IMAP mit App-Passwort.
+- Google (`Neruna.Providers.Google`): OAuth über die bestehenden Provider – Gmail per IMAP/SMTP mit XOAUTH2
+  (`ImapMailProvider.AccessToken`; Gmail legt Gesendetes selbst ab, kein Sieve), Kalender per CalDAV und Kontakte per
+  CardDAV mit Bearer-Token (`DavOAuthProviders`), Google Tasks per REST als VTODO neben den Kalendern (wie To Do bei
+  Microsoft). Desktop-Client von Google: Rückleitung `http://127.0.0.1:{port}/`, `access_type=offline`, und Google
+  verlangt trotz PKCE das Client-Secret – es kommt aus dem Build (`GoogleClientSecret`, im Release-Workflow aus dem
+  Repository-Secret `GOOGLE_DESKTOP_CLIENT_SECRET`), ohne es bleibt Google aus. Bereiche: `mail.google.com` (restricted,
+  Verifizierung mit Sicherheitsprüfung), `calendar` (CalDAV), `carddav` (CardDAV), `tasks`, dazu openid/email/profile.
+  Solange die App bei Google im Testmodus ist (`GoogleAccount.InTesting`), zeigt der Kontodialog, wie man Tester wird.
+  Android folgt mit dem nativen Google-Anmeldeflow.
 
 ## 6e. Online-Besprechungen
 
