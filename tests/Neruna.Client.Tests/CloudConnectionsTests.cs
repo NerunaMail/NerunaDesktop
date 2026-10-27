@@ -110,6 +110,8 @@ public class CloudConnectionsTests
             services.AddSingleton<TextTemplateService>();
             services.AddSingleton<CloudSignatureSync>();
             services.AddSingleton<CloudTextTemplateSync>();
+            services.AddSingleton<MailTagService>();
+            services.AddSingleton<CloudMailTagSync>();
             services.AddSingleton<CloudCertificateSync>();
             services.AddSingleton<CloudAccountSync>();
             services.AddSingleton<SettingsBackupService>();
@@ -132,6 +134,10 @@ public class CloudConnectionsTests
             }));
         }
 
+        // Tags: the first server is older (no tags yet), the partner has one.
+        http.Responses[First + "api/v1/mail-tags"] = (HttpStatusCode.NotFound, """{"message":"Not found"}""");
+        http.Responses[Second + "api/v1/mail-tags"] = (HttpStatusCode.OK, """{"available":true,"tags":[{"id":"T","name":"Offerte","keyword":"offerte","color":"#e8590c","updatedAt":"2026-10-27T12:00:00+01:00"}]}""");
+
         var device = new DeviceInfo("Testgerät", "0.8.2", "Linux", "Debian 13", "anna");
         var example = await cloud.ConnectAsync(new Uri(First), "CODE", "123456", device, ct);
         var partner = await cloud.ConnectAsync(new Uri(Second), "CODE", "123456", device, ct);
@@ -141,6 +147,9 @@ public class CloudConnectionsTests
         await sync.SyncAsync(ct);
         await env.Get<ISignatureStore>().SaveAsync(new Signature(Guid.NewGuid(), "Eigene", "<p>Anna</p>", DateTimeOffset.UnixEpoch), ct);
         Assert.Equal(3, (await signatures.GetAllAsync(ct)).Count);
+        await env.Get<CloudMailTagSync>().SyncAsync(ct);
+        var tags = env.Get<MailTagService>();
+        Assert.Equal(["offerte", "$label1"], (await tags.GetAllAsync(ct)).Take(2).Select(t => t.Keyword));
 
         // Blocked in the partner's portal: its tokens are void, a new one is refused.
         http.Responses[Second + "api/v1/signatures"] = (HttpStatusCode.Unauthorized, """{"error":"unauthenticated","message":"Token ungültig"}""");
@@ -156,6 +165,7 @@ public class CloudConnectionsTests
         Assert.Null(await credentials.GetSecretAsync(partner.EncryptionKeyId, ct));
         Assert.Null(await credentials.GetSecretAsync(partner.VaultKeyId, ct));
         Assert.Equal(["Eigene", "Example AG"], (await signatures.GetAllAsync(ct)).Select(s => s.Name).Order());
+        Assert.DoesNotContain(await tags.GetAllAsync(ct), t => t.IsFromCloud);
 
         // Any other refusal (wrong key, server error) removes nothing.
         http.Responses[First + "api/v1/signatures"] = (HttpStatusCode.Unauthorized, """{"error":"unauthenticated","message":"Token ungültig"}""");

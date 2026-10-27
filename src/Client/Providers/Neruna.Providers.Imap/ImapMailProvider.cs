@@ -222,6 +222,7 @@ public sealed partial class ImapMailProvider(
 
         List<UniqueId> toFetch;
         var flagUpdates = new Dictionary<string, CoreFlags>();
+        var keywordUpdates = new Dictionary<string, IReadOnlyList<string>>();
         var removed = new List<string>();
 
         uint floor;
@@ -254,6 +255,7 @@ public sealed partial class ImapMailProvider(
                 foreach (var summary in await imapFolder.FetchAsync(batch, request, cancellationToken))
                 {
                     flagUpdates[summary.UniqueId.Id.ToString(CultureInfo.InvariantCulture)] = MapFlags(summary.Flags, summary.Keywords);
+                    keywordUpdates[summary.UniqueId.Id.ToString(CultureInfo.InvariantCulture)] = TagsOf(summary.Keywords);
                 }
             }
         }
@@ -271,7 +273,7 @@ public sealed partial class ImapMailProvider(
         var newState = new SyncState(imapFolder.UidValidity, uidNext, floor, modSeq > 0 ? modSeq : null, modSeq > 0 ? imapFolder.Count : null).ToString();
 
         logger.LogDebug("IMAP {Folder}: full={Full}, fetched={Fetched}, removed={Removed}", folder.RemoteId, isFull, added.Count, removed.Count);
-        return new FolderSyncResult(newState, isFull, added, flagUpdates, removed, allUids.Count, unread);
+        return new FolderSyncResult(newState, isFull, added, flagUpdates, removed, allUids.Count, unread, keywordUpdates);
     }
 
     public async Task<MimeMessage> GetMessageAsync(MailFolder folder, string remoteId, CancellationToken cancellationToken = default)
@@ -301,6 +303,25 @@ public sealed partial class ImapMailProvider(
             request.Keywords.Add(ForwardedKeyword);
             await imapFolder.StoreAsync(uids, request, cancellationToken);
         }
+    }
+
+    public bool SupportsTags => true;
+
+    public async Task SetTagAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, MailTag tag, bool add, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(remoteIds);
+        ArgumentNullException.ThrowIfNull(tag);
+
+        var imapFolder = await OpenAsync(folder.RemoteId, FolderAccess.ReadWrite, cancellationToken);
+        if (!AcceptsKeyword(imapFolder, tag.Keyword))
+        {
+            throw new NotSupportedException(T("Dieser Ordner auf dem Server speichert keine Schlagwörter."));
+        }
+
+        var request = new StoreFlagsRequest(add ? StoreAction.Add : StoreAction.Remove, ImapFlags.None) { Silent = true };
+        request.Keywords.Add(tag.Keyword);
+        await imapFolder.StoreAsync(remoteIds.Select(ParseUid).ToList(), request, cancellationToken);
     }
 
     public async Task MoveAsync(MailFolder source, IReadOnlyCollection<string> remoteIds, MailFolder target, CancellationToken cancellationToken = default)
@@ -814,7 +835,8 @@ public sealed partial class ImapMailProvider(
             (long)(summary.Size ?? 0),
             HasRealAttachments(summary),
             summary.PreviewText,
-            SecurityOf(summary.Body?.ContentType));
+            SecurityOf(summary.Body?.ContentType),
+            TagsOf(summary.Keywords));
     }
 
     /// <summary>
@@ -877,6 +899,10 @@ public sealed partial class ImapMailProvider(
 
     /// <summary>Keyword for forwarded messages (RFC 5788; also used by other mail programs).</summary>
     internal const string ForwardedKeyword = "$Forwarded";
+
+    /// <summary>The keywords that can be tags: all but "$Forwarded", which is shown as a flag.</summary>
+    internal static IReadOnlyList<string> TagsOf(IEnumerable<string>? keywords) =>
+        keywords?.Where(k => !string.Equals(k, ForwardedKeyword, StringComparison.OrdinalIgnoreCase)).ToList() ?? [];
 
     private static bool AcceptsKeyword(IMailFolder folder, string keyword) =>
         folder.PermanentFlags.HasFlag(ImapFlags.UserDefined) || folder.PermanentKeywords.Contains(keyword);

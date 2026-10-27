@@ -4,8 +4,20 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf, ServerRulesPageViewModel serverRules) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf, ServerRulesPageViewModel serverRules, MailTagsViewModel mailTags) : ViewModelBase
 {
+    /// <summary>Settings → Schlagwörter.</summary>
+    public MailTagsViewModel MailTags => mailTags;
+
+    public const int MailTagsTab = 21;
+
+    /// <summary>Opens Einstellungen → Schlagwörter ("Verwalten" in a mail's tag menu).</summary>
+    public async Task ShowMailTagsAsync()
+    {
+        SelectedTab = MailTagsTab;
+        await MailTags.ReloadAsync();
+    }
+
     /// <summary>Settings → Serverregeln: the rules of every mail account in one place.</summary>
     public ServerRulesPageViewModel ServerRules => serverRules;
 
@@ -123,6 +135,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(17, T("Schreiben"), "IconEdit"),
         new(3, T("Signaturen"), "IconSignature"),
         new(4, T("Textvorlagen"), "IconTextTemplate"),
+        new(MailTagsTab, T("Schlagwörter"), "IconTag"),
         new(11, T("Schnellaktionen"), "IconFlash"),
         new(PdfTab, "PDF", "IconLock"),
         new(5, T("Zertifikate (S/MIME)"), "IconCertificate"),
@@ -169,6 +182,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             else if (item.Tab == ServerRulesTab && _ruleAccount is null)
             {
                 _ = ServerRules.LoadAsync();
+            }
+            else if (item.Tab == MailTagsTab)
+            {
+                _ = MailTags.ReloadAsync();
             }
             else if (item.Tab == PdfTab)
             {

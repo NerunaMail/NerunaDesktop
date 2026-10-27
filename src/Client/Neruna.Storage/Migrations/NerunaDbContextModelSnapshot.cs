@@ -330,6 +330,9 @@ namespace Neruna.Storage.Migrations
                     b.Property<string>("InReplyTo")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Keywords")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("MessageId")
                         .HasColumnType("TEXT");
 

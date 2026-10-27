@@ -68,6 +68,13 @@ public sealed record TextTemplatesResponse(bool Available, IReadOnlyList<CloudTe
 /// <param name="Shortcut">Typed with "::" while writing (may be null).</param>
 public sealed record CloudTextTemplate(string Id, string Name, string? Shortcut, string Html, string Text, DateTimeOffset UpdatedAt);
 
+/// <summary>Response of <c>GET /api/v1/mail-tags</c>: the organisation's tags for mails (older servers: 404).</summary>
+public sealed record MailTagsResponse(bool Available, IReadOnlyList<CloudMailTag> Tags);
+
+/// <param name="Keyword">Stored on the mail server (IMAP keyword); kept when the tag is renamed.</param>
+/// <param name="Color">#rrggbb</param>
+public sealed record CloudMailTag(string Id, string Name, string Keyword, string Color, DateTimeOffset UpdatedAt);
+
 /// <summary>
 /// Response of <c>GET /api/v1/chat?after=…</c>: rooms the person sees, everyone of the organisation with their online
 /// status, the messages newer than <c>after</c> (at most 500; <see cref="More"/> → ask again) and the read markers.

@@ -142,8 +142,10 @@ internal sealed partial class EwsMailProvider(ServiceConnection connection, EwsC
         var summaries = await SummariesAsync(client, changed.Where(c => c.Created || known.Contains(c.Id)).Select(c => c.Id).Distinct(StringComparer.Ordinal), cancellationToken);
         var added = summaries.Where(s => !known.Contains(s.RemoteId)).ToList();
         var flags = summaries.Where(s => known.Contains(s.RemoteId)).ToDictionary(s => s.RemoteId, s => s.Flags, StringComparer.Ordinal);
+        var categories = summaries.Where(s => known.Contains(s.RemoteId))
+            .ToDictionary(s => s.RemoteId, s => s.Keywords ?? [], StringComparer.Ordinal);
         var (total, unread) = await CountsAsync(client, folder.RemoteId, cancellationToken);
-        return new FolderSyncResult(newState, false, added, flags, [.. deleted.Where(known.Contains)], total, unread);
+        return new FolderSyncResult(newState, false, added, flags, [.. deleted.Where(known.Contains)], total, unread, categories);
     }
 
     /// <summary>All changes since <paramref name="state"/> (null: everything there is, to get a state), page by page.</summary>
@@ -200,7 +202,7 @@ internal sealed partial class EwsMailProvider(ServiceConnection connection, EwsC
     [
         "item:Subject", "item:DateTimeReceived", "item:HasAttachments", "item:IsDraft", "item:Flag", "item:Size", "item:Preview",
         "item:ItemClass", "item:InReplyTo", "message:From", "message:ToRecipients", "message:InternetMessageId", "message:IsRead",
-        X.Extended(LastVerbTag, "Integer"),
+        "item:Categories", X.Extended(LastVerbTag, "Integer"),
     ];
 
     private static async Task<List<MessageSummary>> SummariesAsync(EwsClient client, IEnumerable<string> ids, CancellationToken cancellationToken) =>
@@ -224,8 +226,12 @@ internal sealed partial class EwsMailProvider(ServiceConnection connection, EwsC
             long.TryParse(m.Val("Size"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var size) ? size : 0,
             m.Bool("HasAttachments"),
             m.Val("Preview"),
-            security);
+            security,
+            CategoriesOf(m));
     }
+
+    internal static IReadOnlyList<string> CategoriesOf(XElement m) =>
+        [.. (m.Get("Categories")?.Elements(X.T + "String") ?? []).Select(s => s.Value).Where(s => s.Length > 0)];
 
     internal static MessageFlags FlagsOf(XElement m) =>
         (m.Bool("IsRead") ? MessageFlags.Seen : MessageFlags.None)
@@ -280,6 +286,46 @@ internal sealed partial class EwsMailProvider(ServiceConnection connection, EwsC
             new XAttribute("ConflictResolution", "AlwaysOverwrite"), new XAttribute("MessageDisposition", "SaveOnly"), new XAttribute("SuppressReadReceipts", "true"),
             X.Msg("ItemChanges", chunk.Select(id => X.Typ("ItemChange", X.ItemId(id), X.Typ("Updates", updates.Select(u => new XElement(u))))))),
             cancellationToken, "ErrorItemNotFound");
+    }
+
+    public bool SupportsTags => true;
+
+    // Categories by name, like other mail programs.
+    public string KeywordOf(MailTag tag) => tag?.Name ?? throw new ArgumentNullException(nameof(tag));
+
+    public async Task SetTagAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, MailTag tag, bool add, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remoteIds);
+        ArgumentNullException.ThrowIfNull(tag);
+        if (remoteIds.Count == 0)
+        {
+            return;
+        }
+
+        // The list is replaced as a whole: each message keeps its other categories.
+        var client = await ClientAsync(cancellationToken);
+        var items = await EwsOperations.GetItemsAsync(client, remoteIds, EwsOperations.Shape(["item:Categories"]), cancellationToken);
+        var changes = items.Where(i => i.Id() is not null).Select(item =>
+        {
+            var categories = CategoriesOf(item).Where(c => !tag.Matches(c)).ToList();
+            if (add)
+            {
+                categories.Add(tag.Name);
+            }
+
+            var update = categories.Count == 0
+                ? X.Typ("DeleteItemField", X.Field("item:Categories"))
+                : Set(X.Field("item:Categories"), X.Typ("Categories", categories.Select(c => X.Typ("String", c))));
+            return X.Typ("ItemChange", X.ItemId(item.Id()!), X.Typ("Updates", update));
+        }).ToList();
+        if (changes.Count == 0)
+        {
+            return;
+        }
+
+        await client.CallAsync(X.Msg("UpdateItem",
+            new XAttribute("ConflictResolution", "AlwaysOverwrite"), new XAttribute("MessageDisposition", "SaveOnly"), new XAttribute("SuppressReadReceipts", "true"),
+            X.Msg("ItemChanges", changes)), cancellationToken);
     }
 
     private static XElement Set(XElement field, XElement value) => X.Typ("SetItemField", field, X.Typ("Message", value));

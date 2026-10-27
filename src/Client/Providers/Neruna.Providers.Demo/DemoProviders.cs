@@ -109,7 +109,8 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
                 (x.Message.Seen ? MessageFlags.Seen : MessageFlags.None) | (x.Message.Flagged ? MessageFlags.Flagged : MessageFlags.None),
                 2048,
                 x.Message.Attachment,
-                x.Message.Body.ReplaceLineEndings(" ")))
+                x.Message.Body.ReplaceLineEndings(" "),
+                Keywords: x.Index switch { 0 => ["$label1"], 2 => ["$label2", "$label4"], _ => null }))
             .ToList();
 
         // A fresh sync state every time keeps the demo current (dates relative to now).
@@ -176,6 +177,12 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
 
     // Flags are kept in the local store only; the next demo sync restores the original state.
     public Task SetFlagsAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, MessageFlags flags, bool add, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public bool SupportsTags => true;
+
+    // Like the flags: kept in the local store until the next demo sync.
+    public Task SetTagAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, MailTag tag, bool add, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 
     public Task MoveAsync(MailFolder source, IReadOnlyCollection<string> remoteIds, MailFolder target, CancellationToken cancellationToken = default) =>

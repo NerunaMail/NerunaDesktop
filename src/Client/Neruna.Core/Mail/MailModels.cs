@@ -80,6 +80,7 @@ public sealed record MailAddress(string? Name, string Address)
 }
 
 /// <summary>What the message list needs, without downloading the message body.</summary>
+/// <param name="Keywords">Tags on the server (IMAP keywords, categories); see <see cref="MailTag.Matches"/>.</param>
 public sealed record MessageSummary(
     string RemoteId,
     string? MessageId,
@@ -92,4 +93,5 @@ public sealed record MessageSummary(
     long Size,
     bool HasAttachments,
     string? Preview,
-    MessageSecurity Security = MessageSecurity.None);
+    MessageSecurity Security = MessageSecurity.None,
+    IReadOnlyList<string>? Keywords = null);

@@ -83,6 +83,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         ISettingsStore settings,
         Neruna.Core.Cloud.CloudSignatureSync cloudSignatures,
         Neruna.Core.Cloud.CloudTextTemplateSync cloudTemplates,
+        Neruna.Core.Cloud.CloudMailTagSync cloudTags,
         Neruna.Core.Cloud.CloudCertificateSync cloudCertificates,
         Neruna.Core.Cloud.CloudPairingService cloudPairing,
         Neruna.Core.Cloud.SettingsBackupService backup,
@@ -124,6 +125,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _settings = settings;
         _cloudSignatures = cloudSignatures;
         _cloudTemplates = cloudTemplates;
+        _cloudTags = cloudTags;
         _cloudCertificates = cloudCertificates;
         _cloudPairing = cloudPairing;
         _backup = backup;
@@ -244,6 +246,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             MailPage.ContactsChanged(); // a sender just saved as a contact loses its "+"
         });
         MailPage.AddContactRequested += (_, sender) => ContactsPage.NewContactFrom(sender);
+        MailPage.ManageTagsRequested += async (_, _) =>
+        {
+            Navigate(Section.Settings);
+            await SettingsPage.ShowMailTagsAsync();
+        };
         MailPage.ServerRulesRequested += async (_, account) =>
         {
             Navigate(Section.Settings);
@@ -469,6 +476,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         await RefreshPagesAsync();
         await MailPage.Agenda.LoadStateAsync();
         await MailPage.LoadAiAsync();
+        await MailPage.LoadTagsAsync();
         HasAccounts = (await _accounts.GetAccountsAsync()).Count > 0;
     }
 
@@ -579,6 +587,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private readonly Neruna.Core.Cloud.CloudSignatureSync _cloudSignatures;
     private readonly Neruna.Core.Cloud.CloudTextTemplateSync _cloudTemplates;
+    private readonly Neruna.Core.Cloud.CloudMailTagSync _cloudTags;
     private readonly Neruna.Core.Cloud.CloudCertificateSync _cloudCertificates;
     private readonly Neruna.Core.Cloud.CloudPairingService _cloudPairing;
     private DateTime _cloudSyncedAt;
@@ -598,6 +607,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         {
             await Task.Run(() => _cloudSignatures.SyncAsync());
             await Task.Run(() => _cloudTemplates.SyncAsync());
+            await Task.Run(() => _cloudTags.SyncAsync());
             await Task.Run(() => _cloudCertificates.SyncAsync());
             SettingsPage.Cloud.UpdateCertificateStatus();
             if (await Task.Run(() => _cloudAccounts.SyncAsync()))

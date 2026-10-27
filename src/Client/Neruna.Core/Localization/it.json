@@ -2351,5 +2351,20 @@
  "Duplizieren": "Duplica",
  "Löschen fehlgeschlagen: ": "Eliminazione non riuscita: ",
  "Wiederkehrender Termin – es wird die ganze Serie gelöscht.": "Appuntamento ricorrente – verrà eliminata l’intera serie.",
- "«{0}» gelöscht.": "«{0}» eliminato."
+ "«{0}» gelöscht.": "«{0}» eliminato.",
+ "Arbeit": "Lavoro",
+ "Wichtig": "Importante",
+ "Persönlich": "Personale",
+ "Zu erledigen": "Da fare",
+ "Schlagwörter": "Etichette",
+ "Eigene Schlagwörter": "Etichette personali",
+ "Neues Schlagwort": "Nuova etichetta",
+ "Schlagwort setzen": "Assegnare l’etichetta",
+ "Verwalten …": "Gestisci …",
+ "Von Ihrer Organisation": "Della sua organizzazione",
+ "Ein Schlagwort «{0}» gibt es schon.": "Un’etichetta «{0}» esiste già.",
+ "Dieser Ordner auf dem Server speichert keine Schlagwörter.": "Questa cartella sul server non salva etichette.",
+ "Dieses Konto speichert keine Schlagwörter.": "Questo account non salva etichette.",
+ "Mit Schlagwörtern markieren Sie E-Mails farbig – per Rechtsklick auf eine E-Mail. Sie werden auf dem Mailserver gespeichert und erscheinen so auch auf Ihren anderen Geräten und in anderen Mailprogrammen.": "Le etichette segnano le e-mail a colori – con il clic destro su un’e-mail. Vengono salvate sul server di posta e compaiono così anche sugli altri suoi dispositivi e in altri programmi di posta.",
+ "Beim Umbenennen bleiben bereits markierte E-Mails markiert – ausser bei Microsoft 365 und Exchange: Dort werden Schlagwörter als Kategorien mit ihrem Namen gespeichert.": "Rinominando, le e-mail già etichettate restano tali – tranne con Microsoft 365 ed Exchange, dove le etichette vengono salvate come categorie con il loro nome."
 }

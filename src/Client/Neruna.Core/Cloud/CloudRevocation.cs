@@ -15,6 +15,7 @@ public sealed class CloudRevocation
         CloudController cloud,
         CloudSignatureSync signatures,
         CloudTextTemplateSync textTemplates,
+        CloudMailTagSync mailTags,
         CloudCertificateSync certificates,
         CloudAccountSync accounts,
         SettingsBackupService backup,
@@ -29,6 +30,7 @@ public sealed class CloudRevocation
             await certificates.RemoveDisconnectedAsync(cancellationToken);
             await signatures.RemoveDisconnectedAsync(cancellationToken);
             await textTemplates.RemoveDisconnectedAsync(cancellationToken);
+            await mailTags.RemoveDisconnectedAsync(cancellationToken);
             await backup.ForgetAsync(connection, cancellationToken);
             if (chat is not null)
             {

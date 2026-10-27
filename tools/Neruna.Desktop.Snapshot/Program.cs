@@ -298,6 +298,36 @@ internal static class Snapshots
         await vm.SettingsPage.QuickActions.ReloadAsync();
         await Task.Delay(300);
         await SaveAsync(window, output, "settings-quick-actions.png");
+
+        // Schlagwörter: one from the organisation, the chips in the list, the right-click submenu and the settings page.
+        var tagService = services.GetRequiredService<Neruna.Core.Mail.MailTagService>();
+        await tagService.SetCloudAsync("snapshot", [new Neruna.Core.Mail.MailTag("offerte", "Offerte", "#e8590c", "snapshot")]);
+        await vm.MailPage.LoadTagsAsync();
+        vm.NavigateCommand.Execute(Section.Mail);
+        await Task.Delay(500);
+        await SaveAsync(window, output, "mail-tags.png");
+        var tagged = window.GetVisualDescendants().OfType<ListBoxItem>().FirstOrDefault(i => i.DataContext is MessageItemViewModel m && m.HasTags);
+        if (tagged?.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.ContextMenu is not null) is { } tagRow)
+        {
+            vm.MailPage.SelectedEntry = (MessageListEntry)tagged.DataContext!;
+            tagRow.RaiseEvent(new Avalonia.Input.ContextRequestedEventArgs());
+            await Task.Delay(500);
+            var tagsItem = tagRow.ContextMenu!.Items.OfType<MenuItem>().First(i => i.Tag as string == "tags");
+            tagsItem.Open();
+            await Task.Delay(500);
+            Dispatcher.UIThread.RunJobs();
+            await SaveAsync(window, output, "mail-tags-menu.png");
+            Console.WriteLine($"Tag menu: {string.Join(" | ", tagsItem.Items.OfType<MenuItem>().Select(m => $"{m.Header}{(m.IsEnabled ? "" : " (off)")}"))}");
+            tagRow.ContextMenu.Close();
+        }
+
+        Console.WriteLine($"Tagged messages: {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count(m => m.HasTags)}");
+        await vm.SettingsPage.ShowMailTagsAsync();
+        vm.NavigateCommand.Execute(Section.Settings);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "settings-mail-tags.png");
+        vm.SettingsPage.SelectedTab = 11;
+        await Task.Delay(300);
         await vm.SettingsPage.QuickActions.EditCommand.ExecuteAsync(vm.SettingsPage.QuickActions.Actions[0]);
         await Task.Delay(300);
         await SaveAsync(window, output, "settings-quick-action-edit.png");

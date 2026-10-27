@@ -23,7 +23,7 @@ internal sealed partial class GraphMailProvider(Guid connectionId, GraphClient g
     public const int InitialDays = 90;
 
     // The list fields Neruna shows (the body comes as MIME when a message is opened).
-    private const string SummaryFields = "id,internetMessageId,subject,from,toRecipients,receivedDateTime,isRead,isDraft,flag,hasAttachments,bodyPreview";
+    private const string SummaryFields = "id,internetMessageId,subject,from,toRecipients,receivedDateTime,isRead,isDraft,flag,hasAttachments,bodyPreview,categories";
 
     // PR_LAST_VERB_EXECUTED: how the message was last answered (102 reply, 103 reply all, 104 forward).
     private const string LastVerbProperty = "Integer 0x1081";
@@ -137,6 +137,7 @@ internal sealed partial class GraphMailProvider(Guid connectionId, GraphClient g
         var known = knownRemoteIds.ToHashSet(StringComparer.Ordinal);
         var added = new List<MessageSummary>();
         var flags = new Dictionary<string, MessageFlags>(StringComparer.Ordinal);
+        var categories = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         var removed = new List<string>();
         foreach (var item in items)
         {
@@ -148,6 +149,12 @@ internal sealed partial class GraphMailProvider(Guid connectionId, GraphClient g
             else if (known.Contains(id) && !isFull)
             {
                 flags[id] = FlagsOf(item);
+
+                // A delta link from before tags asks without categories: then they stay as they are.
+                if (CategoriesOf(item) is { } tags)
+                {
+                    categories[id] = tags;
+                }
             }
             else
             {
@@ -161,7 +168,7 @@ internal sealed partial class GraphMailProvider(Guid connectionId, GraphClient g
         }
 
         var counts = await graph.GetAsync($"me/mailFolders/{folder.RemoteId}?$select=totalItemCount,unreadItemCount", cancellationToken);
-        return new FolderSyncResult(deltaLink ?? folder.SyncState ?? string.Empty, isFull, added, flags, removed, counts.Int("totalItemCount"), counts.Int("unreadItemCount"));
+        return new FolderSyncResult(deltaLink ?? folder.SyncState ?? string.Empty, isFull, added, flags, removed, counts.Int("totalItemCount"), counts.Int("unreadItemCount"), categories);
     }
 
     public async Task<MimeMessage> GetMessageAsync(MailFolder folder, string remoteId, CancellationToken cancellationToken = default)
@@ -199,6 +206,29 @@ internal sealed partial class GraphMailProvider(Guid connectionId, GraphClient g
         foreach (var id in remoteIds)
         {
             await graph.SendJsonAsync(HttpMethod.Patch, $"me/messages/{id}", patch, cancellationToken);
+        }
+    }
+
+    public bool SupportsTags => true;
+
+    // Categories by name, like other mail programs (a name not in the mailbox's category list shows there without colour).
+    public string KeywordOf(MailTag tag) => tag?.Name ?? throw new ArgumentNullException(nameof(tag));
+
+    public async Task SetTagAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, MailTag tag, bool add, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remoteIds);
+        ArgumentNullException.ThrowIfNull(tag);
+        foreach (var id in remoteIds)
+        {
+            // The list is replaced as a whole: the message's other categories are kept.
+            var current = CategoriesOf(await graph.GetAsync($"me/messages/{id}?$select=categories", cancellationToken)) ?? [];
+            var categories = current.Where(c => !tag.Matches(c)).ToList();
+            if (add)
+            {
+                categories.Add(tag.Name);
+            }
+
+            await graph.SendJsonAsync(HttpMethod.Patch, $"me/messages/{id}", new { categories }, cancellationToken);
         }
     }
 
@@ -364,8 +394,14 @@ internal sealed partial class GraphMailProvider(Guid connectionId, GraphClient g
             FlagsOf(m),
             0,
             m.Bool("hasAttachments"),
-            m.Str("bodyPreview"));
+            m.Str("bodyPreview"),
+            Keywords: CategoriesOf(m));
     }
+
+    internal static IReadOnlyList<string>? CategoriesOf(JsonElement m) =>
+        m.TryGetProperty("categories", out var list) && list.ValueKind == JsonValueKind.Array
+            ? [.. list.EnumerateArray().Select(c => c.GetString()).OfType<string>()]
+            : null;
 
     internal static MessageFlags FlagsOf(JsonElement m) =>
         (m.Bool("isRead") ? MessageFlags.Seen : MessageFlags.None)

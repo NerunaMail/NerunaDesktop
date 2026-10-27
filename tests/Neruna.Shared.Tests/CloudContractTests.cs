@@ -78,6 +78,15 @@ public class CloudContractTests
     }
 
     [Fact]
+    public void Client_reads_the_mail_tags()
+    {
+        var response = JsonSerializer.Deserialize<MailTagsResponse>(ContractFixtures.Read("mail-tags-example.json"), NerunaJson.Options)!;
+
+        var tag = Assert.Single(response.Tags);
+        Assert.Equal(("Offerte", "offerte", "#e8590c"), (tag.Name, tag.Keyword, tag.Color));
+    }
+
+    [Fact]
     public void Client_reads_the_chat()
     {
         var chat = JsonSerializer.Deserialize<ChatResponse>(ContractFixtures.Read("chat-example.json"), NerunaJson.Options)!;

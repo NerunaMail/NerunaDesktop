@@ -231,6 +231,45 @@ internal sealed partial class MailView : UserControl
     }
 
     // Remember the press; the drag only starts after the pointer moved a few pixels, so a click still opens the mail.
+    // Right click on a mail: the "Schlagwörter" submenu gets each tag (ticked when all selected mails have it), then "Verwalten …".
+    private async void OnMessageMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (sender is not ContextMenu menu || DataContext is not MailViewModel vm
+            || menu.Items.OfType<MenuItem>().FirstOrDefault(i => i.Tag as string == "tags") is not { } tagsItem)
+        {
+            return;
+        }
+
+        var manage = tagsItem.Items.OfType<MenuItem>().LastOrDefault();
+        var (tags, supported) = await vm.TagMenuAsync();
+        tagsItem.Items.Clear();
+        foreach (var (tag, isSet) in tags)
+        {
+            var swatch = new Border
+            {
+                Width = 14,
+                Height = 14,
+                CornerRadius = new CornerRadius(3),
+                Background = Converters.ColorBrush.Convert(tag.Color, typeof(Avalonia.Media.IBrush), null, System.Globalization.CultureInfo.InvariantCulture) as Avalonia.Media.IBrush,
+                Child = isSet ? new TextBlock { Text = "✓", Foreground = Avalonia.Media.Brushes.White, FontSize = 11, FontWeight = Avalonia.Media.FontWeight.Bold,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center } : null,
+            };
+            tagsItem.Items.Add(new MenuItem { Header = tag.Name, Icon = swatch, IsEnabled = supported, Command = vm.ToggleTagCommand, CommandParameter = tag });
+        }
+
+        if (!supported)
+        {
+            tagsItem.Items.Add(new MenuItem { Header = T("Dieses Konto speichert keine Schlagwörter."), IsEnabled = false });
+        }
+
+        if (tags.Count > 0)
+        {
+            tagsItem.Items.Add(new Separator());
+        }
+
+        tagsItem.Items.Add(manage ?? new MenuItem { Header = T("Verwalten …"), Command = vm.ManageTagsCommand });
+    }
+
     private void OnListPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         _pressed = null;

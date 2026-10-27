@@ -18,6 +18,7 @@ internal sealed partial class CloudViewModel(
     CloudController cloud,
     CloudSignatureSync signatures,
     CloudTextTemplateSync textTemplates,
+    CloudMailTagSync mailTags,
     CloudCertificateSync certificates,
     AccountDiscovery discovery,
     SettingsBackupService backup,
@@ -828,6 +829,7 @@ internal sealed partial class CloudViewModel(
             await backup.ForgetAsync(connection);
             await signatures.RemoveDisconnectedAsync();
             await textTemplates.RemoveDisconnectedAsync();
+            await mailTags.RemoveDisconnectedAsync();
             await certificates.RemoveDisconnectedAsync();
             if (await accounts.RemoveDisconnectedAsync())
             {
@@ -864,6 +866,7 @@ internal sealed partial class CloudViewModel(
         await LoadPairedPhonesAsync();
         await signatures.SyncAsync();
         await textTemplates.SyncAsync();
+        await mailTags.SyncAsync();
         try
         {
             await certificates.SyncAsync();

@@ -41,6 +41,9 @@ public interface IMailStore
 
     Task UpdateFlagsAsync(Guid connectionId, string folderRemoteId, IReadOnlyCollection<string> remoteIds, MessageFlags flags, bool add, CancellationToken cancellationToken = default);
 
+    /// <summary>Adds or removes a keyword (tag) on stored messages, until the next sync brings the server's.</summary>
+    Task UpdateKeywordsAsync(Guid connectionId, string folderRemoteId, IReadOnlyCollection<string> remoteIds, string keyword, bool add, CancellationToken cancellationToken = default);
+
     /// <summary>Raw MIME of a downloaded message, or null if not cached yet.</summary>
     Task<Stream?> OpenMessageContentAsync(Guid connectionId, string folderRemoteId, string remoteId, CancellationToken cancellationToken = default);
 

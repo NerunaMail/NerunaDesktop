@@ -396,6 +396,24 @@ public sealed class MailController(
         await store.UpdateFlagsAsync(folder.ConnectionId, folder.RemoteId, remoteIds, flags, add, cancellationToken);
     }
 
+    /// <summary>Whether the account keeps tags on its mails (IMAP keywords, categories).</summary>
+    public async Task<bool> SupportsTagsAsync(ServiceConnection connection)
+    {
+        await using var provider = providers.CreateMail(connection);
+        return provider.SupportsTags;
+    }
+
+    /// <summary>Puts a tag on messages or takes it off – on the server, then in the local copy.</summary>
+    public async Task SetTagAsync(ServiceConnection connection, MailFolder folder, IReadOnlyCollection<string> remoteIds, MailTag tag, bool add, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(tag);
+
+        await using var provider = providers.CreateMail(connection);
+        await provider.SetTagAsync(folder, remoteIds, tag, add, cancellationToken);
+        await store.UpdateKeywordsAsync(folder.ConnectionId, folder.RemoteId, remoteIds, provider.KeywordOf(tag), add, cancellationToken);
+    }
+
     /// <summary>"Alle als gelesen markieren": on the server for the whole folder, then the folder is synced (counts).</summary>
     public async Task MarkAllReadAsync(ServiceConnection connection, MailFolder folder, CancellationToken cancellationToken = default)
     {

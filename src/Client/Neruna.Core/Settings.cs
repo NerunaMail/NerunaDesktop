@@ -228,6 +228,12 @@ public static class SettingKeys
     /// <summary>Einstellungen → Schreiben: new mails and answers as plain text, with the simple text editor (default off).</summary>
     public const string ComposePlainText = "compose.plainText";
 
+    /// <summary>The user's own tags (JSON list of MailTag); not set: the five defaults.</summary>
+    public const string MailTags = "mail.tags";
+
+    /// <summary>The organisations' tags from Neruna Cloud (JSON: source → list of MailTag).</summary>
+    public const string MailTagsCloud = "mail.tags.cloud";
+
     /// <summary>"Speichern unter …" of a mail: the format chosen last ("eml" or "pdf").</summary>
     public const string MailSaveFormat = "mail.saveFormat";
 

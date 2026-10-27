@@ -236,6 +236,13 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task<TextTemplatesResponse> GetTextTemplatesAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<TextTemplatesResponse>(connection, "api/v1/text-templates", cancellationToken);
 
+    /// <summary>The organisation's tags for mails; null when the server has none yet (older version: 404).</summary>
+    public async Task<MailTagsResponse?> GetMailTagsAsync(CloudConnection connection, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAuthorizedAsync(connection, HttpMethod.Get, "api/v1/mail-tags", cancellationToken);
+        return response.StatusCode == HttpStatusCode.NotFound ? null : await ReadAsync<MailTagsResponse>(response, cancellationToken);
+    }
+
     /// <summary>Chat: everything newer than message <paramref name="after"/>; also keeps this person online.</summary>
     public async Task<ChatResponse> GetChatAsync(CloudConnection connection, long after, CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<ChatResponse>(connection, $"api/v1/chat?after={after}", cancellationToken);

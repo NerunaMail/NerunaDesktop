@@ -94,7 +94,8 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
             }
         }
 
-        var changedIds = result.AddedOrChanged.Select(m => m.RemoteId).Concat(result.FlagUpdates.Keys).ToList();
+        var changedIds = result.AddedOrChanged.Select(m => m.RemoteId).Concat(result.FlagUpdates.Keys)
+            .Concat(result.KeywordUpdates?.Keys ?? Enumerable.Empty<string>()).Distinct(StringComparer.Ordinal).ToList();
         var existing = new Dictionary<string, MessageEntity>(StringComparer.Ordinal);
         foreach (var chunk in changedIds.Chunk(500))
         {
@@ -121,6 +122,14 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
             if (existing.TryGetValue(remoteId, out var entity))
             {
                 entity.Flags = flags;
+            }
+        }
+
+        foreach (var (remoteId, keywords) in result.KeywordUpdates ?? new Dictionary<string, IReadOnlyList<string>>())
+        {
+            if (existing.TryGetValue(remoteId, out var entity))
+            {
+                entity.Keywords = JoinKeywords(keywords);
             }
         }
 
@@ -188,6 +197,30 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task UpdateKeywordsAsync(Guid connectionId, string folderRemoteId, IReadOnlyCollection<string> remoteIds, string keyword, bool add, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var folderId = await FolderIdAsync(db, connectionId, folderRemoteId, cancellationToken);
+        foreach (var message in await db.Messages.Where(m => m.FolderId == folderId && remoteIds.Contains(m.RemoteId)).ToListAsync(cancellationToken))
+        {
+            var keywords = SplitKeywords(message.Keywords).Where(k => !string.Equals(k, keyword, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (add)
+            {
+                keywords.Add(keyword);
+            }
+
+            message.Keywords = JoinKeywords(keywords);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string? JoinKeywords(IReadOnlyList<string>? keywords) =>
+        keywords is null || keywords.Count == 0 ? null : string.Join('\n', keywords);
+
+    private static List<string> SplitKeywords(string? keywords) =>
+        keywords is null ? [] : [.. keywords.Split('\n', StringSplitOptions.RemoveEmptyEntries)];
 
     public Task<Stream?> OpenMessageContentAsync(Guid connectionId, string folderRemoteId, string remoteId, CancellationToken cancellationToken = default)
     {
@@ -381,6 +414,7 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         entity.HasAttachments = summary.HasAttachments;
         entity.Preview = summary.Preview;
         entity.Security = summary.Security;
+        entity.Keywords = JoinKeywords(summary.Keywords);
     }
 
     private static MailFolder ToModel(MailFolderEntity f) =>
@@ -398,5 +432,6 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         m.Size,
         m.HasAttachments,
         m.Preview,
-        m.Security);
+        m.Security,
+        m.Keywords is null ? null : SplitKeywords(m.Keywords));
 }

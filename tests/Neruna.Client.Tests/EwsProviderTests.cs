@@ -276,6 +276,34 @@ public class EwsProviderTests
     }
 
     [Fact]
+    public async Task Tags_are_categories_and_keep_the_message_s_others()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (connection, factory, server, _) = Connect();
+        server.On("GetItem", op => Many("GetItem", op.Descendants(T + "ItemId").Select(i => Message("GetItem", i.Attribute("Id")!.Value == "M1"
+            ? "<m:Items><t:Message><t:ItemId Id=\"M1\"/><t:Categories><t:String>Rot</t:String><t:String>Offerte</t:String></t:Categories></t:Message></m:Items>"
+            : "<m:Items><t:Message><t:ItemId Id=\"M2\"/></t:Message></m:Items>"))));
+        server.On("UpdateItem", op => Many("UpdateItem", op.Descendants(T + "ItemChange").Select(_ => Message("UpdateItem", "<m:Items/>"))));
+        await using var mail = new EwsMailProviderFactory(factory).Create(connection);
+        var inbox = new MailFolder(connection.Id, "INBOX", "Posteingang", null, FolderRole.Inbox);
+        var offer = new MailTag("offerte", "Offerte", "#e8590c");
+
+        Assert.True(mail.SupportsTags);
+        Assert.Equal("Offerte", mail.KeywordOf(offer));
+        await mail.SetTagAsync(inbox, ["M1", "M2"], offer, add: true, ct);
+        var changes = server.Operations("UpdateItem").Single().Descendants(T + "ItemChange").ToList();
+        Assert.Equal(["Rot", "Offerte"], changes[0].Descendants(T + "String").Select(c => c.Value));
+        Assert.Equal(["Offerte"], changes[1].Descendants(T + "String").Select(c => c.Value));
+
+        // Taken off the last one: the field goes.
+        await mail.SetTagAsync(inbox, ["M2"], offer, add: false, ct);
+        Assert.Equal("DeleteItemField", server.Operations("UpdateItem").Last().Descendants(T + "Updates").Single().Elements().Single().Name.LocalName);
+
+        var summary = EwsMailProvider.SummaryOf(XElement.Parse($"<t:Message xmlns:t=\"{T.NamespaceName}\"><t:ItemId Id=\"M1\"/><t:Categories><t:String>Offerte</t:String></t:Categories></t:Message>"));
+        Assert.Equal(["Offerte"], summary.Keywords);
+    }
+
+    [Fact]
     public async Task Flags_sending_and_storing_mail_send_what_exchange_expects()
     {
         var ct = TestContext.Current.CancellationToken;

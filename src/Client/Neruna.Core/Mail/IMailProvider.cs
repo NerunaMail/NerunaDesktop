@@ -70,6 +70,16 @@ public interface IMailProvider : IAsyncDisposable
     Task SetFlagsAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, MessageFlags flags, bool add, CancellationToken cancellationToken = default);
 
     /// <exception cref="NotSupportedException">The provider lacks <see cref="MailProviderCapabilities.Move"/>.</exception>
+    /// <summary>The server keeps tags on messages (<see cref="SetTagAsync"/>).</summary>
+    bool SupportsTags => false;
+
+    /// <summary>Adds or removes a tag: an IMAP keyword, or a category (by name) at Microsoft 365 / Exchange.</summary>
+    Task SetTagAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, MailTag tag, bool add, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    /// <summary>What <see cref="SetTagAsync"/> stores on the message: the keyword, or the name as category.</summary>
+    string KeywordOf(MailTag tag) => tag?.Keyword ?? throw new ArgumentNullException(nameof(tag));
+
     Task MoveAsync(MailFolder source, IReadOnlyCollection<string> remoteIds, MailFolder target, CancellationToken cancellationToken = default);
 
     /// <summary>Deletes permanently (IMAP: \Deleted + EXPUNGE). Moving to the trash is <see cref="MoveAsync"/>.</summary>
@@ -136,6 +146,7 @@ public interface IMailProvider : IAsyncDisposable
 
 /// <param name="IsFullResync">The previous state is void (e.g. IMAP UIDVALIDITY changed): replace the folder's contents.</param>
 /// <param name="FlagUpdates">Flag changes of already known messages, without re-downloading their summaries.</param>
+/// <param name="KeywordUpdates">The tags of already known messages, where the provider has them (null: unchanged).</param>
 public sealed record FolderSyncResult(
     string NewSyncState,
     bool IsFullResync,
@@ -143,4 +154,5 @@ public sealed record FolderSyncResult(
     IReadOnlyDictionary<string, MessageFlags> FlagUpdates,
     IReadOnlyList<string> RemovedRemoteIds,
     int TotalCount,
-    int UnreadCount);
+    int UnreadCount,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? KeywordUpdates = null);

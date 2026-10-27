@@ -41,6 +41,7 @@ internal sealed partial class MailViewModel(
     Neruna.Core.Meetings.MeetingController meetings,
     PdfProtectionService pdfSecurity,
     AddressCollector addressCollector,
+    MailTagService tagService,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
@@ -1444,6 +1445,7 @@ internal sealed partial class MailViewModel(
             {
                 item.IsUnread = !summary.Flags.HasFlag(MessageFlags.Seen);
                 item.IsFlagged = summary.Flags.HasFlag(MessageFlags.Flagged);
+                item.Keywords = summary.Keywords ?? [];
                 items.Add(item);
             }
             else
@@ -2154,6 +2156,26 @@ internal sealed partial class MessageItemViewModel(MessageSummary summary, MailF
     /// <summary>Forwarded (IMAP keyword $Forwarded).</summary>
     [ObservableProperty]
     public partial bool IsForwarded { get; set; } = summary.Flags.HasFlag(MessageFlags.Forwarded);
+
+    /// <summary>The tags offered (own and the organisation's); set by the mail page, which refreshes the items.</summary>
+    internal static IReadOnlyList<MailTag> KnownTags { get; set; } = MailTagService.Defaults;
+
+    /// <summary>Keywords/categories on the server; only those of a known tag show.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Tags), nameof(HasTags))]
+    public partial IReadOnlyList<string> Keywords { get; set; } = summary.Keywords ?? [];
+
+    public IReadOnlyList<MailTag> Tags => [.. KnownTags.Where(Has)];
+
+    public bool HasTags => Tags.Count > 0;
+
+    public bool Has(MailTag tag) => Keywords.Any(tag.Matches);
+
+    public void RefreshTags()
+    {
+        OnPropertyChanged(nameof(Tags));
+        OnPropertyChanged(nameof(HasTags));
+    }
 
     public bool Matches(string query) =>
         Subject.Contains(query, StringComparison.CurrentCultureIgnoreCase)

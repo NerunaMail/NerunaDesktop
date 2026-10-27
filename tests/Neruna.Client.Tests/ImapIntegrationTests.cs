@@ -70,6 +70,23 @@ public class ImapIntegrationTests
         var responded = Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
         Assert.True(responded.Flags.HasFlag(MessageFlags.Answered));
         Assert.True(responded.Flags.HasFlag(MessageFlags.Forwarded));
+        Assert.Empty(responded.Keywords ?? []); // $Forwarded is a flag here, not a tag
+
+        // Tags are IMAP keywords: set here, they come back with the next sync (also when the local copy lost them).
+        Assert.True(await controller.SupportsTagsAsync(connection));
+        var important = MailTagService.Defaults[0];
+        var offer = new MailTag("offerte", "Offerte", "#e8590c");
+        await controller.SetTagAsync(connection, inbox, [summary.RemoteId], important, add: true, ct);
+        await controller.SetTagAsync(connection, inbox, [summary.RemoteId], offer, add: true, ct);
+        await env.MailStore.UpdateKeywordsAsync(inbox.ConnectionId, inbox.RemoteId, [summary.RemoteId], "offerte", false, ct);
+        await controller.SyncAllAsync(ct);
+        var tagged = Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+        Assert.Equal(["$label1", "offerte"], tagged.Keywords!.Order(StringComparer.Ordinal));
+
+        await controller.SetTagAsync(connection, inbox, [summary.RemoteId], important, add: false, ct);
+        await controller.SyncAllAsync(ct);
+        var untagged = Assert.Single(await controller.GetMessagesAsync(inbox, cancellationToken: ct), m => m.Subject == subject);
+        Assert.Equal(["offerte"], untagged.Keywords);
     }
 
     [Fact]
