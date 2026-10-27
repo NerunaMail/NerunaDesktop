@@ -53,6 +53,38 @@ public class OAuthSignInTests
         await Assert.ThrowsAsync<OAuthException>(() => new OAuthClient(tokenHttp).SignInAsync(endpoints, null, forged, ct));
     }
 
+    [Fact]
+    public async Task A_relay_page_gets_the_answer_and_finds_the_port_in_the_state()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var endpoints = new OAuthEndpoints(new Uri("https://login.example/authorize"), new Uri("https://login.example/token"), "client-1", [])
+        {
+            RedirectHost = "127.0.0.1",
+            RedirectPath = "/callback",
+            RelayRedirect = new Uri("https://neruna.example/zoom/callback/"),
+        };
+        var stub = new StubHttpHandler();
+        stub.Responses["https://login.example/token"] = (HttpStatusCode.OK, """{"access_token":"A","refresh_token":"R","expires_in":3600}""");
+        using var tokenHttp = new HttpClient(stub);
+        using var local = new HttpClient();
+
+        var browser = new Browser(async authorize =>
+        {
+            var query = HttpUtility.ParseQueryString(authorize.Query);
+            Assert.Equal("https://neruna.example/zoom/callback/", query["redirect_uri"]);
+
+            // What the page on the website does: the port from the state, then on to this computer.
+            var state = query["state"]!;
+            var port = int.Parse(state[..state.IndexOf('.', StringComparison.Ordinal)], System.Globalization.CultureInfo.InvariantCulture);
+            await local.GetAsync($"http://127.0.0.1:{port}/callback?code=C0DE&state={Uri.EscapeDataString(state)}", ct);
+        });
+
+        var tokens = await new OAuthClient(tokenHttp).SignInAsync(endpoints, null, browser, ct);
+        await browser.Visits!;
+        Assert.Equal("A", tokens.AccessToken);
+        Assert.Contains("redirect_uri=https%3A%2F%2Fneruna.example%2Fzoom%2Fcallback%2F", Assert.Single(stub.Sent).Body, StringComparison.Ordinal);
+    }
+
     // A phone: the provider's redirect goes to the app's own scheme, which hands its parameters back.
     private sealed class AppBrowser(Func<Uri, Uri, IReadOnlyDictionary<string, string>> answer) : IAppRedirectBrowser
     {

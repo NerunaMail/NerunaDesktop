@@ -56,6 +56,13 @@ public sealed record OAuthEndpoints(Uri Authorize, Uri Token, string ClientId, I
     /// <see cref="IAppRedirectBrowser"/> on a phone. Null: only the loopback listener.
     /// </summary>
     public Uri? AppRedirect { get; init; }
+
+    /// <summary>
+    /// A page on a public domain registered with the provider instead of the loopback address (Zoom allows no loopback
+    /// redirect for published apps). It hands code and state on to the listener on this computer, whose port it takes
+    /// from the state ("{port}.{random}"); the code alone is of no use without the PKCE verifier, which stays here.
+    /// </summary>
+    public Uri? RelayRedirect { get; init; }
 }
 
 /// <summary>What the sign-in yields; kept only in the system keychain (never in the database or logs).</summary>
@@ -116,11 +123,13 @@ public sealed class OAuthClient(HttpClient http)
 
         var verifier = Base64Url(RandomNumberGenerator.GetBytes(32));
         var challenge = Base64Url(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
-        var state = Base64Url(RandomNumberGenerator.GetBytes(16));
         var nonce = endpoints.Issuer is null ? null : Base64Url(RandomNumberGenerator.GetBytes(16));
         var app = browser is IAppRedirectBrowser appBrowser && endpoints.AppRedirect is { } appRedirect ? (appBrowser, appRedirect) : default;
         using var listener = app.appBrowser is null ? LoopbackListener.Start(endpoints.RedirectHost) : null;
-        var redirect = listener is null ? app.appRedirect.OriginalString : $"http://{endpoints.RedirectHost}:{listener.Port}{endpoints.RedirectPath}";
+        var redirect = listener is null ? app.appRedirect.OriginalString
+            : endpoints.RelayRedirect?.AbsoluteUri ?? $"http://{endpoints.RedirectHost}:{listener.Port}{endpoints.RedirectPath}";
+        var state = (listener is not null && endpoints.RelayRedirect is not null ? listener.Port.ToString(System.Globalization.CultureInfo.InvariantCulture) + "." : string.Empty)
+                    + Base64Url(RandomNumberGenerator.GetBytes(16));
 
         var query = new Dictionary<string, string?>
         {

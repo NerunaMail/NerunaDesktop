@@ -12,18 +12,21 @@ namespace Neruna.Providers.Zoom;
 
 /// <summary>
 /// Neruna's app in the Zoom App Marketplace (General app, user-managed, "public client" with PKCE – no secret). The
-/// client id is not secret; while it is empty, Zoom stays switched off in the settings. Redirect: the app's "PKCE OAuth
-/// Redirect URL" is <c>http://127.0.0.1/callback</c>, any port is accepted for it; the scopes are those set for the app
-/// (<c>meeting:write:meeting</c>, <c>user:read:user</c>).
+/// client id is not secret; while it is empty, Zoom stays switched off in the settings. Redirect: Zoom allows no
+/// loopback address for published apps, so it goes to a page on neruna.org (<see cref="RelayRedirect"/>, in the app's
+/// redirect URLs and OAuth allow list) that hands the code on to <c>http://127.0.0.1:{port}/callback</c>; the scopes are
+/// those set for the app (<c>meeting:write:meeting</c>, <c>user:read:user</c>).
 /// </summary>
 public static class ZoomAccount
 {
     /// <summary>
     /// The app's public client id (marketplace.zoom.us → the app → Basic Information → App Credentials → "Use Public
-    /// Client OAuth") – not the development or production client id, which go with a secret. Its loopback redirect
-    /// must be in the app's OAuth allow list; Zoom ignores the port.
+    /// Client OAuth") – not the development or production client id, which go with a secret.
     /// </summary>
     public const string ClientId = "Ci2RHjG4SGm7t1pdaBg2OA";
+
+    /// <summary>The production redirect (website: src/static/zoom-callback.html); the development one is …/zoom/dev/callback/.</summary>
+    public static readonly Uri RelayRedirect = new("https://neruna.org/zoom/callback/");
 
     public static OAuthEndpoints Endpoints { get; } = new(
         new Uri("https://zoom.us/oauth/authorize"),
@@ -33,6 +36,7 @@ public static class ZoomAccount
     {
         RedirectHost = "127.0.0.1",
         RedirectPath = "/callback",
+        RelayRedirect = RelayRedirect,
         SelectAccount = false,
         ScopeOnTokenRequests = false,
     };
