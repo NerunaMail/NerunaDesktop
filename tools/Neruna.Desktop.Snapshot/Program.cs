@@ -710,6 +710,15 @@ internal static class Snapshots
         await SaveAsync(toast, output, "notification-window.png");
         toast.Close();
 
+        // A mail's picture enlarged in its own window (Windows: "Bild vergrössern" in the reading pane's menu).
+        using (var logo = new MemoryStream(FourKBitmap()))
+        {
+            var viewer = new ImageViewerWindow(new Avalonia.Media.Imaging.Bitmap(logo)) { Width = 900, Height = 600 };
+            viewer.Show();
+            await SaveAsync(viewer, output, "image-viewer.png");
+            viewer.Close();
+        }
+
         // The font dropdown opens in a popup that headless capture does not include, so render its items on their own.
         await SaveFontListAsync(output);
         await SaveSplashAsync(output);

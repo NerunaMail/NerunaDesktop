@@ -2392,5 +2392,10 @@
  "Neue Kategorie": "Nouvelle catégorie",
  "Eine Kategorie «{0}» gibt es schon.": "Une catégorie « {0} » existe déjà.",
  "Kategorien ordnen Termine – im Kalender als farbige Linie rechts am Termin, die Namen zeigt der Tooltip. Gespeichert wird der Name beim Termin auf dem Server, so sehen ihn auch andere Kalenderprogramme.": "Les catégories classent les rendez-vous – dans le calendrier sous forme de ligne colorée à droite du rendez-vous, l’infobulle affiche les noms. Le nom est enregistré avec le rendez-vous sur le serveur, ainsi les autres programmes de calendrier le voient aussi.",
- "Beim Umbenennen behalten bestehende Termine den alten Namen und erscheinen ohne Farbe, bis Sie die Kategorie beim Termin neu wählen.": "Lors d’un renommage, les rendez-vous existants gardent l’ancien nom et s’affichent sans couleur jusqu’à ce que vous choisissiez à nouveau la catégorie dans le rendez-vous."
+ "Beim Umbenennen behalten bestehende Termine den alten Namen und erscheinen ohne Farbe, bis Sie die Kategorie beim Termin neu wählen.": "Lors d’un renommage, les rendez-vous existants gardent l’ancien nom et s’affichent sans couleur jusqu’à ce que vous choisissiez à nouveau la catégorie dans le rendez-vous.",
+ "Bild vergrössern": "Agrandir l’image",
+ "Verkleinern": "Réduire",
+ "Vergrössern": "Agrandir",
+ "Einpassen": "Ajuster",
+ "{0} × {1} Pixel": "{0} × {1} pixels"
 }

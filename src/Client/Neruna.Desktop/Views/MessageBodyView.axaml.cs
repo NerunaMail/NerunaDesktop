@@ -44,6 +44,10 @@ internal sealed partial class MessageBodyView : UserControl
     private bool _written;
     private MainWindowViewModel? _window;
 
+    // Windows: Neruna's "Bild vergrössern" in the web view's menu (kept, or its handler goes with it).
+    private object? _imageMenu;
+    private static readonly System.Net.Http.HttpClient Pictures = new() { Timeout = TimeSpan.FromSeconds(30) };
+
     public MessageBodyView()
     {
         InitializeComponent();
@@ -183,6 +187,7 @@ internal sealed partial class MessageBodyView : UserControl
                 _web.NavigationCompleted += OnNavigationCompleted;
                 _web.WebMessageReceived += OnWebMessage;
                 _web.NewWindowRequested += OnNewWindowRequested;
+                _web.AdapterCreated += (_, args) => HookImageMenu(args.TryGetPlatformHandle());
             }
 
             if (!ReferenceEquals(_host.Child, _web))
@@ -204,6 +209,48 @@ internal sealed partial class MessageBodyView : UserControl
             _webUnavailable = true;
             _web = null;
             return false;
+        }
+    }
+
+    private void HookImageMenu(Avalonia.Platform.IPlatformHandle? handle)
+    {
+        if (_imageMenu is null && OperatingSystem.IsWindows() && handle is Avalonia.Platform.IWindowsWebView2PlatformHandle webView2)
+        {
+            _imageMenu = Neruna.Desktop.Editor.WebView2ImageMenu.Attach(webView2.CoreWebView2, Neruna.Core.Localization.Texts.T("Bild vergrössern"),
+                source => Dispatcher.UIThread.Post(() => _ = MagnifyAsync(source)));
+        }
+    }
+
+    // The picture as the mail has it: embedded (data:), or off the internet only where the mail may load it anyway.
+    private async Task MagnifyAsync(string source)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner)
+        {
+            return;
+        }
+
+        try
+        {
+            byte[] data;
+            if (source.StartsWith("data:", StringComparison.OrdinalIgnoreCase) && source.IndexOf(";base64,", StringComparison.OrdinalIgnoreCase) is var at and > 0)
+            {
+                data = Convert.FromBase64String(Uri.UnescapeDataString(source[(at + 8)..]));
+            }
+            else if (DataContext is ReadingPaneViewModel { AllowsRemoteContent: true } && Uri.TryCreate(source, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http")
+            {
+                data = await Pictures.GetByteArrayAsync(uri);
+            }
+            else
+            {
+                return;
+            }
+
+            using var stream = new MemoryStream(data);
+            new ImageViewerWindow(new Avalonia.Media.Imaging.Bitmap(stream)).Show(owner);
+        }
+        catch (Exception ex) when (ex is FormatException or System.Net.Http.HttpRequestException or TaskCanceledException or ArgumentException or InvalidOperationException or NotSupportedException or IOException)
+        {
+            // Not a picture Neruna can show (SVG …) or no longer reachable: the menu does nothing.
         }
     }
 

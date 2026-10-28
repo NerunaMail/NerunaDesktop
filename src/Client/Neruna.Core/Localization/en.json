@@ -2392,5 +2392,10 @@
  "Neue Kategorie": "New category",
  "Eine Kategorie «{0}» gibt es schon.": "A category “{0}” already exists.",
  "Kategorien ordnen Termine – im Kalender als farbige Linie rechts am Termin, die Namen zeigt der Tooltip. Gespeichert wird der Name beim Termin auf dem Server, so sehen ihn auch andere Kalenderprogramme.": "Categories sort events – in the calendar as a coloured line on the right of the event, the tooltip shows the names. The name is stored with the event on the server, so other calendar programs see it too.",
- "Beim Umbenennen behalten bestehende Termine den alten Namen und erscheinen ohne Farbe, bis Sie die Kategorie beim Termin neu wählen.": "When renaming, existing events keep the old name and show without colour until you choose the category on the event again."
+ "Beim Umbenennen behalten bestehende Termine den alten Namen und erscheinen ohne Farbe, bis Sie die Kategorie beim Termin neu wählen.": "When renaming, existing events keep the old name and show without colour until you choose the category on the event again.",
+ "Bild vergrössern": "Enlarge image",
+ "Verkleinern": "Zoom out",
+ "Vergrössern": "Zoom in",
+ "Einpassen": "Fit",
+ "{0} × {1} Pixel": "{0} × {1} pixels"
 }

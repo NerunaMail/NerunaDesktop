@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:l="using:Neruna.Desktop"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Neruna.Desktop.Views.ImageViewerWindow"
+        Title="{l:T 'Bild'}"
+        Icon="/Assets/app.ico"
+        Width="1000" Height="760" MinWidth="320" MinHeight="240"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ShellBackgroundBrush}">
+  <!-- A picture of a mail, larger: fitted to the window, or zoomed (buttons, Ctrl + mouse wheel) and scrolled -->
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Padding="10,6" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Button Content="−" MinWidth="32" Click="OnZoomOut" ToolTip.Tip="{l:T 'Verkleinern'}" />
+        <TextBlock x:Name="ZoomText" Width="56" TextAlignment="Center" VerticalAlignment="Center" />
+        <Button Content="+" MinWidth="32" Click="OnZoomIn" ToolTip.Tip="{l:T 'Vergrössern'}" />
+        <Button Content="{l:T 'Einpassen'}" Click="OnFit" Margin="8,0,0,0" />
+        <Button Content="100 %" Click="OnActualSize" />
+        <TextBlock x:Name="SizeText" Classes="subtle" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />
+      </StackPanel>
+    </Border>
+    <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{DynamicResource PaneBackgroundBrush}">
+      <Image x:Name="Picture" Stretch="Fill" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12" />
+    </ScrollViewer>
+  </DockPanel>
+</Window>

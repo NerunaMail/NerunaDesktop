@@ -2392,5 +2392,10 @@
  "Neue Kategorie": "Nuova categoria",
  "Eine Kategorie «{0}» gibt es schon.": "Una categoria «{0}» esiste già.",
  "Kategorien ordnen Termine – im Kalender als farbige Linie rechts am Termin, die Namen zeigt der Tooltip. Gespeichert wird der Name beim Termin auf dem Server, so sehen ihn auch andere Kalenderprogramme.": "Le categorie ordinano gli appuntamenti – nel calendario come linea colorata a destra dell’appuntamento, il tooltip mostra i nomi. Il nome viene salvato con l’appuntamento sul server, così lo vedono anche altri programmi di calendario.",
- "Beim Umbenennen behalten bestehende Termine den alten Namen und erscheinen ohne Farbe, bis Sie die Kategorie beim Termin neu wählen.": "Rinominando, gli appuntamenti esistenti mantengono il vecchio nome e appaiono senza colore finché non scegliete di nuovo la categoria nell’appuntamento."
+ "Beim Umbenennen behalten bestehende Termine den alten Namen und erscheinen ohne Farbe, bis Sie die Kategorie beim Termin neu wählen.": "Rinominando, gli appuntamenti esistenti mantengono il vecchio nome e appaiono senza colore finché non scegliete di nuovo la categoria nell’appuntamento.",
+ "Bild vergrössern": "Ingrandisci immagine",
+ "Verkleinern": "Riduci",
+ "Vergrössern": "Ingrandisci",
+ "Einpassen": "Adatta",
+ "{0} × {1} Pixel": "{0} × {1} pixel"
 }
