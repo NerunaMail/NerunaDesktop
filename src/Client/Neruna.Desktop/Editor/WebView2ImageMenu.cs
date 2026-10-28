@@ -15,18 +15,26 @@ internal sealed class WebView2ImageMenu
     // The wrapper must live as long as the web view, or its event handler goes with it.
     private readonly CoreWebView2 _core;
 
-    private WebView2ImageMenu(CoreWebView2 core, string label, Action<string> magnify)
+    // The picture itself is taken from the page (the right-clicked one): WebView2 gives no address for embedded
+    // pictures (data:), and those are most of the pictures in mails.
+    private WebView2ImageMenu(CoreWebView2 core, string label, Action magnify, Action<Exception> failed)
     {
         _core = core;
         _core.ContextMenuRequested += (_, e) =>
         {
-            RemoveMagnifier(e.MenuItems);
-            if (e.ContextMenuTarget is { Kind: CoreWebView2ContextMenuTargetKind.Image, HasSourceUri: true } target)
+            try
             {
-                var source = target.SourceUri;
-                var item = _core.Environment.CreateContextMenuItem(label, null, CoreWebView2ContextMenuItemKind.Command);
-                item.CustomItemSelected += (_, _) => magnify(source);
-                e.MenuItems.Insert(0, item);
+                RemoveMagnifier(e.MenuItems);
+                if (e.ContextMenuTarget?.Kind == CoreWebView2ContextMenuTargetKind.Image)
+                {
+                    var item = _core.Environment.CreateContextMenuItem(label, null, CoreWebView2ContextMenuItemKind.Command);
+                    item.CustomItemSelected += (_, _) => magnify();
+                    e.MenuItems.Insert(0, item);
+                }
+            }
+            catch (Exception ex) when (ex is COMException or InvalidCastException or NotSupportedException or ArgumentException or InvalidOperationException)
+            {
+                failed(ex); // the web view's menu stays as it is
             }
         };
     }
@@ -53,11 +61,11 @@ internal sealed class WebView2ImageMenu
     }
 
     /// <returns>Null if the web view is no WebView2 or its wrapper cannot be created.</returns>
-    public static WebView2ImageMenu? Attach(IntPtr coreWebView2, string label, Action<string> magnify)
+    public static WebView2ImageMenu? Attach(IntPtr coreWebView2, string label, Action magnify, Action<Exception> failed)
     {
         try
         {
-            return coreWebView2 == IntPtr.Zero ? null : new WebView2ImageMenu(CoreWebView2.CreateFromComICoreWebView2(coreWebView2), label, magnify);
+            return coreWebView2 == IntPtr.Zero ? null : new WebView2ImageMenu(CoreWebView2.CreateFromComICoreWebView2(coreWebView2), label, magnify, failed);
         }
         catch (Exception ex) when (ex is COMException or InvalidCastException or NotSupportedException or FileNotFoundException)
         {

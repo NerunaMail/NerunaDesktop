@@ -72,7 +72,9 @@ internal static class CrashHandler
     public static void RecordUnobserved(Exception exception)
     {
         var inner = exception is AggregateException { InnerExceptions.Count: 1 } aggregate ? aggregate.InnerException! : exception;
-        if (inner is OperationCanceledException or HttpRequestException or IOException or TimeoutException or System.Net.Sockets.SocketException)
+        // An aborted WebView2 start comes this way too (its task is also left unobserved): not a crash, see above.
+        if (inner is OperationCanceledException or HttpRequestException or IOException or TimeoutException or System.Net.Sockets.SocketException
+            || IsAbortedWebViewStart(inner))
         {
             return;
         }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Avalonia.Platform.Storage;
 using Avalonia;
 using Avalonia.Controls;
@@ -217,7 +218,28 @@ internal sealed partial class MessageBodyView : UserControl
         if (_imageMenu is null && OperatingSystem.IsWindows() && handle is Avalonia.Platform.IWindowsWebView2PlatformHandle webView2)
         {
             _imageMenu = Neruna.Desktop.Editor.WebView2ImageMenu.Attach(webView2.CoreWebView2, Neruna.Core.Localization.Texts.T("Bild vergrössern"),
-                source => Dispatcher.UIThread.Post(() => _ = MagnifyAsync(source)));
+                () => Dispatcher.UIThread.Post(() => _ = MagnifyClickedAsync()),
+                ex => CrashHandler.Logger?.LogWarning(ex, "Picture menu of the reading pane failed"));
+        }
+    }
+
+    // The address of the picture last right-clicked (KeyScript notes it).
+    private async Task MagnifyClickedAsync()
+    {
+        if (_web is null)
+        {
+            return;
+        }
+
+        var source = await _web.InvokeScript("(function(){var i=window.nerunaPicture;return i?(i.currentSrc||i.src||''):'';})()");
+        if (source is { Length: >= 2 } && source[0] == '"')
+        {
+            source = System.Text.Json.JsonSerializer.Deserialize<string>(source);
+        }
+
+        if (!string.IsNullOrEmpty(source))
+        {
+            await MagnifyAsync(source);
         }
     }
 
@@ -282,6 +304,9 @@ internal sealed partial class MessageBodyView : UserControl
             if (typeof window.invokeCSharpAction === "function") window.invokeCSharpAction(JSON.stringify(message));
           }
           document.addEventListener("mousedown", function () { post({ type: "focus" }); }, true);
+          document.addEventListener("contextmenu", function (e) {
+            window.nerunaPicture = e.target && e.target.closest ? e.target.closest("img") : null;
+          }, true);
           document.addEventListener("keydown", function (e) {
             var command = e.ctrlKey || e.metaKey;
             var key = e.key || "";
