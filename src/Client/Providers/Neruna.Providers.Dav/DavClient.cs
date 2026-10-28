@@ -174,23 +174,37 @@ internal sealed class DavClient(HttpClient http, Func<CancellationToken, Task<Au
     }
 
     /// <summary>
-    /// Retries reads and deletes when the connection drops mid-response (flaky networks, small WSGI servers).
+    /// Retries reads and deletes when the connection drops mid-response (flaky networks, small WSGI servers), and reads
+    /// that a gateway answers with 502/503/504 now and then (Google's CardDAV does every few syncs).
     /// PUT is not retried: a retried create could report a false conflict after the first attempt succeeded.
     /// </summary>
     private async Task<HttpResponseMessage> SendWithRetryAsync(HttpRequestMessage request, HttpMethod method, CancellationToken cancellationToken)
     {
         var retryable = method != HttpMethod.Put && method != HttpMethod.Post;
+        var read = method == HttpMethod.Get || method == HttpMethod.Options || method.Method is "PROPFIND" or "REPORT";
         for (var attempt = 1; ; attempt++)
         {
+            HttpResponseMessage response;
             try
             {
-                return await http.SendAsync(attempt == 1 ? request : await CloneAsync(request), HttpCompletionOption.ResponseContentRead, cancellationToken);
+                response = await http.SendAsync(attempt == 1 ? request : await CloneAsync(request), HttpCompletionOption.ResponseContentRead, cancellationToken);
             }
             catch (HttpRequestException ex) when (retryable && attempt < MaxAttempts && ex.InnerException is IOException)
             {
                 logger.LogDebug(ex, "DAV {Method} {Url}: connection dropped, retrying ({Attempt}/{Max})", method, request.RequestUri, attempt, MaxAttempts);
                 await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), cancellationToken);
+                continue;
             }
+
+            if (!read || attempt >= MaxAttempts || response.StatusCode is not (HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout))
+            {
+                return response;
+            }
+
+            var wait = response.Headers.RetryAfter?.Delta is { } delta && delta <= TimeSpan.FromSeconds(10) ? delta : TimeSpan.FromSeconds(attempt);
+            logger.LogInformation("DAV {Method} {Url}: {Status}, retrying in {Wait} s ({Attempt}/{Max})", method, request.RequestUri, (int)response.StatusCode, wait.TotalSeconds, attempt, MaxAttempts);
+            response.Dispose();
+            await Task.Delay(wait, cancellationToken);
         }
     }
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Web;
+using System.Xml.Linq;
 using Neruna.Core.Auth;
 using Neruna.Core.Calendar;
 using Neruna.Providers.Dav;
@@ -82,6 +83,48 @@ public class GoogleTests
         Assert.Equal(("imap.gmail.com", 993, "smtp.gmail.com", 465, "anna@gmail.com"), (settings.ImapHost, settings.ImapPort, settings.SmtpHost, settings.SmtpPort, settings.Username));
         Assert.True(settings.ServerSavesSent);
         Assert.Equal(new Uri("https://apidata.googleusercontent.com/caldav/v2/anna%40gmail.com/user"), GoogleAccount.CalDav("anna@gmail.com"));
+    }
+
+    [Fact]
+    public async Task A_bad_gateway_now_and_then_is_retried_for_reads_only()
+    {
+        // Google's CardDAV answers a PROPFIND with 502 every few syncs; the next attempt works.
+        var ct = TestContext.Current.CancellationToken;
+        var flaky = new FlakyHandler(failures: 1);
+        using var http = new HttpClient(flaky);
+        var client = new DavClient(http, DavClient.Bearer(_ => Task.FromResult("t")), Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+
+        var found = await client.PropfindAsync(new Uri("https://www.googleapis.com/carddav/v1/principals/anna@gmail.com/lists/"), 1, [XName.Get("displayname", "DAV:")], ct);
+        Assert.NotNull(found);
+        Assert.Equal(2, flaky.Requests);
+
+        // Not for a write: a repeated PUT could report a false conflict.
+        flaky = new FlakyHandler(failures: 1);
+        using var writes = new HttpClient(flaky);
+        client = new DavClient(writes, DavClient.Bearer(_ => Task.FromResult("t")), Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        try
+        {
+            await client.PutAsync(new Uri("https://dav.example/a.vcf"), "BEGIN:VCARD\r\nEND:VCARD\r\n", "text/vcard", null, create: true, ct);
+        }
+        catch (DavException)
+        {
+            // How the 502 is reported does not matter here – only that it was sent once.
+        }
+
+        Assert.Equal(1, flaky.Requests);
+    }
+
+    private sealed class FlakyHandler(int failures) : HttpMessageHandler
+    {
+        public int Requests { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests++;
+            return Task.FromResult(Requests <= failures
+                ? new HttpResponseMessage(HttpStatusCode.BadGateway) { Content = new StringContent("Bad Gateway") }
+                : new HttpResponseMessage(HttpStatusCode.MultiStatus) { Content = new StringContent("""<d:multistatus xmlns:d="DAV:"/>""", System.Text.Encoding.UTF8, "application/xml") });
+        }
     }
 
     [Fact]
