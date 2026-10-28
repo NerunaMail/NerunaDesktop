@@ -100,6 +100,9 @@ public static class SettingKeys
     /// <summary>Address books hidden in the contact list (JSON list of keys).</summary>
     public const string HiddenAddressBooks = "contacts.hidden";
 
+    /// <summary>The order of the address books within their account (JSON list of keys), set under "Adressbücher verwalten"; the others follow by name.</summary>
+    public const string AddressBookOrder = "contacts.order";
+
     /// <summary>How many months the date navigator in the calendar shows (1 or 2).</summary>
     public const string CalendarNavigatorMonths = "calendar.navigatorMonths";
 

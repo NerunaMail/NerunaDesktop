@@ -271,7 +271,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         foreach (var info in all.Where(c => c.HasEvents))
         {
             var color = colors[(info.ConnectionId, info.RemoteId)];
-            var item = new CalendarListItem(this, info, color)
+            var item = new CalendarListItem(info, color)
             {
                 IsVisible = !hidden.Contains(CalendarController.CalendarKey(info)),
                 ShowTasks = tasksShown.Contains(CalendarController.CalendarKey(info)),
@@ -306,7 +306,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var accountOf = sources.ToDictionary(s => s.Connection.Id, s => s.Account);
         var accountOrder = sources.Select(s => s.Account.Id).Distinct().ToList();
         var chosen = ParseOrder(await settings.GetAsync(SettingKeys.CalendarGroupOrder));
-        // Within a group: the order the user chose, the others after them as before (by name).
+        // Within a group: the order chosen under "Kalender verwalten", the others after them as before (by name).
         var calendarOrder = ParseKeys(await settings.GetAsync(SettingKeys.CalendarOrder));
         var groups = items
             .GroupBy(i => accountOf.TryGetValue(i.Info.ConnectionId, out var account) ? account : null)
@@ -327,16 +327,12 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         }
 
         UpdateGroupMoves();
-        foreach (var group in CalendarGroups)
-        {
-            UpdateCalendarMoves(group);
-        }
 
         OnPropertyChanged(nameof(HasCalendars));
         await LoadWeekAsync(dataChanged: true);
     }
 
-    private static List<string> ParseKeys(string? json)
+    internal static List<string> ParseKeys(string? json)
     {
         try
         {
@@ -345,44 +341,6 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         catch (System.Text.Json.JsonException)
         {
             return [];
-        }
-    }
-
-    /// <summary>Moves a calendar up or down within its account group; the order of all groups is kept.</summary>
-    internal async Task MoveCalendarAsync(CalendarListItem item, int delta)
-    {
-        if (CalendarGroups.FirstOrDefault(g => g.Items.Contains(item)) is not { } group)
-        {
-            return;
-        }
-
-        var index = group.Items.IndexOf(item);
-        var target = index + delta;
-        if (target < 0 || target >= group.Items.Count)
-        {
-            return;
-        }
-
-        group.Items.Move(index, target);
-        UpdateCalendarMoves(group);
-        Calendars.Clear();
-        foreach (var calendarItem in CalendarGroups.SelectMany(g => g.Items))
-        {
-            Calendars.Add(calendarItem);
-        }
-
-        // Calendars of other workspaces keep their place: the shown ones are put in, the rest stays behind them.
-        var shown = CalendarGroups.SelectMany(g => g.Items).Select(i => i.Key).ToList();
-        var kept = ParseKeys(await settings.GetAsync(SettingKeys.CalendarOrder)).Where(k => !shown.Contains(k));
-        await settings.SetAsync(SettingKeys.CalendarOrder, System.Text.Json.JsonSerializer.Serialize(shown.Concat(kept)));
-    }
-
-    private static void UpdateCalendarMoves(CalendarGroup group)
-    {
-        for (var i = 0; i < group.Items.Count; i++)
-        {
-            group.Items[i].CanMoveUp = i > 0;
-            group.Items[i].CanMoveDown = i < group.Items.Count - 1;
         }
     }
 
@@ -830,24 +788,10 @@ internal sealed partial class CalendarGroup(CalendarViewModel owner, Guid accoun
     private Task MoveDownAsync() => owner.MoveGroupAsync(this, +1);
 }
 
-internal sealed partial class CalendarListItem(CalendarViewModel owner, CalendarInfo info, string color) : CollectionListItem(info, color)
+/// <summary>A calendar in "Meine Kalender"; its place within the account is set under "Kalender verwalten".</summary>
+internal sealed class CalendarListItem(CalendarInfo info, string color) : CollectionListItem(info, color)
 {
     public override string SoloTip => IsSolo ? T("Wieder alle ausgewählten Kalender anzeigen") : T("Nur diesen Kalender anzeigen");
-
-    /// <summary>Within its account group (arrows on hover).</summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(MoveUpCommand))]
-    public partial bool CanMoveUp { get; set; }
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(MoveDownCommand))]
-    public partial bool CanMoveDown { get; set; }
-
-    [RelayCommand(CanExecute = nameof(CanMoveUp))]
-    private Task MoveUpAsync() => owner.MoveCalendarAsync(this, -1);
-
-    [RelayCommand(CanExecute = nameof(CanMoveDown))]
-    private Task MoveDownAsync() => owner.MoveCalendarAsync(this, +1);
 }
 
 internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem> events)

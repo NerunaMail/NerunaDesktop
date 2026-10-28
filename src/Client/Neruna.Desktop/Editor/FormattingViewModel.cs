@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Neruna.Desktop.Infrastructure;
 using Neruna.Desktop.ViewModels;
+using Neruna.Core.Mail;
 using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.Editor;
@@ -157,6 +158,12 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
     private Task InsertLink()
     {
         var url = LinkUrl.Trim();
+        // Also a phone number (tel:+41…), e.g. in a signature: a click in the mail dials it.
+        if (PhoneLink.Normalize(url) is { } phone)
+        {
+            return RunAsync($"neruna.link({Js(phone)})");
+        }
+
         return Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http" or "mailto"
             ? RunAsync($"neruna.link({Js(uri.AbsoluteUri)})")
             : Task.CompletedTask;

@@ -429,7 +429,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     public double OverlayWidth => Overlay switch
     {
         GroupEditorViewModel { IsReadOnly: false } => 980,
-        CalendarSelectionViewModel { HasSeveralSources: true } => 900,
+        CalendarSelectionViewModel { HasSeveralSources: true } => 1040, // accounts beside the calendars, long names
+        CalendarSelectionViewModel or AddressBookSelectionViewModel => 760,
         CalendarPrintViewModel => 1080, // options beside a page preview
         AccountTransferDialogViewModel => 900, // the QR code (up to ~520 px) with PIN and instructions beside it
         SyncStatusViewModel or BackupChangesViewModel => 820, // account, service and state in one line, errors below
@@ -1109,7 +1110,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private void ShowAddressBookSelection()
     {
-        var selection = new AddressBookSelectionViewModel(_contacts);
+        var selection = new AddressBookSelectionViewModel(_contacts, _settings);
         selection.Finished += async (_, changed) =>
         {
             Overlay = null;

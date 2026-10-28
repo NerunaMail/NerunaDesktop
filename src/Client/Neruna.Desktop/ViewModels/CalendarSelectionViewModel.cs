@@ -12,6 +12,7 @@ namespace Neruna.Desktop.ViewModels;
 /// "Kalender verwalten": asks every calendar server again which calendars exist (own, shared, subscribed in the
 /// web interface) and lets the user choose which ones Neruna shows. Also where new events go: the default calendar,
 /// and per account the one its invitations go into – both chosen from the calendars shown, so the lists are current.
+/// The arrows set the order of the calendars within their account in "Meine Kalender".
 /// </summary>
 internal sealed partial class CalendarSelectionViewModel(CalendarController calendar, ISettingsStore settings) : ViewModelBase
 {
@@ -100,6 +101,8 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
         {
             Sources.Clear();
             _defaultKey ??= await settings.GetAsync(SettingKeys.CalendarDefaultCalendar);
+            // As in "Meine Kalender": the chosen order first, the others by name.
+            var order = CalendarViewModel.ParseKeys(await settings.GetAsync(SettingKeys.CalendarOrder));
 
             // ICS subscriptions are a single calendar each; there is nothing to choose.
             foreach (var source in (await calendar.GetSourcesAsync()).Where(s => s.Connection.ProviderId != ProviderIds.Ics))
@@ -111,9 +114,11 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
                 {
                     var discovery = await calendar.DiscoverWithDetailsAsync(source.Connection);
                     group.Details = discovery.Details;
-                    foreach (var candidate in discovery.Calendars)
+                    foreach (var candidate in discovery.Calendars
+                                 .OrderBy(c => order.IndexOf(CalendarController.CalendarKey(c.Calendar)) is var at and >= 0 ? at : order.Count)
+                                 .ThenBy(c => c.Calendar.Name, StringComparer.CurrentCultureIgnoreCase))
                     {
-                        group.Calendars.Add(new CalendarChoiceItem(candidate));
+                        group.Calendars.Add(new CalendarChoiceItem(group, candidate));
                     }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -152,6 +157,11 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
             // The keys, not the boxes: a chosen calendar of a server that is not reachable right now is not in the list
             // (the box shows "Automatisch"), but stays the default.
             await settings.SetAsync(SettingKeys.CalendarDefaultCalendar, _defaultKey);
+
+            // The order of the calendars listed here; those of servers not reachable now keep their place behind them.
+            var listed = Sources.SelectMany(g => g.Calendars).Select(c => CalendarController.CalendarKey(c.Candidate.Calendar)).ToList();
+            var kept = CalendarViewModel.ParseKeys(await settings.GetAsync(SettingKeys.CalendarOrder)).Where(k => !listed.Contains(k));
+            await settings.SetAsync(SettingKeys.CalendarOrder, System.Text.Json.JsonSerializer.Serialize(listed.Concat(kept)));
             foreach (var group in Sources)
             {
                 await settings.SetAsync(InvitationService.DefaultCalendarKey(group.Source.Account.Id), group.InvitationKey);
@@ -195,7 +205,7 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
             var existing = group.Calendars.FirstOrDefault(c => c.Candidate.Calendar.RemoteId == added.RemoteId);
             if (existing is null)
             {
-                group.Calendars.Add(new CalendarChoiceItem(new CalendarCandidate(added, true, true, true)));
+                group.Calendars.Add(new CalendarChoiceItem(group, new CalendarCandidate(added, true, true, true)));
                 group.ApplyFilter(Filter);
             }
             else
@@ -234,7 +244,9 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
         _invitationKey = invitationKey;
         Calendars.CollectionChanged += (_, e) =>
         {
-            foreach (CalendarChoiceItem item in e.NewItems ?? Array.Empty<CalendarChoiceItem>())
+            // A move (arrows) reports the item as new again: only added ones are subscribed.
+            var added = e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Move ? null : e.NewItems;
+            foreach (CalendarChoiceItem item in added ?? Array.Empty<CalendarChoiceItem>())
             {
                 item.PropertyChanged += (_, p) =>
                 {
@@ -246,10 +258,34 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
             }
 
             UpdateSummary();
+            UpdateMoves();
         };
     }
 
     public CalendarSource Source { get; }
+
+    /// <summary>Moves a calendar past the next one shown (with a search, the hidden ones are skipped).</summary>
+    public void Move(CalendarChoiceItem item, int delta)
+    {
+        var shown = Calendars.Where(c => c.IsVisible).ToList();
+        var at = shown.IndexOf(item) + delta;
+        if (at < 0 || at >= shown.Count)
+        {
+            return;
+        }
+
+        Calendars.Move(Calendars.IndexOf(item), Calendars.IndexOf(shown[at]));
+    }
+
+    private void UpdateMoves()
+    {
+        var shown = Calendars.Where(c => c.IsVisible).ToList();
+        for (var i = 0; i < shown.Count; i++)
+        {
+            shown[i].CanMoveUp = i > 0;
+            shown[i].CanMoveDown = i < shown.Count - 1;
+        }
+    }
 
     public string Title => Source.Account.Title;
 
@@ -323,6 +359,7 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
         }
 
         HasMatches = Calendars.Count == 0 || Calendars.Any(c => c.IsVisible);
+        UpdateMoves();
     }
 
     [ObservableProperty]
@@ -347,7 +384,7 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
     public bool CanAddByUrl => Source.Connection.ProviderId == ProviderIds.CalDav;
 }
 
-internal sealed partial class CalendarChoiceItem(CalendarCandidate candidate) : ObservableObject
+internal sealed partial class CalendarChoiceItem(CalendarSourceGroup group, CalendarCandidate candidate) : ObservableObject
 {
     public CalendarCandidate Candidate { get; } = candidate;
 
@@ -377,6 +414,20 @@ internal sealed partial class CalendarChoiceItem(CalendarCandidate candidate) : 
     /// <summary>Matches the search field.</summary>
     [ObservableProperty]
     public partial bool IsVisible { get; set; } = true;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(MoveUpCommand))]
+    public partial bool CanMoveUp { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(MoveDownCommand))]
+    public partial bool CanMoveDown { get; set; }
+
+    [RelayCommand(CanExecute = nameof(CanMoveUp))]
+    private void MoveUp() => group.Move(this, -1);
+
+    [RelayCommand(CanExecute = nameof(CanMoveDown))]
+    private void MoveDown() => group.Move(this, +1);
 }
 
 /// <summary>A calendar in the choice of a default one; the automatic choices have no key.</summary>

@@ -2378,5 +2378,8 @@
  "Testphase: Bei Google ist Neruna noch in der Prüfung. Bis dahin klappt die Anmeldung nur mit Gmail-Adressen, die als Tester eingetragen sind. Senden Sie Ihre Gmail-Adresse an info@neruna.org – sobald sie eingetragen ist, erhalten Sie Bescheid und können sich hier anmelden.": "Fase di test: Neruna è ancora in fase di verifica presso Google. Fino ad allora l'accesso funziona solo con indirizzi Gmail registrati come tester. Invia il tuo indirizzo Gmail a info@neruna.org – non appena sarà registrato, riceverai una conferma e potrai accedere qui.",
  "Google hat den Zugriff auf Gmail nicht erlaubt. Bitte erneut anmelden und bei Google alle Häkchen setzen.": "Google non ha consentito l'accesso a Gmail. Accedi di nuovo e spunta tutte le caselle da Google.",
  "Nicht freigegeben: {0}. Um sie hinzuzufügen, erneut anmelden und bei Google alle Häkchen setzen – das Konto bleibt, wie es ist.": "Non consentito: {0}. Per aggiungerli, accedi di nuovo e spunta tutte le caselle da Google – l'account resta com'è.",
- "Bitte mit dem Google-Konto {0} anmelden – für ein anderes ein eigenes Konto hinzufügen.": "Accedi con l'account Google {0} – per un altro aggiungi un account separato."
+ "Bitte mit dem Google-Konto {0} anmelden – für ein anderes ein eigenes Konto hinzufügen.": "Accedi con l'account Google {0} – per un altro aggiungi un account separato.",
+ "Mit den Pfeilen legen Sie die Reihenfolge in «Meine Kalender» fest.": "Con le frecce stabilisci l’ordine in «I miei calendari».",
+ "Mit den Pfeilen legen Sie die Reihenfolge in der Adressbuchliste fest.": "Con le frecce stabilisci l’ordine nell’elenco delle rubriche.",
+ "https://…, mailto:… oder tel:+41…": "https://…, mailto:… o tel:+41…"
 }

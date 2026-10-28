@@ -9,7 +9,16 @@
   <Grid RowDefinitions="Auto,*">
 
     <!-- Command bar -->
+    <!-- "Adressbücher verwalten" on the right, where the calendar has "Kalender verwalten" -->
     <Border Classes="pane" Padding="8,6" Margin="0,0,0,6">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Classes="command" Command="{Binding ManageCommand}"
+                ToolTip.Tip="{l:T 'Server erneut nach Adressbüchern fragen und auswählen, welche angezeigt werden'}">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconSync}" />
+            <TextBlock Text="{l:T 'Adressbücher verwalten'}" />
+          </StackPanel>
+        </Button>
       <StackPanel Orientation="Horizontal" Spacing="4">
         <Button Classes="accent" Command="{Binding NewContactCommand}" Padding="12,6" Margin="0,0,4,0">
           <StackPanel Orientation="Horizontal" Spacing="6">
@@ -36,6 +45,7 @@
           </StackPanel>
         </Button>
       </StackPanel>
+      </DockPanel>
     </Border>
 
     <Grid x:Name="Columns" Grid.Row="1" ColumnDefinitions="220,6,340,6,*">
@@ -86,13 +96,6 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <Button Classes="command" Command="{Binding ManageCommand}" Margin="0,4,0,0"
-                  ToolTip.Tip="{l:T 'Server erneut nach Adressbüchern fragen und auswählen, welche angezeigt werden'}">
-            <StackPanel Orientation="Horizontal">
-              <PathIcon Data="{StaticResource IconSync}" />
-              <TextBlock Text="{l:T 'Adressbücher verwalten'}" />
-            </StackPanel>
-          </Button>
         </StackPanel>
       </Border>
 

@@ -8,6 +8,7 @@
     <TextBlock Text="{l:T 'Adressbücher verwalten'}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,12"
                Text="{l:T 'Neruna fragt den Server erneut nach allen Adressbüchern. Abgewählte Adressbücher verschwinden aus der Liste und werden nicht mehr synchronisiert – auf dem Server bleiben sie unverändert. Praktisch, wenn zwei Konten derselben Firma dasselbe Domain-Adressbuch anbieten.'}" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,-6,0,12" Text="{l:T 'Mit den Pfeilen legen Sie die Reihenfolge in der Adressbuchliste fest.'}" />
 
     <ProgressBar IsIndeterminate="True" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
     <TextBlock Classes="subtle" Text="{l:T 'Kein CardDAV-Konto eingerichtet.'}" IsVisible="{Binding HasNoSources}" />
@@ -20,10 +21,17 @@
             <TextBlock Classes="subtle" Text="{Binding Server}" FontSize="12" TextTrimming="CharacterEllipsis" />
             <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" Margin="0,6,0,0"
                        IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <ItemsControl ItemsSource="{Binding AddressBooks}" Margin="0,6,0,0">
+            <!-- Long names scroll sideways; the arrows in front set the order in the contact list -->
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,6,0,0">
+            <ItemsControl ItemsSource="{Binding AddressBooks}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AddressBookChoiceItem">
-                  <CheckBox IsChecked="{Binding IsSelected}" Margin="0,1">
+                  <StackPanel Orientation="Horizontal" Margin="0,1">
+                  <Button Content="↑" Command="{Binding MoveUpCommand}" Padding="5,0" MinWidth="0" FontSize="12" Background="Transparent" BorderThickness="0"
+                          VerticalAlignment="Center" ToolTip.Tip="{l:T 'Nach oben'}" />
+                  <Button Content="↓" Command="{Binding MoveDownCommand}" Padding="5,0" MinWidth="0" FontSize="12" Background="Transparent" BorderThickness="0"
+                          VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Nach unten'}" />
+                  <CheckBox IsChecked="{Binding IsSelected}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                       <Border IsVisible="{Binding IsNew}" Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="3" Padding="5,0" VerticalAlignment="Center">
@@ -34,9 +42,11 @@
                         <TextBlock IsVisible="{Binding IsReadOnly}" Classes="subtle" Text="{l:T 'schreibgeschützt'}" FontSize="12" VerticalAlignment="Center" />
                     </StackPanel>
                   </CheckBox>
+                  </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </ScrollViewer>
           </StackPanel>
         </DataTemplate>
       </ItemsControl.ItemTemplate>

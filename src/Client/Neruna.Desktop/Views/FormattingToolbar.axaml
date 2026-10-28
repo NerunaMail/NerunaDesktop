@@ -174,7 +174,7 @@
           <Flyout Placement="BottomEdgeAlignedLeft">
             <StackPanel Spacing="8" Width="320">
               <TextBlock Text="{l:T 'Link für den markierten Text'}" FontWeight="SemiBold" FontSize="12" />
-              <TextBox Text="{Binding LinkUrl}" />
+              <TextBox Text="{Binding LinkUrl}" PlaceholderText="{l:T 'https://…, mailto:… oder tel:+41…'}" />
               <Button Classes="accent" Content="{l:T 'Einfügen'}" HorizontalAlignment="Right" Command="{Binding InsertLinkCommand}" />
             </StackPanel>
           </Flyout>

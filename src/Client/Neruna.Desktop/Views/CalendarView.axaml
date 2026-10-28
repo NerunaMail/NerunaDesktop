@@ -234,13 +234,8 @@
                   <ItemsControl ItemsSource="{Binding Items}">
                     <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:CalendarListItem">
-                      <!-- Arrows on hover: the calendar's place within its account -->
-                      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" Classes="calendar-row" Background="Transparent"
+                      <Grid ColumnDefinitions="Auto,Auto,*,Auto" Background="Transparent"
                             Opacity="{Binding IsDimmed, Converter={x:Static app:Converters.DimmedOpacity}}">
-                        <Grid.Styles>
-                          <Style Selector="Grid.calendar-row Button.move"><Setter Property="IsVisible" Value="False" /></Style>
-                          <Style Selector="Grid.calendar-row:pointerover Button.move"><Setter Property="IsVisible" Value="True" /></Style>
-                        </Grid.Styles>
                         <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Anzeigen'}" />
                         <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
                         <Button Grid.Column="1" Width="16" Height="16" MinWidth="0" Padding="0" CornerRadius="3" Background="{Binding Brush}"
@@ -256,11 +251,7 @@
                           <TextBlock DockPanel.Dock="Right" Text="{l:T '(nur lesen)'}" Classes="subtle" FontSize="11" IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" Margin="6,0,0,0" />
                           <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
                         </DockPanel>
-                        <Button Grid.Column="3" Classes="move" Content="↑" Command="{Binding MoveUpCommand}" Padding="4,0" MinWidth="0" FontSize="11"
-                                Background="Transparent" BorderThickness="0" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Nach oben'}" />
-                        <Button Grid.Column="4" Classes="move" Content="↓" Command="{Binding MoveDownCommand}" Padding="4,0" MinWidth="0" FontSize="11"
-                                Background="Transparent" BorderThickness="0" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Nach unten'}" />
-                        <Button Grid.Column="5" Classes="solo" Classes.on="{Binding IsSolo}" ToolTip.Tip="{Binding SoloTip}" VerticalAlignment="Center" Margin="4,0,0,0"
+                        <Button Grid.Column="3" Classes="solo" Classes.on="{Binding IsSolo}" ToolTip.Tip="{Binding SoloTip}" VerticalAlignment="Center" Margin="4,0,0,0"
                                 Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).ToggleSoloCommand}" CommandParameter="{Binding}">
                           <PathIcon Data="{StaticResource IconSolo}" Width="12" Height="12" />
                         </Button>

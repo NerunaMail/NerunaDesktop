@@ -62,8 +62,14 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
         // Only the address books the open workspace shows.
         var sources = await contacts.GetSourcesAsync();
         var accountOf = sources.ToDictionary(s => s.Connection.Id, s => s.Account.Id);
+        // In account order (as in the settings), within an account as chosen under "Adressbücher verwalten", the others by name.
+        var connections = sources.Select(s => s.Connection.Id).ToList();
+        var order = CalendarViewModel.ParseKeys(await settings.GetAsync(SettingKeys.AddressBookOrder));
         var books = (await contacts.GetAddressBooksAsync())
             .Where(b => workspaces.Current.ShowsAddressBook(b.ConnectionId, b.RemoteId, accountOf.TryGetValue(b.ConnectionId, out var a) ? a : null))
+            .OrderBy(b => connections.IndexOf(b.ConnectionId) is var at and >= 0 ? at : connections.Count)
+            .ThenBy(b => order.IndexOf(OrderKey(b.ConnectionId, b.RemoteId)) is var at and >= 0 ? at : order.Count)
+            .ThenBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         var shownContacts = (await Task.Run(() => contacts.SearchAsync(null))).Where(e => books.Any(b => Same(e.AddressBook, b)));
         _all = [.. shownContacts];
@@ -223,7 +229,10 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
 
     private static bool Same(AddressBookInfo a, AddressBookInfo b) => a.ConnectionId == b.ConnectionId && a.RemoteId == b.RemoteId;
 
-    private static string Key(AddressBookInfo book) => $"{book.ConnectionId:N}.{book.RemoteId}";
+    private static string Key(AddressBookInfo book) => OrderKey(book.ConnectionId, book.RemoteId);
+
+    /// <summary>An address book in the stored order (and in the hidden ones): "connection.remoteId".</summary>
+    internal static string OrderKey(Guid connectionId, string remoteId) => $"{connectionId:N}.{remoteId}";
 
     private static string ColorKey(AddressBookInfo book) => Neruna.Core.Calendar.CollectionColors.Key(book);
 }

@@ -731,10 +731,27 @@ internal static class Snapshots
         vm.CalendarPage.IsTimeGrid = true;
         await SaveAsync(window, output, "calendar-timegrid.png");
 
-        // A calendar moved within its account; then the right-click menu on an event.
+        // A calendar moved within its account under "Kalender verwalten"; then the right-click menu on an event.
         var firstGroup = vm.CalendarPage.CalendarGroups.First(g => g.Items.Count > 1);
         var before = string.Join(", ", firstGroup.Items.Select(i => i.Name));
-        await firstGroup.Items[0].MoveDownCommand.ExecuteAsync(null);
+        vm.CalendarPage.ManageCommand.Execute(null);
+        var calendarSelection = (CalendarSelectionViewModel)vm.Overlay!;
+        for (var i = 0; i < 50 && (calendarSelection.IsBusy || calendarSelection.Sources.Count == 0); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        var moved = calendarSelection.Sources.First(g => g.Calendars.Count(c => c.IsSelected) > 1);
+        // The last calendar to the top: in "Meine Kalender" it comes first.
+        var last = moved.Calendars.Last();
+        while (last.CanMoveUp)
+        {
+            last.MoveUpCommand.Execute(null);
+        }
+
+        await Task.Delay(300);
+        await SaveAsync(window, output, "calendar-manage.png");
+        await calendarSelection.ApplyCommand.ExecuteAsync(null);
         await vm.CalendarPage.ReloadAsync();
         Console.WriteLine($"Calendar order: {before} -> {string.Join(", ", vm.CalendarPage.CalendarGroups.First(g => g.AccountId == firstGroup.AccountId).Items.Select(i => i.Name))}");
         var eventButton = window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.DataContext is TimedEventItem && b.IsEffectivelyVisible);
@@ -1005,7 +1022,19 @@ internal static class Snapshots
 
         await SaveAsync(window, output, "contacts-addressbooks.png");
         Console.WriteLine("Address books offered: " + string.Join(", ", books.Sources.SelectMany(g => g.AddressBooks).Select(b => b.Name + (b.IsSelected ? " [x]" : " [ ]"))));
+        // The order in the list: one address book moved down, then applied.
+        var booksBefore = string.Join(", ", vm.ContactsPage.AddressBooks.Select(b => b.Name));
+        if (books.Sources.FirstOrDefault(g => g.AddressBooks.Count > 1) is { } bookGroup)
+        {
+            bookGroup.AddressBooks[0].MoveDownCommand.Execute(null);
+            await books.ApplyCommand.ExecuteAsync(null);
+            await vm.ContactsPage.ReloadAsync();
+        }
+
         vm.Overlay = null;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "contacts-manage-button.png");
+        Console.WriteLine($"Address book order: {booksBefore} -> {string.Join(", ", vm.ContactsPage.AddressBooks.Select(b => b.Name))}");
 
         vm.NavigateCommand.Execute(Section.Mail);
         vm.NavigateCommand.Execute(Section.Settings);

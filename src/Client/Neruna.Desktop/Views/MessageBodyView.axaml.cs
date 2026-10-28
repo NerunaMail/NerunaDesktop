@@ -414,6 +414,17 @@ internal sealed partial class MessageBodyView : UserControl
             return;
         }
 
+        // A phone number (tel:, e.g. in a signature): the system's telephony program dials it.
+        if (Neruna.Core.Mail.PhoneLink.Normalize(link) is { } phone)
+        {
+            if (TopLevel.GetTopLevel(this) is Window caller)
+            {
+                _ = caller.Launcher.LaunchUriAsync(new Uri(phone));
+            }
+
+            return;
+        }
+
         // A link to a file: only links at all from a safe sender (otherwise shown as text); programs after asking.
         if (Neruna.Core.Mail.FileLinks.IsFileLink(link))
         {

@@ -15,6 +15,17 @@ namespace Neruna.Client.Tests;
 public class MailtoAndBccTests
 {
     [Fact]
+    public void Tel_links_keep_only_the_number()
+    {
+        Assert.Equal("tel:41417550000", PhoneLink.Normalize("tel:41417550000"));
+        Assert.Equal("tel:+41417550000", PhoneLink.Normalize(" TEL:+41 41 755-00-00"));
+        Assert.Equal("tel:+41417550000", PhoneLink.Normalize("tel:%2B41%20417550000;ext=12"));
+        Assert.Null(PhoneLink.Normalize("tel:javascript:alert(1)"));
+        Assert.Null(PhoneLink.Normalize("tel:"));
+        Assert.Null(PhoneLink.Normalize("https://example.com"));
+    }
+
+    [Fact]
     public void Mailto_links_become_a_new_message()
     {
         var draft = MailtoLink.Parse("mailto:anna@example.com,beat+news@example.com?cc=carla@example.com&bcc=dora@example.com&Subject=Gr%C3%BCezi%20zusammen&body=Zeile%201%0D%0AZeile%202");
