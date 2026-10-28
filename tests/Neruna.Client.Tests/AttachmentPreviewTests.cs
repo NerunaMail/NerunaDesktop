@@ -41,6 +41,18 @@ public class AttachmentPreviewTests
     }
 
     [Fact]
+    public void ShowsWhatWasFilledInAForm()
+    {
+        // Many programs save a filled-in form with the values only and leave drawing them to the viewer
+        // (NeedAppearances): without the form environment the page stayed white.
+        var rendering = PdfPages.Render(FormPdf("(MMMMMMMMMM)"), 0, 1, 595);
+
+        var page = rendering.Pages[0];
+        var field = Enumerable.Range(60, 300).SelectMany(x => Enumerable.Range(842 - 735, 30).Select(y => Pixel(page, x, y)));
+        Assert.Contains(field, b => b < 128);
+    }
+
+    [Fact]
     public void RendersOnlyTheRequestedPages()
     {
         var rendering = PdfPages.Render(MinimalPdf("", ""), 1, 10, 50);
@@ -114,6 +126,22 @@ public class AttachmentPreviewTests
             objects.Add($"<< /Length {content.Length} >>\nstream\n{content}\nendstream");
         }
 
+        return Assemble(objects);
+    }
+
+    /// <summary>One empty A4 page with a text field holding <paramref name="value"/> – no appearance stream.</summary>
+    private static byte[] FormPdf(string value) => Assemble(
+    [
+        "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [5 0 R] /NeedAppearances true /DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv 6 0 R >> >> >> >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Annots [5 0 R] >>",
+        "<< /Length 0 >>\nstream\n\nendstream",
+        $"<< /Type /Annot /Subtype /Widget /FT /Tx /T (Name) /V {value} /Rect [50 700 450 740] /F 4 /P 3 0 R /DA (/Helv 24 Tf 0 g) >>",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    ]);
+
+    private static byte[] Assemble(List<string> objects)
+    {
         var pdf = new StringBuilder("%PDF-1.4\n");
         var offsets = new List<int>();
         for (var i = 0; i < objects.Count; i++)

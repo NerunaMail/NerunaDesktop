@@ -461,6 +461,7 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
             {
                 PdfPreviewProblem.Password => T("Das PDF ist mit einem Passwort geschützt. Bitte öffnen oder speichern."),
                 PdfPreviewProblem.Unavailable => T("Die PDF-Vorschau ist auf diesem System nicht verfügbar. Bitte öffnen oder speichern."),
+                PdfPreviewProblem.XfaForm => T("Dieses PDF ist ein dynamisches Formular (XFA), das nur bestimmte PDF-Programme anzeigen (z. B. Adobe Acrobat Reader). Bitte öffnen oder speichern."),
                 _ => T("Das PDF kann nicht angezeigt werden. Bitte öffnen oder speichern."),
             };
         }

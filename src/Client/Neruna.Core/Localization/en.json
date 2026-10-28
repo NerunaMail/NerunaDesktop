@@ -2397,5 +2397,6 @@
  "Verkleinern": "Zoom out",
  "Vergrössern": "Zoom in",
  "Einpassen": "Fit",
- "{0} × {1} Pixel": "{0} × {1} pixels"
+ "{0} × {1} Pixel": "{0} × {1} pixels",
+ "Dieses PDF ist ein dynamisches Formular (XFA), das nur bestimmte PDF-Programme anzeigen (z. B. Adobe Acrobat Reader). Bitte öffnen oder speichern.": "This PDF is a dynamic form (XFA) that only certain PDF programs can show (e.g. Adobe Acrobat Reader). Please open or save it."
 }

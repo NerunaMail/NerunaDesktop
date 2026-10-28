@@ -2397,5 +2397,6 @@
  "Verkleinern": "Riduci",
  "Vergrössern": "Ingrandisci",
  "Einpassen": "Adatta",
- "{0} × {1} Pixel": "{0} × {1} pixel"
+ "{0} × {1} Pixel": "{0} × {1} pixel",
+ "Dieses PDF ist ein dynamisches Formular (XFA), das nur bestimmte PDF-Programme anzeigen (z. B. Adobe Acrobat Reader). Bitte öffnen oder speichern.": "Questo PDF è un modulo dinamico (XFA) che solo alcuni programmi PDF possono visualizzare (ad es. Adobe Acrobat Reader). Aprilo o salvalo."
 }

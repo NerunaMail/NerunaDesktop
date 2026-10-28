@@ -11,7 +11,8 @@ public sealed record PdfRendering(int PageCount, IReadOnlyList<PdfPageImage> Pag
 
 /// <summary>
 /// Renders PDF pages with PDFium (the PDF engine of Chromium; native library from the bblanchon.PDFium packages).
-/// Only pictures of the pages: no scripts, no forms, no links. PDFium is not thread-safe, so every call holds a lock.
+/// Only pictures of the pages: no scripts, no links. Form fields are drawn with what was filled in – many programs
+/// store only the values and leave drawing them to the viewer. PDFium is not thread-safe, so every call holds a lock.
 /// </summary>
 public static partial class PdfPages
 {
@@ -19,6 +20,12 @@ public static partial class PdfPages
     private const uint White = 0xFFFFFFFF;
     private const int RenderAnnotations = 0x01;
     private const int PasswordError = 4;
+
+    // FPDF_GetFormType: an XFA form whose pages hold only a placeholder (PDFium here has no XFA).
+    private const int XfaFull = 2;
+
+    // FPDF_FORMFILLINFO: version 1 with every callback empty (no scripts, no UI); PDFium checks each before calling.
+    private const int FormInfoSize = 512;
 
     private static readonly Lock Gate = new();
     private static bool _initialized;
@@ -87,19 +94,41 @@ public static partial class PdfPages
                     throw new PdfPreviewException(NativeMethods.FPDF_GetLastError().Value == PasswordError ? PdfPreviewProblem.Password : PdfPreviewProblem.Unreadable);
                 }
 
+                var formInfo = IntPtr.Zero;
+                var form = IntPtr.Zero;
                 try
                 {
+                    if (NativeMethods.FPDF_GetFormType(document) == XfaFull)
+                    {
+                        throw new PdfPreviewException(PdfPreviewProblem.XfaForm);
+                    }
+
+                    formInfo = Marshal.AllocHGlobal(FormInfoSize);
+                    Marshal.Copy(new byte[FormInfoSize], 0, formInfo, FormInfoSize);
+                    Marshal.WriteInt32(formInfo, 1);
+                    form = NativeMethods.FPDFDOC_InitFormFillEnvironment(document, formInfo);
+
                     var pageCount = NativeMethods.FPDF_GetPageCount(document);
                     var pages = new List<PdfPageImage>();
                     for (var index = first; index < Math.Min(pageCount, first + count); index++)
                     {
-                        pages.Add(RenderPage(document, index, width));
+                        pages.Add(RenderPage(document, form, index, width));
                     }
 
                     return new PdfRendering(pageCount, pages);
                 }
                 finally
                 {
+                    if (form != IntPtr.Zero)
+                    {
+                        NativeMethods.FPDFDOC_ExitFormFillEnvironment(form);
+                    }
+
+                    if (formInfo != IntPtr.Zero)
+                    {
+                        Marshal.FreeHGlobal(formInfo);
+                    }
+
                     NativeMethods.FPDF_CloseDocument(document);
                 }
             }
@@ -110,12 +139,18 @@ public static partial class PdfPages
         }
     }
 
-    private static PdfPageImage RenderPage(IntPtr document, int index, int width)
+    /// <param name="form">The form environment (zero: none) – draws the fields with their values over the page.</param>
+    private static PdfPageImage RenderPage(IntPtr document, IntPtr form, int index, int width)
     {
         var page = NativeMethods.FPDF_LoadPage(document, index);
         if (page == IntPtr.Zero)
         {
             throw new PdfPreviewException(PdfPreviewProblem.Unreadable);
+        }
+
+        if (form != IntPtr.Zero)
+        {
+            NativeMethods.FORM_OnAfterLoadPage(page, form);
         }
 
         try
@@ -135,6 +170,11 @@ public static partial class PdfPages
             {
                 _ = NativeMethods.FPDFBitmap_FillRect(bitmap, 0, 0, width, height, White);
                 NativeMethods.FPDF_RenderPageBitmap(bitmap, page, 0, 0, width, height, 0, RenderAnnotations);
+                if (form != IntPtr.Zero)
+                {
+                    NativeMethods.FPDF_FFLDraw(form, bitmap, page, 0, 0, width, height, 0, RenderAnnotations);
+                }
+
                 var stride = NativeMethods.FPDFBitmap_GetStride(bitmap);
                 var pixels = new byte[stride * height];
                 Marshal.Copy(NativeMethods.FPDFBitmap_GetBuffer(bitmap), pixels, 0, pixels.Length);
@@ -147,6 +187,11 @@ public static partial class PdfPages
         }
         finally
         {
+            if (form != IntPtr.Zero)
+            {
+                NativeMethods.FORM_OnBeforeClosePage(page, form);
+            }
+
             NativeMethods.FPDF_ClosePage(page);
         }
     }
@@ -218,6 +263,24 @@ public static partial class PdfPages
 
         [DllImport(Pdfium)]
         internal static extern void FPDFBitmap_Destroy(IntPtr bitmap);
+
+        [DllImport(Pdfium)]
+        internal static extern int FPDF_GetFormType(IntPtr document);
+
+        [DllImport(Pdfium)]
+        internal static extern IntPtr FPDFDOC_InitFormFillEnvironment(IntPtr document, IntPtr formInfo);
+
+        [DllImport(Pdfium)]
+        internal static extern void FPDFDOC_ExitFormFillEnvironment(IntPtr form);
+
+        [DllImport(Pdfium)]
+        internal static extern void FORM_OnAfterLoadPage(IntPtr page, IntPtr form);
+
+        [DllImport(Pdfium)]
+        internal static extern void FORM_OnBeforeClosePage(IntPtr page, IntPtr form);
+
+        [DllImport(Pdfium)]
+        internal static extern void FPDF_FFLDraw(IntPtr form, IntPtr bitmap, IntPtr page, int startX, int startY, int sizeX, int sizeY, int rotate, int flags);
     }
 }
 
@@ -231,6 +294,9 @@ public enum PdfPreviewProblem
 
     /// <summary>PDFium is not available on this system.</summary>
     Unavailable,
+
+    /// <summary>An XFA form (Adobe LiveCycle): its pages are only drawn by programs that know XFA.</summary>
+    XfaForm,
 }
 
 public sealed class PdfPreviewException : Exception
