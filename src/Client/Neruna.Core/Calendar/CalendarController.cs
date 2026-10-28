@@ -100,8 +100,9 @@ public sealed class CalendarController(
         var extra = await GetIdsAsync(ExtraKey(connection.Id), cancellationToken) ?? [];
         var local = (await store.GetCalendarsAsync(connection.Id, cancellationToken)).Select(c => c.RemoteId).ToHashSet(StringComparer.Ordinal);
         var known = await GetIdsAsync(KnownKey(connection.Id), cancellationToken);
+        var viewOnly = await ViewOnlyAsync(cancellationToken);
         var candidates = remote
-            .Select(c => new CalendarCandidate(c, local.Contains(c.RemoteId), known is null ? !local.Contains(c.RemoteId) : !known.Contains(c.RemoteId), extra.Contains(c.RemoteId)))
+            .Select(c => new CalendarCandidate(ViewOnly(c, viewOnly), local.Contains(c.RemoteId), known is null ? !local.Contains(c.RemoteId) : !known.Contains(c.RemoteId), extra.Contains(c.RemoteId)))
             .OrderBy(c => c.Calendar.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         return new CalendarDiscovery(candidates, (provider as ICalendarUrlLookup)?.DiscoveryDetails);
@@ -187,8 +188,10 @@ public sealed class CalendarController(
     public async Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default)
     {
         var result = new List<CalendarInfo>();
-        foreach (var info in await store.GetCalendarsAsync(null, cancellationToken))
+        var viewOnly = await ViewOnlyAsync(cancellationToken);
+        foreach (var stored in await store.GetCalendarsAsync(null, cancellationToken))
         {
+            var info = ViewOnly(stored, viewOnly);
             result.Add(await settings.GetAsync(DisplayNameKey(info), cancellationToken) is { Length: > 0 } own
                 ? info with { Name = own, ServerName = info.Name }
                 : info);
@@ -196,6 +199,27 @@ public sealed class CalendarController(
 
         return result;
     }
+
+    /// <summary>"Nur ansehen" (Kalender verwalten): the calendar stays visible, Neruna writes nothing into it.</summary>
+    public async Task SetViewOnlyAsync(CalendarInfo calendar, bool viewOnly, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        var keys = await ViewOnlyAsync(cancellationToken);
+        if (viewOnly ? keys.Add(CalendarKey(calendar)) : keys.Remove(CalendarKey(calendar)))
+        {
+            await settings.SetAsync(ViewOnlyKey, keys.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(keys.Order(StringComparer.Ordinal)), cancellationToken);
+        }
+    }
+
+    private const string ViewOnlyKey = "calendars.viewOnly";
+
+    private async Task<HashSet<string>> ViewOnlyAsync(CancellationToken cancellationToken) =>
+        await settings.GetAsync(ViewOnlyKey, cancellationToken) is { Length: > 0 } json
+            ? System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(json) ?? new(StringComparer.Ordinal)
+            : new(StringComparer.Ordinal);
+
+    private static CalendarInfo ViewOnly(CalendarInfo calendar, HashSet<string> keys) =>
+        keys.Contains(CalendarKey(calendar)) ? calendar with { IsReadOnly = true, IsViewOnly = true } : calendar;
 
     /// <summary>
     /// The user's own name for a calendar (kept in Neruna; the server and other programs keep theirs).
@@ -258,7 +282,8 @@ public sealed class CalendarController(
     public async Task<(CalendarInfo Calendar, CalendarObject Item)?> FindByUidAsync(string uid, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(uid);
-        foreach (var calendar in await store.GetCalendarsAsync(null, cancellationToken))
+        var viewOnly = await ViewOnlyAsync(cancellationToken);
+        foreach (var calendar in (await store.GetCalendarsAsync(null, cancellationToken)).Select(c => ViewOnly(c, viewOnly)))
         {
             foreach (var item in await store.GetObjectsAsync(calendar.ConnectionId, calendar.RemoteId, cancellationToken))
             {

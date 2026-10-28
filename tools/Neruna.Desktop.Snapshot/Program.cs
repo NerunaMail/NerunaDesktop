@@ -760,6 +760,11 @@ internal static class Snapshots
             last.MoveUpCommand.Execute(null);
         }
 
+        if (moved.Calendars.FirstOrDefault(c => c.CanBeViewOnly && c != last) is { } viewOnly)
+        {
+            viewOnly.IsViewOnly = true;
+        }
+
         await Task.Delay(300);
         await SaveAsync(window, output, "calendar-manage.png");
         await calendarSelection.ApplyCommand.ExecuteAsync(null);
@@ -1485,6 +1490,13 @@ internal static class Snapshots
         proton.DisplayName = "Anna Muster";
         proton.Email = "anna.muster@proton.me";
         await SaveAsync(window, output, "account-setup-proton.png");
+        vm.ShowAccountSetupCommand.Execute(null);
+        var dav = (AccountSetupViewModel)vm.Overlay!;
+        dav.ChooseDavCommand.Execute(null);
+        dav.DavServer = "dav.example.com";
+        dav.Username = "anna";
+        dav.Email = "anna.muster@example.com";
+        await SaveAsync(window, output, "account-setup-dav.png");
 
         window.Close();
         Directory.Delete(dataDir, recursive: true);

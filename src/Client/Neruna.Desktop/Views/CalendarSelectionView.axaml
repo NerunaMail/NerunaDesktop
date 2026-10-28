@@ -10,7 +10,7 @@
     <TextBlock Text="{l:T 'Kalender verwalten'}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,12"
                Text="{l:T 'Neruna fragt die Server erneut nach allen Kalendern – auch nach im Webmail abonnierten oder mit Ihnen geteilten. Wählen Sie, welche angezeigt werden und wohin neue Termine und angenommene Einladungen kommen.'}" />
-    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,-6,0,12" Text="{l:T 'Mit den Pfeilen legen Sie die Reihenfolge in «Meine Kalender» fest.'}" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,-6,0,12" Text="{l:T 'Mit den Pfeilen legen Sie die Reihenfolge in «Meine Kalender» fest. «nur ansehen»: angezeigt, aber nicht für neue Termine angeboten.'}" />
 
     <ProgressBar IsIndeterminate="True" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" Margin="0,0,0,8" />
     <TextBlock Classes="subtle" Text="{l:T 'Kein CalDAV-Konto eingerichtet.'}" IsVisible="{Binding HasNoSources}" />
@@ -77,6 +77,9 @@
                         <TextBlock IsVisible="{Binding IsAddedByUrl}" Classes="subtle" Text="{l:T 'per Adresse'}" FontSize="12" VerticalAlignment="Center" />
                       </StackPanel>
                     </CheckBox>
+                    <!-- Shown, but never offered for new events or invitations -->
+                    <CheckBox IsChecked="{Binding IsViewOnly}" IsVisible="{Binding CanBeViewOnly}" Margin="14,0,0,0" FontSize="12"
+                              Content="{l:T 'nur ansehen'}" ToolTip.Tip="{l:T 'Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.'}" />
                     </StackPanel>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>

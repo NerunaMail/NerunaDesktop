@@ -382,7 +382,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
             $"{account.DisplayName} {text}\n\n{invitation.Summary}\n{ITip.When(invitation.Start, invitation.End, invitation.IsAllDay)}",
             ITip.Reply(invitation, me, account.DisplayName, answer),
             "REPLY");
-        await mail.SendAsync(MailConnection(account), message, cancellationToken);
+        await mail.SendAsync(await MailConnectionAsync(account, cancellationToken), message, cancellationToken);
         logger.LogInformation("Answered {Uid} with {Answer} by e-mail", invitation.Uid, answer);
     }
 
@@ -420,20 +420,28 @@ public sealed class InvitationService(CalendarController calendars, MailControll
     {
         ArgumentNullException.ThrowIfNull(calendar);
         var account = await AccountOfAsync(calendar.ConnectionId, cancellationToken);
-        var me = account.EmailAddress ?? throw new InvalidOperationException(T("Das Konto hat keine E-Mail-Adresse."));
+        var me = account.EmailAddress;
         var current = ITip.Parse(AsRequest(newData));
         var before = previousData is null ? null : ITip.Parse(AsRequest(previousData));
-        if (current is null || !IsMine(current, me) || await calendars.SchedulesItselfAsync(calendar, cancellationToken))
+        if (current is null || !IsMine(current, me))
         {
             return 0;
         }
 
         var invited = Others(current, me);
         var removed = before is null ? [] : Others(before, me).Where(b => !invited.Any(a => Same(a, b))).ToList();
-        if (invited.Count == 0 && removed.Count == 0)
+        if ((invited.Count == 0 && removed.Count == 0) || await calendars.SchedulesItselfAsync(calendar, cancellationToken))
         {
             return 0;
         }
+
+        // A calendar-only account (CalDAV without mail) has nothing to send with unless the server does it.
+        if (me is null)
+        {
+            throw new InvalidOperationException(T("Das Konto hat keine E-Mail-Adresse, und der Server verschickt keine Einladungen."));
+        }
+
+        var connection = await MailConnectionAsync(account, cancellationToken);
 
         var sender = new MailboxAddress(account.DisplayName, me);
         var when = ITip.When(current.Start, current.End, current.IsAllDay);
@@ -446,12 +454,12 @@ public sealed class InvitationService(CalendarController calendars, MailControll
                            : F("{0} lädt Sie ein:\n\n{1}\n{2}", account.DisplayName, current.Summary, when))
                        + (string.IsNullOrWhiteSpace(current.Location) ? string.Empty : "\n" + F("Ort: {0}", current.Location));
             var subject = update ? F("Aktualisiert: {0} ({1})", current.Summary, when) : F("Einladung: {0} ({1})", current.Summary, when);
-            await mail.SendAsync(MailConnection(account), ITip.Mail(sender, invited.Select(ToMailbox), subject, text, ITip.Request(newData), "REQUEST"), cancellationToken);
+            await mail.SendAsync(connection, ITip.Mail(sender, invited.Select(ToMailbox), subject, text, ITip.Request(newData), "REQUEST"), cancellationToken);
         }
 
         if (removed.Count > 0)
         {
-            await mail.SendAsync(MailConnection(account), ITip.Mail(sender, removed.Select(ToMailbox), F("Abgesagt: {0} ({1})", current.Summary, when), F("{0} hat Sie von diesem Termin ausgeladen:\n\n{1}\n{2}", account.DisplayName, current.Summary, when), ITip.Cancel(previousData!), "CANCEL"), cancellationToken);
+            await mail.SendAsync(connection, ITip.Mail(sender, removed.Select(ToMailbox), F("Abgesagt: {0} ({1})", current.Summary, when), F("{0} hat Sie von diesem Termin ausgeladen:\n\n{1}\n{2}", account.DisplayName, current.Summary, when), ITip.Cancel(previousData!), "CANCEL"), cancellationToken);
         }
 
         logger.LogInformation("Invitations for {Uid}: {Invited} invited, {Removed} cancelled", current.Uid, invited.Count, removed.Count);
@@ -470,7 +478,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
         }
 
         var when = ITip.When(evt.Start, evt.End, evt.IsAllDay);
-        await mail.SendAsync(MailConnection(account), ITip.Mail(
+        await mail.SendAsync(await MailConnectionAsync(account, cancellationToken), ITip.Mail(
             new MailboxAddress(account.DisplayName, account.EmailAddress), attendees.Select(ToMailbox),
             F("Abgesagt: {0} ({1})", evt.Summary, when), F("{0} hat diesen Termin abgesagt:\n\n{1}\n{2}", account.DisplayName, evt.Summary, when),
             ITip.Cancel(data), "CANCEL"), cancellationToken);
@@ -502,7 +510,7 @@ public sealed class InvitationService(CalendarController calendars, MailControll
             F("{0} nimmt nicht teil.\n\n{1}\n{2}", account.DisplayName, evt.Summary, ITip.When(evt.Start, evt.End, evt.IsAllDay)),
             ITip.Reply(evt, me, account.DisplayName, Participation.Declined),
             "REPLY");
-        await mail.SendAsync(MailConnection(account), message, cancellationToken);
+        await mail.SendAsync(await MailConnectionAsync(account, cancellationToken), message, cancellationToken);
         logger.LogInformation("Declined {Uid} on deleting it", evt.Uid);
         return true;
     }
@@ -522,8 +530,13 @@ public sealed class InvitationService(CalendarController calendars, MailControll
 
     private static MailboxAddress ToMailbox(EventAttendee attendee) => new(attendee.Name, attendee.Email);
 
-    private static ServiceConnection MailConnection(Account account) =>
+    /// <summary>
+    /// The account's own mail connection; for a calendar-only account (CalDAV without mail) the one of the account with
+    /// the same address, e.g. the IMAP account next to it.
+    /// </summary>
+    private async Task<ServiceConnection> MailConnectionAsync(Account account, CancellationToken cancellationToken) =>
         account.ConnectionsOf(ServiceKind.Mail).FirstOrDefault()
+        ?? (await accounts.GetAccountsAsync(cancellationToken)).Where(a => a.Owns(account.EmailAddress)).SelectMany(a => a.ConnectionsOf(ServiceKind.Mail)).FirstOrDefault()
         ?? throw new InvalidOperationException(F("Das Konto {0} hat keine E-Mail-Verbindung – Einladungen und Antworten können nicht versendet werden.", account.EmailAddress));
 
     private async Task<Account> AccountOfAsync(Guid connectionId, CancellationToken cancellationToken) =>

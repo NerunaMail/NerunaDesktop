@@ -10,6 +10,10 @@ namespace Neruna.Core.Calendar;
 /// "Kalender verwalten" but only synchronized once chosen. Not stored – the provider reports it on each discovery.
 /// </param>
 /// <param name="IsDefault">The account's own default calendar as the server names it (CalDAV schedule-default-calendar-URL, Exchange's "Calendar").</param>
+/// <param name="IsViewOnly">
+/// Marked "nur ansehen" in "Kalender verwalten": shown, but treated as read-only (<see cref="IsReadOnly"/> is set too) –
+/// not offered for new events or invitations. <see cref="IsReadOnly"/> without it: the server allows no writing.
+/// </param>
 public sealed record CalendarInfo(
     Guid ConnectionId,
     string RemoteId,
@@ -20,7 +24,8 @@ public sealed record CalendarInfo(
     string? ServerName = null,
     CalendarContent Content = CalendarContent.Events,
     string? SharedBy = null,
-    bool IsDefault = false)
+    bool IsDefault = false,
+    bool IsViewOnly = false)
 {
     public bool HasEvents => Content.HasFlag(CalendarContent.Events);
 

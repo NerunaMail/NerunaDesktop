@@ -72,11 +72,11 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     // ── Step 1 for a new account: which kind. Everything with IMAP/CalDAV/CardDAV is one choice (found automatically);
     //    only providers that need their own sign-in are listed separately. ──
 
-    /// <summary>"choose", "imap", "exchange", "proton", "nextcloud", "microsoft" or "google".</summary>
+    /// <summary>"choose", "imap", "exchange", "proton", "nextcloud", "dav", "microsoft" or "google".</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsNextcloud), nameof(IsMailForm), nameof(IsMicrosoft), nameof(IsGoogle), nameof(IsSignInStep), nameof(SignInText), nameof(SignInNote), nameof(ShowGoogleTesting), nameof(CanGoBack),
+    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsNextcloud), nameof(IsDav), nameof(IsMailForm), nameof(IsMicrosoft), nameof(IsGoogle), nameof(IsSignInStep), nameof(SignInText), nameof(SignInNote), nameof(ShowGoogleTesting), nameof(CanGoBack),
         nameof(Subtitle), nameof(NeedsPassword), nameof(PasswordLabel))]
-    [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateCommand), nameof(SaveDavCommand))]
     public partial string Step { get; set; } = "choose";
 
     public bool IsChoosing => Step == "choose";
@@ -98,6 +98,146 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     [RelayCommand]
     private void ChooseNextcloud() => Step = "nextcloud";
+
+    // ── Calendars and contacts only (CalDAV/CardDAV without mail) ──
+
+    /// <summary>Calendars and/or contacts of a DAV server, no mail; invitations are left to the server (RFC 6638).</summary>
+    public bool IsDav => Step == "dav";
+
+    /// <summary>"dav.example.com" or the full address of the calendar or address book service.</summary>
+    [ObservableProperty]
+    public partial string DavServer { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool UseCalDav { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool UseCardDav { get; set; } = true;
+
+    [RelayCommand]
+    private void ChooseDav() => Step = "dav";
+
+    /// <summary>
+    /// A new account: the server name is looked up (SRV, /.well-known) for each chosen service; a full address is used
+    /// as it is. When editing: the two addresses as shown (empty removes the service).
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanCreate))]
+    private async Task SaveDavAsync()
+    {
+        Error = null;
+        var email = Email.Trim();
+        if (email.Length > 0 && (!MimeKit.MailboxAddress.TryParse(email, out var parsed) || parsed.Address != email || !email.Contains('@', StringComparison.Ordinal)))
+        {
+            Error = T("Bitte eine gültige E-Mail-Adresse eingeben.");
+            return;
+        }
+
+        var username = Username.Trim();
+        if (username.Length == 0)
+        {
+            Error = T("Bitte den Benutzernamen angeben.");
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            if (!IsEditing)
+            {
+                if (!UseCalDav && !UseCardDav)
+                {
+                    Error = T("Bitte Kalender, Kontakte oder beides wählen.");
+                    return;
+                }
+
+                BusyText = T("Suche Kalender- und Kontaktdienst …");
+                var (caldav, carddav) = await FindDavAsync(DavServer.Trim());
+                if (caldav is null && carddav is null)
+                {
+                    return;
+                }
+
+                CalDavUrl = caldav ?? string.Empty;
+                CardDavUrl = carddav ?? string.Empty;
+            }
+
+            var dav = new List<DavServerSettings>();
+            if (!TryAddDav(dav, ServerProtocol.CalDav, CalDavUrl, username) || !TryAddDav(dav, ServerProtocol.CardDav, CardDavUrl, username))
+            {
+                Error = T("Die CalDAV-/CardDAV-Adresse muss mit https:// oder http:// beginnen.");
+                return;
+            }
+
+            if (dav.Count == 0)
+            {
+                Error = T("Bitte mindestens eine CalDAV- oder CardDAV-Adresse angeben.");
+                return;
+            }
+
+            var host = dav[0].ServerUrl.Host;
+            var name = string.IsNullOrWhiteSpace(DisplayName) ? (email.Length > 0 ? email : username) : DisplayName.Trim();
+            var label = string.IsNullOrWhiteSpace(Label) ? host : Label.Trim();
+            var config = new MailProviderConfig(host, null, [], [], dav);
+            BusyText = T("Verbindungen werden geprüft …");
+            if (Editing is { } existing)
+            {
+                await setup.UpdateAsync(existing, name, label, email, config, Password.Length > 0 ? Password : null, acceptAnyCertificate: AcceptAnyCertificate);
+            }
+            else
+            {
+                var account = setup.BuildAccount(name, email, config, AcceptAnyCertificate) with { EmailAddress = email.Length > 0 ? email : null, Label = label };
+                await setup.CreateAsync(account, Password);
+                CreatedAccount = account;
+            }
+
+            Finished?.Invoke(this, true);
+        }
+        catch (AccountSetupException ex)
+        {
+            Error = T("Verbindung fehlgeschlagen – ") + ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyText = null;
+        }
+    }
+
+    /// <summary>Where the chosen services are: a full address as it is, a server name looked up (else its root, whose /.well-known the connection tries).</summary>
+    private async Task<(string? CalDav, string? CardDav)> FindDavAsync(string server)
+    {
+        if (server.Length == 0)
+        {
+            Error = T("Bitte den Server angeben, z. B. dav.example.com.");
+            return (null, null);
+        }
+
+        if (server.Contains("://", StringComparison.Ordinal))
+        {
+            if (!Uri.TryCreate(server, UriKind.Absolute, out var url) || url.Scheme is not ("https" or "http"))
+            {
+                Error = T("Die CalDAV-/CardDAV-Adresse muss mit https:// oder http:// beginnen.");
+                return (null, null);
+            }
+
+            return (UseCalDav ? url.AbsoluteUri : null, UseCardDav ? url.AbsoluteUri : null);
+        }
+
+        if (Uri.CheckHostName(server.Split(':')[0]) == UriHostNameType.Unknown)
+        {
+            Error = T("Bitte den Server angeben, z. B. dav.example.com.");
+            return (null, null);
+        }
+
+        string[] hosts = [server];
+        var domain = server.Split(':')[0];
+        var caldav = UseCalDav ? await DavProbe.FindAsync(davProbeClient, hosts, "caldav", domain: domain) : null;
+        var carddav = UseCardDav ? await DavProbe.FindAsync(davProbeClient, hosts, "carddav", domain: domain) : null;
+        var allowed = await AllowedAsync(caldav, carddav) ?? [];
+        var root = "https://" + server + "/";
+        return (UseCalDav ? (allowed.Contains(caldav) && caldav is not null ? caldav.Url.AbsoluteUri : root) : null,
+                UseCardDav ? (allowed.Contains(carddav) && carddav is not null ? carddav.Url.AbsoluteUri : root) : null);
+    }
 
     /// <summary>
     /// Nextcloud Login Flow v2: the browser opens, the user signs in and allows access; Nextcloud gives Neruna an app
@@ -378,6 +518,10 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             ? T("Mail, Kalender und Kontakte Ihres Microsoft-Kontos – angemeldet wird im Browser.")
             : IsGoogle
             ? T("Gmail, Google Kalender, Kontakte und Google Tasks – angemeldet wird im Browser.")
+            : IsDav
+            ? IsEditing
+                ? T("Namen, Passwort und Adressen ändern. Die Verbindungen werden vor dem Speichern geprüft; Termine und Kontakte bleiben erhalten. Leeres Kalender- oder Kontaktfeld entfernt diesen Dienst.")
+                : T("Nur Kalender (CalDAV), nur Kontakte (CardDAV) oder beides – ohne E-Mail. Einladungen verschickt der Server, wenn er das kann (z. B. SOGo, Nextcloud).")
             : IsNextcloud
             ? T("Kalender und Kontakte Ihrer Nextcloud – angemeldet wird im Browser, auch mit Zwei-Faktor-Anmeldung. Die E-Mail richten Sie als eigenes Konto ein.")
             : IsProton
@@ -403,7 +547,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         var bridge = account.Connections.FirstOrDefault(c => c.Settings.GetValueOrDefault(ImapSettings.KindKey) == ImapSettings.ProtonBridgeKind);
         Step = setup.IsSignedIn(account)
             ? account.Connections.Any(c => c.ProviderId == Neruna.Core.Providers.ProviderIds.Google) ? "google" : "microsoft"
-            : ews is not null ? "exchange" : bridge is not null ? "proton" : "imap";
+            : ews is not null ? "exchange" : bridge is not null ? "proton"
+            : account.Connections.Count > 0 && account.Connections.All(c => c.ProviderId is Neruna.Core.Providers.ProviderIds.CalDav or Neruna.Core.Providers.ProviderIds.CardDav) ? "dav"
+            : "imap";
         _bridgeFingerprints = bridge?.Settings.GetValueOrDefault(TlsCertificates.PinnedCertificateKey)?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? [];
         DisplayName = account.DisplayName;
         Label = account.Label ?? string.Empty;
@@ -475,7 +621,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     public partial string Email { get; set; } = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateCommand), nameof(SaveDavCommand))]
     public partial string Password { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -553,7 +699,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     public partial string CardDavUrl { get; set; } = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(DiscoverCommand), nameof(CreateCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DiscoverCommand), nameof(CreateCommand), nameof(SaveDavCommand))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]

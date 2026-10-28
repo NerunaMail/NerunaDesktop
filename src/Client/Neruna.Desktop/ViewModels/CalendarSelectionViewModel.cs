@@ -152,6 +152,10 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
                     group.Source.Connection,
                     group.Calendars.Where(c => c.IsSelected).Select(c => c.Candidate.Calendar.RemoteId).ToList(),
                     group.Calendars.Select(c => c.Candidate.Calendar.RemoteId).ToList());
+                foreach (var item in group.Calendars.Where(c => c.CanBeViewOnly))
+                {
+                    await calendar.SetViewOnlyAsync(item.Candidate.Calendar, item.IsViewOnly);
+                }
             }
 
             // The keys, not the boxes: a chosen calendar of a server that is not reachable right now is not in the list
@@ -250,7 +254,7 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
             {
                 item.PropertyChanged += (_, p) =>
                 {
-                    if (p.PropertyName == nameof(CalendarChoiceItem.IsSelected))
+                    if (p.PropertyName is nameof(CalendarChoiceItem.IsSelected) or nameof(CalendarChoiceItem.IsViewOnly))
                     {
                         UpdateSummary();
                     }
@@ -305,7 +309,7 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
 
     /// <summary>The calendars shown that new events can go into (not read-only, not a pure task list).</summary>
     public IEnumerable<CalendarChoiceItem> Writable() =>
-        Calendars.Where(c => c.IsSelected && !c.IsReadOnly && c.Candidate.Calendar.Content != Neruna.Core.Calendar.CalendarContent.Tasks);
+        Calendars.Where(c => c.IsSelected && !c.IsReadOnly && !c.IsViewOnly && c.Candidate.Calendar.Content != Neruna.Core.Calendar.CalendarContent.Tasks);
 
     public string? InvitationKey => _invitationKey;
 
@@ -404,7 +408,14 @@ internal sealed partial class CalendarChoiceItem(CalendarSourceGroup group, Cale
     /// <summary>"geteilt von Lea Keller": another person's calendar, found through delegation.</summary>
     public string? SharedByText => Candidate.Calendar.SharedBy is { } owner ? F("geteilt von {0}", owner) : null;
 
-    public bool IsReadOnly => Candidate.Calendar.IsReadOnly;
+    /// <summary>The server allows no writing.</summary>
+    public bool IsReadOnly => Candidate.Calendar.IsReadOnly && !Candidate.Calendar.IsViewOnly;
+
+    /// <summary>"Nur ansehen": the user keeps Neruna from writing into it (shown, not offered for new events).</summary>
+    [ObservableProperty]
+    public partial bool IsViewOnly { get; set; } = candidate.Calendar.IsViewOnly;
+
+    public bool CanBeViewOnly => !IsReadOnly && Candidate.Calendar.Content != Neruna.Core.Calendar.CalendarContent.Tasks;
 
     public bool IsAddedByUrl => Candidate.IsAddedByUrl;
 
