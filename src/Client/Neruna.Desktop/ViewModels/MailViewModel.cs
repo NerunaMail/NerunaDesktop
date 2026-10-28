@@ -1711,20 +1711,27 @@ internal sealed partial class MailViewModel(
 
         try
         {
+            // Where the time goes when a mail is slow to show: in the log, per step.
+            var watch = System.Diagnostics.Stopwatch.StartNew();
             var mime = await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId, token);
+            var loaded = watch.ElapsedMilliseconds;
             if (token.IsCancellationRequested)
             {
                 return;
             }
 
             var opened = _opened = await secureMime.OpenAsync(mime, token);
+            var secured = watch.ElapsedMilliseconds;
             var view = await ViewForAsync(message.Summary, opened, await IsRemoteContentAllowedAsync(message.Summary));
+            var checkedAt = watch.ElapsedMilliseconds;
             if (token.IsCancellationRequested)
             {
                 return;
             }
 
             ShowOpened(message.Summary, view);
+            logger.LogInformation("Message opened in {Total} ms: loaded {Loaded} ms, S/MIME {Secure} ms, check {Check} ms, pane {Pane} ms",
+                watch.ElapsedMilliseconds, loaded, secured - loaded, checkedAt - secured, watch.ElapsedMilliseconds - checkedAt);
 
             if (message.IsUnread)
             {

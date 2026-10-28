@@ -73,6 +73,26 @@ public class AddressCollectorTests
     }
 
     /// <summary>A writable address book that is not "Verwendete Adressen".</summary>
+    [Fact]
+    public async Task Contact_certificates_are_kept_until_contacts_change()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync(services => services.AddSingleton<IProviderFactory<IContactProvider>, PersonalBookFactory>());
+        var personal = await env.AddAccountAsync(ServiceKind.Contacts, PersonalBookFactory.Id);
+        await env.Contacts.SyncConnectionAsync(personal, ct);
+        var certificates = env.Contacts;
+        Assert.Empty(await certificates.GetAllAsync(ct));
+
+        // A contact saved with a certificate: read again, not the empty list from before.
+        var book = (await env.Contacts.GetAddressBooksAsync(ct)).Single(b => b.ConnectionId == personal.Id);
+        var der = TestPki.User("Lea Keller", "lea@example.com").Certificate.GetEncoded();
+        await env.Contacts.SaveContactAsync(book, ContactDraft.Empty with { GivenName = "Lea", Emails = [new ContactField("lea@example.com")], Certificates = [der] }, cancellationToken: ct);
+        var (found, emails) = Assert.Single(await certificates.GetAllAsync(ct));
+        Assert.Equal(der, found);
+        Assert.Contains("lea@example.com", emails);
+        Assert.Same(await certificates.GetAllAsync(ct), await certificates.GetAllAsync(ct));
+    }
+
     private sealed class PersonalBookFactory : IProviderFactory<IContactProvider>
     {
         public const string Id = "test-personal";

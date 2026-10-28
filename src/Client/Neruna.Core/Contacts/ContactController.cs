@@ -40,6 +40,16 @@ public sealed class ContactController(
     ILogger<ContactController> logger,
     SyncActivity? activity = null) : Security.IContactCertificates
 {
+    // The contacts' certificates: asked for with every signed or encrypted mail, read again only after contacts changed.
+    private IReadOnlyList<(byte[] Der, IReadOnlyList<string> Emails)>? _certificates;
+    private int _contactsVersion;
+
+    private void ContactsChanged()
+    {
+        Interlocked.Increment(ref _contactsVersion);
+        _certificates = null;
+    }
+
     public Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default) =>
         SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Contacts, SyncConnectionAsync, logger, cancellationToken, activity);
 
@@ -55,11 +65,22 @@ public sealed class ContactController(
             ? [.. remote.Where(b => selected.Contains(b.RemoteId))]
             : [.. remote.Where(b => b.SharedBy is null)];
 
-        foreach (var book in await store.MergeAddressBooksAsync(connection.Id, remote, cancellationToken))
+        var before = (await store.GetAddressBooksAsync(connection.Id, cancellationToken)).Select(b => b.RemoteId).ToHashSet(StringComparer.Ordinal);
+        var books = await store.MergeAddressBooksAsync(connection.Id, remote, cancellationToken);
+        if (!before.SetEquals(books.Select(b => b.RemoteId)))
+        {
+            ContactsChanged();
+        }
+
+        foreach (var book in books)
         {
             var known = await store.GetContactVersionsAsync(connection.Id, book.RemoteId, cancellationToken);
             var result = await provider.SyncAddressBookAsync(book, known, cancellationToken);
             await store.ApplySyncResultAsync(book, result, cancellationToken);
+            if (result.IsFullResync || result.AddedOrChanged.Count > 0 || result.RemovedRemoteIds.Count > 0)
+            {
+                ContactsChanged();
+            }
         }
     }
 
@@ -199,6 +220,7 @@ public sealed class ContactController(
         }
 
         await store.UpsertContactAsync(target, saved, cancellationToken);
+        ContactsChanged();
 
         if (moving && current is not null)
         {
@@ -249,11 +271,18 @@ public sealed class ContactController(
         }
 
         await store.DeleteContactAsync(addressBook, remoteId, cancellationToken);
+        ContactsChanged();
     }
 
     /// <summary>The S/MIME certificates kept with contacts (vCard KEY), with the contact's addresses.</summary>
     public async Task<IReadOnlyList<(byte[] Der, IReadOnlyList<string> Emails)>> GetAllAsync(CancellationToken cancellationToken = default)
     {
+        if (_certificates is { } cached)
+        {
+            return cached;
+        }
+
+        var version = Volatile.Read(ref _contactsVersion);
         var result = new List<(byte[], IReadOnlyList<string>)>();
         foreach (var book in await store.GetAddressBooksAsync(null, cancellationToken))
         {
@@ -268,6 +297,12 @@ public sealed class ContactController(
                     result.AddRange(certificates.Select(c => (c, emails)));
                 }
             }
+        }
+
+        // Kept unless contacts changed while reading (then the next call reads again).
+        if (version == Volatile.Read(ref _contactsVersion))
+        {
+            _certificates = result;
         }
 
         return result;

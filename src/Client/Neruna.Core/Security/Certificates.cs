@@ -268,6 +268,9 @@ public static class CertificateParser
 /// <param name="contacts">Where other people's certificates go when they have a contact; null: all stay on this device.</param>
 public sealed class CertificateManager(ICertificateStore store, ICredentialStore secrets, TimeProvider clock, IContactCertificates? contacts = null)
 {
+    // Opening a PKCS#12 container is slow on purpose (key derivation): done once per container and password, not with every mail.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (byte[] Pkcs12, string Password, IReadOnlyList<PrivateKeyEntry> Keys)> _keys = new(StringComparer.Ordinal);
+
     public async Task<IReadOnlyList<CertificateInfo>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var parser = new X509CertificateParser();
@@ -470,7 +473,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
             {
                 try
                 {
-                    keys.AddRange(CertificateParser.ReadPkcs12(item.Pkcs12, password).Where(k => CertificateParser.Thumbprint(k.Certificate) == item.Thumbprint));
+                    keys.AddRange(PrivateKeysOf(item, password));
                 }
                 catch (CertificatePasswordException)
                 {
@@ -480,6 +483,18 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         }
 
         return new SecureMimeMaterial(keys, certificates, authorities, infos);
+    }
+
+    private IReadOnlyList<PrivateKeyEntry> PrivateKeysOf(StoredCertificate item, string password)
+    {
+        if (_keys.TryGetValue(item.Thumbprint, out var known) && known.Password == password && known.Pkcs12.AsSpan().SequenceEqual(item.Pkcs12))
+        {
+            return known.Keys;
+        }
+
+        var keys = CertificateParser.ReadPkcs12(item.Pkcs12!, password).Where(k => CertificateParser.Thumbprint(k.Certificate) == item.Thumbprint).ToList();
+        _keys[item.Thumbprint] = (item.Pkcs12!, password, keys);
+        return keys;
     }
 
     /// <summary>

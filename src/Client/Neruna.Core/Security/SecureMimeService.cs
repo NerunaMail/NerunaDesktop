@@ -171,7 +171,9 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             return new OpenedMessage(message, MessageSecurityInfo.None);
         }
 
+        var watch = System.Diagnostics.Stopwatch.StartNew();
         using var context = await CreateContextAsync(cancellationToken);
+        var material = watch.ElapsedMilliseconds;
         var entity = message.Body;
         var signatures = new List<SignatureInfo>();
         var encrypted = false;
@@ -229,6 +231,8 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         }
 
         var readable = decryptionError is null && entity is not null ? WithBody(message, entity) : message;
+        logger.LogInformation("S/MIME opened in {Total} ms (certificates {Material} ms, {Signatures} signature(s), encrypted: {Encrypted})",
+            watch.ElapsedMilliseconds, material, signatures.Count, encrypted);
         return new OpenedMessage(readable, new MessageSecurityInfo(encrypted, decryptionError, signatures));
     }
 

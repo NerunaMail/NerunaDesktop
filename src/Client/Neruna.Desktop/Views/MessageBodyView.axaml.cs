@@ -47,6 +47,7 @@ internal sealed partial class MessageBodyView : UserControl
 
     // Windows: Neruna's "Bild vergrössern" in the web view's menu (kept, or its handler goes with it).
     private object? _imageMenu;
+    private System.Diagnostics.Stopwatch? _shownAt;
     private static readonly System.Net.Http.HttpClient Pictures = new() { Timeout = TimeSpan.FromSeconds(30) };
 
     public MessageBodyView()
@@ -201,6 +202,7 @@ internal sealed partial class MessageBodyView : UserControl
             _page = page;
             _written = false;
             _expectedLoads++;
+            _shownAt = System.Diagnostics.Stopwatch.StartNew();
             _web.NavigateToString(MailPaper.BrowserShell(pane.AllowsRemoteContent, dark, ++_load));
             return true;
         }
@@ -336,6 +338,7 @@ internal sealed partial class MessageBodyView : UserControl
         }
 
         _written = true;
+        CrashHandler.Logger?.LogInformation("Mail page ready in the web view after {Elapsed} ms", _shownAt?.ElapsedMilliseconds);
         _ = _web.InvokeScript("document.open();document.write(" + System.Text.Json.JsonSerializer.Serialize(page) + ");document.close();" + KeyScript + ";\"ok\""); // a result WebKitGTK can return (undefined fails there)
     }
 
