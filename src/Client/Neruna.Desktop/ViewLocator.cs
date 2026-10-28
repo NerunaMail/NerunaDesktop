@@ -57,6 +57,7 @@ internal sealed class ViewLocator : IDataTemplate
         CloudViewModel => new CloudView(),
         TextTemplatesViewModel => new TextTemplatesView(),
         MailTagsViewModel => new MailTagsView(),
+        CalendarCategoriesViewModel => new CalendarCategoriesView(),
         QuickActionsViewModel => new QuickActionsView(),
         null => null,
         _ => new TextBlock { Text = "Keine Ansicht für " + param.GetType().Name },

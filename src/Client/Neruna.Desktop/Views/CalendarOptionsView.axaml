@@ -53,6 +53,9 @@
         <ComboBox ItemsSource="{x:Static vm:CalendarOptionsViewModel.HourOptions}" SelectedItem="{Binding VisibleTo}" Width="100" />
       </StackPanel>
 
+      <TextBlock Text="{l:T 'Kategorien'}" FontSize="16" FontWeight="SemiBold" />
+      <ContentControl Content="{Binding Categories}" MaxWidth="640" HorizontalAlignment="Left" />
+
       <TextBlock Text="{l:T 'Monatsübersicht'}" FontSize="16" FontWeight="SemiBold" />
       <TextBlock Classes="subtle" TextWrapping="Wrap"
                  Text="{l:T 'Der Monatskalender links über der Kalenderliste – Klick auf einen Tag oder eine Kalenderwoche zeigt diese Woche.'}" />

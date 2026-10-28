@@ -141,6 +141,7 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Cloud.CloudTextTemplateSync>();
         services.AddSingleton<Neruna.Core.Cloud.CloudMailTagSync>();
         services.AddSingleton<Neruna.Core.Mail.MailTagService>();
+        services.AddSingleton<Neruna.Core.Calendar.CalendarCategoryService>();
         services.AddSingleton<Neruna.Core.Cloud.CloudCertificateSync>();
         services.AddSingleton<Neruna.Core.Cloud.CloudPairingService>();
         services.AddSingleton<Neruna.Core.Cloud.AccountTransferService>();
@@ -188,6 +189,7 @@ internal static class AppServices
         services.AddSingleton<CloudViewModel>();
         services.AddSingleton<TextTemplatesViewModel>();
         services.AddSingleton<MailTagsViewModel>();
+        services.AddSingleton<CalendarCategoriesViewModel>();
         services.AddSingleton<Neruna.Core.Mail.QuickActionService>();
         services.AddSingleton<Neruna.Core.Mail.PdfProtectionService>();
         services.AddSingleton<PdfOptionsViewModel>();

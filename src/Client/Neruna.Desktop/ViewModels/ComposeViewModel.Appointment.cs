@@ -8,7 +8,8 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>What writing a mail needs to make an event for it: the calendars, the invitations and a window for the editor.</summary>
-internal sealed record ComposeCalendar(CalendarController Calendar, InvitationService Invitations, IWindowService Windows, Neruna.Core.Meetings.MeetingController? Meetings = null);
+internal sealed record ComposeCalendar(CalendarController Calendar, InvitationService Invitations, IWindowService Windows, Neruna.Core.Meetings.MeetingController? Meetings = null,
+    CalendarCategoryService? Categories = null);
 
 /// <summary>The event made while writing (calendar, id there, what was saved).</summary>
 internal sealed record ComposeAppointment(CalendarInfo Calendar, string RemoteId, EventDraft Draft)
@@ -74,6 +75,7 @@ internal sealed partial class ComposeViewModel
             {
                 Recipients = Recipients,
                 Meetings = c.Meetings,
+                KnownCategories = c.Categories is null ? [] : await c.Categories.GetAllAsync(),
             };
             if (existing is null)
             {

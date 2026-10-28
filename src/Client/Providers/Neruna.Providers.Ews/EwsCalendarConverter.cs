@@ -19,7 +19,7 @@ internal static class EwsCalendarConverter
     /// <summary>What Neruna reads of a calendar item.</summary>
     public static readonly object[] Fields =
     [
-        "item:Subject", "item:Body", "item:Sensitivity", "item:ReminderIsSet", "item:ReminderMinutesBeforeStart",
+        "item:Subject", "item:Body", "item:Categories", "item:Sensitivity", "item:ReminderIsSet", "item:ReminderMinutesBeforeStart",
         "calendar:UID", "calendar:Start", "calendar:End", "calendar:IsAllDayEvent", "calendar:LegacyFreeBusyStatus", "calendar:Location",
         "calendar:IsMeeting", "calendar:IsCancelled", "calendar:MyResponseType", "calendar:Organizer", "calendar:RequiredAttendees",
         "calendar:OptionalAttendees", "calendar:Recurrence", "calendar:ModifiedOccurrences", "calendar:DeletedOccurrences", "calendar:StartTimeZone",
@@ -74,6 +74,7 @@ internal static class EwsCalendarConverter
             Summary = item.Val("Subject") ?? string.Empty,
             Location = item.Val("Location") is { Length: > 0 } location ? location : null,
             Description = item.Val("Body") is { Length: > 0 } text ? text.Trim() : null,
+            Categories = [.. EwsMailProvider.CategoriesOf(item)],
         };
         var allDay = item.Bool("IsAllDayEvent");
         var start = item.Date("Start") ?? DateTimeOffset.UnixEpoch;
@@ -305,6 +306,8 @@ internal static class EwsCalendarConverter
         [
             ("item:Subject", X.Typ("Subject", draft.Summary)),
             ("item:Body", X.Typ("Body", new XAttribute("BodyType", "Text"), draft.Description ?? string.Empty)),
+            // In the schema's order: after the body, before the reminder.
+            ("item:Categories", draft.Categories is { Count: > 0 } categories ? X.Typ("Categories", categories.Select(c => X.Typ("String", c))) : null),
             ("item:ReminderIsSet", X.Typ("ReminderIsSet", draft.ReminderMinutes is null ? "false" : "true")),
             ("item:ReminderMinutesBeforeStart", draft.ReminderMinutes is { } minutes ? X.Typ("ReminderMinutesBeforeStart", minutes) : null),
             ("calendar:Start", X.Typ("Start", Utc(start))),

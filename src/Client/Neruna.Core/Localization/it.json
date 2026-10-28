@@ -2381,5 +2381,16 @@
  "Bitte mit dem Google-Konto {0} anmelden – für ein anderes ein eigenes Konto hinzufügen.": "Accedi con l'account Google {0} – per un altro aggiungi un account separato.",
  "Mit den Pfeilen legen Sie die Reihenfolge in «Meine Kalender» fest.": "Con le frecce stabilisci l’ordine in «I miei calendari».",
  "Mit den Pfeilen legen Sie die Reihenfolge in der Adressbuchliste fest.": "Con le frecce stabilisci l’ordine nell’elenco delle rubriche.",
- "https://…, mailto:… oder tel:+41…": "https://…, mailto:… o tel:+41…"
+ "https://…, mailto:… oder tel:+41…": "https://…, mailto:… o tel:+41…",
+ "Kunde": "Cliente",
+ "Anruf": "Chiamata",
+ "Projekt": "Progetto",
+ "Reise": "Viaggio",
+ "Ferien": "Vacanze",
+ "Nachfassen": "Da seguire",
+ "Kategorien": "Categorie",
+ "Neue Kategorie": "Nuova categoria",
+ "Eine Kategorie «{0}» gibt es schon.": "Una categoria «{0}» esiste già.",
+ "Kategorien ordnen Termine – im Kalender als farbige Linie rechts am Termin, die Namen zeigt der Tooltip. Gespeichert wird der Name beim Termin auf dem Server, so sehen ihn auch andere Kalenderprogramme.": "Le categorie ordinano gli appuntamenti – nel calendario come linea colorata a destra dell’appuntamento, il tooltip mostra i nomi. Il nome viene salvato con l’appuntamento sul server, così lo vedono anche altri programmi di calendario.",
+ "Beim Umbenennen behalten bestehende Termine den alten Namen und erscheinen ohne Farbe, bis Sie die Kategorie beim Termin neu wählen.": "Rinominando, gli appuntamenti esistenti mantengono il vecchio nome e appaiono senza colore finché non scegliete di nuovo la categoria nell’appuntamento."
 }

@@ -113,6 +113,16 @@ public sealed record EventDraft(
     /// <summary>The online meeting (Teams, Zoom, Jitsi …); null: none. Its join text is part of <see cref="Description"/>.</summary>
     public Meetings.OnlineMeeting? Meeting { get; init; }
 
+    /// <summary>Categories (iCalendar CATEGORIES) by name, also those Neruna does not know; null leaves them as they are.</summary>
+    public IReadOnlyList<string>? Categories { get; init; }
+
+    /// <summary>The categories of an event, each once (a CATEGORIES line may hold several, separated by commas).</summary>
+    public static IReadOnlyList<string> CategoriesOf(CalendarEvent evt)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+        return [.. evt.Categories.SelectMany(c => c.Split(',')).Select(c => c.Trim()).Where(c => c.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
     /// <summary>The Microsoft property for tentative and away (TRANSP knows only free and busy).</summary>
     public const string BusyStatusProperty = "X-MICROSOFT-CDO-BUSYSTATUS";
 
@@ -175,6 +185,7 @@ public sealed record EventDraft(
         {
             ShowAs = ShowAsOf(master),
             Meeting = Meetings.OnlineMeeting.Of(master),
+            Categories = CategoriesOf(master),
         };
     }
 
@@ -295,6 +306,10 @@ public sealed record EventDraft(
         ApplyAttendees(master);
         ApplyShowAs(master, ShowAs);
         Meetings.OnlineMeeting.Apply(master, Meeting);
+        if (Categories is not null && !CategoriesOf(master).SequenceEqual(Categories))
+        {
+            master.Categories = [.. Categories];
+        }
 
         // Other clients only pick up changes reliably when SEQUENCE and DTSTAMP move forward.
         if (existingData is not null)

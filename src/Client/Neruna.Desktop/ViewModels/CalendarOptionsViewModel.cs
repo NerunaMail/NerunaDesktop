@@ -6,7 +6,7 @@ using Neruna.Core.Calendar;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Settings → Kalender. Changes apply immediately to the calendar view.</summary>
-internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, CalendarViewModel calendarPage) : ViewModelBase
+internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, CalendarViewModel calendarPage, CalendarCategoriesViewModel categories) : ViewModelBase
 {
     private bool _loading;
 
@@ -151,8 +151,12 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         }
     }
 
+    /// <summary>Name and colour of the categories for events.</summary>
+    public CalendarCategoriesViewModel Categories => categories;
+
     public async Task ReloadAsync()
     {
+        await categories.ReloadAsync();
         _loading = true;
         try
         {

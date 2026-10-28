@@ -321,8 +321,14 @@
                           <Button Padding="0" Margin="0,0,0,2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0"
                                   Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).EditEventCommand}" CommandParameter="{Binding}" ContextRequested="OnEventContextRequested"
                                   ToolTip.Tip="{Binding Tooltip}">
-                            <Border Background="{Binding Background}" BorderBrush="{Binding Brush}" BorderThickness="3,0,0,0" CornerRadius="3" Padding="6,2">
+                            <Border Background="{Binding Background}" BorderBrush="{Binding Brush}" BorderThickness="3,0,0,0" CornerRadius="3" Padding="6,2" ClipToBounds="True">
+                              <DockPanel>
+                              <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding CategoryBrushes}" IsVisible="{Binding HasCategories}" Margin="4,-2,-6,-2" IsHitTestVisible="False">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate><DataTemplate x:DataType="IBrush"><Border Width="4" Background="{Binding}" /></DataTemplate></ItemsControl.ItemTemplate>
+                              </ItemsControl>
                               <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                              </DockPanel>
                             </Border>
                           </Button>
                         </DataTemplate>
@@ -390,6 +396,11 @@
                                         Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).EditEventCommand}" CommandParameter="{Binding Item}"
                                         ContextRequested="OnEventContextRequested">
                                   <Border Background="{Binding Item.Background}" BorderBrush="{Binding Item.Brush}" BorderThickness="3,0,0,0" CornerRadius="3" Padding="6,2" ClipToBounds="True">
+                                    <DockPanel>
+                              <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Item.CategoryBrushes}" IsVisible="{Binding Item.HasCategories}" Margin="4,-2,-6,-2" IsHitTestVisible="False">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate><DataTemplate x:DataType="IBrush"><Border Width="4" Background="{Binding}" /></DataTemplate></ItemsControl.ItemTemplate>
+                              </ItemsControl>
                                     <Panel>
                                       <TextBlock IsVisible="{Binding IsShort}" FontSize="12" TextTrimming="CharacterEllipsis">
                                         <Run Text="{Binding Item.Title}" FontWeight="SemiBold" />
@@ -401,6 +412,7 @@
                                         <TextBlock Text="{Binding Item.Location}" FontSize="11" Classes="subtle" IsVisible="{Binding Item.HasLocation}" TextTrimming="CharacterEllipsis" />
                                       </StackPanel>
                                     </Panel>
+                                    </DockPanel>
                                   </Border>
                                 </Button>
                               </DataTemplate>
@@ -602,7 +614,12 @@
                                   Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).EditEventCommand}" CommandParameter="{Binding}" ContextRequested="OnEventContextRequested"
                                   ToolTip.Tip="{Binding Tooltip}">
                             <Border Background="{Binding Background}" BorderBrush="{Binding Brush}" BorderThickness="3,0,0,0"
-                                    CornerRadius="3" Padding="8,5">
+                                    CornerRadius="3" Padding="8,5" ClipToBounds="True">
+                              <DockPanel>
+                              <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding CategoryBrushes}" IsVisible="{Binding HasCategories}" Margin="4,-5,-8,-5" IsHitTestVisible="False">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate><DataTemplate x:DataType="IBrush"><Border Width="4" Background="{Binding}" /></DataTemplate></ItemsControl.ItemTemplate>
+                              </ItemsControl>
                               <StackPanel Spacing="1">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                   <TextBlock Text="{Binding TimeText}" FontSize="11" Classes="subtle" />
@@ -611,6 +628,7 @@
                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding Location}" FontSize="11" Classes="subtle" IsVisible="{Binding HasLocation}" TextTrimming="CharacterEllipsis" />
                               </StackPanel>
+                              </DockPanel>
                             </Border>
                           </Button>
                         </DataTemplate>
@@ -639,7 +657,12 @@
                                   Background="Transparent" BorderThickness="0"
                                   Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).OpenSearchHitCommand}" CommandParameter="{Binding}"
                                   ToolTip.Tip="{Binding Item.Tooltip}">
-                            <Border Background="{Binding Item.Background}" BorderBrush="{Binding Item.Brush}" BorderThickness="3,0,0,0" CornerRadius="3" Padding="10,6">
+                            <Border Background="{Binding Item.Background}" BorderBrush="{Binding Item.Brush}" BorderThickness="3,0,0,0" CornerRadius="3" Padding="10,6" ClipToBounds="True">
+                              <DockPanel>
+                              <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Item.CategoryBrushes}" IsVisible="{Binding Item.HasCategories}" Margin="8,-6,-10,-6" IsHitTestVisible="False">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate><DataTemplate x:DataType="IBrush"><Border Width="4" Background="{Binding}" /></DataTemplate></ItemsControl.ItemTemplate>
+                              </ItemsControl>
                               <Grid ColumnDefinitions="260,*,Auto">
                                 <StackPanel Spacing="1">
                                   <TextBlock Text="{Binding DateText}" FontSize="13" />
@@ -654,6 +677,7 @@
                                 </StackPanel>
                                 <TextBlock Grid.Column="2" Text="{Binding CalendarName}" FontSize="11" Classes="subtle" VerticalAlignment="Center" />
                               </Grid>
+                              </DockPanel>
                             </Border>
                           </Button>
                         </DataTemplate>

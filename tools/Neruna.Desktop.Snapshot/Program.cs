@@ -730,6 +730,8 @@ internal static class Snapshots
         vm.CalendarPage.NavigatorMonthCount = 1;
         vm.CalendarPage.IsTimeGrid = true;
         await SaveAsync(window, output, "calendar-timegrid.png");
+        var categorized = vm.CalendarPage.Days.SelectMany(d => d.Events).First(e => e.CategoryBrushes.Count > 2);
+        Console.WriteLine($"Category tooltip: {categorized.Tooltip.Replace('\n', '|')}");
 
         // A calendar moved within its account under "Kalender verwalten"; then the right-click menu on an event.
         var firstGroup = vm.CalendarPage.CalendarGroups.First(g => g.Items.Count > 1);
@@ -820,6 +822,21 @@ internal static class Snapshots
         vm.Overlay = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal], meeting,
             (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com");
         await SaveAsync(window, output, "event-attendees.png");
+        // Categories chosen in the editor, the list open.
+        var categoryEditor = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal],
+            meeting with { Categories = ["Besprechung", "Projekt"] }, (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com")
+        {
+            KnownCategories = await services.GetRequiredService<Neruna.Core.Calendar.CalendarCategoryService>().GetAllAsync(),
+        };
+        vm.Overlay = categoryEditor;
+        await SaveAsync(window, output, "event-categories.png");
+        if (window.GetVisualDescendants().OfType<DropDownButton>().FirstOrDefault(b => b.IsEffectivelyVisible && b.Flyout is Flyout) is { } categoryButton)
+        {
+            categoryButton.Flyout!.ShowAt(categoryButton);
+            await SaveAsync(window, output, "event-categories-open.png");
+            categoryButton.Flyout.Hide();
+        }
+
         vm.Overlay = null;
 
         // Online meeting: a Jitsi server set up (Einstellungen → Besprechungen), the meeting added in the editor.
@@ -1041,6 +1058,13 @@ internal static class Snapshots
         await vm.SettingsPage.ReloadAsync();
         vm.SettingsPage.SelectedTab = 1;
         await SaveAsync(window, output, "settings-mail.png");
+        vm.SettingsPage.SelectedTab = 2;
+        await SaveAsync(window, output, "settings-calendar.png");
+        if (window.GetVisualDescendants().OfType<CalendarCategoriesView>().FirstOrDefault(v => v.IsEffectivelyVisible) is { } categoriesView)
+        {
+            categoriesView.BringIntoView();
+            await SaveAsync(window, output, "settings-calendar-categories.png");
+        }
         // Workspaces: "Business" without one folder, the rail in its colour, the menu, the tabs and the settings page.
         var workspaceService = services.GetRequiredService<Neruna.Core.Workspaces.WorkspaceService>();
         var workspaceAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync())[0];

@@ -25,6 +25,9 @@ public sealed record CalendarOccurrence(
 
     /// <summary>Busy, free, tentative or away (the colours of the planning view).</summary>
     public ShowAs ShowAs { get; init; }
+
+    /// <summary>Categories by name (iCalendar CATEGORIES).</summary>
+    public IReadOnlyList<string> Categories { get; init; } = [];
 }
 
 /// <summary>A calendar offered by the server, for choosing which ones to show (Thunderbird only offers this at setup).</summary>
@@ -581,6 +584,7 @@ public sealed class CalendarController(
             evt.RecurrenceRule is not null || evt.RecurrenceIdentifier is not null)
         {
             ShowAs = EventDraft.ShowAsOf(evt),
+            Categories = EventDraft.CategoriesOf(evt),
         };
     }
 

@@ -68,6 +68,17 @@ internal sealed record ReminderOption(int? Minutes, string Label)
         Standard.Any(o => o.Minutes == minutes) ? Standard : [.. Standard, new(minutes, F("{0} Minuten vorher", minutes))];
 }
 
+/// <summary>A category to tick in the editor; one the event has but Neruna does not know shows grey (it can be removed).</summary>
+internal sealed partial class CategoryChoice(string name, string? color, bool isSelected) : ObservableObject
+{
+    public string Name { get; } = name;
+
+    public Avalonia.Media.IBrush Brush { get; } = Avalonia.Media.Brush.Parse(color ?? "#9E9E9E");
+
+    [ObservableProperty]
+    public partial bool IsSelected { get; set; } = isSelected;
+}
+
 /// <summary>One invited person with their answer, shown below the attendee field.</summary>
 internal sealed record AttendeeStatus(string Text, string State);
 
@@ -80,6 +91,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     private readonly Func<CalendarInfo, string?> _ownAddress;
     private readonly IReadOnlyList<EventAttendee> _attendees;
     private readonly (DateTime Start, DateTime End)? _originalTimes;
+    private readonly IReadOnlyList<string> _categories;
 
     public EventEditorViewModel(
         CalendarController calendar,
@@ -95,6 +107,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         _ownAddress = ownAddress;
         _attendees = draft.Attendees ?? [];
         _originalTimes = existing is null ? null : (draft.Start, draft.End);
+        _categories = draft.Categories ?? [];
         Organizer = draft.Organizer;
 
         IsReadOnly = existing?.Calendar.IsReadOnly ?? false;
@@ -309,6 +322,34 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     [ObservableProperty]
     public partial ShowAsOption ShowAs { get; set; }
 
+    /// <summary>The categories offered (Einstellungen → Kalender), then those of the event Neruna does not know.</summary>
+    public IReadOnlyList<CalendarCategory> KnownCategories
+    {
+        init
+        {
+            foreach (var category in value)
+            {
+                CategoryChoices.Add(new CategoryChoice(category.Name, category.Color, _categories.Any(category.Matches)));
+            }
+
+            foreach (var other in _categories.Where(c => !value.Any(k => k.Matches(c))))
+            {
+                CategoryChoices.Add(new CategoryChoice(other, null, true));
+            }
+
+            foreach (var choice in CategoryChoices)
+            {
+                choice.PropertyChanged += (_, _) => OnPropertyChanged(nameof(SelectedCategories));
+            }
+        }
+    }
+
+    public System.Collections.ObjectModel.ObservableCollection<CategoryChoice> CategoryChoices { get; } = [];
+
+    public bool HasCategoryChoices => CategoryChoices.Count > 0;
+
+    public IReadOnlyList<CategoryChoice> SelectedCategories => [.. CategoryChoices.Where(c => c.IsSelected)];
+
     /// <summary>Invited people, as typed: "Lea Keller &lt;lea@example.com&gt;, marco@example.com".</summary>
     [ObservableProperty]
     public partial string AttendeesText { get; set; }
@@ -515,6 +556,8 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         {
             ShowAs = (ShowAs ?? ShowAsOption.Of(Neruna.Core.Calendar.ShowAs.Busy)).Value,
             Meeting = Meeting,
+            // Without a list (no settings loaded) the event keeps its categories.
+            Categories = CategoryChoices.Count > 0 ? [.. SelectedCategories.Select(c => c.Name)] : null,
         };
         await RunAsync(async () =>
         {

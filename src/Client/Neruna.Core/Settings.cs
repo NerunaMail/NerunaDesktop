@@ -129,6 +129,9 @@ public static class SettingKeys
     /// <summary>The order of the calendars within their account group (JSON list of calendar keys); the others follow by name.</summary>
     public const string CalendarOrder = "calendar.order";
 
+    /// <summary>The categories offered for events (JSON list of name and colour); not set: the defaults.</summary>
+    public const string CalendarCategories = "calendar.categories";
+
     /// <summary>Reminder for new events and accepted invitations, minutes before the start; "none" for none. Default: 15.</summary>
     public const string CalendarDefaultReminder = "calendar.defaultReminder";
 

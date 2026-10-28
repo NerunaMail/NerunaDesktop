@@ -53,13 +53,14 @@ internal sealed partial class CalendarViewModel
         var shown = visible.Select(c => c.Info).ToList();
         var now = DateTimeOffset.Now;
         var found = await Task.Run(() => calendar.SearchAsync(shown, query, now));
+        var known = await categories.GetAllAsync();
         if (version != _searchVersion)
         {
             return; // A newer search took over.
         }
 
         CalendarSearchHit Hit(CalendarOccurrence o) => new(
-            new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0]),
+            new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0], known),
             names.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? string.Empty);
 
         var today = now.LocalDateTime.Date;

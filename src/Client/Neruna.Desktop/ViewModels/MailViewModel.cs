@@ -42,6 +42,7 @@ internal sealed partial class MailViewModel(
     PdfProtectionService pdfSecurity,
     AddressCollector addressCollector,
     MailTagService tagService,
+    CalendarCategoryService categories,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
@@ -938,7 +939,7 @@ internal sealed partial class MailViewModel(
             Recipients = recipients,
             Preferences = preferences,
             TextTemplates = textTemplates,
-            Calendars = new ComposeCalendar(calendar, invitations, windows, meetings),
+            Calendars = new ComposeCalendar(calendar, invitations, windows, meetings, categories),
             PdfSecurity = pdfSecurity,
         };
         compose.Ai = new ComposeAiViewModel(ai, compose);

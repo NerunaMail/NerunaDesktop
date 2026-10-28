@@ -65,7 +65,7 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
         return new Availability(email, slots);
     }
 
-    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs,isOnlineMeeting,onlineMeetingProvider,onlineMeeting";
+    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs,isOnlineMeeting,onlineMeetingProvider,onlineMeeting,categories";
 
     /// <summary>
     /// Teams, where the organisation has it for this calendar (work or school accounts): Exchange then creates the
@@ -248,6 +248,9 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
             OnlineMeeting.Apply(evt, new OnlineMeeting(e.Str("onlineMeetingProvider") == TeamsProvider ? MeetingKinds.Teams : MeetingKinds.FromUrl(joinUrl), joinUrl));
         }
 
+        // Categories by name, as Outlook shows them (the colour is the mailbox's, Neruna has its own per name).
+        evt.Categories = [.. e.Arr("categories").Select(c => c.GetString()).OfType<string>().Where(c => c.Length > 0)];
+
         if (e.Bool("isReminderOn"))
         {
             evt.Alarms.Add(new Alarm { Action = "DISPLAY", Description = evt.Summary, Trigger = new Trigger(Duration.FromMinutes(-e.Int("reminderMinutesBeforeStart"))) });
@@ -285,6 +288,7 @@ internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph
             ["reminderMinutesBeforeStart"] = draft.ReminderMinutes ?? 0,
             ["attendees"] = (draft.Attendees ?? []).Select(a => new { emailAddress = new { address = a.Email, name = a.Name }, type = "required" }).ToList(),
             ["recurrence"] = master?.RecurrenceRule is { } rule ? GraphRecurrence(rule, DateOnly.FromDateTime(start)) : null,
+            ["categories"] = draft.Categories ?? [],
         };
 
         // A Teams meeting still to be created: Exchange makes it and adds the join text to the body. Once there it

@@ -12,7 +12,7 @@ namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Week view across all calendars, whatever provider they come from.</summary>
 internal sealed partial class CalendarViewModel(CalendarController calendar, TaskController tasks, InvitationService invitations, ISettingsStore settings,
-    Infrastructure.RecipientDirectory recipients, Neruna.Core.Workspaces.WorkspaceService workspaces, Neruna.Core.Meetings.MeetingController meetings) : ViewModelBase, ICollectionListHost
+    Infrastructure.RecipientDirectory recipients, Neruna.Core.Workspaces.WorkspaceService workspaces, Neruna.Core.Meetings.MeetingController meetings, CalendarCategoryService categories) : ViewModelBase, ICollectionListHost
 {
     internal static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
@@ -625,6 +625,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         {
             Recipients = recipients,
             Meetings = meetings,
+            KnownCategories = await categories.GetAllAsync(),
         };
         if (target is not null && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == CalendarController.CalendarKey(target)) is { } same)
         {
@@ -654,6 +655,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var shown = visible.Select(c => c.Info).ToList();
         var version = ++_weekVersion;
         var occurrences = await Task.Run(() => OccurrencesAsync(shown, from, from.AddDays(7)));
+        var known = await categories.GetAllAsync();
         if (version != _weekVersion)
         {
             return; // A newer load (other week, calendars changed) is under way; an older result must not overwrite it.
@@ -667,7 +669,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
                 .Where(o => o.Start.LocalDateTime.Date <= day && (o.End.LocalDateTime > day || o.Start.LocalDateTime.Date == day))
                 .OrderByDescending(o => o.IsAllDay)
                 .ThenBy(o => o.Start)
-                .Select(o => new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0]))
+                .Select(o => new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0], known))
                 .ToList();
             Days.Add(new CalendarDay(day, events));
         }
@@ -813,7 +815,8 @@ internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem
     public IReadOnlyList<CalendarEventItem> Events { get; } = events;
 }
 
-internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string color)
+/// <param name="categories">The categories offered: those of the event show as colour lines on the right.</param>
+internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string color, IReadOnlyList<CalendarCategory>? categories = null)
 {
     public CalendarOccurrence Occurrence { get; } = occurrence;
 
@@ -833,8 +836,13 @@ internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string co
         ? T("Ganztägig")
         : $"{Occurrence.Start.LocalDateTime:HH:mm}–{Occurrence.End.LocalDateTime:HH:mm}";
 
-    /// <summary>Hover text: title, location (if any) and time, one per line.</summary>
-    public string Tooltip => string.Join('\n', new[] { Title, Location, TimeText }.Where(line => !string.IsNullOrWhiteSpace(line)));
+    /// <summary>The colours of the event's categories (known ones, in the order of the settings).</summary>
+    public IReadOnlyList<IBrush> CategoryBrushes { get; } = [.. CalendarCategoryService.Of(occurrence.Categories, categories ?? []).Select(c => Avalonia.Media.Brush.Parse(c.Color))];
+
+    public bool HasCategories => CategoryBrushes.Count > 0;
+
+    /// <summary>Hover text: title, location (if any), time and categories (also those without colour), one per line.</summary>
+    public string Tooltip => string.Join('\n', new[] { Title, Location, TimeText, string.Join(", ", Occurrence.Categories) }.Where(line => !string.IsNullOrWhiteSpace(line)));
 }
 
 /// <summary>An event placed in the time grid of one day: vertical position from its time, column from overlaps.</summary>

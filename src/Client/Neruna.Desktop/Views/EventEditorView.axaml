@@ -124,6 +124,49 @@
       </StackPanel>
     </Grid>
 
+    <!-- Categories: colour lines on the right of the entry in the calendar, names in its tooltip -->
+    <StackPanel IsVisible="{Binding HasCategoryChoices}">
+      <TextBlock Classes="label" Text="{l:T 'Kategorien'}" />
+      <DropDownButton HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" IsEnabled="{Binding CanEdit}">
+        <Panel>
+          <TextBlock Classes="subtle" Text="{l:T 'Keine'}" IsVisible="{Binding !SelectedCategories.Count}" />
+          <ItemsControl ItemsSource="{Binding SelectedCategories}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:CategoryChoice">
+                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,12,0">
+                  <Border Width="10" Height="10" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Name}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Panel>
+        <DropDownButton.Flyout>
+          <Flyout Placement="BottomEdgeAlignedLeft">
+            <ScrollViewer MaxHeight="320">
+              <ItemsControl ItemsSource="{Binding CategoryChoices}" MinWidth="220">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CategoryChoice">
+                    <CheckBox IsChecked="{Binding IsSelected}">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Width="12" Height="12" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </CheckBox>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Flyout>
+        </DropDownButton.Flyout>
+      </DropDownButton>
+    </StackPanel>
+
     <TextBlock Classes="label" Text="{l:T 'Teilnehmer'}" />
     <!-- With suggestions from the address book, like An/Cc while writing -->
     <ctl:RecipientBox Text="{Binding AttendeesText}" Directory="{Binding Recipients}" IsVisible="{Binding CanEditAttendees}"

@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:app="using:Neruna.Desktop"
+             x:Class="Neruna.Desktop.Views.CalendarCategoriesView"
+             x:DataType="vm:CalendarCategoriesViewModel">
+  <StackPanel Spacing="8">
+    <TextBlock Classes="subtle" TextWrapping="Wrap"
+               Text="{l:T 'Kategorien ordnen Termine – im Kalender als farbige Linie rechts am Termin, die Namen zeigt der Tooltip. Gespeichert wird der Name beim Termin auf dem Server, so sehen ihn auch andere Kalenderprogramme.'}" />
+    <ItemsControl ItemsSource="{Binding Items}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:CalendarCategoryRow">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,3">
+            <!-- Colour: click to choose -->
+            <Button Width="22" Height="22" MinWidth="0" Padding="0" CornerRadius="3" BorderThickness="0" VerticalAlignment="Center"
+                    Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{l:T 'Farbe ändern'}">
+              <Button.Flyout>
+                <Flyout Placement="RightEdgeAlignedTop">
+                  <ItemsControl ItemsSource="{x:Static vm:CalendarCategoriesViewModel.ColorChoices}" Width="200">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <Button Width="20" Height="20" MinWidth="0" Padding="0" Margin="1" CornerRadius="3" BorderThickness="0"
+                                Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" Click="OnColorPicked" Tag="{Binding}" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
+            <TextBox Grid.Column="1" Text="{Binding Name}" Margin="8,0,0,0" LostFocus="OnNameLeft" KeyDown="OnNameKey" />
+            <Button Grid.Column="2" Content="↑" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Nach oben'}"
+                    Command="{Binding $parent[UserControl].((vm:CalendarCategoriesViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+            <Button Grid.Column="3" Content="{l:T 'Entfernen'}" Margin="6,0,0,0" VerticalAlignment="Center"
+                    Command="{Binding $parent[UserControl].((vm:CalendarCategoriesViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+      <TextBox Text="{Binding NewName}" PlaceholderText="{l:T 'Neue Kategorie'}" KeyDown="OnNewKey" />
+      <Button Grid.Column="1" Classes="accent" Content="{l:T 'Hinzufügen'}" Command="{Binding AddCommand}" Margin="6,0,0,0" />
+    </Grid>
+    <TextBlock Text="{Binding Error}" Foreground="#C42B1C" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+               Text="{l:T 'Beim Umbenennen behalten bestehende Termine den alten Namen und erscheinen ohne Farbe, bis Sie die Kategorie beim Termin neu wählen.'}" />
+  </StackPanel>
+</UserControl>

@@ -324,18 +324,18 @@ internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvide
             return Task.FromResult(new CalendarSyncResult(Guid.NewGuid().ToString("N"), IsFullResync: true, [.. Tasks.Values], []));
         }
 
-        (int Day, int Hour, int Minute, int Duration, string Title, string? Location, string? Rule)[] events = calendar.RemoteId == "personal"
+        (int Day, int Hour, int Minute, int Duration, string Title, string? Location, string? Rule, string? Categories)[] events = calendar.RemoteId == "personal"
             ?
             [
-                (0, 9, 0, 15, "Stand-up", "Teams-Raum", "FREQ=WEEKLY;BYDAY=MO,WE,FR"),
-                (1, 13, 30, 60, "Offerte Netzwerk prüfen", null, null),
-                (3, 14, 0, 90, "Quartalsplanung", "Sitzungszimmer Pilatus", null),
-                (4, 12, 0, 60, "Mittagessen mit Lea", "Restaurant Lindenhof", null),
+                (0, 9, 0, 15, "Stand-up", "Teams-Raum", "FREQ=WEEKLY;BYDAY=MO,WE,FR", "Besprechung"),
+                (1, 13, 30, 60, "Offerte Netzwerk prüfen", null, null, "Kunde,Projekt"),
+                (3, 14, 0, 90, "Quartalsplanung", "Sitzungszimmer Pilatus", null, "Besprechung,Projekt"),
+                (4, 12, 0, 60, "Mittagessen mit Lea", "Restaurant Lindenhof", null, null),
             ]
             :
             [
-                (2, 10, 0, 120, "Kundenworkshop Bernasconi AG", "Zürich", null),
-                (4, 16, 0, 60, "Apéro Team", "Dachterrasse", null),
+                (2, 10, 0, 120, "Kundenworkshop Bernasconi AG", "Zürich", null, "Kunde,Reise,Besprechung"),
+                (4, 16, 0, 60, "Apéro Team", "Dachterrasse", null, null),
             ];
 
         var items = events.Select((e, i) =>
@@ -349,6 +349,7 @@ internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvide
                 .Append(CultureInfo.InvariantCulture, $"SUMMARY:{e.Title}\r\n")
                 .Append(e.Location is null ? string.Empty : $"LOCATION:{e.Location}\r\n")
                 .Append(e.Rule is null ? string.Empty : $"RRULE:{e.Rule}\r\n")
+                .Append(e.Categories is null ? string.Empty : $"CATEGORIES:{e.Categories}\r\n")
                 .Append("END:VEVENT\r\nEND:VCALENDAR\r\n")
                 .ToString();
             return new CalendarObject(uid, null, ics);
