@@ -49,6 +49,14 @@ internal static class AppServices
         services.AddLogging(logging =>
         {
             logging.SetMinimumLevel(options.LogLevel);
+            // Every SQL command and HTTP request at "Information" made the log grow by megabytes an hour: only their
+            // warnings, unless a finer level is asked for (NERUNA_LOG_LEVEL=Debug, protocol log).
+            if (options.LogLevel >= LogLevel.Information)
+            {
+                logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+                logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);
+            }
+
             logging.AddProvider(new FileLoggerProvider(options.LogDirectory, options.LogLevel));
         });
 

@@ -161,6 +161,26 @@ public class SecureMimeTests
     }
 
     [Fact]
+    public async Task Trusted_signature_is_checked_once_but_tampering_is_still_detected()
+    {
+        // Trusted CA and someone to fetch issuers: the chain is checked while looking for missing issuers and the
+        // result reused – only for a good signature.
+        await using var annaEnv = await TestEnvironment.CreateAsync();
+        await using var readerEnv = await TestEnvironment.CreateAsync(services => services.AddSingleton(new HttpClient(new FakeAia(TestPki.Ca, []))));
+        var ct = TestContext.Current.CancellationToken;
+        await annaEnv.Get<CertificateManager>().ImportAsync(TestPki.Pkcs12(Anna.Value, "a"), "a", cancellationToken: ct);
+        await readerEnv.Get<CertificateManager>().ImportAsync(TestPki.Ca.GetEncoded(), null, cancellationToken: ct);
+
+        var message = Message("Signiert", "Original");
+        await annaEnv.Get<SecureMimeService>().ProtectAsync(message, sign: true, encrypt: false, ct);
+        Assert.Equal(SignatureStatus.Valid, Assert.Single((await readerEnv.Get<SecureMimeService>().OpenAsync(Reparse(message), ct)).Security.Signatures).Status);
+
+        var tampered = Serialize(message).Replace("Original", "Gefälscht", StringComparison.Ordinal);
+        var opened = await readerEnv.Get<SecureMimeService>().OpenAsync(MimeMessage.Load(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(tampered)), ct), ct);
+        Assert.Equal(SignatureStatus.Invalid, Assert.Single(opened.Security.Signatures).Status);
+    }
+
+    [Fact]
     public async Task Missing_recipient_certificate_and_missing_own_key_are_reported()
     {
         await using var env = await TestEnvironment.CreateAsync();

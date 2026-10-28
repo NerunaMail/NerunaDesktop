@@ -1720,7 +1720,8 @@ internal sealed partial class MailViewModel(
                 return;
             }
 
-            var opened = _opened = await secureMime.OpenAsync(mime, token);
+            // Checking signatures takes a moment of CPU: not on the UI thread, the reading pane stays responsive.
+            var opened = _opened = await Task.Run(() => secureMime.OpenAsync(mime, token), token);
             var secured = watch.ElapsedMilliseconds;
             var view = await ViewForAsync(message.Summary, opened, await IsRemoteContentAllowedAsync(message.Summary));
             var checkedAt = watch.ElapsedMilliseconds;

@@ -6,7 +6,8 @@ using Microsoft.Extensions.Logging;
 namespace Neruna.Desktop.Infrastructure;
 
 /// <summary>
-/// Writes one log file per day to <c>&lt;data&gt;/logs</c>. Deliberately tiny: a background writer, no dependencies.
+/// Writes one log file per day to <c>&lt;data&gt;/logs</c>, keeping the last two weeks (see LogFiles). Deliberately
+/// tiny: a background writer, no dependencies.
 /// Secrets must never be logged; protocol traces (NERUNA_PROTOCOL_LOG=1) are redacted by MailKit.
 /// </summary>
 internal sealed class FileLoggerProvider : ILoggerProvider
@@ -21,6 +22,7 @@ internal sealed class FileLoggerProvider : ILoggerProvider
         _directory = directory;
         _minimum = minimum;
         Directory.CreateDirectory(directory);
+        Neruna.Core.Diagnostics.LogFiles.DeleteOld(directory, DateTime.Now);
         _writer = new Thread(WriteLoop) { IsBackground = true, Name = "Neruna log writer" };
         _writer.Start();
     }
@@ -44,18 +46,28 @@ internal sealed class FileLoggerProvider : ILoggerProvider
         }
     }
 
+    // What has piled up meanwhile goes out in one write (opening the file for every line was slow with many lines).
     private void WriteLoop()
     {
+        var batch = new StringBuilder();
         foreach (var line in _queue.GetConsumingEnumerable())
         {
+            batch.Append(line);
+            while (batch.Length < 256_000 && _queue.TryTake(out var more))
+            {
+                batch.Append(more);
+            }
+
             try
             {
-                File.AppendAllText(CurrentFile, line, Encoding.UTF8);
+                File.AppendAllText(CurrentFile, batch.ToString(), Encoding.UTF8);
             }
             catch (IOException)
             {
                 // Logging must never take the app down.
             }
+
+            batch.Clear();
         }
     }
 

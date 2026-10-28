@@ -179,18 +179,20 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         var encrypted = false;
         string? decryptionError = null;
         var sender = message.From.Mailboxes.FirstOrDefault()?.Address;
+        // Checking a chain is the slow part: a signature found trusted while looking for missing issuers is not checked again.
+        var trusted = new HashSet<IDigitalSignature>(ReferenceEqualityComparer.Instance);
 
         for (var depth = 0; depth < 5 && entity is not null; depth++)
         {
             if (entity is MultipartSigned signed)
             {
                 var collection = await signed.VerifyAsync(context, cancellationToken);
-                if (await AddMissingIssuersAsync(collection, context, cancellationToken))
+                if (await AddMissingIssuersAsync(collection, context, trusted, cancellationToken))
                 {
                     collection = await signed.VerifyAsync(context, cancellationToken);
                 }
 
-                signatures.AddRange(await EvaluateAsync(collection, sender, cancellationToken));
+                signatures.AddRange(await EvaluateAsync(collection, sender, trusted, cancellationToken));
                 entity = signed.Count > 0 ? signed[0] : null;
             }
             else if (entity is ApplicationPkcs7Mime pkcs7 && pkcs7.SecureMimeType == SecureMimeType.EnvelopedData)
@@ -212,12 +214,12 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             else if (entity is ApplicationPkcs7Mime opaque && opaque.SecureMimeType == SecureMimeType.SignedData)
             {
                 var collection = opaque.Verify(context, out var inner, cancellationToken);
-                if (await AddMissingIssuersAsync(collection, context, cancellationToken))
+                if (await AddMissingIssuersAsync(collection, context, trusted, cancellationToken))
                 {
                     collection = opaque.Verify(context, out inner, cancellationToken);
                 }
 
-                signatures.AddRange(await EvaluateAsync(collection, sender, cancellationToken));
+                signatures.AddRange(await EvaluateAsync(collection, sender, trusted, cancellationToken));
                 entity = inner;
             }
             else if (entity is ApplicationPkcs7Mime compressed && compressed.SecureMimeType == SecureMimeType.CompressedData)
@@ -317,7 +319,8 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
     /// A signature whose chain does not reach a trusted root: the issuers its certificate names are fetched and added.
     /// </summary>
     /// <returns>True when something was added – then the signatures are verified again.</returns>
-    private async Task<bool> AddMissingIssuersAsync(DigitalSignatureCollection signatures, NerunaSecureMimeContext context, CancellationToken cancellationToken)
+    /// <param name="trusted">Gets the signatures whose chain is trusted as it is.</param>
+    private async Task<bool> AddMissingIssuersAsync(DigitalSignatureCollection signatures, NerunaSecureMimeContext context, HashSet<IDigitalSignature> trusted, CancellationToken cancellationToken)
     {
         if (_issuers is null)
         {
@@ -327,8 +330,19 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         var added = false;
         foreach (var signature in signatures)
         {
-            if (signature.SignerCertificate is not SecureMimeDigitalCertificate { Certificate: { } certificate } || ChainIsTrusted(signature))
+            if (signature.SignerCertificate is not SecureMimeDigitalCertificate { Certificate: { } certificate })
             {
+                continue;
+            }
+
+            // Chain fine: nothing to fetch; only a good signature is kept as checked (a broken one is evaluated again).
+            if (VerifyWithChain(signature) is { } valid)
+            {
+                if (valid)
+                {
+                    trusted.Add(signature);
+                }
+
                 continue;
             }
 
@@ -347,20 +361,20 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         return added;
     }
 
-    private static bool ChainIsTrusted(IDigitalSignature signature)
+    /// <returns>Whether the signature is good; null when its chain does not reach a trusted root.</returns>
+    private static bool? VerifyWithChain(IDigitalSignature signature)
     {
         try
         {
-            signature.Verify();
-            return true;
+            return signature.Verify();
         }
         catch (DigitalSignatureVerifyException)
         {
-            return false;
+            return null;
         }
     }
 
-    private async Task<List<SignatureInfo>> EvaluateAsync(DigitalSignatureCollection signatures, string? sender, CancellationToken cancellationToken)
+    private async Task<List<SignatureInfo>> EvaluateAsync(DigitalSignatureCollection signatures, string? sender, HashSet<IDigitalSignature> trusted, CancellationToken cancellationToken)
     {
         var result = new List<SignatureInfo>();
         foreach (var signature in signatures)
@@ -374,7 +388,7 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             string? detail = null;
             try
             {
-                status = signature.Verify() ? SignatureStatus.Valid : SignatureStatus.Invalid;
+                status = trusted.Contains(signature) || signature.Verify() ? SignatureStatus.Valid : SignatureStatus.Invalid;
             }
             catch (DigitalSignatureVerifyException chainError)
             {
