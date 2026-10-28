@@ -2413,5 +2413,10 @@
  "sonst der Name des Servers": "otherwise the server’s name",
  "Mit der Adresse sind Sie Organisator Ihrer Termine. Einladungen verschickt der Server; kann er das nicht, nimmt Neruna das E-Mail-Konto mit derselben Adresse.": "With the address you are the organizer of your events. The server sends invitations; if it cannot, Neruna uses the e-mail account with the same address.",
  "nur ansehen": "view only",
- "Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.": "Shown, but not offered for new events and invitations. Events in it cannot be edited."
+ "Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.": "Shown, but not offered for new events and invitations. Events in it cannot be edited.",
+ "Reihenfolge": "Order",
+ "Geteilt von": "Shared by",
+ "Im Kalender anzeigen": "Show in the calendar",
+ "Vom Server schreibgeschützt": "Read-only on the server",
+ "Nur ansehen": "View only"
 }

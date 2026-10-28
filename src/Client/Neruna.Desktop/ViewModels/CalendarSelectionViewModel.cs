@@ -405,11 +405,11 @@ internal sealed partial class CalendarChoiceItem(CalendarSourceGroup group, Cale
 
     public bool IsNew => Candidate.IsNew;
 
-    /// <summary>"geteilt von Lea Keller": another person's calendar, found through delegation.</summary>
-    public string? SharedByText => Candidate.Calendar.SharedBy is { } owner ? F("geteilt von {0}", owner) : null;
-
     /// <summary>The server allows no writing.</summary>
     public bool IsReadOnly => Candidate.Calendar.IsReadOnly && !Candidate.Calendar.IsViewOnly;
+
+    /// <summary>Whose calendar it is, when found through delegation (the table's "Geteilt von").</summary>
+    public string? SharedBy => Candidate.Calendar.SharedBy;
 
     /// <summary>"Nur ansehen": the user keeps Neruna from writing into it (shown, not offered for new events).</summary>
     [ObservableProperty]

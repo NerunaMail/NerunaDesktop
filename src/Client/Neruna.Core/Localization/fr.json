@@ -2413,5 +2413,10 @@
  "sonst der Name des Servers": "sinon le nom du serveur",
  "Mit der Adresse sind Sie Organisator Ihrer Termine. Einladungen verschickt der Server; kann er das nicht, nimmt Neruna das E-Mail-Konto mit derselben Adresse.": "Avec l’adresse, vous êtes l’organisateur de vos rendez-vous. Le serveur envoie les invitations ; s’il ne le peut pas, Neruna utilise le compte e-mail ayant la même adresse.",
  "nur ansehen": "consultation seule",
- "Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.": "Affiché, mais pas proposé pour les nouveaux rendez-vous et invitations. Ses rendez-vous ne peuvent pas être modifiés."
+ "Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.": "Affiché, mais pas proposé pour les nouveaux rendez-vous et invitations. Ses rendez-vous ne peuvent pas être modifiés.",
+ "Reihenfolge": "Ordre",
+ "Geteilt von": "Partagé par",
+ "Im Kalender anzeigen": "Afficher dans l’agenda",
+ "Vom Server schreibgeschützt": "En lecture seule sur le serveur",
+ "Nur ansehen": "Consultation seule"
 }

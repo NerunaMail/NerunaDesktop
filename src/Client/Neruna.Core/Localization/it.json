@@ -2413,5 +2413,10 @@
  "sonst der Name des Servers": "altrimenti il nome del server",
  "Mit der Adresse sind Sie Organisator Ihrer Termine. Einladungen verschickt der Server; kann er das nicht, nimmt Neruna das E-Mail-Konto mit derselben Adresse.": "Con l’indirizzo sei l’organizzatore dei tuoi appuntamenti. Gli inviti li invia il server; se non può, Neruna usa l’account e-mail con lo stesso indirizzo.",
  "nur ansehen": "solo visualizzazione",
- "Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.": "Viene mostrato, ma non proposto per nuovi appuntamenti e inviti. I suoi appuntamenti non si possono modificare."
+ "Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.": "Viene mostrato, ma non proposto per nuovi appuntamenti e inviti. I suoi appuntamenti non si possono modificare.",
+ "Reihenfolge": "Ordine",
+ "Geteilt von": "Condiviso da",
+ "Im Kalender anzeigen": "Mostra nel calendario",
+ "Vom Server schreibgeschützt": "In sola lettura sul server",
+ "Nur ansehen": "Solo visualizzazione"
 }

@@ -51,39 +51,69 @@
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="8,4" Height="250">
           <Panel>
             <TextBlock Classes="subtle" Text="{l:T 'Kein Kalender passt zur Suche.'}" IsVisible="{Binding !HasMatches}" Margin="4" />
-            <!-- Long names scroll sideways; the arrows in front set the order in "Meine Kalender" -->
+            <!-- A table: order, shown, view only, name, shared by, notes – the boxes in front line up however long the names are.
+                 Long names scroll sideways. -->
             <ScrollViewer HorizontalScrollBarVisibility="Auto">
-              <ItemsControl ItemsSource="{Binding Calendars}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:CalendarChoiceItem">
-                    <StackPanel Orientation="Horizontal" IsVisible="{Binding IsVisible}" Margin="0,1,0,1">
-                    <Button Content="↑" Command="{Binding MoveUpCommand}" Padding="5,0" MinWidth="0" FontSize="12" Background="Transparent" BorderThickness="0"
-                            VerticalAlignment="Center" ToolTip.Tip="{l:T 'Nach oben'}" />
-                    <Button Content="↓" Command="{Binding MoveDownCommand}" Padding="5,0" MinWidth="0" FontSize="12" Background="Transparent" BorderThickness="0"
-                            VerticalAlignment="Center" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Nach unten'}" />
-                    <CheckBox IsChecked="{Binding IsSelected}">
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border Width="12" Height="12" CornerRadius="3" VerticalAlignment="Center"
-                                Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" />
-                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
-                        <TextBlock Classes="subtle" FontSize="11" Text="{Binding ContentText}" VerticalAlignment="Center" Margin="6,0,0,0"
-                                   IsVisible="{Binding ContentText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                        <Border IsVisible="{Binding IsNew}" Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="3" Padding="5,0" VerticalAlignment="Center">
-                          <TextBlock Text="{l:T 'neu'}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
-                        </Border>
-                        <TextBlock Classes="subtle" Text="{Binding SharedByText}" FontSize="12" VerticalAlignment="Center"
-                                   IsVisible="{Binding SharedByText, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                        <TextBlock IsVisible="{Binding IsReadOnly}" Classes="subtle" Text="{l:T 'schreibgeschützt'}" FontSize="12" VerticalAlignment="Center" />
-                        <TextBlock IsVisible="{Binding IsAddedByUrl}" Classes="subtle" Text="{l:T 'per Adresse'}" FontSize="12" VerticalAlignment="Center" />
-                      </StackPanel>
-                    </CheckBox>
-                    <!-- Shown, but never offered for new events or invitations -->
-                    <CheckBox IsChecked="{Binding IsViewOnly}" IsVisible="{Binding CanBeViewOnly}" Margin="14,0,0,0" FontSize="12"
-                              Content="{l:T 'nur ansehen'}" ToolTip.Tip="{l:T 'Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.'}" />
-                    </StackPanel>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+              <StackPanel Grid.IsSharedSizeScope="True">
+                <Grid Margin="0,2,0,4" IsVisible="{Binding HasMatches}">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="Order" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="Shown" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ViewOnly" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="Owner" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Classes="subtle" FontSize="11" FontWeight="SemiBold" Text="{l:T 'Reihenfolge'}" Margin="0,0,14,0" />
+                  <TextBlock Grid.Column="1" Classes="subtle" FontSize="11" FontWeight="SemiBold" Text="{l:T 'Anzeigen'}" Margin="0,0,14,0" />
+                  <TextBlock Grid.Column="2" Classes="subtle" FontSize="11" FontWeight="SemiBold" Text="{l:T 'Nur ansehen'}" Margin="0,0,14,0" />
+                  <TextBlock Grid.Column="3" Classes="subtle" FontSize="11" FontWeight="SemiBold" Text="{l:T 'Name'}" Margin="0,0,18,0" />
+                  <TextBlock Grid.Column="4" Classes="subtle" FontSize="11" FontWeight="SemiBold" Text="{l:T 'Geteilt von'}" Margin="0,0,18,0" />
+                </Grid>
+                <ItemsControl ItemsSource="{Binding Calendars}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CalendarChoiceItem">
+                      <Grid IsVisible="{Binding IsVisible}" Margin="0,1,0,1">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Order" />
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Shown" />
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="ViewOnly" />
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Name" />
+                          <ColumnDefinition Width="Auto" SharedSizeGroup="Owner" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
+                          <Button Content="↑" Command="{Binding MoveUpCommand}" Padding="5,0" MinWidth="0" FontSize="12" Background="Transparent" BorderThickness="0"
+                                  VerticalAlignment="Center" ToolTip.Tip="{l:T 'Nach oben'}" />
+                          <Button Content="↓" Command="{Binding MoveDownCommand}" Padding="5,0" MinWidth="0" FontSize="12" Background="Transparent" BorderThickness="0"
+                                  VerticalAlignment="Center" ToolTip.Tip="{l:T 'Nach unten'}" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" IsChecked="{Binding IsSelected}" ToolTip.Tip="{l:T 'Im Kalender anzeigen'}" />
+                        <!-- Own choice; a calendar the server allows no writing in is ticked and fixed -->
+                        <Panel Grid.Column="2">
+                          <CheckBox IsChecked="{Binding IsViewOnly}" IsVisible="{Binding CanBeViewOnly}"
+                                    ToolTip.Tip="{l:T 'Wird angezeigt, aber nicht für neue Termine und Einladungen angeboten. Termine darin lassen sich nicht bearbeiten.'}" />
+                          <CheckBox IsChecked="True" IsEnabled="False" IsVisible="{Binding IsReadOnly}" ToolTip.Tip="{l:T 'Vom Server schreibgeschützt'}" />
+                        </Panel>
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" Margin="0,0,18,0">
+                          <Border Width="12" Height="12" CornerRadius="3" VerticalAlignment="Center"
+                                  Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" />
+                          <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="4" Classes="subtle" FontSize="12" Text="{Binding SharedBy}" VerticalAlignment="Center" Margin="0,0,18,0" />
+                        <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="8">
+                          <Border IsVisible="{Binding IsNew}" Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="3" Padding="5,0" VerticalAlignment="Center">
+                            <TextBlock Text="{l:T 'neu'}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                          </Border>
+                          <TextBlock Classes="subtle" FontSize="11" Text="{Binding ContentText}" VerticalAlignment="Center"
+                                     IsVisible="{Binding ContentText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                          <TextBlock IsVisible="{Binding IsAddedByUrl}" Classes="subtle" Text="{l:T 'per Adresse'}" FontSize="12" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
             </ScrollViewer>
           </Panel>
         </Border>
