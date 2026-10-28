@@ -175,9 +175,12 @@ internal sealed partial class MailViewModel(
     public partial MessageListEntry? SelectedEntry { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDraftsFolder))]
+    [NotifyPropertyChangedFor(nameof(IsDraftsFolder), nameof(FromColumnTitle))]
     [NotifyCanExecuteChangedFor(nameof(EditDraftCommand))]
     public partial MailFolderNode? CurrentFolder { get; set; }
+
+    /// <summary>Head of the table column: in "Gesendet" and "Entwürfe" the list shows the recipients.</summary>
+    public string FromColumnTitle => MessageItemViewModel.ShowsRecipients(CurrentFolder) ? T("An") : T("Von");
 
     /// <summary>In "Entwürfe" a message opens for editing ("Bearbeiten", double-click).</summary>
     public bool IsDraftsFolder => (SelectedMessage?.Folder ?? CurrentFolder)?.Folder.Role == FolderRole.Drafts;
@@ -2116,7 +2119,15 @@ internal sealed partial class MessageItemViewModel(MessageSummary summary, MailF
 
     public override bool IsSelectable => true;
 
-    public string Sender => Summary.From?.DisplayText ?? "(unbekannt)";
+    /// <summary>Who the message is from – in "Gesendet" and "Entwürfe" (always from oneself) whom it goes to: "An: Lea Keller, Marco".</summary>
+    public string Sender => ShowsRecipients(Folder) && Summary.To.Count > 0 ? F("An: {0}", Correspondent) : Correspondent;
+
+    /// <summary>The same without "An:" – for the table, whose column head already says "An".</summary>
+    public string Correspondent => ShowsRecipients(Folder) && Summary.To.Count > 0
+        ? string.Join(", ", Summary.To.Select(a => a.DisplayText))
+        : Summary.From?.DisplayText ?? T("(unbekannt)");
+
+    internal static bool ShowsRecipients(MailFolderNode? folder) => folder?.Folder.Role is FolderRole.Sent or FolderRole.Drafts;
 
     public string Subject => string.IsNullOrWhiteSpace(Summary.Subject) ? T("(kein Betreff)") : Summary.Subject;
 

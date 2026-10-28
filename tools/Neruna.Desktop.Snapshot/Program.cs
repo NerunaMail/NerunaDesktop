@@ -183,6 +183,19 @@ internal static class Snapshots
         Console.WriteLine($"Table: sort {vm.MailPage.ListLayout.Sort} desc={vm.MailPage.ListLayout.Descending}, first {vm.MailPage.Entries.OfType<MessageItemViewModel>().First().Sender}");
         vm.MailPage.SortByCommand.Execute(Neruna.Desktop.ViewModels.MailSort.Date);
 
+        // "Gesendete Elemente": the list shows whom a mail went to ("An: …"), the column head says "An".
+        var inbox = vm.MailPage.CurrentFolder;
+        vm.MailPage.Tree.SelectedTreeItem = vm.MailPage.Accounts.SelectMany(a => a.AllFolders()).First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Sent);
+        await Task.Delay(600);
+        await SaveAsync(window, output, "mail-table-sent.png");
+        Console.WriteLine($"Sent: column {vm.MailPage.FromColumnTitle}, first {vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault()?.Sender}");
+        vm.MailPage.ListLayout.IsTable = false;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-sent.png");
+        vm.MailPage.ListLayout.IsTable = true;
+        vm.MailPage.Tree.SelectedTreeItem = inbox;
+        await Task.Delay(600);
+
         // The reading pane below the list (tall screens), then none (a double-click opens the mail).
         vm.MailPage.PlacePaneCommand.Execute(Neruna.Desktop.ViewModels.ReadingPanePosition.Below);
         await Task.Delay(400);

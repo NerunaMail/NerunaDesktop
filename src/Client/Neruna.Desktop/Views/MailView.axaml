@@ -307,7 +307,7 @@
               </Style>
             </Grid.Styles>
             <Button Grid.Column="1" Classes="command head" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.From}">
-              <TextBlock><Run Text="{l:T 'Von'}" /><Run Text="{Binding ListLayout.FromArrow}" /></TextBlock>
+              <TextBlock><Run Text="{Binding FromColumnTitle}" /><Run Text="{Binding ListLayout.FromArrow}" /></TextBlock>
             </Button>
             <GridSplitter Grid.Column="2" ResizeDirection="Columns" />
             <Button Grid.Column="3" Classes="command head" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Subject}">
@@ -377,7 +377,7 @@
                       <PathIcon Data="{StaticResource IconAttach}" Width="11" Height="11" Opacity="{Binding HasAttachments, Converter={x:Static app:Converters.OpaqueIf}}" />
                       <PathIcon Data="{StaticResource IconFlag}" Width="11" Height="11" Foreground="#C50F1F" IsVisible="{Binding IsFlagged}" />
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Left" Classes="sender" Text="{Binding Sender}" TextTrimming="CharacterEllipsis" FontSize="13" Margin="4,0,0,0"
+                    <TextBlock DockPanel.Dock="Left" Classes="sender" Text="{Binding Correspondent}" TextTrimming="CharacterEllipsis" FontSize="13" Margin="4,0,0,0"
                                Width="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ListLayout.FromWidth}" VerticalAlignment="Center" />
                     <TextBlock DockPanel.Dock="Right" Classes="subtle" Text="{Binding SizeText}" FontSize="12" TextAlignment="Right" Margin="0,0,6,0"
                                Width="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ListLayout.SizeWidth}" VerticalAlignment="Center" />

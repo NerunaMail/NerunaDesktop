@@ -85,6 +85,14 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
         ("Projekte", "Projekte", FolderRole.None),
     ];
 
+    /// <summary>Received mail goes to Anna; what she sent or drafted goes to the people she writes to.</summary>
+    private static MailAddress Recipient(string folder) => folder switch
+    {
+        "Sent" => new MailAddress("Marco Bernasconi", "marco@bernasconi.example"),
+        "Drafts" => new MailAddress("Lea Keller", "lea.keller@example.com"),
+        _ => new MailAddress("Anna Muster", "anna.muster@example.com"),
+    };
+
     public MailProviderCapabilities Capabilities => MailProviderCapabilities.Flags;
 
     public Task TestConnectionAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -104,7 +112,7 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
                 null,
                 x.Message.Subject,
                 new MailAddress(x.Message.FromName, x.Message.FromAddress),
-                [new MailAddress("Anna Muster", "anna.muster@example.com")],
+                [Recipient(x.Message.Folder)],
                 now.AddMinutes(-x.Message.MinutesAgo),
                 (x.Message.Seen ? MessageFlags.Seen : MessageFlags.None) | (x.Message.Flagged ? MessageFlags.Flagged : MessageFlags.None),
                 2048,
@@ -129,7 +137,8 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
         var m = DemoData.Messages[int.Parse(remoteId, CultureInfo.InvariantCulture)];
         var message = new MimeMessage { Subject = m.Subject, Date = DateTimeOffset.Now.AddMinutes(-m.MinutesAgo) };
         message.From.Add(new MailboxAddress(m.FromName, m.FromAddress));
-        message.To.Add(new MailboxAddress("Anna Muster", "anna.muster@example.com"));
+        var to = Recipient(m.Folder);
+        message.To.Add(new MailboxAddress(to.Name, to.Address));
         message.Body = m.Subject.StartsWith("Einladung:", StringComparison.Ordinal)
             ? new MultipartAlternative { new TextPart("plain") { Text = m.Body }, InvitationPart() }
             : new TextPart("plain") { Text = m.Body };
