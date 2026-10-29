@@ -34,18 +34,43 @@ internal sealed partial class LoginGate : ObservableObject
     {
         Error = null;
         Prompt = prompt;
+
+        // No password on this computer: nothing to confirm with; the owner chose so.
         if (OperatingSystem.IsWindows())
         {
+            if (await UserVerification.HasNoPasswordAsync())
+            {
+                return true;
+            }
+
             var owner = (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)
                 ?.MainWindow?.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
             return Judge(await UserVerification.AskWindowsAsync(owner, T("Bestätigung mit dem Computer-Login"), prompt));
         }
 
         _waiting?.TrySetResult(false);
-        _waiting = new TaskCompletionSource<bool>();
+        var waiting = _waiting = new TaskCompletionSource<bool>();
         Password = string.Empty;
         IsAsking = true;
-        return await _waiting.Task;
+
+        // PAM waits a few seconds after a wrong (here: empty) password, so the field is shown meanwhile and closes by
+        // itself when there is no password.
+        _ = Task.Run(async () =>
+        {
+            if (await UserVerification.HasNoPasswordAsync())
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (_waiting == waiting)
+                    {
+                        IsAsking = false;
+                        _waiting = null;
+                        waiting.TrySetResult(true);
+                    }
+                });
+            }
+        });
+        return await waiting.Task;
     }
 
     [RelayCommand]

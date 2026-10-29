@@ -41,6 +41,13 @@ internal static class UserVerification
     public static Task<UserCheck> AskWindowsAsync(IntPtr owner, string caption, string message) =>
         Task.Run(() => Windows.Ask(owner, caption, message));
 
+    /// <summary>
+    /// True when the current account has no password: then there is nothing to confirm with (Windows' dialog does not
+    /// even accept an empty one) – whoever sits at such a computer is its user, by the owner's choice.
+    /// </summary>
+    public static Task<bool> HasNoPasswordAsync(ILogger? logger = null) =>
+        Task.Run(() => OperatingSystem.IsWindows() ? Windows.HasNoPassword() : Pam.Check(UserName, string.Empty, logger) == UserCheck.Confirmed);
+
     /// <summary>Linux, macOS: checks the password of the current account with PAM.</summary>
     public static Task<UserCheck> CheckPasswordAsync(string password, ILogger? logger = null) =>
         Task.Run(() => Pam.Check(UserName, password, logger));
@@ -52,6 +59,23 @@ internal static class UserVerification
         private const int ErrorCancelled = 1223;
         private const int LogonInteractive = 2;
         private const int ProviderDefault = 0;
+        private const int ErrorAccountRestriction = 1327;
+
+        // An empty password is refused outside the login screen ("Konten: Leere Kennwörter nur für Konsolenanmeldung
+        // verwenden", on by default) with "account restriction" – which Windows only says once the password matched.
+        // A wrong one says "wrong password". Without that policy the empty password simply signs in.
+        public static bool HasNoPassword()
+        {
+            if (LogonUserW(Environment.UserName, Environment.UserDomainName, string.Empty, LogonInteractive, ProviderDefault, out var token))
+            {
+                using var identity = new WindowsIdentity(token);
+                CloseHandle(token);
+                using var current = WindowsIdentity.GetCurrent();
+                return identity.User is not null && identity.User == current.User;
+            }
+
+            return Marshal.GetLastPInvokeError() == ErrorAccountRestriction;
+        }
 
         public static UserCheck Ask(IntPtr owner, string caption, string message)
         {
