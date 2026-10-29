@@ -136,7 +136,7 @@ public sealed class SettingsBackupService(
         return output.ToArray();
     }
 
-    private static readonly string[] DeviceSettings = ["cloud.", "chat.", "vault.", "ui.layout", "mail.collapsedFolders", "mail.agendaOpen", "mail.lastFolder", "autoreply.cache", "ai.", "search.", "meetings.", "pdf.protection.rules"];
+    private static readonly string[] DeviceSettings = ["cloud.", "chat.", "vault.", "ui.layout", "mail.collapsedFolders", "mail.agendaOpen", "mail.lastFolder", "mail.remoteContentAllowed", "autoreply.cache", "ai.", "search.", "meetings.", "pdf.protection.rules"];
 
     public static bool IsPersonalSetting(string key) => !DeviceSettings.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal));
 
@@ -680,10 +680,13 @@ public sealed class SettingsBackupService(
 
     /// <summary>
     /// The content as compared for "Einstellungen geändert": without what changes by itself – certificates collected
-    /// from signed mail, and the sign-in tokens of Microsoft and Google accounts (renewed every hour). Both stay in the backup.
+    /// from signed mail, the sign-in tokens of Microsoft and Google accounts (renewed every hour) and the signature
+    /// remembered per recipient when sending. All stay in the backup.
     /// </summary>
     private static BackupContent Comparable(BackupContent content) => content with
     {
+        Settings = new SortedDictionary<string, string>(
+            content.Settings.Where(s => !s.Key.StartsWith(SignatureService.RecipientPrefix, StringComparison.Ordinal)).ToDictionary(), StringComparer.Ordinal),
         Accounts = [.. content.Accounts.Select(a => a with
         {
             Connections = [.. a.Connections.Select(c => c.ProviderId.StartsWith(ProviderIds.Graph, StringComparison.Ordinal) || c.ProviderId.StartsWith(ProviderIds.Google, StringComparison.Ordinal) ? c with { Secret = null } : c)],

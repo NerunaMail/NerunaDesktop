@@ -754,6 +754,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 _ = RefreshAutoRepliesAsync();
             }
 
+            if (DateTime.UtcNow - _backupCheckedAt > BackupCheckInterval)
+            {
+                _ = CheckBackupHintAsync();
+            }
+
             var failures = reports.SelectMany(r => r.Failures).ToList();
             HasSyncProblems = failures.Count > 0;
             StatusText = failures.Count == 0
@@ -1218,28 +1223,20 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             _crashOfferWaiting = false;
             Dispatcher.UIThread.Post(async () => await OfferCrashReportsAsync());
         }
-
-        if (value is null && CurrentPage != SettingsPage)
-        {
-            _ = CheckBackupHintAsync();
-        }
-    }
-
-    // Leaving the settings (or an account dialog opened from elsewhere): changed since the last backup? Then ask.
-    partial void OnCurrentPageChanged(ViewModelBase oldValue, ViewModelBase newValue)
-    {
-        if (oldValue == SettingsPage && newValue != SettingsPage)
-        {
-            _ = CheckBackupHintAsync();
-        }
     }
 
     /// <summary>"Einstellungen geändert – Neue Sicherung erstellen?" (only when this device has the vault set up).</summary>
     [ObservableProperty]
     public partial bool ShowBackupHint { get; set; }
 
+    // Changed since the last backup? Asked at the first sync after the start, then every few hours – not after every
+    // dialog, a reminder now and then is enough.
+    private static readonly TimeSpan BackupCheckInterval = TimeSpan.FromHours(4);
+    private DateTime _backupCheckedAt;
+
     private async Task CheckBackupHintAsync()
     {
+        _backupCheckedAt = DateTime.UtcNow;
         try
         {
             ShowBackupHint = await _backup.ShouldSuggestBackupAsync();

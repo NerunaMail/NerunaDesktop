@@ -102,7 +102,10 @@ public sealed class SignatureService(ISignatureStore store, ISettingsStore setti
 
     private const string NoSignature = "none";
 
-    private static string RecipientKey(Guid accountId, string recipient) => $"signature.to.{accountId:N}.{recipient.Trim().ToLowerInvariant()}";
+    /// <summary>Settings key prefix of the signatures remembered per recipient.</summary>
+    public const string RecipientPrefix = "signature.to.";
+
+    private static string RecipientKey(Guid accountId, string recipient) => $"{RecipientPrefix}{accountId:N}.{recipient.Trim().ToLowerInvariant()}";
 
     private async Task<Guid?> GetIdAsync(string key, CancellationToken cancellationToken) =>
         Guid.TryParse(await settings.GetAsync(key, cancellationToken), out var id) ? id : null;

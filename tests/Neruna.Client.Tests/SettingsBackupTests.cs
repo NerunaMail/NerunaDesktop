@@ -79,6 +79,11 @@ public class SettingsBackupTests
         await office.Get<ISettingsStore>().SetAsync("ui.layout", "{\"width\":800}", ct); // device only: no reason
         Assert.False(await officeBackup.ShouldSuggestBackupAsync(ct));
 
+        // Learned while working, not set: pictures loaded for one mail, the signature remembered for a recipient.
+        await office.Get<ISettingsStore>().SetAsync(SettingKeys.RemoteContentAllowed, "[\"<a@example.com>\"]", ct);
+        await office.Get<ISettingsStore>().SetAsync($"{SignatureService.RecipientPrefix}{mail.Id:N}.anna@example.com", "none", ct);
+        Assert.False(await officeBackup.ShouldSuggestBackupAsync(ct));
+
         // The new laptop: the backups are listed, notes only once unlocked; a wrong password changes nothing.
         var locked = await laptopBackup.GetOverviewAsync(cancellationToken: ct);
         Assert.True(locked.HasVault);
