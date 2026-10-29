@@ -86,6 +86,8 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <TextBlock Classes="subtle" Text="{l:T 'Kein E-Mail-Konto eingerichtet.'}" IsVisible="{Binding !Accounts.Count}" />
+        <TextBlock Classes="subtle" TextWrapping="Wrap" MaxWidth="772" HorizontalAlignment="Left" IsVisible="{Binding Accounts.Count}"
+                   Text="{l:T 'Wählen Sie beim Schreiben eine andere Signatur (z. B. «Du» statt «Sie»), merkt sich Neruna das beim Senden für diese Empfänger und dieses Konto und wählt sie beim nächsten Mail an sie wieder aus.'}" />
       </StackPanel>
     </Grid>
   </ScrollViewer>

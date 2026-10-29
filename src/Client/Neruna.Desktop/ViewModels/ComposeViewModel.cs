@@ -40,6 +40,13 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     private bool _settingEncrypt;
     private bool _initialized;
     private int _recipientVersion;
+
+    // The signature in the mail (known: chosen here or placed automatically; unknown in a draft opened again) and
+    // whether the user picked it – then a change of recipients no longer swaps it.
+    private Signature? _signature;
+    private bool _signatureKnown;
+    private bool _signatureChosen;
+    private int _signatureVersion;
     private ComposeDraft? _editorDraft;
 
     // Drafts: the saved copy in "Entwürfe", replaced on every save. Edits are counted; a save records the count it
@@ -298,7 +305,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         {
             try
             {
-                await ChooseSignature(await _signatures.ResolveAsync(_account.Id, _kind));
+                _signatureChosen = false;
+                await PlaceSignatureAsync(await _signatures.ResolveAsync(_account.Id, _kind, ToAddresses()));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -423,6 +431,45 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     {
         ScheduleEncryptionCheck();
         RefreshTemplateRecipient();
+        _ = FollowRecipientSignatureAsync();
+    }
+
+    /// <summary>The addresses in «An», as far as they can be read yet.</summary>
+    private List<string> ToAddresses() =>
+        InternetAddressList.TryParse(To ?? string.Empty, out var list) ? [.. list.Mailboxes.Select(m => m.Address)] : [];
+
+    /// <summary>
+    /// «An» changed: the signature last used for these recipients (e.g. «Du»), as long as the user has not picked one
+    /// in this mail.
+    /// </summary>
+    private async Task FollowRecipientSignatureAsync()
+    {
+        if (_editor is null || _signatureChosen || !_signatureKnown)
+        {
+            return;
+        }
+
+        var version = ++_signatureVersion;
+        try
+        {
+            var signature = await _signatures.ResolveAsync(_account.Id, _kind, ToAddresses());
+            if (version == _signatureVersion && !_signatureChosen && signature?.Id != _signature?.Id)
+            {
+                await PlaceSignatureAsync(signature);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Notice?.Invoke(this, ex.Message);
+        }
+    }
+
+    /// <summary>Puts <paramref name="signature"/> in its place in the text (automatically; not the user's choice).</summary>
+    private Task PlaceSignatureAsync(Signature? signature)
+    {
+        _signature = signature;
+        _signatureKnown = true;
+        return Formatting.RunAsync($"neruna.setSignature({FormattingViewModel.Js(signature?.Html ?? string.Empty)})");
     }
 
     partial void OnCcChanged(string value) => ScheduleEncryptionCheck();
@@ -540,10 +587,20 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         var font = await _settings.GetAsync(SettingKeys.ComposeFont) is { Length: > 0 } configured ? configured : FontCatalog.DefaultFont;
         var size = double.TryParse(await _settings.GetAsync(SettingKeys.ComposeFontSize), NumberStyles.Float, CultureInfo.InvariantCulture, out var pt) ? pt : 11;
 
-        // A popped-out or saved draft already carries its signature.
-        var draft = _draft.HtmlBody?.Contains(SignatureBlock.ElementId, StringComparison.Ordinal) == true || _draft.DraftRemoteId is not null
-            ? _draft
-            : SignatureBlock.Apply(_draft, await _signatures.ResolveAsync(_account.Id, _kind));
+        // A popped-out or saved draft already carries its signature (which one is not known: left as it is). Otherwise
+        // the one last used for these recipients, else the account's default.
+        ComposeDraft draft;
+        if (_draft.HtmlBody?.Contains(SignatureBlock.ElementId, StringComparison.Ordinal) == true || _draft.DraftRemoteId is not null)
+        {
+            draft = _draft;
+        }
+        else
+        {
+            _signature = await _signatures.ResolveAsync(_account.Id, _kind, ToAddresses());
+            _signatureKnown = true;
+            draft = SignatureBlock.Apply(_draft, _signature);
+        }
+
         var html = draft.HtmlBody ?? (string.IsNullOrEmpty(draft.Body) ? string.Empty : PlainToHtml(draft.Body));
         Formatting.Attach(editor, html, font, size, T("Nachricht verfassen …"));
         editor.SetAutoLists(await _settings.GetBoolAsync(SettingKeys.ComposeAutoLists, fallback: true));
@@ -772,6 +829,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             await _secureMime.ProtectAsync(message, Sign, Encrypt);
             await _mail.SendAsync(_connection, message);
             Sent?.Invoke(this, message);
+            await RememberSignatureAsync();
             if (AfterSent is { } afterSent)
             {
                 await afterSent();
@@ -796,6 +854,25 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     }
 
     private bool CanSend() => !IsSending && !string.IsNullOrWhiteSpace(To);
+
+    // Sent: the next mail to these recipients gets the same signature (only a deviation from the default is kept).
+    private async Task RememberSignatureAsync()
+    {
+        if (!_signatureKnown)
+        {
+            return;
+        }
+
+        try
+        {
+            await _signatures.RememberAsync(_account.Id, _kind, ToAddresses(), _signature);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The mail is sent; only the choice is not kept.
+            Notice?.Invoke(this, ex.Message);
+        }
+    }
 
     [RelayCommand]
     private async Task AddAttachmentAsync() => await AttachFilesAsync(await _files.PickFilesAsync(T("Datei anhängen")));
@@ -980,11 +1057,13 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         await _editor.InsertAsync(html, text);
     }
 
+    /// <summary>Picked in the menu: stays, whatever the recipients – and is remembered for them when sending.</summary>
     [RelayCommand]
     private Task ChooseSignature(Signature? signature)
     {
         MarkChanged();
-        return Formatting.RunAsync($"neruna.setSignature({FormattingViewModel.Js(signature?.Html ?? string.Empty)})");
+        _signatureChosen = true;
+        return PlaceSignatureAsync(signature);
     }
 
     private static string PlainToHtml(string text) =>

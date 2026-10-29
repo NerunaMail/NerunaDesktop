@@ -67,4 +67,37 @@ public class SignatureTests
         Assert.Null(await service.ResolveAsync(accountA, ComposeKind.New, ct));
         Assert.Equal("Liebe Grüsse", (await service.ResolveAsync(accountA, ComposeKind.Reply, ct))?.Html);
     }
+
+    [Fact]
+    public async Task The_signature_last_sent_to_a_recipient_comes_again_per_account()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var service = env.Get<SignatureService>();
+        var ct = TestContext.Current.CancellationToken;
+        var sie = Formal with { Name = "Sie" };
+        var du = new Signature(Guid.NewGuid(), "Du", "Liebe Grüsse<br>Anna", DateTimeOffset.Now);
+        await service.SaveAsync(sie, ct);
+        await service.SaveAsync(du, ct);
+        var business = Guid.NewGuid();
+        var privat = Guid.NewGuid();
+        await service.SetAssignmentAsync(business, new SignatureAssignment(sie.Id, sie.Id), ct);
+        await service.SetAssignmentAsync(privat, new SignatureAssignment(sie.Id, sie.Id), ct);
+
+        // «Du» to Lea: next time – new mail or reply, address written in any case – «Du» again; others keep «Sie».
+        await service.RememberAsync(business, ComposeKind.New, ["lea@example.com"], du, ct);
+        Assert.Equal("Du", (await service.ResolveAsync(business, ComposeKind.Reply, ["Lea@Example.com"], ct))?.Name);
+        Assert.Equal("Du", (await service.ResolveAsync(business, ComposeKind.New, ["marco@example.com", "lea@example.com"], ct))?.Name);
+        Assert.Equal("Sie", (await service.ResolveAsync(business, ComposeKind.New, ["marco@example.com"], ct))?.Name);
+        Assert.Equal("Sie", (await service.ResolveAsync(privat, ComposeKind.New, ["lea@example.com"], ct))?.Name);
+
+        // No signature is remembered as well.
+        await service.RememberAsync(business, ComposeKind.New, ["marco@example.com"], null, ct);
+        Assert.Null(await service.ResolveAsync(business, ComposeKind.New, ["marco@example.com"], ct));
+
+        // Back to the default: forgotten. A deleted signature: the default again.
+        await service.RememberAsync(business, ComposeKind.Reply, ["marco@example.com"], sie, ct);
+        Assert.Null(await env.Get<Neruna.Core.ISettingsStore>().GetAsync($"signature.to.{business:N}.marco@example.com", ct));
+        await service.DeleteAsync(du.Id, ct);
+        Assert.Equal("Sie", (await service.ResolveAsync(business, ComposeKind.New, ["lea@example.com"], ct))?.Name);
+    }
 }

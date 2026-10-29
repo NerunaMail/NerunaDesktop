@@ -2441,5 +2441,6 @@
  "Welches Profil öffnen?": "Quale profilo aprire?",
  "Abfrage ausschalten: Einstellungen → Profile.": "Per non chiedere più: Impostazioni → Profili.",
  "Bei jedem Start Profil abfragen": "Chiedi il profilo a ogni avvio",
- "Neruna fragt beim Start, welches Profil es öffnen soll (wenn es mehrere gibt). Verknüpfungen mit --profile öffnen ihr Profil direkt.": "Neruna chiede all’avvio quale profilo aprire (se ce ne sono diversi). I collegamenti con --profile aprono direttamente il loro profilo."
+ "Neruna fragt beim Start, welches Profil es öffnen soll (wenn es mehrere gibt). Verknüpfungen mit --profile öffnen ihr Profil direkt.": "Neruna chiede all’avvio quale profilo aprire (se ce ne sono diversi). I collegamenti con --profile aprono direttamente il loro profilo.",
+ "Wählen Sie beim Schreiben eine andere Signatur (z. B. «Du» statt «Sie»), merkt sich Neruna das beim Senden für diese Empfänger und dieses Konto und wählt sie beim nächsten Mail an sie wieder aus.": "Se scrivendo scegli un’altra firma (p. es. una informale invece di quella formale), Neruna la memorizza all’invio per questi destinatari e questo account e la sceglie di nuovo per la tua prossima e-mail a loro."
 }

@@ -63,6 +63,47 @@ public sealed class SignatureService(ISignatureStore store, ISettingsStore setti
         return id is null ? null : (await store.GetAllAsync(cancellationToken)).FirstOrDefault(s => s.Id == id);
     }
 
+    /// <summary>
+    /// The signature for a mail to <paramref name="recipients"/>: the one last sent to the first of them Neruna
+    /// remembers one for (e.g. «Du» instead of the account's «Sie»), else the account's default.
+    /// </summary>
+    public async Task<Signature?> ResolveAsync(Guid accountId, ComposeKind kind, IEnumerable<string> recipients, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(recipients);
+        foreach (var recipient in recipients.Where(r => r.Contains('@', StringComparison.Ordinal)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            switch (await settings.GetAsync(RecipientKey(accountId, recipient), cancellationToken))
+            {
+                case NoSignature:
+                    return null;
+                case { } stored when Guid.TryParse(stored, out var id) && (await store.GetAllAsync(cancellationToken)).FirstOrDefault(s => s.Id == id) is { } remembered:
+                    return remembered;
+            }
+        }
+
+        return await ResolveAsync(accountId, kind, cancellationToken);
+    }
+
+    /// <summary>
+    /// After sending: the signature used is remembered for each recipient – only where it differs from the account's
+    /// default (the same as the default again: forgotten, so a changed default applies to them as well).
+    /// </summary>
+    /// <param name="used">The signature in the mail; null: none.</param>
+    public async Task RememberAsync(Guid accountId, ComposeKind kind, IEnumerable<string> recipients, Signature? used, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(recipients);
+        var standard = await ResolveAsync(accountId, kind, cancellationToken);
+        var value = used?.Id == standard?.Id ? null : used?.Id.ToString() ?? NoSignature;
+        foreach (var recipient in recipients.Where(r => r.Contains('@', StringComparison.Ordinal)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            await settings.SetAsync(RecipientKey(accountId, recipient), value, cancellationToken);
+        }
+    }
+
+    private const string NoSignature = "none";
+
+    private static string RecipientKey(Guid accountId, string recipient) => $"signature.to.{accountId:N}.{recipient.Trim().ToLowerInvariant()}";
+
     private async Task<Guid?> GetIdAsync(string key, CancellationToken cancellationToken) =>
         Guid.TryParse(await settings.GetAsync(key, cancellationToken), out var id) ? id : null;
 
