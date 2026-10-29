@@ -117,14 +117,31 @@ public sealed partial class MessageContent
         {
             var source0 = htmlPart.Text ?? string.Empty;
             html = Sanitize(fileLinks ? source0 : FileLinks.AsText(source0), allowRemoteContent, blockTrackers, forRenderer, referencedIds, ref blocked, ref trackers);
-            foreach (var extra in walker.ExtraBodies)
+            var index = 0;
+            foreach (var (part, joined) in walker.Flow)
             {
-                html += TextToHtmlFragment(extra, forRenderer);
+                if (part is TextPart extra)
+                {
+                    html += joined && extra.IsHtml
+                        ? Sanitize(FileLinks.AsText(extra.Text ?? string.Empty), allowRemoteContent, blockTrackers, forRenderer, referencedIds, ref blocked, ref trackers)
+                        : TextToHtmlFragment(extra, forRenderer);
+                }
+                else if (part is MimePart image)
+                {
+                    // Apple Mail places pictures between the pieces of the text, without a cid: reference – shown
+                    // there under an id of our own (the message itself is left as it is).
+                    var id = $"{LooseImagePrefix}{index++}";
+                    walker.LooseImages[id] = image;
+                    html += Sanitize($"<div><img src=\"cid:{id}\" alt=\"{System.Net.WebUtility.HtmlEncode(FileNameOf(image))}\" style=\"max-width:100%\"></div>",
+                        false, true, forRenderer, referencedIds, ref blocked, ref trackers);
+                }
             }
         }
         else if (walker.TextBody is { } textPart)
         {
-            html = "<html><body>" + TextToHtmlFragment(textPart, forRenderer) + string.Concat(walker.ExtraBodies.Select(b => TextToHtmlFragment(b, forRenderer))) + "</body></html>";
+            html = "<html><body>" + TextToHtmlFragment(textPart, forRenderer)
+                + string.Concat(walker.Flow.Select(f => f.Part).OfType<TextPart>().Select(b => TextToHtmlFragment(b, forRenderer))) + "</body></html>";
+            walker.UnshownImagesAreAttachments();
         }
         else
         {
@@ -140,6 +157,10 @@ public sealed partial class MessageContent
             {
                 inline[id] = part;
             }
+            else if (walker.LooseImages.FirstOrDefault(l => l.Value == candidate) is { Key: { } looseId } && referencedIds.Contains(looseId))
+            {
+                inline[looseId] = (MimePart)candidate;
+            }
             else
             {
                 attachments.Add(candidate);
@@ -152,6 +173,9 @@ public sealed partial class MessageContent
     }
 
     /// <summary>"cid:part1.abc@x" → "part1.abc@x" (URL-decoded), or null for other URLs.</summary>
+    /// <summary>The ids pictures without a Content-ID are shown by (see <see cref="Walker.Flow"/>).</summary>
+    private const string LooseImagePrefix = "neruna-inline-";
+
     public static string? ContentIdOf(string? src) =>
         src is not null && src.StartsWith("cid:", StringComparison.OrdinalIgnoreCase) ? Uri.UnescapeDataString(src[4..]).Trim('<', '>') : null;
 
@@ -811,8 +835,20 @@ public sealed partial class MessageContent
 
         public TextPart? TextBody { get; private set; }
 
-        /// <summary>Further inline text parts (Apple Mail splits text around inline images).</summary>
-        public List<TextPart> ExtraBodies { get; } = [];
+        /// <summary>
+        /// What follows the body in its place: further text parts and pictures without a cid: reference (Apple Mail
+        /// splits its text around inserted pictures and attachments). Joined: it continues the text after such a part
+        /// (no separating line).
+        /// </summary>
+        public List<(MimeEntity Part, bool Joined)> Flow { get; } = [];
+
+        /// <summary>The pictures of <see cref="Flow"/> under the id the HTML shows them by.</summary>
+        public Dictionary<string, MimePart> LooseImages { get; } = new(StringComparer.Ordinal);
+
+        private bool _afterPart;
+
+        /// <summary>A plain text body shows no pictures: those of the flow stay attachments.</summary>
+        public void UnshownImagesAreAttachments() => LooseImages.Clear();
 
         /// <summary>Non-body parts; those referenced via cid: become inline images, the rest attachments.</summary>
         public List<MimeEntity> Candidates { get; } = [];
@@ -866,13 +902,22 @@ public sealed partial class MessageContent
                     }
                     else
                     {
-                        ExtraBodies.Add(text);
+                        Flow.Add((text, _afterPart));
                     }
 
+                    _afterPart = false;
+                    break;
+
+                case MimePart { ContentId: null } image when HasBody && image.ContentType.MediaType.Equals("image", StringComparison.OrdinalIgnoreCase)
+                    && !image.IsAttachment:
+                    Flow.Add((image, false));
+                    Candidates.Add(image);
+                    _afterPart = true;
                     break;
 
                 default:
                     Candidates.Add(entity);
+                    _afterPart = HasBody;
                     break;
             }
         }
@@ -883,7 +928,7 @@ public sealed partial class MessageContent
             MimeEntity? best = null;
             foreach (var child in alternative)
             {
-                if (child is TextPart { IsHtml: true } || (child is MultipartRelated related && ContainsHtml(related)) || (child is TextPart t && IsBodyText(t) && best is null))
+                if (child is TextPart { IsHtml: true } || (child is Multipart multipart && ContainsHtml(multipart)) || (child is TextPart t && IsBodyText(t) && best is null))
                 {
                     best = child;
                 }
@@ -910,6 +955,14 @@ public sealed partial class MessageContent
                         TextBody = t;
                     }
                 }
+                else if (child is Multipart other && best is not null && other != best)
+                {
+                    // A second rich alternative (rare): its attachments must not get lost.
+                    foreach (var part in other.OfType<MimePart>().Where(p => p.IsAttachment))
+                    {
+                        Candidates.Add(part);
+                    }
+                }
                 else if (child is not Multipart)
                 {
                     // e.g. text/calendar invitations offered as an alternative.
@@ -934,18 +987,19 @@ public sealed partial class MessageContent
             if (converted.Body is { } body)
             {
                 var hadBody = HasBody;
-                var extraBefore = ExtraBodies.Count;
+                var extraBefore = Flow.Count;
                 Visit(body);
                 if (hadBody)
                 {
                     // The outer message already had a body; TNEF then only contributes attachments.
-                    ExtraBodies.RemoveRange(extraBefore, ExtraBodies.Count - extraBefore);
+                    Flow.RemoveRange(extraBefore, Flow.Count - extraBefore);
                 }
             }
         }
 
-        private static bool ContainsHtml(MultipartRelated related) =>
-            related.Root is TextPart { IsHtml: true } || related.OfType<TextPart>().Any(t => t.IsHtml);
+        // multipart/related (pictures by cid:) or multipart/mixed (Apple Mail: text, attachments, pictures in order).
+        private static bool ContainsHtml(Multipart multipart) =>
+            multipart.Any(child => child is TextPart { IsHtml: true, IsAttachment: false } || (child is Multipart inner and not MultipartAlternative && ContainsHtml(inner)));
 
         private static bool IsBodyText(TextPart text) =>
             (text.IsHtml || text.IsPlain || text.IsFlowed) && text.ContentDisposition?.FileName is null && text.ContentType.Name is null;

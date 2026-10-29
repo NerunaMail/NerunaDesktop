@@ -189,6 +189,39 @@ public class MessageContentTests
     }
 
     [Fact]
+    public void Apple_mail_html_in_mixed_alternative_keeps_attachment_and_picture()
+    {
+        // Apple Mail with an attachment and a picture in the signature: the HTML alternative is multipart/mixed, the
+        // text split around them, the picture without Content-ID.
+        var zip = new MimePart("application", "zip") { Content = new MimeContent(new MemoryStream([1, 2, 3])), ContentDisposition = new ContentDisposition(ContentDisposition.Attachment) { FileName = "v2026.zip" } };
+        var logo = new MimePart("image", "png") { Content = new MimeContent(new MemoryStream(Png)), ContentDisposition = new ContentDisposition(ContentDisposition.Inline) { FileName = "Logo.png" } };
+        var message = Message(new MultipartAlternative
+        {
+            new TextPart("plain") { Text = "Hallo Anna\n\nFreundliche Grüsse" },
+            new Multipart("mixed")
+            {
+                new TextPart("html") { Text = "<html><body><div>Hallo Anna</div></body></html>" },
+                zip,
+                new TextPart("html") { Text = "<html><body><div>Freundliche Grüsse</div></body></html>" },
+                logo,
+                new TextPart("html") { Text = "<html><body><div>Muster AG</div></body></html>" },
+            },
+        });
+
+        var content = MessageContent.From(message);
+
+        Assert.Contains("<div>Hallo Anna</div>", content.Html, StringComparison.Ordinal);
+        Assert.Contains("Muster AG", content.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<hr", content.Html, StringComparison.Ordinal);
+        Assert.Equal("v2026.zip", MessageContent.FileNameOf(Assert.Single(content.Attachments)));
+        var (id, picture) = Assert.Single(content.InlineParts);
+        Assert.Same(logo, picture);
+        Assert.Contains("cid:" + id, content.Html, StringComparison.Ordinal);
+        Assert.True(content.Html.IndexOf("cid:" + id, StringComparison.Ordinal) < content.Html.IndexOf("Muster AG", StringComparison.Ordinal));
+        Assert.Contains("Freundliche Grüsse", content.PlainText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Thunderbird_flowed_text_has_no_paragraph_per_line()
     {
         var part = new TextPart("plain") { Text = "Hallo Anna\r\n\r\nZeile eins, die lang ist und \r\numgebrochen wurde.\r\nZeile zwei\r\n" };
