@@ -111,7 +111,7 @@
             </TextBox>
           </StackPanel>
 
-          <ListBox Grid.Row="1" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent"
+          <ListBox Grid.Row="1" x:Name="ContactList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent"
                    DoubleTapped="OnContactDoubleTapped">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:ContactItem">

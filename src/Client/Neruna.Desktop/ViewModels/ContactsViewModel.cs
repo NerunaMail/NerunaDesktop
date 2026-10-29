@@ -172,12 +172,19 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     private List<AddressBookInfo> Writable() =>
         AddressBooks.Select(b => b.Info).Where(b => !b.IsReadOnly).OrderBy(b => b.RemoteId == AddressCollector.AddressBookId).ToList();
 
+    /// <summary>The list is about to be built again (the view keeps where it was scrolled to).</summary>
+    public event EventHandler? ItemsRebuilding;
+
+    /// <summary>The list is built again; true when the selected contact is still there (saved, synchronized).</summary>
+    public event EventHandler<bool>? ItemsRebuilt;
+
     private void Filter()
     {
         var selected = Selected?.Entry;
         var visible = AddressBooks.Where(b => b.IsVisible).ToList();
         var query = SearchText.Trim();
 
+        ItemsRebuilding?.Invoke(this, EventArgs.Empty);
         Items.Clear();
         foreach (var entry in _all)
         {
@@ -188,8 +195,9 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
             }
         }
 
-        Selected = Items.FirstOrDefault(i => selected is not null && i.Entry.RemoteId == selected.RemoteId && Same(i.Entry.AddressBook, selected.AddressBook))
-                   ?? Items.FirstOrDefault();
+        var kept = Items.FirstOrDefault(i => selected is not null && i.Entry.RemoteId == selected.RemoteId && Same(i.Entry.AddressBook, selected.AddressBook));
+        Selected = kept ?? Items.FirstOrDefault();
+        ItemsRebuilt?.Invoke(this, kept is not null);
     }
 
     private async Task LoadMembersAsync(ContactItem? item)
