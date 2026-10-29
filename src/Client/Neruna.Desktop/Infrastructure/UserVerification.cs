@@ -66,6 +66,13 @@ internal static class UserVerification
         // A wrong one says "wrong password". Without that policy the empty password simply signs in.
         public static bool HasNoPassword()
         {
+            // Only local accounts (Microsoft accounts included): in a domain or Entra ID every account has a password,
+            // and the attempt would count towards the domain's lockout.
+            if (!string.Equals(Environment.UserDomainName, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
             if (LogonUserW(Environment.UserName, Environment.UserDomainName, string.Empty, LogonInteractive, ProviderDefault, out var token))
             {
                 using var identity = new WindowsIdentity(token);
