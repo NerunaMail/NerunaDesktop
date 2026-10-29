@@ -29,6 +29,20 @@ internal sealed partial class ProfilesViewModel(AppOptions options, ICredentialS
     [ObservableProperty]
     public partial string? Error { get; set; }
 
+    /// <summary>"Bei jedem Start Profil abfragen" (only asked when there are several).</summary>
+    [ObservableProperty]
+    public partial bool AskAtStart { get; set; }
+
+    private bool _loading;
+
+    partial void OnAskAtStartChanged(bool value)
+    {
+        if (!_loading && IsAvailable)
+        {
+            ProfileList.Load(options.Root!).SetAskAtStart(value);
+        }
+    }
+
     public void Reload()
     {
         if (!IsAvailable)
@@ -37,6 +51,9 @@ internal sealed partial class ProfilesViewModel(AppOptions options, ICredentialS
         }
 
         _list = ProfileList.Load(options.Root!);
+        _loading = true;
+        AskAtStart = _list.AskAtStart;
+        _loading = false;
         Profiles.Clear();
         foreach (var profile in _list.All)
         {

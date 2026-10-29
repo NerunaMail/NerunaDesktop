@@ -51,6 +51,24 @@ public sealed class ProfileTests : IDisposable
     }
 
     [Fact]
+    public void Asking_at_start_needs_several_profiles_and_a_start_without_arguments()
+    {
+        var list = ProfileList.Load(_root);
+        list.SetAskAtStart(true);
+        Assert.False(ProfileList.Load(_root).AsksFor([]));
+
+        list.Add("Business");
+        var reloaded = ProfileList.Load(_root);
+        Assert.True(reloaded.AskAtStart);
+        Assert.True(reloaded.AsksFor([]));
+        Assert.False(reloaded.AsksFor(["--profile", "Business"]));
+        Assert.False(reloaded.AsksFor(["mailto:lea@example.com"]));
+
+        reloaded.SetAskAtStart(false);
+        Assert.False(ProfileList.Load(_root).AsksFor([]));
+    }
+
+    [Fact]
     public void A_changed_list_cannot_point_outside_the_data_folder()
     {
         Directory.CreateDirectory(_root);

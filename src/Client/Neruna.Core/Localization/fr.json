@@ -2436,5 +2436,10 @@
  "Verknüpfung:": "Raccourci :",
  "Name des neuen Profils, z. B. Privat": "Nom du nouveau profil, p. ex. Privé",
  "Profil anlegen": "Créer le profil",
- "Ein neues Profil startet leer: Konten richten Sie in seinem Fenster ein. Mails, die das System öffnet (mailto:, .eml), kommen in das Profil, das beim Start öffnet.": "Un nouveau profil démarre vide : vous configurez ses comptes dans sa fenêtre. Les e-mails ouverts par le système (mailto:, .eml) vont dans le profil qui s’ouvre au démarrage."
+ "Ein neues Profil startet leer: Konten richten Sie in seinem Fenster ein. Mails, die das System öffnet (mailto:, .eml), kommen in das Profil, das beim Start öffnet.": "Un nouveau profil démarre vide : vous configurez ses comptes dans sa fenêtre. Les e-mails ouverts par le système (mailto:, .eml) vont dans le profil qui s’ouvre au démarrage.",
+ "Neruna – Profil wählen": "Neruna – choisir un profil",
+ "Welches Profil öffnen?": "Quel profil ouvrir ?",
+ "Abfrage ausschalten: Einstellungen → Profile.": "Pour ne plus demander : Paramètres → Profils.",
+ "Bei jedem Start Profil abfragen": "Demander le profil à chaque démarrage",
+ "Neruna fragt beim Start, welches Profil es öffnen soll (wenn es mehrere gibt). Verknüpfungen mit --profile öffnen ihr Profil direkt.": "Neruna demande au démarrage quel profil ouvrir (s’il y en a plusieurs). Les raccourcis avec --profile ouvrent directement leur profil."
 }

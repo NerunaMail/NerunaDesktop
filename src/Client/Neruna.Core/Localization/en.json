@@ -2436,5 +2436,10 @@
  "Verknüpfung:": "Shortcut:",
  "Name des neuen Profils, z. B. Privat": "Name of the new profile, e.g. Private",
  "Profil anlegen": "Create profile",
- "Ein neues Profil startet leer: Konten richten Sie in seinem Fenster ein. Mails, die das System öffnet (mailto:, .eml), kommen in das Profil, das beim Start öffnet.": "A new profile starts empty: you set up its accounts in its window. Emails the system opens (mailto:, .eml) go to the profile that opens at startup."
+ "Ein neues Profil startet leer: Konten richten Sie in seinem Fenster ein. Mails, die das System öffnet (mailto:, .eml), kommen in das Profil, das beim Start öffnet.": "A new profile starts empty: you set up its accounts in its window. Emails the system opens (mailto:, .eml) go to the profile that opens at startup.",
+ "Neruna – Profil wählen": "Neruna – choose a profile",
+ "Welches Profil öffnen?": "Which profile to open?",
+ "Abfrage ausschalten: Einstellungen → Profile.": "To stop asking: Settings → Profiles.",
+ "Bei jedem Start Profil abfragen": "Ask for the profile at every start",
+ "Neruna fragt beim Start, welches Profil es öffnen soll (wenn es mehrere gibt). Verknüpfungen mit --profile öffnen ihr Profil direkt.": "Neruna asks at startup which profile to open (if there are several). Shortcuts with --profile open their profile directly."
 }

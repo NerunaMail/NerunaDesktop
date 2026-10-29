@@ -22,8 +22,14 @@ namespace Neruna.Desktop;
 /// <param name="ProtocolLog">Write raw IMAP/SMTP traces and DAV request/response bodies (passwords redacted).</param>
 /// <param name="Root">The data folder holding the profiles (NerunaData); <see cref="DataDirectory"/> is the open profile's.</param>
 /// <param name="Profile">The open profile; null in the demo.</param>
-internal sealed record AppOptions(string DataDirectory, bool Demo, LogLevel LogLevel = LogLevel.Information, bool ProtocolLog = false, string? Root = null, Neruna.Storage.Profile? Profile = null)
+/// <param name="AskForProfile">"Bei jedem Start Profil abfragen": the window asks before anything is opened (<see cref="WithProfile"/>).</param>
+internal sealed record AppOptions(string DataDirectory, bool Demo, LogLevel LogLevel = LogLevel.Information, bool ProtocolLog = false, string? Root = null, Neruna.Storage.Profile? Profile = null,
+    bool AskForProfile = false)
 {
+    /// <summary>The options for the profile chosen at the start.</summary>
+    public AppOptions WithProfile(Neruna.Storage.Profile profile) =>
+        this with { DataDirectory = Neruna.Storage.ProfileList.Load(Root!).DirectoryOf(profile), Profile = profile, AskForProfile = false };
+
     public string LogDirectory => Path.Combine(DataDirectory, "logs");
 
     public static AppOptions FromArgs(string[] args)
@@ -44,7 +50,7 @@ internal sealed record AppOptions(string DataDirectory, bool Demo, LogLevel LogL
         // An unknown --profile (renamed, deleted): the default one rather than a new empty Neruna.
         var profiles = Neruna.Storage.ProfileList.Load(root);
         var profile = profiles.Resolve(args) ?? profiles.Default;
-        return new AppOptions(profiles.DirectoryOf(profile), demo, level, protocolLog, root, profile);
+        return new AppOptions(profiles.DirectoryOf(profile), demo, level, protocolLog, root, profile, profiles.AsksFor(args));
     }
 }
 

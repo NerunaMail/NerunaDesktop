@@ -382,6 +382,10 @@ internal static class Snapshots
         profilesWindow.Show();
         await SaveAsync(profilesWindow, output, "settings-profiles.png");
         profilesWindow.Close();
+        var chooser = new ProfileChooserWindow(Neruna.Storage.ProfileList.Load(profileRoot));
+        chooser.Show();
+        await SaveAsync(chooser, output, "profile-chooser.png");
+        chooser.Close();
         Directory.Delete(profileRoot, recursive: true);
         vm.SettingsPage.QuickActions.Editing!.CancelCommand.Execute(null);
         vm.NavigateCommand.Execute(Section.Mail);

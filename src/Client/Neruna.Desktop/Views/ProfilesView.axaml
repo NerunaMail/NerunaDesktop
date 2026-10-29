@@ -50,6 +50,9 @@
         <TextBox Text="{Binding NewName}" Width="260" PlaceholderText="{l:T 'Name des neuen Profils, z. B. Privat'}" />
         <Button Content="{l:T 'Profil anlegen'}" Command="{Binding AddCommand}" />
       </StackPanel>
+      <CheckBox IsChecked="{Binding AskAtStart}" IsVisible="{Binding IsAvailable}" Margin="0,8,0,0"
+                Content="{l:T 'Bei jedem Start Profil abfragen'}"
+                ToolTip.Tip="{l:T 'Neruna fragt beim Start, welches Profil es öffnen soll (wenn es mehrere gibt). Verknüpfungen mit --profile öffnen ihr Profil direkt.'}" />
       <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
       <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding IsAvailable}"
                  Text="{l:T 'Ein neues Profil startet leer: Konten richten Sie in seinem Fenster ein. Mails, die das System öffnet (mailto:, .eml), kommen in das Profil, das beim Start öffnet.'}" />

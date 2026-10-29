@@ -30,6 +30,28 @@ internal sealed partial class App : Application
             // Language: as last chosen (file next to the database), the system's at first; see Neruna.Core.Localization.
             Neruna.Core.Localization.Texts.Use(LanguageFile.Read(Options.DataDirectory));
 
+            // "Bei jedem Start Profil abfragen": which one, before its data is opened. Closed without a choice: end.
+            if (Options.AskForProfile)
+            {
+                desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
+                var chosen = await ProfileChooserWindow.AskAsync(Neruna.Storage.ProfileList.Load(Options.Root!));
+                if (chosen is null)
+                {
+                    desktop.Shutdown();
+                    return;
+                }
+
+                Options = Options.WithProfile(chosen);
+                if (SingleInstance.TryHandOver(Options, []))
+                {
+                    desktop.Shutdown(); // already open: its window came to the front
+                    return;
+                }
+
+                CrashHandler.Install(Options);
+                Neruna.Core.Localization.Texts.Use(LanguageFile.Read(Options.DataDirectory));
+            }
+
             // Splash first, so the user sees something while the database opens and the window is built.
             ScreenFit.Install();
             var splash = new SplashWindow();

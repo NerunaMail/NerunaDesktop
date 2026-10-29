@@ -20,13 +20,18 @@ internal static class Program
         velopack.SetArgs(args).Run();
         App.Options = AppOptions.FromArgs(args);
 
-        // Already running (e.g. a mailto: link or .eml file opened from the system): hand over and end.
-        if (Infrastructure.SingleInstance.TryHandOver(App.Options, args))
+        // Already running (e.g. a mailto: link or .eml file opened from the system): hand over and end. Asking for the
+        // profile first: done once it is chosen (App).
+        if (!App.Options.AskForProfile)
         {
-            return;
+            if (Infrastructure.SingleInstance.TryHandOver(App.Options, args))
+            {
+                return;
+            }
+
+            Infrastructure.CrashHandler.Install(App.Options);
         }
 
-        Infrastructure.CrashHandler.Install(App.Options);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

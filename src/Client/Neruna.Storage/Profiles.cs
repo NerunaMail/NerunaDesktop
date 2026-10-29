@@ -34,11 +34,12 @@ public sealed class ProfileList
     private readonly string _root;
     private readonly List<Profile> _profiles;
 
-    private ProfileList(string root, List<Profile> profiles, Guid defaultId)
+    private ProfileList(string root, List<Profile> profiles, Guid defaultId, bool askAtStart)
     {
         _root = root;
         _profiles = profiles;
         DefaultId = profiles.Any(p => p.Id == defaultId) ? defaultId : Guid.Empty;
+        AskAtStart = askAtStart;
     }
 
     /// <summary>The standard profile first, then the others in the order they were made.</summary>
@@ -47,6 +48,21 @@ public sealed class ProfileList
     public Guid DefaultId { get; private set; }
 
     public Profile Default => _profiles.First(p => p.Id == DefaultId);
+
+    /// <summary>"Bei jedem Start Profil abfragen": a start without <c>--profile</c> asks which one (if there are several).</summary>
+    public bool AskAtStart { get; private set; }
+
+    /// <summary>
+    /// Whether this start asks for the profile: set, several profiles, and nothing given – a link or file the system
+    /// opens goes to the default one without a question.
+    /// </summary>
+    public bool AsksFor(IReadOnlyList<string> args) => AskAtStart && _profiles.Count > 1 && NameIn(args) is null && WithoutProfile(args).Length == 0;
+
+    public void SetAskAtStart(bool ask)
+    {
+        AskAtStart = ask;
+        Save();
+    }
 
     public static ProfileList Load(string root)
     {
@@ -74,7 +90,7 @@ public sealed class ProfileList
             }
         }
 
-        return new ProfileList(root, profiles, stored?.Default ?? Guid.Empty);
+        return new ProfileList(root, profiles, stored?.Default ?? Guid.Empty, stored?.AskAtStart ?? false);
     }
 
     /// <summary>The profile <c>--profile</c> names (its name, ignoring case, or its id); none named: the default one; an unknown name: null.</summary>
@@ -217,7 +233,7 @@ public sealed class ProfileList
         Directory.CreateDirectory(_root);
         var path = Path.Combine(_root, FileName);
         var temporary = path + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(new Stored(DefaultId == Guid.Empty ? null : DefaultId, _profiles), Json));
+        File.WriteAllText(temporary, JsonSerializer.Serialize(new Stored(DefaultId == Guid.Empty ? null : DefaultId, _profiles, AskAtStart ? true : null), Json));
         File.Move(temporary, path, overwrite: true);
     }
 
@@ -225,7 +241,7 @@ public sealed class ProfileList
     private static bool IsInside(string folder) =>
         !string.IsNullOrWhiteSpace(folder) && !Path.IsPathRooted(folder) && !folder.Split('/', '\\').Contains("..");
 
-    private sealed record Stored(Guid? Default, List<Profile>? Profiles);
+    private sealed record Stored(Guid? Default, List<Profile>? Profiles, bool? AskAtStart = null);
 }
 
 /// <summary>
