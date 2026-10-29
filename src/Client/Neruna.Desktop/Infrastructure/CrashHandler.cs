@@ -63,9 +63,11 @@ internal static class CrashHandler
         };
 
     // WebView2 gives up starting (E_ABORT) when its window is closed or the view replaced before it is ready – e.g. a
-    // compose window closed right away. Avalonia starts it in an async void, so no caller can catch it; nothing is lost.
+    // compose window closed right away –, or reports "resource in use" (0x800700AA) while another view of the same
+    // environment is still starting; the next view starts normally. Avalonia starts it in an async void, so no caller
+    // can catch it; nothing is lost.
     internal static bool IsAbortedWebViewStart(Exception exception) =>
-        exception is System.Runtime.InteropServices.COMException { HResult: unchecked((int)0x80004004) }
+        exception is System.Runtime.InteropServices.COMException { HResult: unchecked((int)0x80004004) or unchecked((int)0x800700AA) }
         && exception.StackTrace?.Contains("WebView", StringComparison.Ordinal) == true;
 
     /// <summary>A failed background task nobody waited for: kept for the next offer, unless it is just the network.</summary>

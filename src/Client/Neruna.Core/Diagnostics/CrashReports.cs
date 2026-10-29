@@ -339,7 +339,23 @@ public sealed class CrashReportService(CrashReportStore store, ISettingsStore se
     /// <summary>The waiting crashes with the cleaned report for each – exactly what <see cref="SendAsync"/> sends.</summary>
     public async Task<IReadOnlyList<PendingCrash>> GetPendingAsync(CancellationToken cancellationToken = default)
     {
-        var records = store.Pending();
+        // Already sent today, or the same error twice (a caught error often comes again as its unobserved task): not
+        // offered – sending would skip it anyway, and the user would wait for a report that never arrives.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var records = new List<(string File, CrashRecord Record)>();
+        foreach (var pending in store.Pending())
+        {
+            if (store.WasSentToday(pending.Record, today) || !seen.Add($"{pending.Record.Fingerprint}|{pending.Record.AppVersion}"))
+            {
+                store.Remove(pending.File);
+            }
+            else
+            {
+                records.Add(pending);
+            }
+        }
+
         if (records.Count == 0)
         {
             return [];

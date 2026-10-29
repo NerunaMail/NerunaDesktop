@@ -129,5 +129,16 @@ public class CrashReportTests
         Assert.Equal("Auf «Senden» geklickt, Antwort an <email>", body.Comment);
         // With its log a report is large: it must go with a Content-Length, or the hosting hands the server an empty body (422).
         Assert.DoesNotContain(url, env.Http.Chunked);
+
+        // The same error again today, twice (caught, then as its unobserved task): nothing left to offer.
+        store.Save(CrashReportBuilder.Capture(Thrown("Keine Verbindung für anna@example.com"), fatal: true, "0.1.11", null, DateTimeOffset.Now));
+        store.Save(CrashReportBuilder.Capture(Thrown("Keine Verbindung für anna@example.com"), fatal: false, "0.1.11", null, DateTimeOffset.Now));
+        Assert.Empty(await service.GetPendingAsync(ct));
+        Assert.Empty(store.Pending());
+
+        // A new version: offered once, not twice.
+        store.Save(CrashReportBuilder.Capture(Thrown("Keine Verbindung"), fatal: false, "0.1.12", null, DateTimeOffset.Now));
+        store.Save(CrashReportBuilder.Capture(Thrown("Keine Verbindung"), fatal: false, "0.1.12", null, DateTimeOffset.Now));
+        Assert.Single(await service.GetPendingAsync(ct));
     }
 }
