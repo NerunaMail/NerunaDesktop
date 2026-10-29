@@ -33,12 +33,15 @@ internal static class SingleInstance
     }
 
     /// <summary>True when another Neruna took the arguments (this process should end).</summary>
-    public static bool TryHandOver(AppOptions options, string[] args)
+    public static bool TryHandOver(AppOptions options, string[] args) => TrySend(options.DataDirectory, args);
+
+    /// <summary>Hands <paramref name="args"/> to the Neruna that has this data folder open; false when none has.</summary>
+    public static bool TrySend(string dataDirectory, string[] args)
     {
         try
         {
             // CurrentUserOnly: hand links and files only to a Neruna of this user, never to a pipe another user opened.
-            using var pipe = new NamedPipeClientStream(".", PipeName(options), PipeDirection.Out, PipeOptions.CurrentUserOnly);
+            using var pipe = new NamedPipeClientStream(".", PipeName(dataDirectory), PipeDirection.Out, PipeOptions.CurrentUserOnly);
             pipe.Connect(300);
             using var writer = new StreamWriter(pipe, new UTF8Encoding(false));
             writer.WriteLine(JsonSerializer.Serialize(args));

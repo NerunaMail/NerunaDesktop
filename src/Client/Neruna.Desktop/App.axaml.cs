@@ -133,6 +133,13 @@ internal sealed partial class App : Application
             // A later start of this profile (its shortcut, "In neuem Fenster öffnen") brings the window to the front.
             Infrastructure.SingleInstance.Listen(Options, args =>
             {
+                // Another profile installs an update: close as if the user did (drafts are asked about).
+                if (args.Contains(SystemOpen.CloseForUpdate))
+                {
+                    Dispatcher.UIThread.Post(main.Close);
+                    return;
+                }
+
                 var rest = Neruna.Storage.ProfileList.WithoutProfile(args);
                 Open(rest.Length == 0 ? [SystemOpen.Activate] : rest);
             }, Shutdown.Token);
@@ -157,6 +164,23 @@ internal sealed partial class App : Application
             await viewModel.StartAsync();
             _ = _services.GetRequiredService<PrivacyService>().StartPhishingListAsync();
             Open(desktop.Args ?? []);
+
+            // After an update: the other profiles that were open come back as well.
+            foreach (var id in SystemOpen.ReopenIn(desktop.Args ?? []).Where(id => id != Options.Profile?.Id))
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!)
+                    {
+                        ArgumentList = { Neruna.Storage.ProfileList.Argument, id.ToString() },
+                        UseShellExecute = false,
+                    });
+                }
+                catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+                {
+                    // That profile opens with its next start.
+                }
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

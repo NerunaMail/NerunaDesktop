@@ -17,6 +17,13 @@ internal static class Program
             velopack = velopack.OnBeforeUninstallFastCallback(_ => Infrastructure.DefaultMailApp.Current?.Unregister());
         }
 
+        // Another profile running: a downloaded update waits for "Jetzt neu starten" (or a start with nothing else
+        // open) – installing it now would end the running one without asking.
+        if (OtherNerunaRunning())
+        {
+            velopack = velopack.SetAutoApplyOnStartup(false);
+        }
+
         velopack.SetArgs(args).Run();
         App.Options = AppOptions.FromArgs(args);
 
@@ -33,6 +40,26 @@ internal static class Program
         }
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
+
+    private static bool OtherNerunaRunning()
+    {
+        try
+        {
+            using var self = System.Diagnostics.Process.GetCurrentProcess();
+            var same = System.Diagnostics.Process.GetProcessesByName(self.ProcessName);
+            var others = same.Length > 1;
+            foreach (var process in same)
+            {
+                process.Dispose();
+            }
+
+            return others;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.

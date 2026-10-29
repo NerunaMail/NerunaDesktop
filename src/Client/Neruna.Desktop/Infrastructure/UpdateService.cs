@@ -23,9 +23,12 @@ internal sealed partial class UpdateService : ObservableObject
     private readonly DispatcherTimer _timer;
     private UpdateInfo? _ready;
 
-    public UpdateService(ILogger<UpdateService> logger)
+    private readonly AppOptions _options;
+
+    public UpdateService(ILogger<UpdateService> logger, AppOptions options)
     {
         _logger = logger;
+        _options = options;
         try
         {
             // Pre-releases included: Neruna is in beta, every release is one for now.
@@ -130,12 +133,40 @@ internal sealed partial class UpdateService : ObservableObject
     [RelayCommand]
     private void RestartNow() => RestartRequested?.Invoke(this, EventArgs.Empty);
 
-    /// <summary>Installs the downloaded version and starts it again (the window has already closed).</summary>
+    /// <summary>
+    /// Installs the downloaded version and starts it again (the window has already closed). Other profiles open in
+    /// their own Neruna are asked to close first – the installer would otherwise end them without asking – and open
+    /// again afterwards, like this one.
+    /// </summary>
     public void ApplyAndRestart()
     {
-        if (_manager is not null && _ready is not null)
+        if (_manager is null || _ready is null)
         {
-            _manager.ApplyUpdatesAndRestart(_ready.TargetFullRelease);
+            return;
         }
+
+        var restart = new List<string>();
+        if (_options.Profile is { } own && _options.Root is { } root)
+        {
+            restart.AddRange([Neruna.Storage.ProfileList.Argument, own.Id.ToString()]);
+            var profiles = Neruna.Storage.ProfileList.Load(root);
+            var others = profiles.All.Where(p => p.Id != own.Id)
+                .Select(p => (Profile: p, Directory: profiles.DirectoryOf(p)))
+                .Where(p => SingleInstance.TrySend(p.Directory, [SystemOpen.CloseForUpdate]))
+                .ToList();
+            if (others.Count > 0)
+            {
+                _logger.LogInformation("Update: closing {Count} other open profile(s) first", others.Count);
+                var until = DateTime.UtcNow.AddSeconds(20);
+                while (others.Any(o => SingleInstance.IsRunning(o.Directory)) && DateTime.UtcNow < until)
+                {
+                    Thread.Sleep(250);
+                }
+
+                restart.AddRange([SystemOpen.Reopen, string.Join(',', others.Select(o => o.Profile.Id))]);
+            }
+        }
+
+        _manager.ApplyUpdatesAndRestart(_ready.TargetFullRelease, [.. restart]);
     }
 }
