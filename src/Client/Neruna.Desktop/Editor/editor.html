@@ -11,9 +11,10 @@
     color: #000000; word-wrap: break-word; overflow-wrap: anywhere; line-height: 1.3;
   }
   /* Lines inside a block (signature, quoted original) stay together; a paragraph of its own (Enter) gets half a line
-     more, so it stands apart from lines that merely wrap. cleanHtml puts the same margin into the sent mail. */
+     more (Einstellungen → Schreiben), so it stands apart from lines that merely wrap. cleanHtml puts the same margin
+     into the sent mail. */
   #editor div, #editor p { margin: 0; }
-  #editor > div, #editor > p { margin: 0 0 0.5em 0; }
+  #editor > div, #editor > p { margin: 0 0 var(--paragraph-spacing, 0.5em) 0; }
   #editor blockquote { margin: 0 0 0 4px; padding-left: 10px; border-left: 2px solid #c8c8c8; }
   #editor img { max-width: 100%; }
   /* A fine frame around pictures while writing, so white or transparent ones can be seen (not sent: CSS of the editor). */
@@ -159,7 +160,7 @@
     // The paragraph spacing travels with the mail (inline, which every mail program understands).
     Array.prototype.slice.call(clone.children).forEach(function (el) {
       if ((el.tagName === "DIV" || el.tagName === "P") && !el.style.margin && !el.style.marginBottom) {
-        el.style.margin = "0 0 0.5em 0";
+        el.style.margin = "0 0 " + paragraphSpacing + " 0";
       }
     });
     return clone.innerHTML;
@@ -337,6 +338,7 @@
   // Automatic lists (Einstellungen → Schreiben): "- " or "* " at the start of a line becomes a bulleted list,
   // "1. " a numbered one. Not inside a list or a table cell; Ctrl+Z undoes it.
   var autoLists = true;
+  var paragraphSpacing = "0.5em";
   function autoList() {
     var selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
@@ -586,6 +588,12 @@
     },
     setAutoLists: function (enabled) {
       autoLists = !!enabled;
+      return "ok";
+    },
+    /** Space after a paragraph in lines (Einstellungen → Schreiben). */
+    setParagraphSpacing: function (lines) {
+      paragraphSpacing = (+lines || 0) + "em";
+      editor.style.setProperty("--paragraph-spacing", paragraphSpacing);
       return "ok";
     },
     /** Inserts html where files were dropped (or at the caret, see insertHtml). */

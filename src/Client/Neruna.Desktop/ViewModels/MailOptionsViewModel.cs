@@ -59,7 +59,25 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
     public partial FontChoice? ComposeFont { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ParagraphSpacingPixels))]
     public partial double ComposeFontSize { get; set; } = 11;
+
+    /// <summary>Einstellungen → Schreiben: the space after a paragraph (Enter), in lines.</summary>
+    public static IReadOnlyList<ParagraphSpacingChoice> ParagraphSpacingChoices { get; } =
+    [
+        new(0, T("Kein Abstand")),
+        new(0.25, T("Klein (¼ Zeile)")),
+        new(0.5, T("Mittel (½ Zeile)")),
+        new(0.75, T("Gross (¾ Zeile)")),
+        new(1, T("Eine ganze Zeile")),
+    ];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ParagraphSpacingPixels))]
+    public partial ParagraphSpacingChoice ParagraphSpacing { get; set; } = ParagraphSpacingChoices[2];
+
+    /// <summary>The preview's space between its two paragraphs.</summary>
+    public double ParagraphSpacingPixels => ParagraphSpacing.Lines * ComposeFontSize * 4 / 3;
 
     public MarkAsReadMode MarkAsRead => MarkAsReadOptions.FirstOrDefault(o => o.IsSelected)?.Mode ?? MarkAsReadMode.OnSelect;
 
@@ -139,6 +157,8 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
             Notifications = await _settings.GetBoolAsync(SettingKeys.MailNotifications, fallback: true);
             ComposeFont = FontCatalog.Find(await _settings.GetAsync(SettingKeys.ComposeFont)) ?? FontCatalog.Find(FontCatalog.DefaultFont);
             ComposeFontSize = double.TryParse(await _settings.GetAsync(SettingKeys.ComposeFontSize), NumberStyles.Float, CultureInfo.InvariantCulture, out var size) ? size : 11;
+            var spacing = await _settings.GetParagraphSpacingAsync();
+            ParagraphSpacing = ParagraphSpacingChoices.MinBy(c => Math.Abs(c.Lines - spacing))!;
             var mode = Enum.TryParse<MarkAsReadMode>(await _settings.GetAsync(SettingKeys.MarkAsRead), out var parsed) ? parsed : MarkAsReadMode.OnSelect;
             foreach (var option in MarkAsReadOptions)
             {
@@ -264,6 +284,13 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
 
     partial void OnComposeFontSizeChanged(double value) => Save(SettingKeys.ComposeFontSize, value.ToString(CultureInfo.InvariantCulture));
 
+    partial void OnParagraphSpacingChanged(ParagraphSpacingChoice value)
+    {
+        // Reading follows at once (from the next mail opened); writing from the next message.
+        Infrastructure.MailPaper.ParagraphLines = value.Lines;
+        Save(SettingKeys.ComposeParagraphSpacing, value.Lines.ToString(CultureInfo.InvariantCulture));
+    }
+
     private void Select(MarkAsReadMode mode) => Save(SettingKeys.MarkAsRead, mode.ToString());
 
     private void Save(string key, string value)
@@ -291,4 +318,10 @@ internal sealed partial class MarkAsReadOption(MarkAsReadMode mode, string label
             selected(Mode);
         }
     }
+}
+
+/// <summary>A choice for the space after a paragraph, in lines.</summary>
+public sealed record ParagraphSpacingChoice(double Lines, string Name)
+{
+    public override string ToString() => Name;
 }

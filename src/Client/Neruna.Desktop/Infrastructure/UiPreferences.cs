@@ -50,6 +50,7 @@ internal sealed partial class UiPreferences : ObservableObject
             ToolbarLabels = await settings.GetBoolAsync(SettingKeys.ToolbarLabels, fallback: true);
             ShowAddAccountButton = await settings.GetBoolAsync(SettingKeys.ShowAddAccountButton, fallback: true);
             LoadNavigation(await settings.GetAsync(SettingKeys.NavigationItems));
+            MailPaper.ParagraphLines = await settings.GetParagraphSpacingAsync();
         }
         finally
         {

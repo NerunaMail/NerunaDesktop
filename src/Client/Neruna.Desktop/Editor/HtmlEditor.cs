@@ -75,6 +75,9 @@ internal interface IHtmlEditor
     /// <summary>"- " and "1. " at the start of a line become a bulleted or numbered list (Einstellungen → Schreiben).</summary>
     void SetAutoLists(bool enabled);
 
+    /// <summary>Space after a paragraph (Enter) in lines, also in the sent mail (Einstellungen → Schreiben).</summary>
+    void SetParagraphSpacing(double lines);
+
     void FocusEditor();
 
     /// <summary>The language of the spell check (null: the system's); the editor starts again with it, keeping the text.</summary>
@@ -365,6 +368,20 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         }
     }
 
+    private double _paragraphSpacing = Neruna.Core.SettingKeys.DefaultParagraphSpacing;
+
+    public void SetParagraphSpacing(double lines)
+    {
+        _paragraphSpacing = lines;
+        if (_web is not null && _ready)
+        {
+            _ = PushParagraphSpacingAsync();
+        }
+    }
+
+    private Task<string?> PushParagraphSpacingAsync() =>
+        ScriptAsync($"neruna.setParagraphSpacing({_paragraphSpacing.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+
     // "kürzel::" typed, or "kürzel" and Tab (suffix ""): the template instead. False when there is none (Tab then moves on).
     private bool ExpandPlainShortcut(string suffix = "::")
     {
@@ -653,6 +670,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 _ = PushContentAsync();
                 _ = PushShortcutsAsync();
                 _ = ScriptAsync($"neruna.setAutoLists({(_autoLists ? "true" : "false")})");
+                _ = PushParagraphSpacingAsync();
                 if (OperatingSystem.IsLinux())
                 {
                     // WebKitGTK in the embedded view gets the keys but draws no caret: the page draws one.

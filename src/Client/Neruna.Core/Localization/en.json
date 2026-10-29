@@ -2442,5 +2442,13 @@
  "Abfrage ausschalten: Einstellungen → Profile.": "To stop asking: Settings → Profiles.",
  "Bei jedem Start Profil abfragen": "Ask for the profile at every start",
  "Neruna fragt beim Start, welches Profil es öffnen soll (wenn es mehrere gibt). Verknüpfungen mit --profile öffnen ihr Profil direkt.": "Neruna asks at startup which profile to open (if there are several). Shortcuts with --profile open their profile directly.",
- "Wählen Sie beim Schreiben eine andere Signatur (z. B. «Du» statt «Sie»), merkt sich Neruna das beim Senden für diese Empfänger und dieses Konto und wählt sie beim nächsten Mail an sie wieder aus.": "If you pick a different signature while writing (e.g. an informal one instead of the formal one), Neruna remembers it when sending for these recipients and this account and picks it again for your next mail to them."
+ "Wählen Sie beim Schreiben eine andere Signatur (z. B. «Du» statt «Sie»), merkt sich Neruna das beim Senden für diese Empfänger und dieses Konto und wählt sie beim nächsten Mail an sie wieder aus.": "If you pick a different signature while writing (e.g. an informal one instead of the formal one), Neruna remembers it when sending for these recipients and this account and picks it again for your next mail to them.",
+ "Kein Abstand": "No space",
+ "Klein (¼ Zeile)": "Small (¼ line)",
+ "Mittel (½ Zeile)": "Medium (½ line)",
+ "Gross (¾ Zeile)": "Large (¾ line)",
+ "Eine ganze Zeile": "A whole line",
+ "Abstand nach einem Absatz": "Space after a paragraph",
+ "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "After every Enter, also in the sent email. With Shift+Enter the next line stays in the same paragraph, without space. Also applies when reading, to paragraphs without spacing of their own.",
+ "Nach einem Enter beginnt hier der nächste Absatz.": "After an Enter, the next paragraph starts here."
 }

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Neruna.Core;
 
 namespace Neruna.Desktop.Infrastructure;
 
@@ -11,25 +12,33 @@ namespace Neruna.Desktop.Infrastructure;
 /// </summary>
 internal static partial class MailPaper
 {
+    /// <summary>
+    /// The space after a paragraph in lines (Einstellungen → Schreiben, the same as when writing): for paragraphs
+    /// that bring none of their own.
+    /// </summary>
+    public static double ParagraphLines { get; set; } = SettingKeys.DefaultParagraphSpacing;
+
+    private static string Em => ParagraphLines.ToString(System.Globalization.CultureInfo.InvariantCulture) + "em";
+
     // A hard Enter (paragraph, line of a text mail) a little more apart than a line that merely wraps or a soft break;
     // the line height itself stays the renderer's (on Windows, more made soft breaks look like hard ones).
     // HTML5's sections are blocks; the renderer only knows the older elements and laid them out like text – the tables
     // inside a newsletter's <header>/<section> vanished (Apple Music's weekly mail showed only its logo).
-    private const string Common =
+    private static string Common =>
         " header, footer, section, article, nav, aside, main, figure, figcaption, hgroup, address, details, summary { display: block; }" +
         " pre, code { font-family: Consolas, 'Cascadia Mono', monospace; }" +
-        " p { margin-top: 0; margin-bottom: 0.3em; } .neruna-text > div { margin-bottom: 0.3em; }";
+        $" p {{ margin-top: 0; margin-bottom: {Em}; }} .neruna-text > div {{ margin-bottom: {Em}; }}";
 
     // Outlook writes every line as its own paragraph with margin 0 (p.MsoNormal in the mail's own <style>), so a
     // hard Enter looked like a wrapped line; this comes after the mail's styles and wins.
-    private const string ParagraphSpacing =
-        "<style>p.MsoNormal, li.MsoNormal, div.MsoNormal, p.MsoPlainText { margin-bottom: 0.3em; }</style>";
+    private static string ParagraphSpacing =>
+        $"<style>p.MsoNormal, li.MsoNormal, div.MsoNormal, p.MsoPlainText {{ margin-bottom: {Em}; }}</style>";
 
-    public const string LightStylesheet =
+    public static string LightStylesheet =>
         "body { font-family: 'Segoe UI', Inter, Arial, sans-serif; font-size: 10.5pt; color: #1b1b1b; margin: 0; }" +
         " a { color: #0F6CBD; } blockquote { border-left: 2px solid #C8C8C8; margin-left: 4px; padding-left: 10px; color: #424242; }" + Common;
 
-    public const string DarkStylesheet =
+    public static string DarkStylesheet =>
         "body { font-family: 'Segoe UI', Inter, Arial, sans-serif; font-size: 10.5pt; color: #E6E6E6; margin: 0; }" +
         " a { color: #6CB8F6; } blockquote { border-left: 2px solid #5A5A5A; margin-left: 4px; padding-left: 10px; color: #BDBDBD; }" + Common;
 

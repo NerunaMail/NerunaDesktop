@@ -2442,5 +2442,13 @@
  "Abfrage ausschalten: Einstellungen → Profile.": "Per non chiedere più: Impostazioni → Profili.",
  "Bei jedem Start Profil abfragen": "Chiedi il profilo a ogni avvio",
  "Neruna fragt beim Start, welches Profil es öffnen soll (wenn es mehrere gibt). Verknüpfungen mit --profile öffnen ihr Profil direkt.": "Neruna chiede all’avvio quale profilo aprire (se ce ne sono diversi). I collegamenti con --profile aprono direttamente il loro profilo.",
- "Wählen Sie beim Schreiben eine andere Signatur (z. B. «Du» statt «Sie»), merkt sich Neruna das beim Senden für diese Empfänger und dieses Konto und wählt sie beim nächsten Mail an sie wieder aus.": "Se scrivendo scegli un’altra firma (p. es. una informale invece di quella formale), Neruna la memorizza all’invio per questi destinatari e questo account e la sceglie di nuovo per la tua prossima e-mail a loro."
+ "Wählen Sie beim Schreiben eine andere Signatur (z. B. «Du» statt «Sie»), merkt sich Neruna das beim Senden für diese Empfänger und dieses Konto und wählt sie beim nächsten Mail an sie wieder aus.": "Se scrivendo scegli un’altra firma (p. es. una informale invece di quella formale), Neruna la memorizza all’invio per questi destinatari e questo account e la sceglie di nuovo per la tua prossima e-mail a loro.",
+ "Kein Abstand": "Nessuna spaziatura",
+ "Klein (¼ Zeile)": "Piccola (¼ di riga)",
+ "Mittel (½ Zeile)": "Media (½ riga)",
+ "Gross (¾ Zeile)": "Grande (¾ di riga)",
+ "Eine ganze Zeile": "Una riga intera",
+ "Abstand nach einem Absatz": "Spaziatura dopo un paragrafo",
+ "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "Dopo ogni Invio, anche nell’e-mail inviata. Con Maiusc+Invio la riga successiva resta nello stesso paragrafo, senza spaziatura. Vale anche in lettura, per i paragrafi senza spaziatura propria.",
+ "Nach einem Enter beginnt hier der nächste Absatz.": "Dopo un Invio, qui inizia il paragrafo successivo."
 }

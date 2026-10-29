@@ -2442,5 +2442,13 @@
  "Abfrage ausschalten: Einstellungen → Profile.": "Pour ne plus demander : Paramètres → Profils.",
  "Bei jedem Start Profil abfragen": "Demander le profil à chaque démarrage",
  "Neruna fragt beim Start, welches Profil es öffnen soll (wenn es mehrere gibt). Verknüpfungen mit --profile öffnen ihr Profil direkt.": "Neruna demande au démarrage quel profil ouvrir (s’il y en a plusieurs). Les raccourcis avec --profile ouvrent directement leur profil.",
- "Wählen Sie beim Schreiben eine andere Signatur (z. B. «Du» statt «Sie»), merkt sich Neruna das beim Senden für diese Empfänger und dieses Konto und wählt sie beim nächsten Mail an sie wieder aus.": "Si vous choisissez une autre signature en rédigeant (par ex. une signature informelle au lieu de la formelle), Neruna la retient à l’envoi pour ces destinataires et ce compte, et la choisit de nouveau pour votre prochain e-mail à leur intention."
+ "Wählen Sie beim Schreiben eine andere Signatur (z. B. «Du» statt «Sie»), merkt sich Neruna das beim Senden für diese Empfänger und dieses Konto und wählt sie beim nächsten Mail an sie wieder aus.": "Si vous choisissez une autre signature en rédigeant (par ex. une signature informelle au lieu de la formelle), Neruna la retient à l’envoi pour ces destinataires et ce compte, et la choisit de nouveau pour votre prochain e-mail à leur intention.",
+ "Kein Abstand": "Aucun espacement",
+ "Klein (¼ Zeile)": "Petit (¼ de ligne)",
+ "Mittel (½ Zeile)": "Moyen (½ ligne)",
+ "Gross (¾ Zeile)": "Grand (¾ de ligne)",
+ "Eine ganze Zeile": "Une ligne entière",
+ "Abstand nach einem Absatz": "Espacement après un paragraphe",
+ "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "Après chaque Entrée, aussi dans l’e-mail envoyé. Avec Maj+Entrée, la ligne suivante reste dans le même paragraphe, sans espacement. S’applique aussi à la lecture, aux paragraphes sans espacement propre.",
+ "Nach einem Enter beginnt hier der nächste Absatz.": "Après une Entrée, le paragraphe suivant commence ici."
 }

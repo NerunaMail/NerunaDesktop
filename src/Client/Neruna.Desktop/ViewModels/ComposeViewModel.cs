@@ -604,6 +604,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         var html = draft.HtmlBody ?? (string.IsNullOrEmpty(draft.Body) ? string.Empty : PlainToHtml(draft.Body));
         Formatting.Attach(editor, html, font, size, T("Nachricht verfassen …"));
         editor.SetAutoLists(await _settings.GetBoolAsync(SettingKeys.ComposeAutoLists, fallback: true));
+        editor.SetParagraphSpacing(await _settings.GetParagraphSpacingAsync());
         _editorDraft = draft;
         await LoadTemplatesAsync(editor);
     }

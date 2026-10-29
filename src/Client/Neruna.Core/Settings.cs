@@ -79,6 +79,11 @@ public static class SettingKeys
     /// <summary>Default font size in points for new mails.</summary>
     public const string ComposeFontSize = "compose.fontSize";
 
+    /// <summary>Einstellungen → Schreiben: space after a paragraph (Enter) in lines, e.g. "0.5" (default).</summary>
+    public const string ComposeParagraphSpacing = "compose.paragraphSpacing";
+
+    public const double DefaultParagraphSpacing = 0.5;
+
     /// <summary>When an opened message is marked as read, see <see cref="MarkAsReadMode"/>.</summary>
     public const string MarkAsRead = "mail.markAsRead";
 
@@ -261,6 +266,15 @@ public enum MarkAsReadMode
 
 public static class SettingsStoreExtensions
 {
+    /// <summary>Einstellungen → Schreiben: space after a paragraph in lines (0 to 1).</summary>
+    public static async Task<double> GetParagraphSpacingAsync(this ISettingsStore store, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        return double.TryParse(await store.GetAsync(SettingKeys.ComposeParagraphSpacing, cancellationToken), NumberStyles.Float, CultureInfo.InvariantCulture, out var lines)
+            ? Math.Clamp(lines, 0, 1)
+            : SettingKeys.DefaultParagraphSpacing;
+    }
+
     /// <summary>A list of strings stored as JSON; null when never set or unreadable.</summary>
     public static async Task<List<string>?> GetListAsync(this ISettingsStore store, string key, CancellationToken cancellationToken = default)
     {

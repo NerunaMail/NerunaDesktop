@@ -55,10 +55,21 @@
           </ComboBox>
           <ComboBox ItemsSource="{x:Static ed:FontCatalog.Sizes}" SelectedItem="{Binding ComposeFontSize}" Width="80" MaxDropDownHeight="360" />
         </StackPanel>
+
+        <TextBlock Classes="subtle" Text="{l:T 'Abstand nach einem Absatz'}" Margin="0,8,0,0" />
+        <ComboBox ItemsSource="{x:Static vm:MailOptionsViewModel.ParagraphSpacingChoices}" SelectedItem="{Binding ParagraphSpacing}" Width="240" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.'}" />
+
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="{DynamicResource PaperBrush}" Padding="12,10" Margin="0,4,0,0">
-          <TextBlock Text="{l:T 'Guten Tag – so sehen Ihre neuen Nachrichten aus.'}"
-                     FontFamily="{Binding ComposeFont.Family}"
-                     FontSize="{Binding ComposeFontSize, Converter={x:Static vm:MailOptionsViewModel.PointsToPixels}}" />
+          <StackPanel Spacing="{Binding ParagraphSpacingPixels}">
+            <TextBlock Text="{l:T 'Guten Tag – so sehen Ihre neuen Nachrichten aus.'}" TextWrapping="Wrap"
+                       FontFamily="{Binding ComposeFont.Family}"
+                       FontSize="{Binding ComposeFontSize, Converter={x:Static vm:MailOptionsViewModel.PointsToPixels}}" />
+            <TextBlock Text="{l:T 'Nach einem Enter beginnt hier der nächste Absatz.'}" TextWrapping="Wrap"
+                       FontFamily="{Binding ComposeFont.Family}"
+                       FontSize="{Binding ComposeFontSize, Converter={x:Static vm:MailOptionsViewModel.PointsToPixels}}" />
+          </StackPanel>
         </Border>
       </StackPanel>
 

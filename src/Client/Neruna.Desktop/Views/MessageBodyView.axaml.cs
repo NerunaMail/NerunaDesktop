@@ -21,7 +21,7 @@ namespace Neruna.Desktop.Views;
 /// </summary>
 internal sealed partial class MessageBodyView : UserControl
 {
-    internal const string BaseStylesheet = MailPaper.LightStylesheet;
+    internal static string BaseStylesheet => MailPaper.LightStylesheet;
 
     /// <summary>
     /// Snapshot tool only: no web view headless – the HTML renderer draws the mail, so screenshots show it formatted.

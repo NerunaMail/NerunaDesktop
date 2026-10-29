@@ -282,6 +282,7 @@ internal sealed partial class SignatureEditorViewModel : ViewModelBase
     {
         var font = await _settings.GetAsync(SettingKeys.ComposeFont) is { Length: > 0 } configured ? configured : FontCatalog.DefaultFont;
         var size = double.TryParse(await _settings.GetAsync(SettingKeys.ComposeFontSize), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var pt) ? pt : 11;
+        editor.SetParagraphSpacing(await _settings.GetParagraphSpacingAsync());
         Formatting.Attach(editor, _original.Html, font, size, _isTextTemplate
             ? T("Text der Vorlage – z. B. eine Tabelle für eine Anrufnotiz (Name, Nummer, Grund) oder eine Standardantwort …")
             : T("Signatur hier eingeben – z. B. Name, Funktion, Firma, Telefon, Logo …"));
