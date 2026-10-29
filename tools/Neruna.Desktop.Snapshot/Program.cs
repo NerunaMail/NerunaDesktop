@@ -368,6 +368,21 @@ internal static class Snapshots
         await SaveAsync(pickerWindow, output, "quick-action-folder-picker-search.png");
         Console.WriteLine($"Picker focus on search: {pickerWindow.FocusManager?.GetFocusedElement() is TextBox}, matches: {string.Join(" | ", folderPicker.Folders.Select(f => f.Name))}");
         pickerWindow.Close();
+
+        // Einstellungen → Profile with two profiles (the demo itself has none).
+        var profileRoot = Path.Combine(Path.GetTempPath(), "neruna-snapshot-profiles-" + Guid.NewGuid().ToString("N"));
+        var profileList = Neruna.Storage.ProfileList.Load(profileRoot);
+        profileList.Add("Business");
+        var profiles = new ProfilesViewModel(new AppOptions(profileRoot, false, Root: profileRoot, Profile: profileList.All[0]),
+            new Neruna.Storage.Credentials.LocalCredentialStore(profileRoot), Microsoft.Extensions.Logging.Abstractions.NullLogger<ProfilesViewModel>.Instance);
+        profiles.Reload();
+        profiles.Profiles[1].ConfirmDelete = true;
+        var profilesWindow = new Window { Width = 980, Height = 560, Content = new ProfilesView { DataContext = profiles, Margin = new Thickness(24, 16) } };
+        profilesWindow.Bind(Window.BackgroundProperty, profilesWindow.GetResourceObservable("PaneBackgroundBrush"));
+        profilesWindow.Show();
+        await SaveAsync(profilesWindow, output, "settings-profiles.png");
+        profilesWindow.Close();
+        Directory.Delete(profileRoot, recursive: true);
         vm.SettingsPage.QuickActions.Editing!.CancelCommand.Execute(null);
         vm.NavigateCommand.Execute(Section.Mail);
         await Task.Delay(200);

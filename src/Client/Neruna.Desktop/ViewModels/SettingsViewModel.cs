@@ -4,7 +4,7 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf, ServerRulesPageViewModel serverRules, MailTagsViewModel mailTags) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, ProfilesViewModel profiles, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf, ServerRulesPageViewModel serverRules, MailTagsViewModel mailTags) : ViewModelBase
 {
     /// <summary>Settings → Schlagwörter.</summary>
     public MailTagsViewModel MailTags => mailTags;
@@ -44,6 +44,11 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
 
     /// <summary>Settings → Workspaces.</summary>
     public WorkspacesViewModel Workspaces => workspaces;
+
+    /// <summary>Settings → Profile.</summary>
+    public ProfilesViewModel Profiles => profiles;
+
+    public const int ProfilesTab = 22;
 
     /// <summary>Index of the «Workspaces» tab (the switcher's "Workspaces verwalten").</summary>
     public const int WorkspacesTab = 15;
@@ -150,6 +155,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(-1, T("Programm"), null, IsHeading: true),
         new(6, T("Darstellung"), "IconPalette"),
         new(15, T("Workspaces"), "IconFolder"),
+        new(ProfilesTab, T("Profile"), "IconPeople"),
         new(8, T("KI"), "IconAi"),
         new(9, T("Über Neruna"), "IconInfo"),
         new(NewsTab, T("News"), "IconRss"),
@@ -198,6 +204,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             else if (item.Tab == NewsTab)
             {
                 _ = News.ShowAsync();
+            }
+            else if (item.Tab == ProfilesTab)
+            {
+                Profiles.Reload();
             }
         }
     }

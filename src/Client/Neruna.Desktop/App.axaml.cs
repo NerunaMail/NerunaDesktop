@@ -76,6 +76,12 @@ internal sealed partial class App : Application
 
             await splash.ShowStatusAsync(Neruna.Core.Localization.Texts.T("Oberfläche wird aufgebaut …"));
             var main = new MainWindow { DataContext = viewModel };
+            if (Options.Profile is { IsStandard: false } profile)
+            {
+                // Two Neruna side by side: the title tells them apart (task bar, window switcher).
+                main.Title = "Neruna – " + profile.Name;
+            }
+
             layout.TrackWindow(main, "window.main", withPosition: true);
             desktop.MainWindow = main;
 
@@ -102,7 +108,12 @@ internal sealed partial class App : Application
 
                 await viewModel.OpenFromSystemAsync(items);
             });
-            Infrastructure.SingleInstance.Listen(Options, args => Open(args.Length == 0 ? [SystemOpen.Activate] : args), Shutdown.Token);
+            // A later start of this profile (its shortcut, "In neuem Fenster öffnen") brings the window to the front.
+            Infrastructure.SingleInstance.Listen(Options, args =>
+            {
+                var rest = Neruna.Storage.ProfileList.WithoutProfile(args);
+                Open(rest.Length == 0 ? [SystemOpen.Activate] : rest);
+            }, Shutdown.Token);
             if (this.TryGetFeature<Avalonia.Controls.ApplicationLifetimes.IActivatableLifetime>() is { } activatable)
             {
                 activatable.Activated += (_, e) =>

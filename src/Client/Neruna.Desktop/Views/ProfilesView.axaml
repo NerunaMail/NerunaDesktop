@@ -1,0 +1,58 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.ProfilesView"
+             x:DataType="vm:ProfilesViewModel">
+  <!-- Einstellungen → Profile: Neruna side by side with own accounts and settings, each in its own window -->
+  <ScrollViewer>
+    <StackPanel Spacing="10" MaxWidth="820" HorizontalAlignment="Left" Margin="0,0,0,20">
+      <TextBlock Text="{l:T 'Profile'}" FontSize="20" FontWeight="SemiBold" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap"
+                 Text="{l:T 'Jedes Profil ist ein eigenes Neruna mit eigenen Konten, Einstellungen und Signaturen – in einem eigenen Fenster, z. B. «Business» auf dem einen und «Privat» auf dem anderen Bildschirm. Innerhalb eines Profils zeigen Workspaces verschiedene Ausschnitte im selben Fenster.'}" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding !IsAvailable}"
+                 Text="{l:T 'In der Demo gibt es keine Profile.'}" />
+
+      <ItemsControl ItemsSource="{Binding Profiles}" IsVisible="{Binding IsAvailable}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ProfileItem">
+            <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,10">
+              <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="15" IsVisible="{Binding !IsRenaming}" VerticalAlignment="Center" />
+                    <TextBox Text="{Binding NewName}" Width="240" IsVisible="{Binding IsRenaming}" />
+                    <Button Content="{l:T 'Übernehmen'}" Command="{Binding RenameCommand}" IsVisible="{Binding IsRenaming}" />
+                    <TextBlock Classes="subtle" FontSize="12" Text="{Binding Notes}" VerticalAlignment="Center"
+                               IsVisible="{Binding Notes, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </StackPanel>
+                  <WrapPanel Grid.Column="1" ItemSpacing="6" LineSpacing="6">
+                    <Button Classes="accent" Content="{l:T 'In neuem Fenster öffnen'}" Command="{Binding OpenCommand}" IsVisible="{Binding CanOpen}" />
+                    <Button Content="{l:T 'Beim Start öffnen'}" Command="{Binding SetDefaultCommand}" IsVisible="{Binding !IsDefault}" />
+                    <Button Content="{l:T 'Umbenennen'}" Command="{Binding StartRenameCommand}" IsVisible="{Binding !IsRenaming}" />
+                    <Button Content="{Binding DeleteText}" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" />
+                  </WrapPanel>
+                </Grid>
+                <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding ConfirmDelete}"
+                           Text="{l:T 'Löscht die Konten, Mails, Termine, Kontakte und gespeicherten Passwörter dieses Profils auf diesem Computer. Auf den Servern bleibt alles.'}" />
+                <!-- For a shortcut of its own (desktop, task bar) -->
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Classes="subtle" FontSize="11" Text="{l:T 'Verknüpfung:'}" Margin="0,0,6,0" />
+                  <SelectableTextBlock Grid.Column="1" FontSize="11" FontFamily="Consolas, Cascadia Mono, monospace" Text="{Binding Command}" TextWrapping="Wrap" />
+                </Grid>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding IsAvailable}">
+        <TextBox Text="{Binding NewName}" Width="260" PlaceholderText="{l:T 'Name des neuen Profils, z. B. Privat'}" />
+        <Button Content="{l:T 'Profil anlegen'}" Command="{Binding AddCommand}" />
+      </StackPanel>
+      <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding IsAvailable}"
+                 Text="{l:T 'Ein neues Profil startet leer: Konten richten Sie in seinem Fenster ein. Mails, die das System öffnet (mailto:, .eml), kommen in das Profil, das beim Start öffnet.'}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

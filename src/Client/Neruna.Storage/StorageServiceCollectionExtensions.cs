@@ -16,7 +16,8 @@ public static class StorageServiceCollectionExtensions
     /// Passwords in the operating system's credential store (the app); false keeps them in an encrypted file in the
     /// data directory (tests – they must never touch the user's keychain).
     /// </param>
-    public static IServiceCollection AddNerunaStorage(this IServiceCollection services, string dataDirectory, bool useSystemCredentials = false)
+    /// <param name="profileId">A profile other than the standard one: its entries in the system's credential store get ids of their own.</param>
+    public static IServiceCollection AddNerunaStorage(this IServiceCollection services, string dataDirectory, bool useSystemCredentials = false, Guid profileId = default)
     {
         Directory.CreateDirectory(dataDirectory);
         var databasePath = Path.Combine(dataDirectory, "neruna.db");
@@ -38,7 +39,9 @@ public static class StorageServiceCollectionExtensions
         services.AddSingleton<Neruna.Core.Calendar.IReminderStore, SqliteReminderStore>();
         services.AddSingleton(new LocalCredentialStore(dataDirectory));
         services.AddSingleton<ICredentialStore>(sp =>
-            (useSystemCredentials ? CredentialStoreSelector.TrySystemStore(Logger(sp)) : null)
+            (useSystemCredentials && CredentialStoreSelector.TrySystemStore(Logger(sp)) is { } system
+                ? profileId == Guid.Empty ? system : new ProfileCredentialStore(system, profileId, dataDirectory)
+                : (ICredentialStore?)null)
             ?? (ICredentialStore)sp.GetRequiredService<LocalCredentialStore>());
         return services;
     }

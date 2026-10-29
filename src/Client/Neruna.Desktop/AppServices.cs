@@ -20,7 +20,9 @@ namespace Neruna.Desktop;
 
 /// <param name="Demo">Start with the in-memory demo account in a separate data directory.</param>
 /// <param name="ProtocolLog">Write raw IMAP/SMTP traces and DAV request/response bodies (passwords redacted).</param>
-internal sealed record AppOptions(string DataDirectory, bool Demo, LogLevel LogLevel = LogLevel.Information, bool ProtocolLog = false)
+/// <param name="Root">The data folder holding the profiles (NerunaData); <see cref="DataDirectory"/> is the open profile's.</param>
+/// <param name="Profile">The open profile; null in the demo.</param>
+internal sealed record AppOptions(string DataDirectory, bool Demo, LogLevel LogLevel = LogLevel.Information, bool ProtocolLog = false, string? Root = null, Neruna.Storage.Profile? Profile = null)
 {
     public string LogDirectory => Path.Combine(DataDirectory, "logs");
 
@@ -34,7 +36,15 @@ internal sealed record AppOptions(string DataDirectory, bool Demo, LogLevel LogL
             ? parsed
             : protocolLog ? LogLevel.Trace : LogLevel.Information;
 
-        return new AppOptions(demo ? Path.Combine(root, "demo") : root, demo, level, protocolLog);
+        if (demo)
+        {
+            return new AppOptions(Path.Combine(root, "demo"), demo, level, protocolLog, root);
+        }
+
+        // An unknown --profile (renamed, deleted): the default one rather than a new empty Neruna.
+        var profiles = Neruna.Storage.ProfileList.Load(root);
+        var profile = profiles.Resolve(args) ?? profiles.Default;
+        return new AppOptions(profiles.DirectoryOf(profile), demo, level, protocolLog, root, profile);
     }
 }
 
@@ -70,7 +80,7 @@ internal static class AppServices
         // WebDAV clients must see redirects themselves to keep credentials (see DavClient).
         services.AddHttpClient("dav").ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
 
-        services.AddNerunaStorage(options.DataDirectory, useSystemCredentials: true);
+        services.AddNerunaStorage(options.DataDirectory, useSystemCredentials: true, profileId: options.Profile?.Id ?? Guid.Empty);
 
         // Providers. New protocols (EWS, JMAP, LDAP …) are added here and nowhere else.
         services.AddSingleton<IProviderFactory<IMailProvider>>(sp => new ImapProviderFactory(
@@ -189,6 +199,7 @@ internal static class AppServices
         services.AddSingleton<MailOptionsViewModel>();
         services.AddSingleton<PrivacyOptionsViewModel>();
         services.AddSingleton<WorkspacesViewModel>();
+        services.AddSingleton<ProfilesViewModel>();
         services.AddSingleton<Neruna.Core.News.DevblogFeed>();
         services.AddSingleton<NewsViewModel>();
         services.AddSingleton<CalendarOptionsViewModel>();
@@ -222,8 +233,8 @@ internal static class AppServices
         provider.GetRequiredService<MailSearchIndexer>().Start();
 
         var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("Neruna");
-        logger.LogInformation("Neruna Desktop {Version} started (data: {DataDirectory}, demo: {Demo}, protocol log: {ProtocolLog})",
-            typeof(AppServices).Assembly.GetName().Version, options.DataDirectory, options.Demo, options.ProtocolLog);
+        logger.LogInformation("Neruna Desktop {Version} started (data: {DataDirectory}, profile: {Profile}, demo: {Demo}, protocol log: {ProtocolLog})",
+            typeof(AppServices).Assembly.GetName().Version, options.DataDirectory, options.Profile?.Name, options.Demo, options.ProtocolLog);
         // Crashes: logged and kept for a report (CrashHandler, installed in Main).
         CrashHandler.Logger = logger;
         Editor.HtmlEditor.WebViewDataFolder = Path.Combine(options.DataDirectory, "WebView2");

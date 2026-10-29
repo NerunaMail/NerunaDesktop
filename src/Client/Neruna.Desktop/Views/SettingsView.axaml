@@ -47,6 +47,7 @@
         <ContentControl Content="{Binding LocalData}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=13}" />
         <ContentControl Content="{Binding Privacy}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=14}" />
         <ContentControl Content="{Binding Workspaces}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=15}" />
+        <ContentControl Content="{Binding Profiles}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=22}" />
         <ContentControl Content="{Binding News}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=16}" />
         <ContentControl Content="{Binding Meetings}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=18}" />
         <ContentControl Content="{Binding Pdf}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=19}" />

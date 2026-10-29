@@ -12,8 +12,25 @@ namespace Neruna.Desktop.Infrastructure;
 /// </summary>
 internal static class SingleInstance
 {
-    private static string PipeName(AppOptions options) =>
-        "neruna-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(options.DataDirectory))))[..16];
+    private static string PipeName(AppOptions options) => PipeName(options.DataDirectory);
+
+    private static string PipeName(string dataDirectory) =>
+        "neruna-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(dataDirectory))))[..16];
+
+    /// <summary>Whether a Neruna has this data folder open (a profile must not be deleted under it).</summary>
+    public static bool IsRunning(string dataDirectory)
+    {
+        try
+        {
+            using var pipe = new NamedPipeClientStream(".", PipeName(dataDirectory), PipeDirection.Out, PipeOptions.CurrentUserOnly);
+            pipe.Connect(200);
+            return true;
+        }
+        catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>True when another Neruna took the arguments (this process should end).</summary>
     public static bool TryHandOver(AppOptions options, string[] args)
