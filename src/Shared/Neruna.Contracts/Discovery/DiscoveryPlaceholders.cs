@@ -10,6 +10,14 @@ public static class DiscoveryPlaceholders
     public static string Expand(string template, string emailAddress)
     {
         ArgumentNullException.ThrowIfNull(template);
+
+        // Nothing to fill in (a user name as it is – Nextcloud's login, a calendar-only account): no address needed.
+        if (!template.Contains(EmailAddress, StringComparison.Ordinal) && !template.Contains(EmailLocalPart, StringComparison.Ordinal)
+            && !template.Contains(EmailDomain, StringComparison.Ordinal))
+        {
+            return template;
+        }
+
         var (localPart, domain) = SplitAddress(emailAddress);
 
         return template

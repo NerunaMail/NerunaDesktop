@@ -35,6 +35,26 @@ public class AccountSetupTests
     }
 
     [Fact]
+    public void A_calendar_only_account_needs_no_email_address()
+    {
+        // Nextcloud's sign-in and "Kalender und Kontakte" without an address: the user name is given as it is (the
+        // crash report of 0.21.0 – the address was split for placeholders that were not there).
+        using var http = new HttpClient();
+        var registry = new ProviderRegistry([],
+            [new Neruna.Providers.Dav.CalDavProviderFactory(http, new NullCredentialStore(), NullLoggerFactory.Instance)],
+            [new Neruna.Providers.Dav.CardDavProviderFactory(http, new NullCredentialStore(), NullLoggerFactory.Instance)]);
+        var setup = new AccountSetupService(registry, null!, null!, []);
+        var dav = new Uri("https://cloud.example.com/remote.php/dav");
+        var config = new MailProviderConfig("cloud.example.com", null, [], [],
+            [new DavServerSettings(ServerProtocol.CalDav, dav, "anna"), new DavServerSettings(ServerProtocol.CardDav, dav, "anna")]);
+
+        var account = setup.BuildAccount("anna", string.Empty, config);
+
+        Assert.Equal([ServiceKind.Calendar, ServiceKind.Contacts], account.Connections.Select(c => c.Kind).Order());
+        Assert.All(account.Connections, c => Assert.Contains("anna", c.Settings.Values));
+    }
+
+    [Fact]
     public async Task Failing_connection_test_leaves_nothing_behind()
     {
         await using var env = await TestEnvironment.CreateAsync();
