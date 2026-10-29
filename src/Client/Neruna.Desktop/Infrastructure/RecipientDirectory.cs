@@ -14,7 +14,7 @@ internal sealed class RecipientDirectory(ContactController contacts)
     private Task<Dictionary<string, ContactCard>>? _cards;
     private DateTime _cardsAt;
 
-    /// <summary>The contact with this address (the first one found), for the placeholders of text templates.</summary>
+    /// <summary>The contact with this address (the first one found, one with a picture first), for the placeholders of text templates and the sender's picture.</summary>
     public async Task<ContactCard?> FindContactAsync(string email)
     {
         if (_cards is null || _cards.IsFaulted || _cards.IsCanceled || DateTime.UtcNow - _cardsAt > KeepFor)
@@ -28,7 +28,11 @@ internal sealed class RecipientDirectory(ContactController contacts)
                 {
                     foreach (var address in entry.Card.IsGroup ? [] : entry.Card.EmailAddresses)
                     {
-                        byAddress.TryAdd(address, entry.Card);
+                        // The same person in several address books: the one with a picture (shown for the sender).
+                        if (!byAddress.TryAdd(address, entry.Card) && byAddress[address].Photo is null && entry.Card.Photo is not null)
+                        {
+                            byAddress[address] = entry.Card;
+                        }
                     }
                 }
 
