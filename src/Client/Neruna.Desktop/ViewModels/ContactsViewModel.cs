@@ -344,7 +344,8 @@ internal sealed class MemberItem(ResolvedMember member)
 
 internal static class ContactPhotoBitmap
 {
-    public static Bitmap? From(ContactPhoto? photo)
+    /// <param name="width">Decoded at this width (small avatars from large photos); null: as it is.</param>
+    public static Bitmap? From(ContactPhoto? photo, int? width = null)
     {
         if (photo is null)
         {
@@ -354,7 +355,7 @@ internal static class ContactPhotoBitmap
         try
         {
             using var stream = new MemoryStream(photo.Data);
-            return new Bitmap(stream);
+            return width is { } w ? Bitmap.DecodeToWidth(stream, w) : new Bitmap(stream);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or NotSupportedException)
         {

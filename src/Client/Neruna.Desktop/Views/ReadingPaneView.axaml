@@ -33,9 +33,12 @@
                    IsVisible="{Binding ExportStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </Grid>
       <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="24,16,24,8">
-        <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentTextBrush}" VerticalAlignment="Top">
-          <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
-                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentTextBrush}" VerticalAlignment="Top" ClipToBounds="True">
+          <Panel>
+            <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasSenderPhoto}" />
+            <Image Source="{Binding SenderPhoto}" Stretch="UniformToFill" IsVisible="{Binding HasSenderPhoto}" />
+          </Panel>
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
           <StackPanel Orientation="Horizontal" Spacing="4">

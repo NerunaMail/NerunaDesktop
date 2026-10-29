@@ -889,23 +889,34 @@ internal sealed partial class MailViewModel(
     /// <summary>"+" beside a sender that is no contact yet: the contact editor opens with name and address.</summary>
     public event EventHandler<MailAddress>? AddContactRequested;
 
-    // The "+" beside the sender shows when the sender is in no address book and is no own address.
+    // The "+" beside the sender shows when the sender is in no address book and is no own address; a contact's
+    // picture replaces the initials.
     private ReadingPaneViewModel OfferContact(ReadingPaneViewModel pane)
     {
-        if (pane.Sender is { } sender && !Accounts.Any(a => a.Account.Owns(sender.Address)))
+        if (pane.Sender is { } sender)
         {
-            pane.AddSender = () => AddContactRequested?.Invoke(this, sender);
-            _ = CheckSenderAsync(pane, sender.Address);
+            var own = Accounts.Any(a => a.Account.Owns(sender.Address));
+            if (!own)
+            {
+                pane.AddSender = () => AddContactRequested?.Invoke(this, sender);
+            }
+
+            _ = CheckSenderAsync(pane, sender.Address, offerContact: !own);
         }
 
         return pane;
     }
 
-    private async Task CheckSenderAsync(ReadingPaneViewModel pane, string address)
+    private async Task CheckSenderAsync(ReadingPaneViewModel pane, string address, bool offerContact)
     {
         try
         {
-            pane.CanAddSender = await recipients.FindContactAsync(address) is null;
+            var contact = await recipients.FindContactAsync(address);
+            pane.CanAddSender = offerContact && contact is null;
+            if (contact?.Photo is { } photo)
+            {
+                pane.SenderPhoto = await Task.Run(() => ContactPhotoBitmap.From(photo, 96));
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

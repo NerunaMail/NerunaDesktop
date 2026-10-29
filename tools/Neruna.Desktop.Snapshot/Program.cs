@@ -138,6 +138,14 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
 
+        // A sender with a contact picture: the picture instead of the initials.
+        if (vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault(m => m.Summary.From?.Address == "nadia.rossi@example.com") is { } nadia)
+        {
+            vm.MailPage.SelectedEntry = nadia;
+            await Task.Delay(500);
+            await SaveAsync(window, output, "mail-sender-photo.png");
+        }
+
         // An account on its color in the folder list (Einstellungen → Konten → ⋯ → Farbe in der Ordnerliste).
         var colorSettings = services.GetRequiredService<ISettingsStore>();
         foreach (var node in vm.MailPage.Accounts)

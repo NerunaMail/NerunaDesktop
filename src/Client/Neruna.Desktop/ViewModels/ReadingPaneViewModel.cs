@@ -382,6 +382,13 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool CanAddSender { get; set; }
 
+    /// <summary>The picture of the sender's contact, shown instead of the initials.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSenderPhoto))]
+    public partial Bitmap? SenderPhoto { get; set; }
+
+    public bool HasSenderPhoto => SenderPhoto is not null;
+
     /// <summary>Opens the contact editor with name and address of the sender.</summary>
     public Action? AddSender { get; set; }
 
