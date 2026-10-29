@@ -59,6 +59,27 @@ internal sealed partial class ProfilesViewModel(AppOptions options, ICredentialS
         {
             Profiles.Add(new ProfileItem(this, profile, profile.Id == _list.DefaultId, profile.Id == options.Profile!.Id, _list.DirectoryOf(profile)));
         }
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Profiles added, renamed or deleted.</summary>
+    public event EventHandler? Changed;
+
+    /// <summary>
+    /// The other profiles that no window has open (offered next to the workspaces). Asked of each profile's Neruna on
+    /// a background thread: an answer that does not come takes a moment.
+    /// </summary>
+    public async Task<IReadOnlyList<Profile>> GetClosedOthersAsync()
+    {
+        if (!IsAvailable)
+        {
+            return [];
+        }
+
+        var list = ProfileList.Load(options.Root!);
+        var others = list.All.Where(p => p.Id != options.Profile!.Id).Select(p => (Profile: p, Folder: list.DirectoryOf(p))).ToList();
+        return await Task.Run(() => others.Where(o => !Infrastructure.SingleInstance.IsRunning(o.Folder)).Select(o => o.Profile).ToList());
     }
 
     private bool CanAdd() => NewName.Trim().Length > 0;
@@ -105,7 +126,10 @@ internal sealed partial class ProfilesViewModel(AppOptions options, ICredentialS
     }
 
     /// <summary>Another Neruna with this profile; if it runs already, its window comes to the front.</summary>
-    internal void Open(ProfileItem item)
+    internal void Open(ProfileItem item) => Open(item.Profile);
+
+    /// <inheritdoc cref="Open(ProfileItem)"/>
+    internal void Open(Profile profile)
     {
         Error = null;
         if (Environment.ProcessPath is not { } program)
@@ -115,11 +139,11 @@ internal sealed partial class ProfilesViewModel(AppOptions options, ICredentialS
 
         try
         {
-            Process.Start(new ProcessStartInfo(program) { ArgumentList = { ProfileList.Argument, item.Profile.Id.ToString() }, UseShellExecute = false });
+            Process.Start(new ProcessStartInfo(program) { ArgumentList = { ProfileList.Argument, profile.Id.ToString() }, UseShellExecute = false });
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException)
         {
-            logger.LogWarning(ex, "Could not start the profile {Profile}", item.Profile.Name);
+            logger.LogWarning(ex, "Could not start the profile {Profile}", profile.Name);
             Error = T("Das Profil konnte nicht geöffnet werden: ") + ex.Message;
         }
     }

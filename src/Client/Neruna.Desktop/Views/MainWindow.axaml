@@ -244,6 +244,27 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        <!-- The other profiles no window has open: each in a window of its own -->
+        <Border Width="1" Height="18" Margin="8,0" Background="{DynamicResource DividerBrush}" VerticalAlignment="Center"
+                IsVisible="{Binding HasClosedProfiles}" />
+        <ItemsControl ItemsSource="{Binding ClosedProfiles}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="4" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ProfileChoice">
+              <Button Classes="workspaceTab" Padding="12,5" ToolTip.Tip="{l:T 'Profil in neuem Fenster öffnen'}"
+                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenProfileCommand}" CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding Name}" />
+                  <PathIcon Data="{StaticResource IconPopOut}" Width="12" Height="12" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
         </DockPanel>
         <ContentControl Content="{Binding CurrentPage}" Margin="6,6,6,0" />
       </DockPanel>

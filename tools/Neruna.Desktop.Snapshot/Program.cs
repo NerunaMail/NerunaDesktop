@@ -1126,7 +1126,12 @@ internal static class Snapshots
         await SaveAsync(window, output, "settings-workspaces.png");
         vm.SettingsPage.Workspaces.ShowAsTabs = true;
         vm.NavigateCommand.Execute(Section.Mail);
+        // Another profile no window has open: offered behind the workspaces.
+        vm.ClosedProfiles.Add(new ProfileChoice(new Neruna.Storage.Profile(Guid.NewGuid(), "Verein", "verein")));
+        vm.HasClosedProfiles = true;
         await SaveAsync(window, output, "workspace-tabs.png");
+        vm.ClosedProfiles.Clear();
+        vm.HasClosedProfiles = false;
         vm.SettingsPage.Workspaces.ShowAsTabs = false;
         await workspaceService.SwitchAsync(Guid.Empty);
         await Task.Delay(500);

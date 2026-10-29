@@ -2450,5 +2450,7 @@
  "Eine ganze Zeile": "A whole line",
  "Abstand nach einem Absatz": "Space after a paragraph",
  "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "After every Enter, also in the sent email. With Shift+Enter the next line stays in the same paragraph, without space. Also applies when reading, to paragraphs without spacing of their own.",
- "Nach einem Enter beginnt hier der nächste Absatz.": "After an Enter, the next paragraph starts here."
+ "Nach einem Enter beginnt hier der nächste Absatz.": "After an Enter, the next paragraph starts here.",
+ "Profil «{0}» öffnen": "Open profile “{0}”",
+ "Profil in neuem Fenster öffnen": "Open profile in a new window"
 }

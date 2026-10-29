@@ -20,6 +20,12 @@ internal sealed record WorkspaceChoice(Workspace Workspace, bool IsCurrent)
     public IBrush Brush => Workspace.IsFull ? Brushes.Gray : WorkspaceColors.Brush(Workspace.Color);
 }
 
+/// <summary>Another profile no window has open: offered next to the workspaces, opens in a window of its own.</summary>
+internal sealed record ProfileChoice(Neruna.Storage.Profile Profile)
+{
+    public string Name => Profile.Name;
+}
+
 /// <summary>An entry of the workspace menu ("-" is a separator line).</summary>
 internal sealed record WorkspaceMenuItem(string Title, System.Windows.Input.ICommand? Command, object? Parameter, Avalonia.Controls.MenuItemToggleType ToggleType, bool IsChecked);
 
@@ -43,6 +49,14 @@ internal sealed partial class MainWindowViewModel
     private WorkspaceService? _workspaces;
 
     public ObservableCollection<WorkspaceChoice> WorkspaceChoices { get; } = [];
+
+    /// <summary>The other profiles not open in any window (Einstellungen → Profile).</summary>
+    public ObservableCollection<ProfileChoice> ClosedProfiles { get; } = [];
+
+    [ObservableProperty]
+    public partial bool HasClosedProfiles { get; set; }
+
+    private int _profilesCheck;
 
     /// <summary>The menu at the top of the rail: the workspaces, then "Workspaces verwalten …".</summary>
     public ObservableCollection<WorkspaceMenuItem> WorkspaceMenu { get; } = [];
@@ -77,6 +91,56 @@ internal sealed partial class MainWindowViewModel
             ShowWorkspaces();
             await ReloadForWorkspaceAsync();
         });
+        SettingsPage.Profiles.Changed += async (_, _) => await RefreshClosedProfilesAsync();
+        await RefreshClosedProfilesAsync();
+    }
+
+    /// <summary>
+    /// Which other profiles are closed – asked again when this window comes to the front (another one may have been
+    /// closed or opened meanwhile).
+    /// </summary>
+    public async Task RefreshClosedProfilesAsync()
+    {
+        var check = ++_profilesCheck;
+        IReadOnlyList<Neruna.Storage.Profile> closed;
+        try
+        {
+            closed = await SettingsPage.Profiles.GetClosedOthersAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            _logger.LogWarning(ex, "Could not tell which profiles are open");
+            return;
+        }
+
+        if (check != _profilesCheck || closed.Select(p => p.Id).SequenceEqual(ClosedProfiles.Select(c => c.Profile.Id))
+            && closed.Select(p => p.Name).SequenceEqual(ClosedProfiles.Select(c => c.Name)))
+        {
+            return;
+        }
+
+        ClosedProfiles.Clear();
+        foreach (var profile in closed)
+        {
+            ClosedProfiles.Add(new ProfileChoice(profile));
+        }
+
+        ShowWorkspaces();
+    }
+
+    [RelayCommand]
+    private void OpenProfile(ProfileChoice? choice)
+    {
+        if (choice is null)
+        {
+            return;
+        }
+
+        SettingsPage.Profiles.Open(choice.Profile);
+        // Open now: no longer offered here (asked again when this window comes back to the front).
+        _profilesCheck++;
+        ClosedProfiles.Remove(choice);
+        ShowWorkspaces();
     }
 
     /// <summary>Einstellungen → Workspaces changed where they are shown.</summary>
@@ -126,9 +190,19 @@ internal sealed partial class MainWindowViewModel
             WorkspaceMenu.Add(new WorkspaceMenuItem(choice.Name, SwitchWorkspaceCommand, choice, MenuItemToggleType.Radio, choice.IsCurrent));
         }
 
+        if (ClosedProfiles.Count > 0)
+        {
+            WorkspaceMenu.Add(new WorkspaceMenuItem("-", null, null, MenuItemToggleType.None, false));
+            foreach (var profile in ClosedProfiles)
+            {
+                WorkspaceMenu.Add(new WorkspaceMenuItem(F("Profil «{0}» öffnen", profile.Name), OpenProfileCommand, profile, MenuItemToggleType.None, false));
+            }
+        }
+
         WorkspaceMenu.Add(new WorkspaceMenuItem("-", null, null, MenuItemToggleType.None, false));
         WorkspaceMenu.Add(new WorkspaceMenuItem(T("Workspaces verwalten …"), ManageWorkspacesCommand, null, MenuItemToggleType.None, false));
-        HasWorkspaces = WorkspaceChoices.Count > 1;
+        HasClosedProfiles = ClosedProfiles.Count > 0;
+        HasWorkspaces = WorkspaceChoices.Count > 1 || HasClosedProfiles;
         RailTint = current.IsFull ? Brushes.Transparent : WorkspaceColors.Tint(current.Color);
 
         // The chat button follows the workspace; a chat open in front makes way for the mail.

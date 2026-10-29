@@ -19,6 +19,7 @@ internal sealed partial class MainWindow : Window
             {
                 // "Jetzt neu starten": close as usual (drafts are asked about), then install and start again.
                 Activated += (_, _) => vm.UpdateChatActive();
+                Activated += async (_, _) => await vm.RefreshClosedProfilesAsync();
                 Deactivated += (_, _) => vm.UpdateChatActive();
                 PropertyChanged += (_, e) =>
                 {

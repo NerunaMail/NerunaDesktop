@@ -2450,5 +2450,7 @@
  "Eine ganze Zeile": "Une ligne entière",
  "Abstand nach einem Absatz": "Espacement après un paragraphe",
  "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "Après chaque Entrée, aussi dans l’e-mail envoyé. Avec Maj+Entrée, la ligne suivante reste dans le même paragraphe, sans espacement. S’applique aussi à la lecture, aux paragraphes sans espacement propre.",
- "Nach einem Enter beginnt hier der nächste Absatz.": "Après une Entrée, le paragraphe suivant commence ici."
+ "Nach einem Enter beginnt hier der nächste Absatz.": "Après une Entrée, le paragraphe suivant commence ici.",
+ "Profil «{0}» öffnen": "Ouvrir le profil « {0} »",
+ "Profil in neuem Fenster öffnen": "Ouvrir le profil dans une nouvelle fenêtre"
 }

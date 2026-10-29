@@ -2450,5 +2450,7 @@
  "Eine ganze Zeile": "Una riga intera",
  "Abstand nach einem Absatz": "Spaziatura dopo un paragrafo",
  "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "Dopo ogni Invio, anche nell’e-mail inviata. Con Maiusc+Invio la riga successiva resta nello stesso paragrafo, senza spaziatura. Vale anche in lettura, per i paragrafi senza spaziatura propria.",
- "Nach einem Enter beginnt hier der nächste Absatz.": "Dopo un Invio, qui inizia il paragrafo successivo."
+ "Nach einem Enter beginnt hier der nächste Absatz.": "Dopo un Invio, qui inizia il paragrafo successivo.",
+ "Profil «{0}» öffnen": "Apri il profilo «{0}»",
+ "Profil in neuem Fenster öffnen": "Apri il profilo in una nuova finestra"
 }
