@@ -1050,6 +1050,29 @@ internal static class Snapshots
         Console.WriteLine($"Group editor: {editable.Members.Count} members, offered: {string.Join(", ", editable.Available.Select(c => c.Name))}");
         vm.Overlay = null;
 
+        // Business cards instead of the list; then only the groups.
+        vm.ContactsPage.IsCardView = true;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "contacts-cards.png");
+        vm.ContactsPage.Show = ContactsViewModel.FilterChoices[2];
+        await Task.Delay(200);
+        await SaveAsync(window, output, "contacts-cards-groups.png");
+        vm.ContactsPage.Show = ContactsViewModel.FilterChoices[0];
+        vm.ContactsPage.IsCardView = false;
+
+        // Duplicates: the same person once with the number, once with the address (the demo books are read-only: made here).
+        var dupBook = writable[0];
+        Neruna.Core.Contacts.ContactEntry Dup(string id, string body) => new(dupBook, id,
+            Neruna.Core.Contacts.VCardReader.Read($"BEGIN:VCARD\r\nVERSION:3.0\r\nUID:{id}\r\n{body}END:VCARD\r\n"));
+        vm.Overlay = new ContactDuplicatesViewModel(contactController, Neruna.Core.Contacts.ContactMerge.FindDuplicates([
+            Dup("d1", "FN:Nadia Rossi\r\nN:Rossi;Nadia;;;\r\nTEL;TYPE=cell:079 555 12 34\r\n"),
+            Dup("d2", "FN:Nadia Rossi\r\nN:Rossi;Nadia;;;\r\nEMAIL:nadia.rossi@example.com\r\nORG:Rossi Design GmbH\r\n"),
+            Dup("d3", "FN:Thomas Frei\r\nEMAIL:thomas.frei@example.com\r\n"),
+            Dup("d4", "FN:T. Frei\r\nEMAIL:Thomas.Frei@example.com\r\nTEL:044 123 45 67\r\n"),
+        ]));
+        await SaveAsync(window, output, "contacts-duplicates.png");
+        vm.Overlay = null;
+
         // A contact with an S/MIME certificate (made here: name and address in it, valid for two years).
         var person = allContacts.First(c => !c.Card.IsGroup && c.Card.EmailAddresses.Count > 0);
         var personData = (await contactController.GetContactAsync(person.AddressBook, person.RemoteId))!.VCardData;

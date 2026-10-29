@@ -2452,5 +2452,19 @@
  "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "After every Enter, also in the sent email. With Shift+Enter the next line stays in the same paragraph, without space. Also applies when reading, to paragraphs without spacing of their own.",
  "Nach einem Enter beginnt hier der nächste Absatz.": "After an Enter, the next paragraph starts here.",
  "Profil «{0}» öffnen": "Open profile “{0}”",
- "Profil in neuem Fenster öffnen": "Open profile in a new window"
+ "Profil in neuem Fenster öffnen": "Open profile in a new window",
+ "Nur Kontakte": "Contacts only",
+ "Nur Gruppen": "Groups only",
+ "Duplikate": "Duplicates",
+ "Kontakte mit gleichem Namen, gleicher E-Mail-Adresse oder Telefonnummer finden und zusammenführen": "Find and merge contacts with the same name, email address or phone number",
+ "Visitenkarten": "Business cards",
+ "Zwischen Liste und Visitenkarten umschalten": "Switch between list and business cards",
+ "Kontakte und Gruppen, nur Kontakte oder nur Gruppen": "Contacts and groups, contacts only or groups only",
+ "Doppelte Kontakte": "Duplicate contacts",
+ "Kontakte mit gleichem Namen, gleicher E-Mail-Adresse oder gleicher Telefonnummer. Beim Zusammenführen bekommt der gewählte Kontakt alles, was die anderen zusätzlich haben – Adressen, Nummern, Notizen, Bild –, die anderen werden gelöscht. Gruppen zeigen danach auf den gewählten Kontakt.": "Contacts with the same name, email address or phone number. When merging, the chosen contact gets everything the others have in addition – addresses, numbers, notes, picture –, the others are deleted. Groups then point to the chosen contact.",
+ "Keine doppelten Kontakte gefunden.": "No duplicate contacts found.",
+ "Behalten und ergänzen:": "Keep and complete:",
+ "Nicht dieselbe Person": "Not the same person",
+ "Zusammenführen": "Merge",
+ "Zusammenführen fehlgeschlagen: ": "Merging failed: "
 }

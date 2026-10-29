@@ -39,6 +39,7 @@ internal sealed class ViewLocator : IDataTemplate
         EventEditorViewModel => new EventEditorView(),
         ContactEditorViewModel => new ContactEditorView(),
         GroupEditorViewModel => new GroupEditorView(),
+        ContactDuplicatesViewModel => new ContactDuplicatesView(),
         AccountsViewModel => new AccountsView(),
         CertificatesViewModel => new CertificatesView(),
         SettingsViewModel => new SettingsView(),

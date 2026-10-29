@@ -1153,6 +1153,9 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             case GroupEditorViewModel groupEditor:
                 groupEditor.Finished += OnFinished;
                 break;
+            case ContactDuplicatesViewModel duplicates:
+                duplicates.Finished += OnFinished;
+                break;
             case TaskEditorViewModel taskEditor:
                 taskEditor.Finished += OnFinished;
                 break;

@@ -29,6 +29,12 @@ internal static class Converters
 
     public static FuncValueConverter<bool, double> DimmedOpacity { get; } = new(dimmed => dimmed ? 0.45 : 1);
 
+    /// <summary>Contacts as business cards: the list spans list and details (columns 2–4).</summary>
+    public static FuncValueConverter<bool, int> CardSpan { get; } = new(cards => cards ? 3 : 1);
+
+    /// <summary>Over the whole width the search box would be too long: as wide as in the list.</summary>
+    public static FuncValueConverter<bool, double> CardSearchWidth { get; } = new(cards => cards ? 460 : double.NaN);
+
     public static FuncValueConverter<bool, FontWeight> BoldIf { get; } = new(bold => bold ? FontWeight.SemiBold : FontWeight.Normal);
 
     /// <summary>A ring around the chosen one (e.g. the account color in its picker).</summary>

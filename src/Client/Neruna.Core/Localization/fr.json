@@ -2452,5 +2452,19 @@
  "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "Après chaque Entrée, aussi dans l’e-mail envoyé. Avec Maj+Entrée, la ligne suivante reste dans le même paragraphe, sans espacement. S’applique aussi à la lecture, aux paragraphes sans espacement propre.",
  "Nach einem Enter beginnt hier der nächste Absatz.": "Après une Entrée, le paragraphe suivant commence ici.",
  "Profil «{0}» öffnen": "Ouvrir le profil « {0} »",
- "Profil in neuem Fenster öffnen": "Ouvrir le profil dans une nouvelle fenêtre"
+ "Profil in neuem Fenster öffnen": "Ouvrir le profil dans une nouvelle fenêtre",
+ "Nur Kontakte": "Contacts uniquement",
+ "Nur Gruppen": "Groupes uniquement",
+ "Duplikate": "Doublons",
+ "Kontakte mit gleichem Namen, gleicher E-Mail-Adresse oder Telefonnummer finden und zusammenführen": "Trouver et fusionner les contacts ayant le même nom, la même adresse e-mail ou le même numéro de téléphone",
+ "Visitenkarten": "Cartes de visite",
+ "Zwischen Liste und Visitenkarten umschalten": "Basculer entre liste et cartes de visite",
+ "Kontakte und Gruppen, nur Kontakte oder nur Gruppen": "Contacts et groupes, contacts uniquement ou groupes uniquement",
+ "Doppelte Kontakte": "Contacts en double",
+ "Kontakte mit gleichem Namen, gleicher E-Mail-Adresse oder gleicher Telefonnummer. Beim Zusammenführen bekommt der gewählte Kontakt alles, was die anderen zusätzlich haben – Adressen, Nummern, Notizen, Bild –, die anderen werden gelöscht. Gruppen zeigen danach auf den gewählten Kontakt.": "Contacts ayant le même nom, la même adresse e-mail ou le même numéro de téléphone. Lors de la fusion, le contact choisi reçoit tout ce que les autres ont en plus – adresses, numéros, notes, photo –, les autres sont supprimés. Les groupes pointent ensuite vers le contact choisi.",
+ "Keine doppelten Kontakte gefunden.": "Aucun contact en double trouvé.",
+ "Behalten und ergänzen:": "Conserver et compléter :",
+ "Nicht dieselbe Person": "Pas la même personne",
+ "Zusammenführen": "Fusionner",
+ "Zusammenführen fehlgeschlagen: ": "Échec de la fusion : "
 }

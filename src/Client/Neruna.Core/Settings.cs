@@ -105,6 +105,9 @@ public static class SettingKeys
     /// <summary>Address books hidden in the contact list (JSON list of keys).</summary>
     public const string HiddenAddressBooks = "contacts.hidden";
 
+    /// <summary>Contacts as "list" (default, with details beside) or as "cards" (business cards side by side).</summary>
+    public const string ContactsView = "ui.contactsView";
+
     /// <summary>The order of the address books within their account (JSON list of keys), set under "Adressbücher verwalten"; the others follow by name.</summary>
     public const string AddressBookOrder = "contacts.order";
 

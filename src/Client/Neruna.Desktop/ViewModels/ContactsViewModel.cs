@@ -43,6 +43,44 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     [ObservableProperty]
     public partial string SearchText { get; set; } = string.Empty;
 
+    /// <summary>All, only contacts or only groups.</summary>
+    public static IReadOnlyList<ContactFilterChoice> FilterChoices { get; } =
+    [
+        new(ContactFilter.All, T("Alle")),
+        new(ContactFilter.Contacts, T("Nur Kontakte")),
+        new(ContactFilter.Groups, T("Nur Gruppen")),
+    ];
+
+    [ObservableProperty]
+    public partial ContactFilterChoice Show { get; set; } = FilterChoices[0];
+
+    partial void OnShowChanged(ContactFilterChoice value) => Filter();
+
+    /// <summary>Business cards side by side instead of the list with the details beside it (remembered).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsListView))]
+    public partial bool IsCardView { get; set; }
+
+    public bool IsListView => !IsCardView;
+
+    [RelayCommand]
+    private void ToggleView() => IsCardView = !IsCardView;
+
+    private bool _viewLoaded;
+
+    partial void OnIsCardViewChanged(bool value)
+    {
+        if (_viewLoaded)
+        {
+            _ = settings.SetAsync(SettingKeys.ContactsView, value ? "cards" : null);
+        }
+    }
+
+    /// <summary>"Duplikate": the same person in several contacts, to merge.</summary>
+    [RelayCommand(CanExecute = nameof(HasAddressBooks))]
+    private void FindDuplicates() =>
+        EditorRequested?.Invoke(this, new ContactDuplicatesViewModel(contacts, ContactMerge.FindDuplicates(_all)));
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(WriteMailCommand))]
     [NotifyPropertyChangedFor(nameof(IsContactSelected), nameof(IsGroupSelected))]
@@ -53,11 +91,17 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     public bool IsGroupSelected => Selected is { IsGroup: true };
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(NewContactCommand), nameof(NewGroupCommand))]
+    [NotifyCanExecuteChangedFor(nameof(NewContactCommand), nameof(NewGroupCommand), nameof(FindDuplicatesCommand))]
     public partial bool HasAddressBooks { get; set; }
 
     public async Task ReloadAsync()
     {
+        if (!_viewLoaded)
+        {
+            IsCardView = await settings.GetAsync(SettingKeys.ContactsView) == "cards";
+            _viewLoaded = true;
+        }
+
         _hidden = await LoadHiddenAsync();
         // Only the address books the open workspace shows.
         var sources = await contacts.GetSourcesAsync();
@@ -189,7 +233,12 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
         foreach (var entry in _all)
         {
             var book = visible.FirstOrDefault(b => Same(b.Info, entry.AddressBook));
-            if (book is not null && Matches(entry.Card, query))
+            if (book is not null && Matches(entry.Card, query) && Show.Filter switch
+                {
+                    ContactFilter.Contacts => !entry.Card.IsGroup,
+                    ContactFilter.Groups => entry.Card.IsGroup,
+                    _ => true,
+                })
             {
                 Items.Add(new ContactItem(entry, book.Color));
             }
@@ -301,6 +350,17 @@ internal sealed class ContactItem(ContactEntry entry, string color)
 
     public string PrimaryEmail => IsGroup ? Subtitle : Entry.Card.Emails.FirstOrDefault()?.Value ?? string.Empty;
 
+    /// <summary>On a business card: the addresses and numbers, one per line (at most three of each).</summary>
+    public string CardEmails => string.Join("\n", Entry.Card.EmailAddresses.Take(3));
+
+    public string CardPhones => string.Join("\n", Entry.Card.PhoneNumbers.Take(3));
+
+    public bool HasCardEmails => !IsGroup && Entry.Card.EmailAddresses.Count > 0;
+
+    public bool HasCardPhones => !IsGroup && Entry.Card.PhoneNumbers.Count > 0;
+
+    public bool HasSubtitle => Subtitle.Length > 0;
+
     public IReadOnlyList<LabeledValue> Emails => Entry.Card.Emails.Select(e => new LabeledValue(e.Value, Label(e.Kind))).ToList();
 
     public IReadOnlyList<LabeledValue> Phones => Entry.Card.Phones.Select(p => new LabeledValue(p.Value, Label(p.Kind))).ToList();
@@ -334,6 +394,18 @@ internal sealed class ContactItem(ContactEntry entry, string color)
     public bool ShowInitials => !HasPhoto && !IsGroup;
 
     private static string Label(string? kind) => FieldKind.Find(FieldKind.PhoneKinds, kind).Label;
+}
+
+internal enum ContactFilter
+{
+    All,
+    Contacts,
+    Groups,
+}
+
+internal sealed record ContactFilterChoice(ContactFilter Filter, string Name)
+{
+    public override string ToString() => Name;
 }
 
 /// <summary>A group member in the details pane.</summary>

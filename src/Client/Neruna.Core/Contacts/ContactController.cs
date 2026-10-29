@@ -255,6 +255,57 @@ public sealed class ContactController(
         }
     }
 
+    /// <summary>
+    /// Merges <paramref name="others"/> into <paramref name="keep"/> (<see cref="ContactMerge.Merge"/>): the kept card
+    /// is saved with everything they add, groups that had one of them now have the kept contact, then they are deleted.
+    /// </summary>
+    /// <exception cref="RemoteConflictException">Someone changed a contact on the server; sync and retry.</exception>
+    public async Task MergeContactsAsync(ContactEntry keep, IReadOnlyList<ContactEntry> others, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(keep);
+        ArgumentNullException.ThrowIfNull(others);
+        var kept = await GetContactAsync(keep.AddressBook, keep.RemoteId, cancellationToken)
+                   ?? throw new InvalidOperationException("The contact to keep is gone");
+        var data = kept.VCardData;
+        var merged = new List<ContactEntry>();
+        foreach (var other in others.Where(o => o.RemoteId != keep.RemoteId || o.AddressBook.ConnectionId != keep.AddressBook.ConnectionId || o.AddressBook.RemoteId != keep.AddressBook.RemoteId))
+        {
+            if (await GetContactAsync(other.AddressBook, other.RemoteId, cancellationToken) is { } stored)
+            {
+                data = ContactMerge.Merge(data, stored.VCardData);
+                merged.Add(other);
+            }
+        }
+
+        if (merged.Count == 0)
+        {
+            return;
+        }
+
+        var final = data;
+        await SaveCardAsync(keep.AddressBook, _ => final, (keep.AddressBook, keep.RemoteId), cancellationToken);
+
+        // Groups pointing at a merged contact point at the kept one now (once, even if they had both).
+        var gone = merged.Select(m => m.Card.MemberUid).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in (await SearchAsync(null, cancellationToken)).Where(e => e.Card.IsGroup && !e.AddressBook.IsReadOnly
+                     && e.Card.Members.Any(m => m.ContactUid is { } uid && gone.Contains(uid))))
+        {
+            var draft = GroupDraft.FromVCard((await GetContactAsync(group.AddressBook, group.RemoteId, cancellationToken))!.VCardData);
+            var members = draft.Members
+                .Select(m => m.ContactUid is { } uid && gone.Contains(uid) ? m with { ContactUid = keep.Card.MemberUid } : m)
+                .DistinctBy(m => m.ContactUid ?? "mail:" + m.Email)
+                .ToList();
+            await SaveGroupAsync(group.AddressBook, draft with { Members = members }, (group.AddressBook, group.RemoteId), cancellationToken);
+        }
+
+        foreach (var other in merged)
+        {
+            await DeleteContactAsync(other.AddressBook, other.RemoteId, cancellationToken);
+        }
+
+        logger.LogInformation("Merged {Count} contact(s) into one", merged.Count);
+    }
+
     /// <exception cref="RemoteConflictException">Someone changed the contact on the server; sync and retry.</exception>
     public async Task DeleteContactAsync(AddressBookInfo addressBook, string remoteId, CancellationToken cancellationToken = default)
     {

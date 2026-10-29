@@ -2452,5 +2452,19 @@
  "Nach jedem Enter, auch in der gesendeten E-Mail. Mit Shift+Enter bleibt die nächste Zeile ohne Abstand im selben Absatz. Gilt auch beim Lesen für Absätze ohne eigenen Abstand.": "Dopo ogni Invio, anche nell’e-mail inviata. Con Maiusc+Invio la riga successiva resta nello stesso paragrafo, senza spaziatura. Vale anche in lettura, per i paragrafi senza spaziatura propria.",
  "Nach einem Enter beginnt hier der nächste Absatz.": "Dopo un Invio, qui inizia il paragrafo successivo.",
  "Profil «{0}» öffnen": "Apri il profilo «{0}»",
- "Profil in neuem Fenster öffnen": "Apri il profilo in una nuova finestra"
+ "Profil in neuem Fenster öffnen": "Apri il profilo in una nuova finestra",
+ "Nur Kontakte": "Solo contatti",
+ "Nur Gruppen": "Solo gruppi",
+ "Duplikate": "Duplicati",
+ "Kontakte mit gleichem Namen, gleicher E-Mail-Adresse oder Telefonnummer finden und zusammenführen": "Trova e unisci i contatti con lo stesso nome, indirizzo e-mail o numero di telefono",
+ "Visitenkarten": "Biglietti da visita",
+ "Zwischen Liste und Visitenkarten umschalten": "Passa da elenco a biglietti da visita",
+ "Kontakte und Gruppen, nur Kontakte oder nur Gruppen": "Contatti e gruppi, solo contatti o solo gruppi",
+ "Doppelte Kontakte": "Contatti duplicati",
+ "Kontakte mit gleichem Namen, gleicher E-Mail-Adresse oder gleicher Telefonnummer. Beim Zusammenführen bekommt der gewählte Kontakt alles, was die anderen zusätzlich haben – Adressen, Nummern, Notizen, Bild –, die anderen werden gelöscht. Gruppen zeigen danach auf den gewählten Kontakt.": "Contatti con lo stesso nome, indirizzo e-mail o numero di telefono. Unendoli, il contatto scelto riceve tutto ciò che gli altri hanno in più – indirizzi, numeri, note, immagine –, gli altri vengono eliminati. I gruppi puntano poi al contatto scelto.",
+ "Keine doppelten Kontakte gefunden.": "Nessun contatto duplicato trovato.",
+ "Behalten und ergänzen:": "Mantieni e completa:",
+ "Nicht dieselbe Person": "Non è la stessa persona",
+ "Zusammenführen": "Unisci",
+ "Zusammenführen fehlgeschlagen: ": "Unione non riuscita: "
 }

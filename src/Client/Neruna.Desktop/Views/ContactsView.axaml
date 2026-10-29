@@ -44,6 +44,25 @@
             <TextBlock Text="{l:T 'E-Mail schreiben'}" />
           </StackPanel>
         </Button>
+        <Button Classes="command" Command="{Binding FindDuplicatesCommand}" Margin="8,0,0,0"
+                ToolTip.Tip="{l:T 'Kontakte mit gleichem Namen, gleicher E-Mail-Adresse oder Telefonnummer finden und zusammenführen'}">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource IconPeople}" />
+            <TextBlock Text="{l:T 'Duplikate'}" />
+          </StackPanel>
+        </Button>
+        <!-- List with details, or business cards side by side -->
+        <Button Classes="command" Command="{Binding ToggleViewCommand}" Margin="8,0,0,0"
+                ToolTip.Tip="{l:T 'Zwischen Liste und Visitenkarten umschalten'}">
+          <StackPanel Orientation="Horizontal">
+            <Panel>
+              <PathIcon Data="{StaticResource IconWorkspaces}" IsVisible="{Binding IsListView}" />
+              <PathIcon Data="{StaticResource IconBullets}" IsVisible="{Binding IsCardView}" />
+            </Panel>
+            <TextBlock Text="{l:T 'Visitenkarten'}" IsVisible="{Binding IsListView}" />
+            <TextBlock Text="{l:T 'Liste'}" IsVisible="{Binding IsCardView}" />
+          </StackPanel>
+        </Button>
       </StackPanel>
       </DockPanel>
     </Border>
@@ -99,20 +118,60 @@
         </StackPanel>
       </Border>
 
-      <!-- List -->
-      <Border Classes="pane" Grid.Column="2">
+      <!-- List (and, as business cards, over list and details) -->
+      <Border Classes="pane" Grid.Column="2" Grid.ColumnSpan="{Binding IsCardView, Converter={x:Static app:Converters.CardSpan}}">
         <Grid RowDefinitions="Auto,*">
           <StackPanel Margin="12,12,12,6" Spacing="8">
             <TextBlock Text="{l:T 'Kontakte und Gruppen'}" FontSize="16" FontWeight="SemiBold" />
-            <TextBox Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}">
-              <TextBox.InnerLeftContent>
-                <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
-              </TextBox.InnerLeftContent>
-            </TextBox>
+            <Grid ColumnDefinitions="*,Auto" Width="{Binding IsCardView, Converter={x:Static app:Converters.CardSearchWidth}}" HorizontalAlignment="Left">
+              <TextBox Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}">
+                <TextBox.InnerLeftContent>
+                  <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
+                </TextBox.InnerLeftContent>
+              </TextBox>
+              <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ContactsViewModel.FilterChoices}" SelectedItem="{Binding Show}" Margin="6,0,0,0" MinWidth="0"
+                        ToolTip.Tip="{l:T 'Kontakte und Gruppen, nur Kontakte oder nur Gruppen'}" />
+            </Grid>
           </StackPanel>
 
+          <!-- Business cards -->
+          <ListBox Grid.Row="1" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent" IsVisible="{Binding IsCardView}"
+                   DoubleTapped="OnContactDoubleTapped" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Padding="6,0,6,6">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ContactItem">
+                <Border Width="270" MinHeight="128" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="12,10"
+                        Background="{DynamicResource PaperBrush}">
+                  <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,*">
+                    <Border Width="44" Height="44" CornerRadius="22" Background="{Binding Brush}" ClipToBounds="True" VerticalAlignment="Top">
+                      <Panel>
+                        <Image Source="{Binding Photo}" Stretch="UniformToFill" IsVisible="{Binding HasPhoto}" />
+                        <TextBlock Text="{Binding Initials}" Foreground="White" FontSize="15" FontWeight="SemiBold" IsVisible="{Binding ShowInitials}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <PathIcon Data="{StaticResource IconGroup}" Width="22" Height="22" Foreground="White" IsVisible="{Binding IsGroup}" />
+                      </Panel>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Subtitle}" Classes="subtle" FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasSubtitle}" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" Spacing="4">
+                      <TextBlock Text="{Binding CardEmails}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" TextTrimming="CharacterEllipsis"
+                                 IsVisible="{Binding HasCardEmails}" />
+                      <TextBlock Text="{Binding CardPhones}" FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCardPhones}" />
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
           <ListBox Grid.Row="1" x:Name="ContactList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent"
-                   DoubleTapped="OnContactDoubleTapped">
+                   DoubleTapped="OnContactDoubleTapped" IsVisible="{Binding IsListView}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:ContactItem">
                 <!-- Colored stripe and avatar: the address book the contact comes from -->
@@ -138,7 +197,7 @@
       </Border>
 
       <!-- Details -->
-      <Border Classes="pane" Grid.Column="4" Padding="28,24">
+      <Border Classes="pane" Grid.Column="4" Padding="28,24" IsVisible="{Binding IsListView}">
         <ScrollViewer>
           <StackPanel>
             <!-- Contact -->

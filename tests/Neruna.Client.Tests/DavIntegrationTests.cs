@@ -322,6 +322,35 @@ public sealed class DavIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task CardDav_duplicates_are_merged_and_groups_follow()
+    {
+        Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");
+        var ct = TestContext.Current.CancellationToken;
+        await MakeCollectionAsync($"{_user}/kontakte/", "addressbook", "Kontakte", ct);
+        await using var env = await CreateEnvironmentAsync(ServiceKind.Contacts, ProviderIds.CardDav);
+        await env.Contacts.SyncAllAsync(ct);
+        var book = Assert.Single(await env.Contacts.GetAddressBooksAsync(ct));
+        await env.Contacts.SaveContactAsync(book, ContactDraft.Empty with { GivenName = "Anna", FamilyName = "Muster", Phones = [new ContactField("079 123 45 67", "cell")] }, null, ct);
+        await env.Contacts.SaveContactAsync(book, ContactDraft.Empty with { GivenName = "Anna", FamilyName = "Muster", Emails = [new ContactField("anna@example.com")] }, null, ct);
+        var withMail = (await env.Contacts.SearchAsync(null, ct)).Single(e => e.Card.EmailAddresses.Count > 0);
+        await env.Contacts.SaveGroupAsync(book, new GroupDraft("Verein", [new GroupMember(withMail.Card.MemberUid, null)]), null, ct);
+
+        var set = Assert.Single(ContactMerge.FindDuplicates(await env.Contacts.SearchAsync(null, ct)));
+        var keep = set.Single(e => e.Card.PhoneNumbers.Count > 0);
+        await env.Contacts.MergeContactsAsync(keep, set, ct);
+        await env.Contacts.SyncAllAsync(ct);
+
+        var all = await env.Contacts.SearchAsync(null, ct);
+        var anna = Assert.Single(all, e => !e.Card.IsGroup);
+        Assert.Equal(keep.RemoteId, anna.RemoteId);
+        Assert.Equal(["anna@example.com"], anna.Card.EmailAddresses);
+        Assert.Equal(["079 123 45 67"], anna.Card.PhoneNumbers);
+        var member = Assert.Single((await env.Contacts.ResolveMembersAsync(all.Single(e => e.Card.IsGroup).Card, ct)));
+        Assert.Equal("anna@example.com", member.Address);
+        Assert.Equal(anna.Card.MemberUid, member.Member.ContactUid);
+    }
+
+    [Fact]
     public async Task CardDav_address_books_can_be_rediscovered_and_chosen()
     {
         Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");
