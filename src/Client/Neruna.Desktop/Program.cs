@@ -25,6 +25,20 @@ internal static class Program
         }
 
         velopack.SetArgs(args).Run();
+
+        // Programs Neruna opens (attachments, links, printing) inherit its working folder. Started from the program
+        // folder, an attachment still open would lock it, and the next update could not replace it.
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                Environment.CurrentDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                // Stays in the program folder.
+            }
+        }
         App.Options = AppOptions.FromArgs(args);
 
         // Already running (e.g. a mailto: link or .eml file opened from the system): hand over and end. Asking for the
