@@ -365,12 +365,26 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     // Push and the full sync run in the background; the UI is updated on its thread.
     private void WireBackground()
     {
-        _push.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId));
+        _push.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => RefreshQuietlyAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId)));
         _push.NewMail += (_, e) => _ = Dispatcher.UIThread.InvokeAsync(() => _notifier.NotifyAsync(e, IsOpenInFront, OpenMessageAsync));
 
         // During a full sync: folders and each finished folder appear at once, not only when everything is done.
-        _mail.FoldersSynced += (_, _) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshAfterSyncAsync());
-        _mail.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId));
+        _mail.FoldersSynced += (_, _) => _ = Dispatcher.UIThread.InvokeAsync(() => RefreshQuietlyAsync(MailPage.RefreshAfterSyncAsync));
+        _mail.FolderSynced += (_, folder) => _ = Dispatcher.UIThread.InvokeAsync(() => RefreshQuietlyAsync(() => MailPage.RefreshFolderAsync(folder.ConnectionId, folder.RemoteId)));
+    }
+
+    // A refresh after a sync that finds the database busy for a moment (a sync or the search index writing) is
+    // skipped – the next sync shows it; no crash report for that.
+    private async Task RefreshQuietlyAsync(Func<Task> refresh)
+    {
+        try
+        {
+            await refresh();
+        }
+        catch (System.Data.Common.DbException ex)
+        {
+            _logger.LogWarning(ex, "Refreshing the mail list after a sync failed");
+        }
     }
 
     public MailViewModel MailPage { get; }
