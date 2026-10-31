@@ -71,6 +71,43 @@ public class CalendarSpanTests
     }
 
     [Fact]
+    public void A_task_with_an_exact_duration_or_an_all_day_event_ending_at_a_time_does_not_stop_the_reminders()
+    {
+        // A task beside the birthday in the same file, like SOGo keeps them: "PT24H" on its DATE start as well.
+        var data = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Test//EN
+            BEGIN:VEVENT
+            UID:birthday@example.com
+            DTSTAMP:20130801T000000Z
+            DTSTART;VALUE=DATE:20130830
+            DTEND:20130831T000000
+            RRULE:FREQ=YEARLY
+            SUMMARY:Geburtstag
+            BEGIN:VALARM
+            ACTION:DISPLAY
+            TRIGGER:-PT15M
+            END:VALARM
+            END:VEVENT
+            BEGIN:VTODO
+            UID:todo@example.com
+            DTSTAMP:20130801T000000Z
+            DTSTART;VALUE=DATE:20130830
+            DURATION:PT24H
+            SUMMARY:Geschenk
+            END:VTODO
+            END:VCALENDAR
+            """;
+        var calendar = new CalendarInfo(Guid.NewGuid(), "cal", "Kalender", null, false);
+        var item = new CalendarObject("birthday", null, data);
+
+        var occurrence = Assert.Single(CalendarController.Expand(calendar, item, At("2026-08-29T00:00Z"), At("2026-09-01T00:00Z")));
+        Assert.Equal(new DateTime(2026, 8, 31), occurrence.End.Date);
+        Assert.Single(ReminderService.AlarmsOf(calendar, item, At("2026-08-29T00:00Z"), At("2026-09-01T00:00Z")));
+    }
+
+    [Fact]
     public async Task Views_only_get_the_events_of_their_time_and_old_rows_get_their_span()
     {
         var ct = TestContext.Current.CancellationToken;
