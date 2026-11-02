@@ -2466,5 +2466,12 @@
  "Behalten und ergänzen:": "Mantieni e completa:",
  "Nicht dieselbe Person": "Non è la stessa persona",
  "Zusammenführen": "Unisci",
- "Zusammenführen fehlgeschlagen: ": "Unione non riuscita: "
+ "Zusammenführen fehlgeschlagen: ": "Unione non riuscita: ",
+ "Dieses Konto speichert keine Schlagwörter auf dem Server.": "Questo account non salva etichette sul server.",
+ "Dieses Schlagwort kommt von Ihrer Organisation und wird im Portal verwaltet.": "Questa etichetta proviene dalla tua organizzazione ed è gestita nel portale.",
+ "Ein neuer Name gilt auch für Mails, die das Schlagwort schon haben.": "Un nuovo nome vale anche per le e-mail che hanno già l'etichetta.",
+ "Noch keine Schlagwörter – unter Einstellungen → Schlagwörter anlegen.": "Ancora nessuna etichetta – creale in Impostazioni → Etichette.",
+ "Schlagwort löschen": "Elimina etichetta",
+ "Schlagwörter stehen auf dem Mailserver: was hier markiert wird, sehen Sie auch am Computer und umgekehrt.": "Le etichette restano sul server di posta: ciò che contrassegni qui lo vedi anche sul computer, e viceversa.",
+ "Schlagwörter …": "Etichette …"
 }

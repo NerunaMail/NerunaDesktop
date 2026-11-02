@@ -2466,5 +2466,12 @@
  "Behalten und ergänzen:": "Keep and complete:",
  "Nicht dieselbe Person": "Not the same person",
  "Zusammenführen": "Merge",
- "Zusammenführen fehlgeschlagen: ": "Merging failed: "
+ "Zusammenführen fehlgeschlagen: ": "Merging failed: ",
+ "Dieses Konto speichert keine Schlagwörter auf dem Server.": "This account does not keep tags on the server.",
+ "Dieses Schlagwort kommt von Ihrer Organisation und wird im Portal verwaltet.": "This tag comes from your organisation and is managed in the portal.",
+ "Ein neuer Name gilt auch für Mails, die das Schlagwort schon haben.": "A new name also applies to emails that already have the tag.",
+ "Noch keine Schlagwörter – unter Einstellungen → Schlagwörter anlegen.": "No tags yet – create them under Settings → Tags.",
+ "Schlagwort löschen": "Delete tag",
+ "Schlagwörter stehen auf dem Mailserver: was hier markiert wird, sehen Sie auch am Computer und umgekehrt.": "Tags are kept on the mail server: what you tag here you also see on the computer, and the other way round.",
+ "Schlagwörter …": "Tags …"
 }

@@ -2466,5 +2466,12 @@
  "Behalten und ergänzen:": "Conserver et compléter :",
  "Nicht dieselbe Person": "Pas la même personne",
  "Zusammenführen": "Fusionner",
- "Zusammenführen fehlgeschlagen: ": "Échec de la fusion : "
+ "Zusammenführen fehlgeschlagen: ": "Échec de la fusion : ",
+ "Dieses Konto speichert keine Schlagwörter auf dem Server.": "Ce compte n'enregistre pas d'étiquettes sur le serveur.",
+ "Dieses Schlagwort kommt von Ihrer Organisation und wird im Portal verwaltet.": "Cette étiquette vient de votre organisation et est gérée dans le portail.",
+ "Ein neuer Name gilt auch für Mails, die das Schlagwort schon haben.": "Un nouveau nom s'applique aussi aux e-mails qui ont déjà cette étiquette.",
+ "Noch keine Schlagwörter – unter Einstellungen → Schlagwörter anlegen.": "Pas encore d'étiquettes – créez-les sous Paramètres → Étiquettes.",
+ "Schlagwort löschen": "Supprimer l'étiquette",
+ "Schlagwörter stehen auf dem Mailserver: was hier markiert wird, sehen Sie auch am Computer und umgekehrt.": "Les étiquettes sont enregistrées sur le serveur de messagerie : ce que vous étiquetez ici, vous le voyez aussi sur l'ordinateur, et inversement.",
+ "Schlagwörter …": "Étiquettes …"
 }
