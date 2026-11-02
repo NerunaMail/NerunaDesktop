@@ -34,8 +34,10 @@ internal static class ChoiceDialog
         var dialog = new Window
         {
             Title = title,
-            Width = 440,
-            SizeToContent = SizeToContent.Height,
+            // As wide as the buttons need (three long ones do not fit in 440), the text wrapped at the usual width.
+            MinWidth = 440,
+            MaxWidth = 800,
+            SizeToContent = SizeToContent.WidthAndHeight,
             CanResize = false,
             ShowInTaskbar = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -71,7 +73,7 @@ internal static class ChoiceDialog
         {
             Margin = new Thickness(24, 20),
             Spacing = 20,
-            Children = { new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap }, buttons },
+            Children = { new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 392, HorizontalAlignment = HorizontalAlignment.Left }, buttons },
         };
 
         Open = dialog;

@@ -678,6 +678,19 @@ internal static class Snapshots
 
         await question;
 
+        // The question for a large picture: three buttons, the dialog as wide as they need.
+        var imageQuestion = ChoiceDialog.ShowAsync(window, "Grosses Bild",
+            "«Logo.bmp» ist 3840 × 2160 Pixel und 23.7 MB gross. Für eine Signatur oder Mail genügen 300 Pixel Breite – jede Mail würde sonst unnötig gross.",
+            ("Auf 300 Pixel verkleinern (PNG)", 1, true), ("Original verwenden", 2, false), ("Abbrechen", 0, false));
+        Dispatcher.UIThread.RunJobs();
+        if (ChoiceDialog.Open is { } imageDialog)
+        {
+            await SaveAsync(imageDialog, output, "image-question.png");
+            imageDialog.Close();
+        }
+
+        await imageQuestion;
+
         // A 4K bitmap as logo: recognised as too large, shrunk to a PNG of 300 pixels.
         var bmp = FourKBitmap();
         var bmpInfo = Neruna.Desktop.Editor.InsertedImages.Inspect(bmp)!;
