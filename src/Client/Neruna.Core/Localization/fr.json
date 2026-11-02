@@ -2473,5 +2473,8 @@
  "Noch keine Schlagwörter – unter Einstellungen → Schlagwörter anlegen.": "Pas encore d'étiquettes – créez-les sous Paramètres → Étiquettes.",
  "Schlagwort löschen": "Supprimer l'étiquette",
  "Schlagwörter stehen auf dem Mailserver: was hier markiert wird, sehen Sie auch am Computer und umgekehrt.": "Les étiquettes sont enregistrées sur le serveur de messagerie : ce que vous étiquetez ici, vous le voyez aussi sur l'ordinateur, et inversement.",
- "Schlagwörter …": "Étiquettes …"
+ "Schlagwörter …": "Étiquettes …",
+ "E-Mail-Datei öffnen": "Ouvrir un fichier e-mail",
+ "E-Mail (.eml)": "E-mail (.eml)",
+ "E-Mail-Datei öffnen …": "Ouvrir un fichier e-mail …"
 }

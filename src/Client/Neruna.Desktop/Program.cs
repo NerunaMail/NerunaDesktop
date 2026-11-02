@@ -45,7 +45,7 @@ internal static class Program
         // profile first: done once it is chosen (App).
         if (!App.Options.AskForProfile)
         {
-            if (Infrastructure.SingleInstance.TryHandOver(App.Options, args))
+            if (Infrastructure.SingleInstance.TryHandOver(App.Options, args) || Infrastructure.SingleInstance.TryHandOverToOpenProfile(App.Options, args))
             {
                 return;
             }

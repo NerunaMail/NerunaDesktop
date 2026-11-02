@@ -542,6 +542,16 @@ internal sealed partial class MailViewModel(
     [RelayCommand]
     private async Task NewMailAsync() => await StartComposeAsync(ComposeDraft.Empty, ComposeKind.New);
 
+    /// <summary>A saved mail (.eml) from the file system, shown like one opened from Explorer (Ctrl+O).</summary>
+    [RelayCommand]
+    private async Task OpenMailFileAsync()
+    {
+        if (await files.PickFileAsync(T("E-Mail-Datei öffnen"), T("E-Mail (.eml)"), ["*.eml"]) is { } path)
+        {
+            await OpenFileAsync(path);
+        }
+    }
+
     // Replies to encrypted mail are encrypted again by default.
     [RelayCommand(CanExecute = nameof(CanRespond))]
     private async Task ReplyAsync() => await RespondAsync(MessageComposer.Reply(ReadingPane!.Message!, OwnAddresses(CurrentAccount!.Account), replyAll: false), ComposeKind.Reply);

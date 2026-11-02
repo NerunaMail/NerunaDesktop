@@ -42,7 +42,7 @@ internal sealed partial class App : Application
                 }
 
                 Options = Options.WithProfile(chosen);
-                if (SingleInstance.TryHandOver(Options, []))
+                if (SingleInstance.TryHandOver(Options, [.. (desktop.Args ?? []).Where(SystemOpen.IsOpenable)]))
                 {
                     desktop.Shutdown(); // already open: its window came to the front
                     return;
@@ -161,9 +161,11 @@ internal sealed partial class App : Application
             desktop.ShutdownRequested += (_, _) => Shutdown.Cancel();
             Infrastructure.DefaultMailApp.Current?.Refresh();
 
-            await viewModel.StartAsync();
-            _ = _services.GetRequiredService<PrivacyService>().StartPhishingListAsync();
+            // A file or link the system started Neruna with opens at once, not only after the first sync of all accounts.
+            var starting = viewModel.StartAsync();
             Open(desktop.Args ?? []);
+            await starting;
+            _ = _services.GetRequiredService<PrivacyService>().StartPhishingListAsync();
 
             // After an update: the other profiles that were open come back as well.
             foreach (var id in SystemOpen.ReopenIn(desktop.Args ?? []).Where(id => id != Options.Profile?.Id))

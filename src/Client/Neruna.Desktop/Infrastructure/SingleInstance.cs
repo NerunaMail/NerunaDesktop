@@ -1,4 +1,5 @@
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -43,6 +44,13 @@ internal static class SingleInstance
             // CurrentUserOnly: hand links and files only to a Neruna of this user, never to a pipe another user opened.
             using var pipe = new NamedPipeClientStream(".", PipeName(dataDirectory), PipeDirection.Out, PipeOptions.CurrentUserOnly);
             pipe.Connect(300);
+            // Windows lets only the program the user just started (this one) bring a window to the front: the running
+            // Neruna may take over, else its window and the opened mail stay behind Explorer, only blinking in the taskbar.
+            if (OperatingSystem.IsWindows())
+            {
+                NativeMethods.AllowSetForegroundWindow(-1 /* ASFW_ANY */);
+            }
+
             using var writer = new StreamWriter(pipe, new UTF8Encoding(false));
             writer.WriteLine(JsonSerializer.Serialize(args));
             writer.Flush();
@@ -52,6 +60,23 @@ internal static class SingleInstance
         {
             return false; // nobody listening: this is the first one
         }
+    }
+
+    /// <summary>
+    /// A mailto: link or .eml file without a chosen profile: to the open profile if the start profile is not open (a
+    /// file opened from Explorer goes to the Neruna that is already on screen, not into a second window).
+    /// </summary>
+    public static bool TryHandOverToOpenProfile(AppOptions options, string[] args)
+    {
+        if (options.Root is not { } root || !args.Any(SystemOpen.IsOpenable) || Neruna.Storage.ProfileList.NameIn(args) is not null)
+        {
+            return false;
+        }
+
+        var profiles = Neruna.Storage.ProfileList.Load(root);
+        return profiles.All.Select(profiles.DirectoryOf)
+            .Where(directory => !string.Equals(Path.GetFullPath(directory), Path.GetFullPath(options.DataDirectory), StringComparison.OrdinalIgnoreCase))
+            .Any(directory => TrySend(directory, args));
     }
 
     /// <summary>Receives the arguments of later starts; <paramref name="received"/> runs on a background thread.</summary>
@@ -81,5 +106,13 @@ internal static class SingleInstance
                 }
             }
         }, CancellationToken.None);
+    }
+
+    private static class NativeMethods
+    {
+        [DllImport("user32.dll")]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool AllowSetForegroundWindow(int processId);
     }
 }

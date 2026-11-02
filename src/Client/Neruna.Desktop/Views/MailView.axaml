@@ -11,6 +11,7 @@
 
   <UserControl.KeyBindings>
     <KeyBinding Gesture="Ctrl+N" Command="{Binding NewMailCommand}" />
+    <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenMailFileCommand}" />
     <KeyBinding Gesture="Ctrl+R" Command="{Binding ReplyCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" />
     <KeyBinding Gesture="Ctrl+F" Command="{Binding ForwardCommand}" />
@@ -27,13 +28,24 @@
       <!-- Folder tree, with "Neue E-Mail" on top -->
       <Border Classes="pane" Grid.Column="0" Grid.RowSpan="3" Padding="4,8">
         <DockPanel>
-          <Button DockPanel.Dock="Top" Classes="accent" Command="{Binding NewMailCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                  Padding="12,7" Margin="6,0,6,8" ToolTip.Tip="{l:T 'Neue E-Mail (Ctrl+N)'}">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
-              <TextBlock Text="{l:T 'Neue E-Mail'}" />
-            </StackPanel>
-          </Button>
+          <!-- The arrow beside it: what is needed now and then (a saved .eml file) without a button of its own -->
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="1" Margin="6,0,6,8">
+            <Button Classes="accent" Command="{Binding NewMailCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Padding="12,7" CornerRadius="4,0,0,4" ToolTip.Tip="{l:T 'Neue E-Mail (Ctrl+N)'}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+                <TextBlock Text="{l:T 'Neue E-Mail'}" />
+              </StackPanel>
+            </Button>
+            <Button Grid.Column="1" Classes="accent" Padding="8,7" CornerRadius="0,4,4,0" VerticalAlignment="Stretch" ToolTip.Tip="{l:T 'E-Mail-Datei öffnen …'}">
+              <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" />
+              <Button.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                  <MenuItem Header="{l:T 'E-Mail-Datei öffnen …'}" Command="{Binding OpenMailFileCommand}" InputGesture="Ctrl+O" />
+                </MenuFlyout>
+              </Button.Flyout>
+            </Button>
+          </Grid>
         <!-- Favourites fixed on top (their own scroll bar only when there are very many); the accounts scroll below -->
         <Grid RowDefinitions="Auto,Auto,*">
             <Grid.Styles>

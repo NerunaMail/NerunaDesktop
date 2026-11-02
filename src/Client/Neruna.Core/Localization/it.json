@@ -2473,5 +2473,8 @@
  "Noch keine Schlagwörter – unter Einstellungen → Schlagwörter anlegen.": "Ancora nessuna etichetta – creale in Impostazioni → Etichette.",
  "Schlagwort löschen": "Elimina etichetta",
  "Schlagwörter stehen auf dem Mailserver: was hier markiert wird, sehen Sie auch am Computer und umgekehrt.": "Le etichette restano sul server di posta: ciò che contrassegni qui lo vedi anche sul computer, e viceversa.",
- "Schlagwörter …": "Etichette …"
+ "Schlagwörter …": "Etichette …",
+ "E-Mail-Datei öffnen": "Apri file e-mail",
+ "E-Mail (.eml)": "E-mail (.eml)",
+ "E-Mail-Datei öffnen …": "Apri file e-mail …"
 }

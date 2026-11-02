@@ -2473,5 +2473,8 @@
  "Noch keine Schlagwörter – unter Einstellungen → Schlagwörter anlegen.": "No tags yet – create them under Settings → Tags.",
  "Schlagwort löschen": "Delete tag",
  "Schlagwörter stehen auf dem Mailserver: was hier markiert wird, sehen Sie auch am Computer und umgekehrt.": "Tags are kept on the mail server: what you tag here you also see on the computer, and the other way round.",
- "Schlagwörter …": "Tags …"
+ "Schlagwörter …": "Tags …",
+ "E-Mail-Datei öffnen": "Open email file",
+ "E-Mail (.eml)": "Email (.eml)",
+ "E-Mail-Datei öffnen …": "Open email file …"
 }
