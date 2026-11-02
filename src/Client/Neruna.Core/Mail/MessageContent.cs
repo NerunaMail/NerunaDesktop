@@ -17,6 +17,10 @@ namespace Neruna.Core.Mail;
 /// </remarks>
 public sealed partial class MessageContent
 {
+    // The Windows code pages (1252 …) are not built into .NET: MimeKit needs them for Outlook's winmail.dat (TNEF) and
+    // for mails in such a charset; without them the TNEF reader fails to start and the whole message does not open.
+    static MessageContent() => System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+
     private static readonly HashSet<string> RemovedWithContent = new(StringComparer.OrdinalIgnoreCase)
     {
         "script", "iframe", "frame", "frameset", "object", "embed", "applet", "noscript", "audio", "video", "canvas", "svg", "math", "template",
@@ -978,8 +982,9 @@ public sealed partial class MessageContent
             {
                 converted = tnef.ConvertToMessage();
             }
-            catch (Exception ex) when (ex is FormatException or IOException or ArgumentException or NotSupportedException)
+            catch (Exception ex) when (ex is FormatException or IOException or ArgumentException or NotSupportedException or TypeInitializationException)
             {
+                // Unreadable: offered as winmail.dat rather than the message not opening at all.
                 Candidates.Add(tnef);
                 return;
             }
