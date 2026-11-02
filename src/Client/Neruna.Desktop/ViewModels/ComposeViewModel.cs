@@ -227,6 +227,13 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool RequestReadReceipt { get; set; }
 
+    // The two checkable menu items do not tick themselves.
+    [RelayCommand]
+    private void ToggleDeliveryReceipt() => RequestDeliveryReceipt = !RequestDeliveryReceipt;
+
+    [RelayCommand]
+    private void ToggleReadReceipt() => RequestReadReceipt = !RequestReadReceipt;
+
     /// <summary>The message went out (its recipients are kept in "Verwendete Adressen").</summary>
     public event EventHandler<MimeMessage>? Sent;
 

@@ -270,6 +270,10 @@ internal sealed partial class MailViewModel(
     [RelayCommand]
     private void SortBy(MailSort sort) => ListLayout.SortBy(sort);
 
+    // A checkable menu item does not tick itself: the click turns the order around.
+    [RelayCommand]
+    private void ToggleDescending() => ListLayout.Descending = !ListLayout.Descending;
+
     [RelayCommand]
     private void PlacePane(ReadingPanePosition position)
     {

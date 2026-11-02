@@ -87,9 +87,9 @@
                         ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
           <ctl:ToolButton.Flyout>
             <MenuFlyout Placement="BottomEdgeAlignedLeft">
-              <MenuItem Header="{l:T 'Übermittlungsbestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestDeliveryReceipt}"
+              <MenuItem Header="{l:T 'Übermittlungsbestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestDeliveryReceipt, Mode=OneWay}" Command="{Binding ToggleDeliveryReceiptCommand}"
                         ToolTip.Tip="{l:T 'Der Mailserver meldet, wenn die Nachricht zugestellt wurde – sofern er das unterstützt.'}" />
-              <MenuItem Header="{l:T 'Lesebestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestReadReceipt}"
+              <MenuItem Header="{l:T 'Lesebestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestReadReceipt, Mode=OneWay}" Command="{Binding ToggleReadReceiptCommand}"
                         ToolTip.Tip="{l:T 'Das Mailprogramm des Empfängers fragt, ob es das Lesen bestätigen soll – der Empfänger entscheidet.'}" />
             </MenuFlyout>
           </ctl:ToolButton.Flyout>

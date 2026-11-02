@@ -194,7 +194,7 @@
                     <MenuItem Header="{l:T 'Nach Absender'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsByFrom, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.From}" />
                     <MenuItem Header="{l:T 'Nach Betreff'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsBySubject, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Subject}" />
                     <MenuItem Header="{l:T 'Nach Grösse'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsBySize, Mode=OneWay}" Command="{Binding SortByCommand}" CommandParameter="{x:Static vm:MailSort.Size}" />
-                    <MenuItem Header="{l:T 'Absteigend'}" ToggleType="CheckBox" IsChecked="{Binding ListLayout.Descending}" />
+                    <MenuItem Header="{l:T 'Absteigend'}" ToggleType="CheckBox" IsChecked="{Binding ListLayout.Descending, Mode=OneWay}" Command="{Binding ToggleDescendingCommand}" />
                     <Separator />
                     <MenuItem Header="{l:T 'Lesebereich rechts'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsPaneRight, Mode=OneWay}" Command="{Binding PlacePaneCommand}" CommandParameter="{x:Static vm:ReadingPanePosition.Right}" />
                     <MenuItem Header="{l:T 'Lesebereich unten'}" ToggleType="Radio" IsChecked="{Binding ListLayout.IsPaneBelow, Mode=OneWay}" Command="{Binding PlacePaneCommand}" CommandParameter="{x:Static vm:ReadingPanePosition.Below}" />
