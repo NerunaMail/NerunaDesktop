@@ -29,7 +29,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     private Account _account;
     private ServiceConnection _connection;
     private readonly IFileService _files;
-    private readonly ComposeDraft _draft;
+    private ComposeDraft _draft;
     private readonly SecureMimeService _secureMime;
     private readonly ISettingsStore _settings;
     private readonly SignatureService _signatures;
@@ -48,6 +48,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     private bool _signatureChosen;
     private int _signatureVersion;
     private ComposeDraft? _editorDraft;
+    private bool _parked;
+    private readonly HashSet<IHtmlEditor> _wired = [];
 
     // Drafts: the saved copy in "Entwürfe", replaced on every save. Edits are counted; a save records the count it
     // captured, so changes typed while saving are not mistaken for saved.
@@ -574,15 +576,18 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     {
         ArgumentNullException.ThrowIfNull(editor);
         _editor = editor;
-        editor.SendRequested += (_, _) =>
+        if (_wired.Add(editor)) // the same editor again after Park: wired already
         {
-            if (SendCommand.CanExecute(null))
+            editor.SendRequested += (_, _) =>
             {
-                _ = SendCommand.ExecuteAsync(null);
-            }
-        };
-        editor.SaveRequested += (_, _) => _ = SaveDraftCommand.ExecuteAsync(null);
-        editor.ContentChanged += (_, _) => MarkChanged();
+                if (SendCommand.CanExecute(null))
+                {
+                    _ = SendCommand.ExecuteAsync(null);
+                }
+            };
+            editor.SaveRequested += (_, _) => _ = SaveDraftCommand.ExecuteAsync(null);
+            editor.ContentChanged += (_, _) => MarkChanged();
+        }
 
         var font = await _settings.GetAsync(SettingKeys.ComposeFont) is { Length: > 0 } configured ? configured : FontCatalog.DefaultFont;
         var size = double.TryParse(await _settings.GetAsync(SettingKeys.ComposeFontSize), NumberStyles.Float, CultureInfo.InvariantCulture, out var pt) ? pt : 11;
@@ -590,7 +595,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         // A popped-out or saved draft already carries its signature (which one is not known: left as it is). Otherwise
         // the one last used for these recipients, else the account's default.
         ComposeDraft draft;
-        if (_draft.HtmlBody?.Contains(SignatureBlock.ElementId, StringComparison.Ordinal) == true || _draft.DraftRemoteId is not null)
+        if (_parked || _draft.HtmlBody?.Contains(SignatureBlock.ElementId, StringComparison.Ordinal) == true || _draft.DraftRemoteId is not null)
         {
             draft = _draft;
         }
@@ -607,6 +612,30 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         editor.SetParagraphSpacing(await _settings.GetParagraphSpacingAsync());
         _editorDraft = draft;
         await LoadTemplatesAsync(editor);
+    }
+
+    /// <summary>
+    /// The form leaves the screen (switching to the calendar): the text typed so far stays with it for when it comes
+    /// back in a new editor, and the draft is saved.
+    /// </summary>
+    public void Park(IHtmlEditor editor)
+    {
+        if (_finished || editor != _editor)
+        {
+            return;
+        }
+
+        var shown = _editorDraft ?? _draft;
+        _draft = editor.IsPlainText ? shown with { HtmlBody = null, Body = editor.GetPlainText() }
+            : editor.LastHtml is { } html ? shown with { HtmlBody = html }
+            : shown;
+        _editor = null;
+        _editorDraft = null;
+        _parked = true;
+        if (IsDirty)
+        {
+            _ = SaveDraftCommand.ExecuteAsync(null);
+        }
     }
 
     /// <summary>

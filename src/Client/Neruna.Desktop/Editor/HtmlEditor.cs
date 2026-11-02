@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using Neruna.Core.Mail;
+using Neruna.Desktop.Infrastructure;
 
 namespace Neruna.Desktop.Editor;
 
@@ -60,6 +61,12 @@ internal interface IHtmlEditor
 
     /// <summary>Like <see cref="GetHtmlAsync"/>, but without the default-font wrapper.</summary>
     Task<string?> GetBodyHtmlAsync();
+
+    /// <summary>
+    /// The body as last reported by the page (a moment after each change), without asking it – still there when the
+    /// page is gone. Null before the first change.
+    /// </summary>
+    string? LastHtml { get; }
 
     string GetPlainText();
 
@@ -230,7 +237,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         if (paths.Count == 0)
         {
             // No paths (WebKit without file:// URIs): the content only, to attach.
-            _ = ScriptAsync($"neruna.readDroppedFiles({MaxDroppedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
+            ScriptAsync($"neruna.readDroppedFiles({MaxDroppedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)})").Forget();
             return;
         }
 
@@ -277,7 +284,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         }
         else if (_ready)
         {
-            _ = PushContentAsync();
+            PushContentAsync().Forget();
         }
     }
 
@@ -327,6 +334,8 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
     private string? _lastHtml;
 
+    public string? LastHtml => _preview is not null ? PreviewHtml() : _lastHtml;
+
     public async Task<string?> GetBodyHtmlAsync()
     {
         if (!IsRich || _web is null)
@@ -344,7 +353,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     public void SetShortcuts(IReadOnlyDictionary<string, (string Html, string Text)> shortcuts)
     {
         _shortcuts = shortcuts;
-        _ = PushShortcutsAsync();
+        PushShortcutsAsync().Forget();
     }
 
     private async Task PushShortcutsAsync()
@@ -364,7 +373,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         _autoLists = enabled;
         if (_web is not null && _ready)
         {
-            _ = ScriptAsync($"neruna.setAutoLists({(enabled ? "true" : "false")})");
+            ScriptAsync($"neruna.setAutoLists({(enabled ? "true" : "false")})").Forget();
         }
     }
 
@@ -375,7 +384,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         _paragraphSpacing = lines;
         if (_web is not null && _ready)
         {
-            _ = PushParagraphSpacingAsync();
+            PushParagraphSpacingAsync().Forget();
         }
     }
 
@@ -667,14 +676,14 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
             case "ready":
                 _ready = true;
                 HookNativeFiles(_web?.TryGetPlatformHandle());
-                _ = PushContentAsync();
-                _ = PushShortcutsAsync();
-                _ = ScriptAsync($"neruna.setAutoLists({(_autoLists ? "true" : "false")})");
-                _ = PushParagraphSpacingAsync();
+                PushContentAsync().Forget();
+                PushShortcutsAsync().Forget();
+                ScriptAsync($"neruna.setAutoLists({(_autoLists ? "true" : "false")})").Forget();
+                PushParagraphSpacingAsync().Forget();
                 if (OperatingSystem.IsLinux())
                 {
                     // WebKitGTK in the embedded view gets the keys but draws no caret: the page draws one.
-                    _ = ScriptAsync("neruna.drawCaret(true)");
+                    ScriptAsync("neruna.drawCaret(true)").Forget();
                 }
 
                 ModeChanged?.Invoke(this, true);
@@ -687,6 +696,9 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 break;
             case "changed":
                 ContentChanged?.Invoke(this, EventArgs.Empty);
+                break;
+            case "html" when message.TryGetProperty("html", out var html):
+                _lastHtml = html.GetString();
                 break;
             case "image" when message.TryGetProperty("data", out var data) && data.GetString() is { } dataUrl:
                 ImagePasted?.Invoke(this, dataUrl);

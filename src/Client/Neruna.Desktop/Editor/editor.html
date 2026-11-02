@@ -48,7 +48,22 @@
   var lastState = "";
   var stateTimer = 0;
 
+  // Shortly after each change (and when the text loses focus) the HTML goes to the app too: if the page is
+  // unloaded (switching to the calendar), what was typed is not lost.
+  var htmlTimer = null;
+  function postHtml() {
+    clearTimeout(htmlTimer);
+    htmlTimer = null;
+    if (window.neruna && window.neruna.getHtml) post({ type: "html", html: window.neruna.getHtml() });
+  }
+
+  editor.addEventListener("blur", function () { if (htmlTimer) postHtml(); });
+
   function post(message) {
+    if (message.type === "changed") {
+      clearTimeout(htmlTimer);
+      htmlTimer = setTimeout(postHtml, 300);
+    }
     if (typeof window.invokeCSharpAction === "function") {
       window.invokeCSharpAction(JSON.stringify(message));
     } else if (typeof window.__nerunaTestSink === "function") {

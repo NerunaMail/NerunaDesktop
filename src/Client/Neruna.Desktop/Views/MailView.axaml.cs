@@ -223,6 +223,13 @@ internal sealed partial class MailView : UserControl
             return;
         }
 
+        // Focus already on a message of the list (Shift+arrows extend the selection from there): left where it is –
+        // moving it to the first selected one would make the next Shift+↓ start over.
+        if (!lost && focused is ListBoxItem current && ItemsControl.ItemsControlFromItemContainer(current) == list)
+        {
+            return;
+        }
+
         list.ScrollIntoView(selected);
         if (list.ContainerFromItem(selected) is ListBoxItem item && !item.IsFocused)
         {

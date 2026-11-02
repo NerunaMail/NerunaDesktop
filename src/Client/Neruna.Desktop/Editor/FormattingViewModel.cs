@@ -109,6 +109,20 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
         ArgumentNullException.ThrowIfNull(editor);
         _editor = editor;
         _ = editor.SetSpellLanguageAsync(SpellLanguage.Code); // e.g. a popped-out draft: the language it had
+        if (_wired.Add(editor)) // the same editor again (its view back on screen): its events are already wired
+        {
+            Wire(editor);
+        }
+
+        IsRichText = !editor.IsPlainText;
+        ApplyState(new EditorState(false, false, false, false, false, false, font, sizePt, "#000000"));
+        editor.Load(html, font, sizePt, placeholder);
+    }
+
+    private readonly HashSet<IHtmlEditor> _wired = [];
+
+    private void Wire(IHtmlEditor editor)
+    {
         editor.StateChanged += (_, state) => ApplyState(state);
         editor.ImagePasted += async (_, dataUrl) =>
         {
@@ -124,9 +138,6 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
             }
         };
         editor.ModeChanged += (_, rich) => IsRichText = rich;
-        IsRichText = !editor.IsPlainText;
-        ApplyState(new EditorState(false, false, false, false, false, false, font, sizePt, "#000000"));
-        editor.Load(html, font, sizePt, placeholder);
     }
 
     public Task RunAsync(string script) => _editor?.RunAsync(script) ?? Task.CompletedTask;

@@ -88,7 +88,7 @@ internal sealed partial class MessageBodyView : UserControl
         else if (e.Key == Avalonia.Input.Key.A)
         {
             e.Handled = true;
-            _ = _web.InvokeScript("(function(){var s=window.getSelection();s.removeAllRanges();var r=document.createRange();r.selectNodeContents(document.body);s.addRange(r);return \"ok\";})()");
+            _web.InvokeScript("(function(){var s=window.getSelection();s.removeAllRanges();var r=document.createRange();r.selectNodeContents(document.body);s.addRange(r);return \"ok\";})()").Forget();
         }
     }
 
@@ -339,7 +339,7 @@ internal sealed partial class MessageBodyView : UserControl
 
         _written = true;
         CrashHandler.Logger?.LogInformation("Mail page ready in the web view after {Elapsed} ms", _shownAt?.ElapsedMilliseconds);
-        _ = _web.InvokeScript("document.open();document.write(" + System.Text.Json.JsonSerializer.Serialize(page) + ");document.close();" + KeyScript + ";\"ok\""); // a result WebKitGTK can return (undefined fails there)
+        _web.InvokeScript("document.open();document.write(" + System.Text.Json.JsonSerializer.Serialize(page) + ");document.close();" + KeyScript + ";\"ok\"").Forget(); // a result WebKitGTK can return (undefined fails there)
     }
 
     private void OnWebMessage(object? sender, WebMessageReceivedEventArgs e)

@@ -30,26 +30,41 @@ internal sealed partial class ComposeView : UserControl
         AddHandler(DragDrop.DragOverEvent, OnDragOver, handledEventsToo: true);
         AddHandler(DragDrop.DropEvent, OnDrop, handledEventsToo: true);
         AddHandler(DragDrop.DragLeaveEvent, (_, _) => _secondaryDrag = false, handledEventsToo: true);
-        DataContextChanged += async (_, _) =>
+        // Leaving for another page: the next ComposeView gets a new editor, so what was typed must stay behind.
+        DetachedFromVisualTree += (_, _) =>
         {
-            if (DataContext is ComposeViewModel vm && vm != _attached)
+            if (_attached is { } parked)
             {
-                _attached = vm;
-                await vm.AttachEditorAsync(this.FindControl<HtmlEditor>("Editor")!);
-
-                // New mail or forward (no recipient yet): start in "An". A reply has its recipient: start typing the answer.
-                if (string.IsNullOrWhiteSpace(vm.To))
-                {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<Neruna.Desktop.Controls.RecipientBox>("ToBox")?.FocusText(),
-                        Avalonia.Threading.DispatcherPriority.Loaded);
-                }
-                else
-                {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<HtmlEditor>("Editor")?.FocusEditor(),
-                        Avalonia.Threading.DispatcherPriority.Loaded);
-                }
+                parked.Park(editor);
+                _attached = null;
             }
         };
+        // The same view back on screen (the WebView has reloaded its page): the parked text goes into it again.
+        AttachedToVisualTree += async (_, _) => await AttachAsync();
+        DataContextChanged += async (_, _) => await AttachAsync();
+    }
+
+    private async Task AttachAsync()
+    {
+        if (DataContext is not ComposeViewModel vm || vm == _attached || VisualRoot is null)
+        {
+            return;
+        }
+
+        _attached = vm;
+        await vm.AttachEditorAsync(this.FindControl<HtmlEditor>("Editor")!);
+
+        // New mail or forward (no recipient yet): start in "An". A reply has its recipient: start typing the answer.
+        if (string.IsNullOrWhiteSpace(vm.To))
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<Neruna.Desktop.Controls.RecipientBox>("ToBox")?.FocusText(),
+                Avalonia.Threading.DispatcherPriority.Loaded);
+        }
+        else
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<HtmlEditor>("Editor")?.FocusEditor(),
+                Avalonia.Threading.DispatcherPriority.Loaded);
+        }
     }
 
     private bool _secondaryDrag;
