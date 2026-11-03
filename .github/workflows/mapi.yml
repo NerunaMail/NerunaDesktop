@@ -28,6 +28,6 @@ jobs:
             exports=$($dll -p | sed -n '/Ordinal\/Name Pointer/,/^$/p')
             echo "$exports"
             for name in MAPILogon MAPILogoff MAPISendMail MAPISendMailW MAPISendDocuments MAPIResolveName MAPIFreeBuffer; do
-              grep -qE "\] $name\$" <<< "$exports" || { echo "::error title=MAPI exports::$name missing in ${dll##* }"; exit 1; }
+              grep -qE "[[:space:]]$name[[:space:]]*\$" <<< "$exports" || { echo "::error title=MAPI exports::$name missing in ${dll##* }%0A$(sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g' <<< "$exports" | head -c 2500)"; exit 1; }
             done
           done
