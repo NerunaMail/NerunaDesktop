@@ -23,10 +23,12 @@ internal enum MapiState
 
 /// <summary>
 /// Simple MAPI on Windows ("Per E-Mail senden" in accounting software, PDF tools …): Windows looks up the DLL of the
-/// default mail program only for the whole computer (HKLM\Software\Clients\Mail\Neruna\DLLPath, for 32-bit programs
-/// under WOW6432Node). Setting it up therefore asks for administrator rights once: the two DLLs are copied to
-/// %ProgramFiles%\Neruna\MAPI (so every user of a terminal server reaches them; each one's own neruna.exe is found
-/// through his registration) and registered. Which mail program a user's programs use is his own choice (HKCU).
+/// default mail program only for the whole computer, in HKLM\Software\Clients\Mail\Neruna\DLLPath – a key 32-bit and
+/// 64-bit programs share, so one path has to serve both. It therefore names %SystemRoot%\System32\NerunaMapi.dll:
+/// the 64-bit DLL lies there, the 32-bit one under the same name in SysWOW64, where Windows redirects 32-bit programs
+/// asking for System32. Setting it up asks for administrator rights once (copying, registering); every user of a
+/// terminal server then reaches the DLLs, and each one's own neruna.exe is found through his registration. Which mail
+/// program a user's programs use is his own choice (HKCU\Software\Clients\Mail).
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal static class MapiSetup
@@ -35,8 +37,15 @@ internal static class MapiSetup
     private const string NerunaKey = ClientsKey + @"\Neruna";
     private const string Dll64 = "NerunaMapi64.dll";
     private const string Dll32 = "NerunaMapi32.dll";
+    private const string Installed = "NerunaMapi.dll";
 
-    private static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Neruna", "MAPI");
+    /// <summary>The path in the registry; 32-bit programs land in SysWOW64.</summary>
+    private static string Target64 => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), Installed);
+
+    private static string Target32 => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.SystemX86), Installed);
+
+    // 0.25.0/0.25.1 copied them here (one path per bitness, which the shared key cannot hold): removed when setting up.
+    private static string OldFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Neruna", "MAPI");
 
     private static string Shipped(string dll) => Path.Combine(AppContext.BaseDirectory, dll);
 
@@ -47,7 +56,7 @@ internal static class MapiSetup
             return MapiState.Unavailable;
         }
 
-        if (!IsRegistered(RegistryView.Registry64, Dll64) || !IsRegistered(RegistryView.Registry32, Dll32))
+        if (!IsRegistered())
         {
             return MapiState.Off;
         }
@@ -58,29 +67,27 @@ internal static class MapiSetup
 
     /// <summary>
     /// Copies and registers the DLLs (one confirmation by Windows), then makes Neruna this user's MAPI program.
-    /// Whether it worked is read from the registry afterwards (not from the exit code of the elevated cmd).
+    /// Whether it worked is read from the registry and the files afterwards (not from the exit code of the elevated cmd).
     /// </summary>
     public static async Task<MapiSetupResult> SetUpAsync()
     {
-        if (!IsRegistered(RegistryView.Registry64, Dll64) || !IsRegistered(RegistryView.Registry32, Dll32) || IsOutdated())
+        if (!IsRegistered() || IsOutdated())
         {
             var ran = await RunElevatedAsync(
             [
+                $"copy /y \"{Shipped(Dll64)}\" \"{Target64}\"",
+                $"copy /y \"{Shipped(Dll32)}\" \"{Target32}\"",
+                $"reg add \"HKLM\\{NerunaKey}\" /ve /d Neruna /t REG_SZ /f /reg:64",
+                $"reg add \"HKLM\\{NerunaKey}\" /v DLLPath /d \"{Target64}\" /t REG_SZ /f /reg:64",
                 // In brackets: "if" would otherwise take everything after it as its own command.
-                $"(if not exist \"{Folder}\" mkdir \"{Folder}\")",
-                $"copy /y \"{Shipped(Dll64)}\" \"{Path.Combine(Folder, Dll64)}\"",
-                $"copy /y \"{Shipped(Dll32)}\" \"{Path.Combine(Folder, Dll32)}\"",
-                Reg(64, "/ve /d Neruna"),
-                Reg(64, $"/v DLLPath /d \"{Path.Combine(Folder, Dll64)}\""),
-                Reg(32, "/ve /d Neruna"),
-                Reg(32, $"/v DLLPath /d \"{Path.Combine(Folder, Dll32)}\""),
+                $"(if exist \"{OldFolder}\" rmdir /s /q \"{OldFolder}\")",
             ]);
             if (ran.Declined)
             {
                 return ran;
             }
 
-            if (!IsRegistered(RegistryView.Registry64, Dll64) || !IsRegistered(RegistryView.Registry32, Dll32))
+            if (!IsRegistered())
             {
                 return ran with { Ok = false };
             }
@@ -106,27 +113,27 @@ internal static class MapiSetup
         var ran = await RunElevatedAsync(
         [
             $"reg delete \"HKLM\\{NerunaKey}\" /v DLLPath /f /reg:64",
-            $"reg delete \"HKLM\\{NerunaKey}\" /v DLLPath /f /reg:32",
-            $"rmdir /s /q \"{Folder}\"",
+            $"del /f /q \"{Target64}\"",
+            $"del /f /q \"{Target32}\"",
+            $"(if exist \"{OldFolder}\" rmdir /s /q \"{OldFolder}\")",
         ], stopOnError: false);
-        return ran.Declined ? ran : ran with { Ok = !IsRegistered(RegistryView.Registry64, Dll64) && !IsRegistered(RegistryView.Registry32, Dll32) };
+        return ran.Declined ? ran : ran with { Ok = !IsRegistered() };
     }
 
-    private static string Reg(int bits, string value) => $"reg add \"HKLM\\{NerunaKey}\" {value} /t REG_SZ /f /reg:{bits}";
-
-    private static bool IsRegistered(RegistryView view, string dll)
+    private static bool IsRegistered()
     {
-        using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+        using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
         using var key = machine.OpenSubKey(NerunaKey);
         return key?.GetValue("DLLPath") is string path
-               && string.Equals(path, Path.Combine(Folder, dll), StringComparison.OrdinalIgnoreCase)
-               && File.Exists(path);
+               && string.Equals(path, Target64, StringComparison.OrdinalIgnoreCase)
+               && File.Exists(Target64)
+               && File.Exists(Target32);
     }
 
-    // A newer Neruna ships a changed DLL: the copy in Program Files is renewed with the next "Einrichten".
+    // A newer Neruna ships a changed DLL: the installed copies are renewed with the next "Einrichten".
     private static bool IsOutdated() =>
-        new[] { Dll64, Dll32 }.Any(dll => !File.Exists(Path.Combine(Folder, dll))
-                                          || !File.ReadAllBytes(Shipped(dll)).AsSpan().SequenceEqual(File.ReadAllBytes(Path.Combine(Folder, dll))));
+        new[] { (Dll64, Target64), (Dll32, Target32) }.Any(pair => !File.Exists(pair.Item2)
+            || !File.ReadAllBytes(Shipped(pair.Item1)).AsSpan().SequenceEqual(File.ReadAllBytes(pair.Item2)));
 
     // What the elevated cmd wrote (also when it ran as another user, an administrator signing in): ProgramData is
     // writable for administrators and readable for everyone.

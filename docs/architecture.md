@@ -632,9 +632,10 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   im Release neben `neruna.exe`) nimmt `MAPISendMail(W)`/`MAPISendDocuments` an, kopiert die Anhänge nach
   `%TEMP%\Neruna-MAPI\…` und startet `neruna.exe` mit einer `.nerunamapi`-Datei (JSON); `MapiRequest` macht daraus
   ein neues Mail – versendet wird nie ohne den Benutzer. Lesen von Mails/Adressbuch: `MAPI_E_NOT_SUPPORTED`.
-  Windows liest `DLLPath` nur maschinenweit: «Für andere Programme einrichten» (`MapiSetup`) kopiert die DLLs mit
-  einmaligen Administratorrechten nach `%ProgramFiles%\Neruna\MAPI` (alle Benutzer eines Terminalservers) und setzt
-  `HKLM\Software\Clients\Mail\Neruna\DLLPath` (64 und 32 Bit); die Wahl des Programms bleibt pro Benutzer
+  Windows liest `DLLPath` nur maschinenweit, und `HKLM\Software\Clients` teilen sich 32- und 64-Bit-Programme (ein
+  Pfad für beide): «Für andere Programme einrichten» (`MapiSetup`) kopiert mit einmaligen Administratorrechten die
+  64-Bit-DLL nach `System32\NerunaMapi.dll` und die 32-Bit-DLL unter demselben Namen nach `SysWOW64` (32-Bit-Programme
+  werden dorthin umgeleitet) und setzt `DLLPath` auf den System32-Pfad; die Wahl des Programms bleibt pro Benutzer
   (`HKCU\Software\Clients\Mail`), die DLL findet `neruna.exe` über dessen Registrierung. Outlook-Automation
   (`Outlook.Application`) ist bewusst nicht nachgebaut.
 
