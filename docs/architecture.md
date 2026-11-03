@@ -628,6 +628,15 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 - Eine Instanz pro Datenordner (`SingleInstance`, lokale Pipe): ein zweiter Start reicht seine Argumente weiter.
   macOS liefert Links/Dateien als Systemereignis (`IActivatableLifetime`).
 - Deinstallation (Velopack-Hook) entfernt die Windows-Registrierung.
+- Senden aus anderen Programmen (nur Windows, Simple MAPI): `native/mapi/neruna_mapi.c` (C, mingw-w64, 64 und 32 Bit,
+  im Release neben `neruna.exe`) nimmt `MAPISendMail(W)`/`MAPISendDocuments` an, kopiert die Anhänge nach
+  `%TEMP%\Neruna-MAPI\…` und startet `neruna.exe` mit einer `.nerunamapi`-Datei (JSON); `MapiRequest` macht daraus
+  ein neues Mail – versendet wird nie ohne den Benutzer. Lesen von Mails/Adressbuch: `MAPI_E_NOT_SUPPORTED`.
+  Windows liest `DLLPath` nur maschinenweit: «Für andere Programme einrichten» (`MapiSetup`) kopiert die DLLs mit
+  einmaligen Administratorrechten nach `%ProgramFiles%\Neruna\MAPI` (alle Benutzer eines Terminalservers) und setzt
+  `HKLM\Software\Clients\Mail\Neruna\DLLPath` (64 und 32 Bit); die Wahl des Programms bleibt pro Benutzer
+  (`HKCU\Software\Clients\Mail`), die DLL findet `neruna.exe` über dessen Registrierung. Outlook-Automation
+  (`Outlook.Application`) ist bewusst nicht nachgebaut.
 
 ## 6d. Anbieter mit eigener Anmeldung (OAuth2)
 

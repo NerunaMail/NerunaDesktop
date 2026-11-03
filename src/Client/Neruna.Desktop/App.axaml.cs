@@ -69,6 +69,7 @@ internal sealed partial class App : Application
                 try
                 {
                     Neruna.Core.Security.OpenedAttachments.CleanUp(TimeSpan.FromDays(1));
+                    Neruna.Core.Mail.MapiRequest.CleanUp(Path.GetTempPath(), TimeSpan.FromDays(1));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {

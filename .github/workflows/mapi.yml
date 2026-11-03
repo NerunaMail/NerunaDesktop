@@ -23,5 +23,11 @@ jobs:
             exit 1
           fi
           ls -la out
-          x86_64-w64-mingw32-objdump -p out/NerunaMapi64.dll | grep -A20 "Ordinal/Name Pointer" | head -25
-          i686-w64-mingw32-objdump -p out/NerunaMapi32.dll | grep -A20 "Ordinal/Name Pointer" | head -25
+          # mapi32.dll looks the functions up by their plain names: no "_MAPISendMail@20" in the 32-bit one.
+          for dll in "x86_64-w64-mingw32-objdump out/NerunaMapi64.dll" "i686-w64-mingw32-objdump out/NerunaMapi32.dll"; do
+            exports=$($dll -p | sed -n '/Ordinal\/Name Pointer/,/^$/p')
+            echo "$exports"
+            for name in MAPILogon MAPILogoff MAPISendMail MAPISendMailW MAPISendDocuments MAPIResolveName MAPIFreeBuffer; do
+              grep -qE "\] $name\$" <<< "$exports" || { echo "::error title=MAPI exports::$name missing in ${dll##* }"; exit 1; }
+            done
+          done

@@ -26,5 +26,8 @@ internal static class SystemOpen
 
     public static bool IsEml(string item) => item.EndsWith(".eml", StringComparison.OrdinalIgnoreCase) && File.Exists(item);
 
-    public static bool IsOpenable(string item) => item == Activate || IsMailto(item) || IsEml(item);
+    /// <summary>A mail handed over by another program through Simple MAPI (Neruna's DLL; see MapiRequest).</summary>
+    public static bool IsMapi(string item) => Neruna.Core.Mail.MapiRequest.IsRequest(item);
+
+    public static bool IsOpenable(string item) => item == Activate || IsMailto(item) || IsEml(item) || IsMapi(item);
 }

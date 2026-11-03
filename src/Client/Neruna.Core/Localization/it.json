@@ -2476,5 +2476,17 @@
  "Schlagwörter …": "Etichette …",
  "E-Mail-Datei öffnen": "Apri file e-mail",
  "E-Mail (.eml)": "E-mail (.eml)",
- "E-Mail-Datei öffnen …": "Apri file e-mail …"
+ "E-Mail-Datei öffnen …": "Apri file e-mail …",
+ "Die Mail des anderen Programms konnte nicht übernommen werden": "Non è stato possibile riprendere l'e-mail dell'altro programma",
+ "Eingerichtet, aber Ihre Programme verwenden noch ein anderes Mailprogramm.": "Configurato, ma i tuoi programmi usano ancora un altro programma di posta.",
+ "Einrichten fehlgeschlagen: {0}": "Configurazione non riuscita: {0}",
+ "Entfernen fehlgeschlagen: {0}": "Rimozione non riuscita: {0}",
+ "Für andere Programme einrichten …": "Configura per altri programmi …",
+ "Ihre Programme verwenden wieder das bisherige Mailprogramm. Für alle Benutzer entfernen braucht Administratorrechte.": "I tuoi programmi usano di nuovo il programma di posta precedente. Rimuoverlo per tutti gli utenti richiede diritti di amministratore.",
+ "In dieser Version nicht verfügbar.": "Non disponibile in questa versione.",
+ "Ohne Administratorrechte lässt sich das nicht einrichten. Bitte erneut versuchen und bei der Frage von Windows «Ja» wählen.": "Senza diritti di amministratore non è possibile configurarlo. Riprova e scegli «Sì» quando Windows lo chiede.",
+ "Programme, die per E-Mail senden (z. B. Buchhaltung, PDF-Programme), verwenden noch ein anderes Mailprogramm.": "I programmi che inviano per e-mail (p. es. contabilità, programmi PDF) usano ancora un altro programma di posta.",
+ "Programme, die per E-Mail senden (z. B. Buchhaltung, PDF-Programme), öffnen ein neues Mail in Neruna – mit Empfängern, Betreff, Text und Anhängen.": "I programmi che inviano per e-mail (p. es. contabilità, programmi PDF) aprono una nuova e-mail in Neruna – con destinatari, oggetto, testo e allegati.",
+ "Senden aus anderen Programmen": "Invio da altri programmi",
+ "Über die Windows-Schnittstelle MAPI. Windows fragt einmal nach Administratorrechten: die Schnittstelle gilt für den ganzen Computer, welches Mailprogramm verwendet wird, wählt jeder Benutzer selbst. Neruna versendet nie von sich aus – Sie prüfen das Mail und klicken auf «Senden».": "Tramite l'interfaccia Windows MAPI. Windows chiede una volta i diritti di amministratore: l'interfaccia vale per tutto il computer, ogni utente sceglie quale programma di posta usare. Neruna non invia mai da solo – controlli l'e-mail e clicchi su «Invia»."
 }

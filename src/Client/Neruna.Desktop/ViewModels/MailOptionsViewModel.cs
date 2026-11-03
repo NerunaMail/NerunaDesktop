@@ -141,9 +141,89 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         await CheckDefaultAppAsync();
     }
 
+    // ── Other programs (Simple MAPI, Windows): "Per E-Mail senden" opens a new mail in Neruna ──
+
+    public static bool CanOfferMapi => OperatingSystem.IsWindows();
+
+    [ObservableProperty]
+    public partial string MapiStatus { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool IsMapiOn { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanSetUpMapi { get; set; }
+
+    [ObservableProperty]
+    public partial string? MapiHint { get; set; }
+
+    private async Task CheckMapiAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var state = await Task.Run(Infrastructure.MapiSetup.GetState);
+        IsMapiOn = state == Infrastructure.MapiState.On;
+        CanSetUpMapi = state is Infrastructure.MapiState.Off or Infrastructure.MapiState.OtherDefault;
+        MapiStatus = state switch
+        {
+            Infrastructure.MapiState.On => T("Programme, die per E-Mail senden (z. B. Buchhaltung, PDF-Programme), öffnen ein neues Mail in Neruna – mit Empfängern, Betreff, Text und Anhängen."),
+            Infrastructure.MapiState.OtherDefault => T("Eingerichtet, aber Ihre Programme verwenden noch ein anderes Mailprogramm."),
+            Infrastructure.MapiState.Off => T("Programme, die per E-Mail senden (z. B. Buchhaltung, PDF-Programme), verwenden noch ein anderes Mailprogramm."),
+            _ => T("In dieser Version nicht verfügbar."),
+        };
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private async Task SetUpMapiAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            MapiHint = await Infrastructure.MapiSetup.SetUpAsync()
+                ? null
+                : T("Ohne Administratorrechte lässt sich das nicht einrichten. Bitte erneut versuchen und bei der Frage von Windows «Ja» wählen.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            MapiHint = F("Einrichten fehlgeschlagen: {0}", ex.Message);
+        }
+
+        await CheckMapiAsync();
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private async Task RemoveMapiAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            MapiHint = await Infrastructure.MapiSetup.RemoveAsync()
+                ? null
+                : T("Ihre Programme verwenden wieder das bisherige Mailprogramm. Für alle Benutzer entfernen braucht Administratorrechte.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            MapiHint = F("Entfernen fehlgeschlagen: {0}", ex.Message);
+        }
+
+        await CheckMapiAsync();
+    }
+
     public async Task ReloadAsync()
     {
         _ = CheckDefaultAppAsync();
+        _ = CheckMapiAsync();
         _loading = true;
         try
         {

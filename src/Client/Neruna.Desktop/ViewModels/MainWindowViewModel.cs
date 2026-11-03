@@ -511,6 +511,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             {
                 await MailPage.OpenFileAsync(item);
             }
+            else if (SystemOpen.IsMapi(item))
+            {
+                Overlay = Overlay is CrashReportViewModel ? Overlay : null;
+                CurrentPage = MailPage;
+                await MailPage.ComposeFromProgramAsync(item);
+            }
         }
     }
 

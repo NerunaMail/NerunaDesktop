@@ -732,6 +732,26 @@ internal sealed partial class MailViewModel(
         }
     }
 
+    /// <summary>
+    /// A mail another program hands over ("Per E-Mail senden" through Simple MAPI): opened as a new mail with its
+    /// recipients, subject, text and attachments – sent only when the user sends it.
+    /// </summary>
+    public async Task ComposeFromProgramAsync(string path)
+    {
+        ComposeDraft draft;
+        try
+        {
+            draft = await MapiRequest.ReadAsync(path);
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException or UnauthorizedAccessException)
+        {
+            Report(T("Die Mail des anderen Programms konnte nicht übernommen werden"), ex);
+            return;
+        }
+
+        await StartComposeAsync(draft, ComposeKind.New);
+    }
+
     /// <summary>Starts a new mail to the given address, e.g. from a mailto: link in a message.</summary>
     public Task ComposeToAsync(string address) => StartComposeAsync(ComposeDraft.Empty with { To = address }, ComposeKind.New);
 

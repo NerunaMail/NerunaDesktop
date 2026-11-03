@@ -45,6 +45,10 @@ jobs:
         run: |
           dotnet publish src/Client/Neruna.Desktop -c Release -r win-x64 --self-contained true \
             -p:PublishReadyToRun=true -p:DebugType=none -p:Version="$VERSION" -o publish
+          # Simple MAPI ("Per E-Mail senden" in other programs): the DLLs ship next to neruna.exe; Einstellungen → E-Mail
+          # copies them to a folder of the machine when the user sets it up.
+          sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
+          bash native/mapi/build.sh publish
           cp LICENSE publish/LICENSE.txt
           cp THIRD-PARTY-NOTICES.md publish/THIRD-PARTY-NOTICES.md
 
