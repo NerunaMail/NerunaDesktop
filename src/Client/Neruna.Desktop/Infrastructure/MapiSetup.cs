@@ -39,6 +39,10 @@ internal static class MapiSetup
     private const string Dll32 = "NerunaMapi32.dll";
     private const string Installed = "NerunaMapi.dll";
 
+    // Many programs ask here first ("MAPI services are not available"); missing on servers without Outlook. Unlike
+    // Clients, this key is separate for 32-bit programs (WOW6432Node).
+    private const string MessagingKey = @"Software\Microsoft\Windows Messaging Subsystem";
+
     /// <summary>The path in the registry; 32-bit programs land in SysWOW64.</summary>
     private static string Target64 => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), Installed);
 
@@ -79,6 +83,8 @@ internal static class MapiSetup
                 $"copy /y \"{Shipped(Dll32)}\" \"{Target32}\"",
                 $"reg add \"HKLM\\{NerunaKey}\" /ve /d Neruna /t REG_SZ /f /reg:64",
                 $"reg add \"HKLM\\{NerunaKey}\" /v DLLPath /d \"{Target64}\" /t REG_SZ /f /reg:64",
+                $"reg add \"HKLM\\{MessagingKey}\" /v MAPI /d 1 /t REG_SZ /f /reg:64",
+                $"reg add \"HKLM\\{MessagingKey}\" /v MAPI /d 1 /t REG_SZ /f /reg:32",
                 // In brackets: "if" would otherwise take everything after it as its own command.
                 $"(if exist \"{OldFolder}\" rmdir /s /q \"{OldFolder}\")",
             ]);
@@ -127,7 +133,16 @@ internal static class MapiSetup
         return key?.GetValue("DLLPath") is string path
                && string.Equals(path, Target64, StringComparison.OrdinalIgnoreCase)
                && File.Exists(Target64)
-               && File.Exists(Target32);
+               && File.Exists(Target32)
+               && MapiAvailable(RegistryView.Registry64)
+               && MapiAvailable(RegistryView.Registry32);
+    }
+
+    private static bool MapiAvailable(RegistryView view)
+    {
+        using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+        using var key = machine.OpenSubKey(MessagingKey);
+        return key?.GetValue("MAPI") as string == "1";
     }
 
     // A newer Neruna ships a changed DLL: the installed copies are renewed with the next "Einrichten".

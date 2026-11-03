@@ -635,7 +635,8 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   Windows liest `DLLPath` nur maschinenweit, und `HKLM\Software\Clients` teilen sich 32- und 64-Bit-Programme (ein
   Pfad für beide): «Für andere Programme einrichten» (`MapiSetup`) kopiert mit einmaligen Administratorrechten die
   64-Bit-DLL nach `System32\NerunaMapi.dll` und die 32-Bit-DLL unter demselben Namen nach `SysWOW64` (32-Bit-Programme
-  werden dorthin umgeleitet) und setzt `DLLPath` auf den System32-Pfad; die Wahl des Programms bleibt pro Benutzer
+  werden dorthin umgeleitet), setzt `DLLPath` auf den System32-Pfad und `Windows Messaging Subsystem\MAPI = "1"` (64 und
+  32 Bit getrennt; viele Programme prüfen das vorher, auf Servern ohne Outlook fehlt es); die Wahl des Programms bleibt pro Benutzer
   (`HKCU\Software\Clients\Mail`), die DLL findet `neruna.exe` über dessen Registrierung. Outlook-Automation
   (`Outlook.Application`) ist bewusst nicht nachgebaut.
 
