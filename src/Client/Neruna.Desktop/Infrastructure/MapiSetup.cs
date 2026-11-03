@@ -66,7 +66,54 @@ internal static class MapiSetup
         }
 
         using var user = Registry.CurrentUser.OpenSubKey(ClientsKey);
-        return user?.GetValue(string.Empty) as string == "Neruna" ? MapiState.On : MapiState.OtherDefault;
+        return user?.GetValue(string.Empty) as string is { Length: > 0 } chosen
+            ? chosen == "Neruna" ? MapiState.On : MapiState.OtherDefault
+            : IsMachineDefault() ? MapiState.On : MapiState.OtherDefault;
+    }
+
+    /// <summary>Neruna is the mail program of the whole computer (every user without a choice of his own).</summary>
+    public static bool IsMachineDefault()
+    {
+        using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+        using var key = machine.OpenSubKey(ClientsKey);
+        return key?.GetValue(string.Empty) as string == "Neruna";
+    }
+
+    /// <summary>
+    /// Neruna as the computer's mail program (some programs, or Windows on a server with Office, ignore a user's own
+    /// choice). The previous one is kept: users without Neruna keep getting it (the DLL hands their calls on), and
+    /// <see cref="UnsetMachineDefaultAsync"/> restores it.
+    /// </summary>
+    public static async Task<MapiSetupResult> SetMachineDefaultAsync()
+    {
+        using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+        using var key = machine.OpenSubKey(ClientsKey);
+        var previous = key?.GetValue(string.Empty) as string;
+        var commands = new List<string>();
+        if (previous is { Length: > 0 } && previous != "Neruna")
+        {
+            commands.Add($"reg add \"HKLM\\{NerunaKey}\" /v Previous /d \"{previous}\" /t REG_SZ /f /reg:64");
+        }
+
+        commands.Add($"reg add \"HKLM\\{ClientsKey}\" /ve /d Neruna /t REG_SZ /f /reg:64");
+        var ran = await RunElevatedAsync(commands);
+        return ran.Declined ? ran : ran with { Ok = IsMachineDefault() };
+    }
+
+    /// <summary>The computer's previous mail program again (or none, if there was none).</summary>
+    public static async Task<MapiSetupResult> UnsetMachineDefaultAsync()
+    {
+        var ran = await RunElevatedAsync(RestoreMachineDefault());
+        return ran.Declined ? ran : ran with { Ok = !IsMachineDefault() };
+    }
+
+    private static List<string> RestoreMachineDefault()
+    {
+        using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+        using var neruna = machine.OpenSubKey(NerunaKey);
+        return neruna?.GetValue("Previous") is string { Length: > 0 } previous
+            ? [$"reg add \"HKLM\\{ClientsKey}\" /ve /d \"{previous}\" /t REG_SZ /f /reg:64"]
+            : [$"reg delete \"HKLM\\{ClientsKey}\" /ve /f /reg:64"];
     }
 
     /// <summary>
@@ -118,6 +165,7 @@ internal static class MapiSetup
 
         var ran = await RunElevatedAsync(
         [
+            .. IsMachineDefault() ? RestoreMachineDefault() : [],
             $"reg delete \"HKLM\\{NerunaKey}\" /v DLLPath /f /reg:64",
             $"del /f /q \"{Target64}\"",
             $"del /f /q \"{Target32}\"",

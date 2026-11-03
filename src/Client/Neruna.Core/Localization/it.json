@@ -2490,5 +2490,7 @@
  "Senden aus anderen Programmen": "Invio da altri programmi",
  "Über die Windows-Schnittstelle MAPI. Windows fragt einmal nach Administratorrechten: die Schnittstelle gilt für den ganzen Computer, welches Mailprogramm verwendet wird, wählt jeder Benutzer selbst. Neruna versendet nie von sich aus – Sie prüfen das Mail und klicken auf «Senden».": "Tramite l'interfaccia Windows MAPI. Windows chiede una volta i diritti di amministratore: l'interfaccia vale per tutto il computer, ogni utente sceglie quale programma di posta usare. Neruna non invia mai da solo – controlli l'e-mail e clicchi su «Invia».",
  "Einrichten fehlgeschlagen. Details stehen im Log.": "Configurazione non riuscita. I dettagli sono nel log.",
- "Entfernen fehlgeschlagen. Details stehen im Log.": "Rimozione non riuscita. I dettagli sono nel log."
+ "Entfernen fehlgeschlagen. Details stehen im Log.": "Rimozione non riuscita. I dettagli sono nel log.",
+ "Neruna ist das Mailprogramm für alle Benutzer dieses Computers": "Neruna è il programma di posta per tutti gli utenti di questo computer",
+ "Nötig, wenn ein Programm trotz Einrichten ein anderes Mailprogramm verwendet (z. B. auf einem Terminalserver mit installiertem Office). Benutzer ohne Neruna erhalten weiterhin ihr bisheriges Mailprogramm.": "Necessario se un programma usa ancora un altro programma di posta nonostante la configurazione (p. es. su un terminal server con Office installato). Gli utenti senza Neruna mantengono il loro programma di posta precedente."
 }

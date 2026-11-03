@@ -504,21 +504,34 @@ static ULONG hand_to_neruna(Mail *m)
     return SUCCESS_SUCCESS;
 }
 
-/* ── Users who have not chosen Neruna ──
-   The DLL can be mapped to a program for every user of a computer (MSMapiApps, e.g. on a terminal server where the
-   computer's mail program would otherwise win). Whoever has not chosen Neruna (HKCU\\Software\\Clients\\Mail) gets
-   the computer's mail program as before: the call goes on unchanged to its DLL. */
+/* ── Users who do not use Neruna ──
+   Neruna can be the mail program of the whole computer (e.g. a terminal server) or only of some users. A user gets
+   Neruna when he chose it (HKCU\Software\Clients\Mail = Neruna), or chose nothing while Neruna is the computer's
+   mail program and installed for him. Everyone else gets his previous mail program as before: the call goes on
+   unchanged to its DLL – the one he chose, the computer's, or, when the computer's is Neruna, the one before
+   (HKLM\Software\Clients\Mail\Neruna, value "Previous", kept when Neruna was made the computer's). */
 
-static int user_chose_neruna(void)
+static int read_text(HKEY root, const wchar_t *key, const wchar_t *value, wchar_t *text, DWORD size)
 {
-    wchar_t name[128];
-    DWORD bytes = sizeof(name);
-    return RegGetValueW(HKEY_CURRENT_USER, L"Software\\Clients\\Mail", NULL, RRF_RT_REG_SZ, NULL, name, &bytes) == ERROR_SUCCESS
-           && _wcsicmp(name, L"Neruna") == 0;
+    DWORD bytes = size * sizeof(wchar_t);
+    return RegGetValueW(root, key, value, RRF_RT_REG_SZ, NULL, text, &bytes) == ERROR_SUCCESS && *text;
 }
 
-/* The computer's mail program (HKLM\\Software\\Clients\\Mail), loaded once; NULL when none, Neruna itself or not loadable
-   (e.g. a 64-bit Office for a 32-bit program). */
+static int uses_neruna(void)
+{
+    wchar_t chosen[128];
+    if (read_text(HKEY_CURRENT_USER, L"Software\\Clients\\Mail", NULL, chosen, 128)) {
+        return _wcsicmp(chosen, L"Neruna") == 0;
+    }
+    wchar_t machine[128];
+    wchar_t exe[MAX_PATH];
+    return read_text(HKEY_LOCAL_MACHINE, L"Software\\Clients\\Mail", NULL, machine, 128)
+           && _wcsicmp(machine, L"Neruna") == 0
+           && find_neruna(exe, MAX_PATH);
+}
+
+/* The mail program this user had without Neruna, loaded once; NULL when none or not loadable (e.g. a 64-bit Office
+   for a 32-bit program). */
 static HMODULE other_client(void)
 {
     static HMODULE module;
@@ -529,9 +542,16 @@ static HMODULE other_client(void)
     tried = 1;
 
     wchar_t name[128];
-    DWORD bytes = sizeof(name);
-    if (RegGetValueW(HKEY_LOCAL_MACHINE, L"Software\\Clients\\Mail", NULL, RRF_RT_REG_SZ, NULL, name, &bytes) != ERROR_SUCCESS
-        || _wcsicmp(name, L"Neruna") == 0) {
+    if (!read_text(HKEY_CURRENT_USER, L"Software\\Clients\\Mail", NULL, name, 128) || _wcsicmp(name, L"Neruna") == 0) {
+        if (!read_text(HKEY_LOCAL_MACHINE, L"Software\\Clients\\Mail", NULL, name, 128)) {
+            return NULL;
+        }
+        if (_wcsicmp(name, L"Neruna") == 0
+            && !read_text(HKEY_LOCAL_MACHINE, L"Software\\Clients\\Mail\\Neruna", L"Previous", name, 128)) {
+            return NULL;
+        }
+    }
+    if (_wcsicmp(name, L"Neruna") == 0) {
         return NULL;
     }
     wchar_t key[256];
@@ -541,7 +561,7 @@ static HMODULE other_client(void)
     const wchar_t *values[] = {L"DLLPathEx", L"DLLPath"};
     for (int i = 0; i < 2 && !module; i++) {
         wchar_t path[MAX_PATH];
-        bytes = sizeof(path);
+        DWORD bytes = sizeof(path);
         if (RegGetValueW(HKEY_LOCAL_MACHINE, key, values[i], RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, NULL, path, &bytes) == ERROR_SUCCESS
             && *path) {
             module = LoadLibraryW(path);
@@ -553,7 +573,7 @@ static HMODULE other_client(void)
 
 /* At the start of each function: not chosen → the same call to the computer's mail program. */
 #define FORWARD(name, type, ...)                                                                                   \
-    if (!user_chose_neruna()) {                                                                                    \
+    if (!uses_neruna()) {                                                                                          \
         HMODULE other = other_client();                                                                            \
         type call = other ? (type)(void (*)(void))GetProcAddress(other, #name) : NULL;                             \
         trace("forwarded " #name, call != NULL);                                                                   \

@@ -637,7 +637,11 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   64-Bit-DLL nach `System32\NerunaMapi.dll` und die 32-Bit-DLL unter demselben Namen nach `SysWOW64` (32-Bit-Programme
   werden dorthin umgeleitet), setzt `DLLPath` auf den System32-Pfad und `Windows Messaging Subsystem\MAPI = "1"` (64 und
   32 Bit getrennt; viele Programme prüfen das vorher, auf Servern ohne Outlook fehlt es); die Wahl des Programms bleibt pro Benutzer
-  (`HKCU\Software\Clients\Mail`), die DLL findet `neruna.exe` über dessen Registrierung. Outlook-Automation
+  (`HKCU\Software\Clients\Mail`), die DLL findet `neruna.exe` über dessen Registrierung. Windows übergeht die Wahl
+  des Benutzers teils (Terminalserver mit Office: das HKLM-Programm gewinnt): «Neruna ist das Mailprogramm für alle
+  Benutzer» setzt den HKLM-Standard auf Neruna und merkt sich den bisherigen (`…\Neruna\Previous`). Die DLL nimmt
+  Neruna für Benutzer, die es gewählt oder nichts gewählt und installiert haben; alle anderen Aufrufe reicht sie
+  unverändert an deren bisheriges Programm weiter (`DLLPathEx`/`DLLPath`). Protokoll: `%TEMP%\Neruna-MAPI\mapi.log`. Outlook-Automation
   (`Outlook.Application`) ist bewusst nicht nachgebaut.
 
 ## 6d. Anbieter mit eigener Anmeldung (OAuth2)

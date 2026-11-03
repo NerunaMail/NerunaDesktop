@@ -27,6 +27,11 @@
           <Button Classes="accent" Content="{l:T 'Für andere Programme einrichten …'}" Command="{Binding SetUpMapiCommand}" IsVisible="{Binding CanSetUpMapi}" />
           <Button Content="{l:T 'Entfernen …'}" Command="{Binding RemoveMapiCommand}" IsVisible="{Binding IsMapiOn}" />
         </StackPanel>
+        <!-- Some programs (and Windows on a server with Office) ignore a user's own choice: the computer's then -->
+        <CheckBox IsChecked="{Binding IsMapiForAll, Mode=OneWay}" Command="{Binding ToggleMapiForAllCommand}" IsVisible="{Binding IsMapiRegistered}"
+                  Content="{l:T 'Neruna ist das Mailprogramm für alle Benutzer dieses Computers'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0" IsVisible="{Binding IsMapiRegistered}"
+                   Text="{l:T 'Nötig, wenn ein Programm trotz Einrichten ein anderes Mailprogramm verwendet (z. B. auf einem Terminalserver mit installiertem Office). Benutzer ohne Neruna erhalten weiterhin ihr bisheriges Mailprogramm.'}" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
                    Text="{l:T 'Über die Windows-Schnittstelle MAPI. Windows fragt einmal nach Administratorrechten: die Schnittstelle gilt für den ganzen Computer, welches Mailprogramm verwendet wird, wählt jeder Benutzer selbst. Neruna versendet nie von sich aus – Sie prüfen das Mail und klicken auf «Senden».'}" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding MapiHint}"

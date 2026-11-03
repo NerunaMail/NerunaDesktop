@@ -157,6 +157,13 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
     [ObservableProperty]
     public partial string? MapiHint { get; set; }
 
+    /// <summary>Set up on this computer (the DLLs registered): the choice for all users is offered.</summary>
+    [ObservableProperty]
+    public partial bool IsMapiRegistered { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsMapiForAll { get; set; }
+
     private async Task CheckMapiAsync()
     {
         if (!OperatingSystem.IsWindows())
@@ -166,6 +173,8 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
 
         var state = await Task.Run(Infrastructure.MapiSetup.GetState);
         IsMapiOn = state == Infrastructure.MapiState.On;
+        IsMapiRegistered = state is Infrastructure.MapiState.On or Infrastructure.MapiState.OtherDefault;
+        IsMapiForAll = IsMapiRegistered && Infrastructure.MapiSetup.IsMachineDefault();
         CanSetUpMapi = state is Infrastructure.MapiState.Off or Infrastructure.MapiState.OtherDefault;
         MapiStatus = state switch
         {
@@ -187,6 +196,33 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         try
         {
             var result = await Infrastructure.MapiSetup.SetUpAsync();
+            MapiHint = result switch
+            {
+                { Ok: true } => null,
+                { Declined: true } => T("Ohne Administratorrechte lässt sich das nicht einrichten. Bitte erneut versuchen und bei der Frage von Windows «Ja» wählen."),
+                { Detail: { } detail } => F("Einrichten fehlgeschlagen: {0}", detail),
+                _ => T("Einrichten fehlgeschlagen. Details stehen im Log."),
+            };
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            MapiHint = F("Einrichten fehlgeschlagen: {0}", ex.Message);
+        }
+
+        await CheckMapiAsync();
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private async Task ToggleMapiForAllAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            var result = IsMapiForAll ? await Infrastructure.MapiSetup.UnsetMachineDefaultAsync() : await Infrastructure.MapiSetup.SetMachineDefaultAsync();
             MapiHint = result switch
             {
                 { Ok: true } => null,
