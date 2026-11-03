@@ -16,7 +16,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
       - name: Build
         run: |
-          native/mapi/build.sh out
+          bash native/mapi/build.sh out
           ls -la out
           x86_64-w64-mingw32-objdump -p out/NerunaMapi64.dll | grep -A20 "Ordinal/Name Pointer" | head -25
           i686-w64-mingw32-objdump -p out/NerunaMapi32.dll | grep -A20 "Ordinal/Name Pointer" | head -25
