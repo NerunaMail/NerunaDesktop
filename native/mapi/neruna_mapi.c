@@ -118,6 +118,51 @@ static int format(wchar_t *buffer, size_t size, const wchar_t *pattern, ...)
     return 1;
 }
 
+/* ── A line per call in %TEMP%\\Neruna-MAPI\\mapi.log: which program called what and how it ended (no addresses or
+   contents – only names of functions, flags and results). ── */
+
+static void trace(const char *what, ULONG value)
+{
+    wchar_t temp[MAX_PATH];
+    DWORD n = GetTempPathW(MAX_PATH, temp);
+    if (n == 0 || n >= MAX_PATH - 32) {
+        return;
+    }
+    wchar_t folder[MAX_PATH];
+    wchar_t file[MAX_PATH];
+    if (!format(folder, MAX_PATH, L"%lsNeruna-MAPI", temp) || !format(file, MAX_PATH, L"%ls\\mapi.log", folder)) {
+        return;
+    }
+    CreateDirectoryW(folder, NULL);
+
+    char program[MAX_PATH] = "";
+    GetModuleFileNameA(NULL, program, MAX_PATH);
+    SYSTEMTIME now;
+    GetLocalTime(&now);
+    char line[MAX_PATH + 160];
+    int length = _snprintf(line, sizeof(line) - 1, "%04u-%02u-%02u %02u:%02u:%02u %u-bit pid %lu %s: %s %lu\r\n",
+                           now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond,
+                           (unsigned)(sizeof(void *) * 8), (unsigned long)GetCurrentProcessId(), program, what, (unsigned long)value);
+    if (length <= 0) {
+        return;
+    }
+    HANDLE handle = CreateFileW(file, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (handle != INVALID_HANDLE_VALUE) {
+        DWORD written;
+        WriteFile(handle, line, (DWORD)length, &written, NULL);
+        CloseHandle(handle);
+    }
+}
+
+BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
+{
+    (void)instance; (void)reserved;
+    if (reason == DLL_PROCESS_ATTACH) {
+        trace("loaded", 0);
+    }
+    return TRUE;
+}
+
 /* ── A growing UTF-16 text (the JSON is built in it, then written as UTF-8) ── */
 
 typedef struct {
@@ -464,6 +509,7 @@ static ULONG hand_to_neruna(Mail *m)
 EXPORT ULONG WINAPI MAPILogon(ULONG_PTR ulUIParam, LPSTR lpszProfileName, LPSTR lpszPassword, ULONG flFlags,
                               ULONG ulReserved, LHANDLE *lplhSession)
 {
+    trace("MAPILogon", flFlags);
     (void)ulUIParam; (void)lpszProfileName; (void)lpszPassword; (void)flFlags; (void)ulReserved;
     if (lplhSession) {
         *lplhSession = 1;
@@ -473,6 +519,7 @@ EXPORT ULONG WINAPI MAPILogon(ULONG_PTR ulUIParam, LPSTR lpszProfileName, LPSTR 
 
 EXPORT ULONG WINAPI MAPILogoff(LHANDLE lhSession, ULONG_PTR ulUIParam, ULONG flFlags, ULONG ulReserved)
 {
+    trace("MAPILogoff", flFlags);
     (void)lhSession; (void)ulUIParam; (void)flFlags; (void)ulReserved;
     return SUCCESS_SUCCESS;
 }
@@ -480,6 +527,7 @@ EXPORT ULONG WINAPI MAPILogoff(LHANDLE lhSession, ULONG_PTR ulUIParam, ULONG flF
 EXPORT ULONG WINAPI MAPISendMailW(LHANDLE lhSession, ULONG_PTR ulUIParam, MapiMessageW *lpMessage, ULONG flFlags,
                                   ULONG ulReserved)
 {
+    trace("MAPISendMailW", flFlags);
     (void)lhSession; (void)ulUIParam; (void)ulReserved;
     if (!lpMessage) {
         return MAPI_E_FAILURE;
@@ -513,12 +561,14 @@ EXPORT ULONG WINAPI MAPISendMailW(LHANDLE lhSession, ULONG_PTR ulUIParam, MapiMe
 
     ULONG result = hand_to_neruna(&m);
     free_mail(&m);
+    trace("-> result", result);
     return result;
 }
 
 EXPORT ULONG WINAPI MAPISendMail(LHANDLE lhSession, ULONG_PTR ulUIParam, MapiMessageA *lpMessage, ULONG flFlags,
                                  ULONG ulReserved)
 {
+    trace("MAPISendMail", flFlags);
     (void)lhSession; (void)ulUIParam; (void)ulReserved;
     if (!lpMessage) {
         return MAPI_E_FAILURE;
@@ -552,6 +602,7 @@ EXPORT ULONG WINAPI MAPISendMail(LHANDLE lhSession, ULONG_PTR ulUIParam, MapiMes
 
     ULONG result = hand_to_neruna(&m);
     free_mail(&m);
+    trace("-> result", result);
     return result;
 }
 
@@ -559,6 +610,7 @@ EXPORT ULONG WINAPI MAPISendMail(LHANDLE lhSession, ULONG_PTR ulUIParam, MapiMes
 EXPORT ULONG WINAPI MAPISendDocuments(ULONG_PTR ulUIParam, LPSTR lpszDelimChar, LPSTR lpszFilePaths,
                                       LPSTR lpszFileNames, ULONG ulReserved)
 {
+    trace("MAPISendDocuments", 0);
     (void)ulUIParam; (void)lpszFileNames; (void)ulReserved;
     wchar_t *paths = from_ansi(lpszFilePaths);
     if (!paths) {
@@ -595,6 +647,7 @@ EXPORT ULONG WINAPI MAPISendDocuments(ULONG_PTR ulUIParam, LPSTR lpszDelimChar, 
 
     ULONG result = hand_to_neruna(&m);
     free_mail(&m);
+    trace("-> result", result);
     return result;
 }
 
@@ -602,6 +655,7 @@ EXPORT ULONG WINAPI MAPISendDocuments(ULONG_PTR ulUIParam, LPSTR lpszDelimChar, 
 EXPORT ULONG WINAPI MAPIResolveName(LHANDLE lhSession, ULONG_PTR ulUIParam, LPSTR lpszName, ULONG flFlags,
                                     ULONG ulReserved, MapiRecipDescA **lppRecip)
 {
+    trace("MAPIResolveName", flFlags);
     (void)lhSession; (void)ulUIParam; (void)flFlags; (void)ulReserved;
     if (!lpszName || !*lpszName || !lppRecip) {
         return MAPI_E_UNKNOWN_RECIPIENT;
@@ -638,24 +692,28 @@ EXPORT ULONG WINAPI MAPIFreeBuffer(LPVOID pv)
 /* Reading the mailbox and the address book is not offered: Neruna keeps its mail to itself. */
 EXPORT ULONG WINAPI MAPIFindNext(LHANDLE a, ULONG_PTR b, LPSTR c, LPSTR d, ULONG e, ULONG f, LPSTR g)
 {
+    trace("MAPIFindNext", 0);
     (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g;
     return MAPI_E_NOT_SUPPORTED;
 }
 
 EXPORT ULONG WINAPI MAPIReadMail(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, ULONG e, MapiMessageA **f)
 {
+    trace("MAPIReadMail", 0);
     (void)a; (void)b; (void)c; (void)d; (void)e; (void)f;
     return MAPI_E_NOT_SUPPORTED;
 }
 
 EXPORT ULONG WINAPI MAPISaveMail(LHANDLE a, ULONG_PTR b, MapiMessageA *c, ULONG d, ULONG e, LPSTR f)
 {
+    trace("MAPISaveMail", 0);
     (void)a; (void)b; (void)c; (void)d; (void)e; (void)f;
     return MAPI_E_NOT_SUPPORTED;
 }
 
 EXPORT ULONG WINAPI MAPIDeleteMail(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, ULONG e)
 {
+    trace("MAPIDeleteMail", 0);
     (void)a; (void)b; (void)c; (void)d; (void)e;
     return MAPI_E_NOT_SUPPORTED;
 }
@@ -663,12 +721,14 @@ EXPORT ULONG WINAPI MAPIDeleteMail(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, ULO
 EXPORT ULONG WINAPI MAPIAddress(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, LPSTR e, ULONG f, MapiRecipDescA *g,
                                 ULONG h, ULONG i, ULONG *j, MapiRecipDescA **k)
 {
+    trace("MAPIAddress", 0);
     (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g; (void)h; (void)i; (void)j; (void)k;
     return MAPI_E_NOT_SUPPORTED;
 }
 
 EXPORT ULONG WINAPI MAPIDetails(LHANDLE a, ULONG_PTR b, MapiRecipDescA *c, ULONG d, ULONG e)
 {
+    trace("MAPIDetails", 0);
     (void)a; (void)b; (void)c; (void)d; (void)e;
     return MAPI_E_NOT_SUPPORTED;
 }
