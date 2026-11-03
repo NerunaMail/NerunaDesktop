@@ -749,7 +749,9 @@ internal sealed partial class MailViewModel(
             return;
         }
 
-        await StartComposeAsync(draft, ComposeKind.New);
+        // Always its own window: a program may hand over several mails at once (one per document), and the reading
+        // pane holds only one – each would push the one before out.
+        await StartComposeAsync(draft, ComposeKind.New, inWindow: true);
     }
 
     /// <summary>Starts a new mail to the given address, e.g. from a mailto: link in a message.</summary>
