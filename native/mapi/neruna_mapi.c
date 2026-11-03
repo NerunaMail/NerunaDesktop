@@ -504,12 +504,83 @@ static ULONG hand_to_neruna(Mail *m)
     return SUCCESS_SUCCESS;
 }
 
+/* ── Users who have not chosen Neruna ──
+   The DLL can be mapped to a program for every user of a computer (MSMapiApps, e.g. on a terminal server where the
+   computer's mail program would otherwise win). Whoever has not chosen Neruna (HKCU\\Software\\Clients\\Mail) gets
+   the computer's mail program as before: the call goes on unchanged to its DLL. */
+
+static int user_chose_neruna(void)
+{
+    wchar_t name[128];
+    DWORD bytes = sizeof(name);
+    return RegGetValueW(HKEY_CURRENT_USER, L"Software\\Clients\\Mail", NULL, RRF_RT_REG_SZ, NULL, name, &bytes) == ERROR_SUCCESS
+           && _wcsicmp(name, L"Neruna") == 0;
+}
+
+/* The computer's mail program (HKLM\\Software\\Clients\\Mail), loaded once; NULL when none, Neruna itself or not loadable
+   (e.g. a 64-bit Office for a 32-bit program). */
+static HMODULE other_client(void)
+{
+    static HMODULE module;
+    static int tried;
+    if (tried) {
+        return module;
+    }
+    tried = 1;
+
+    wchar_t name[128];
+    DWORD bytes = sizeof(name);
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, L"Software\\Clients\\Mail", NULL, RRF_RT_REG_SZ, NULL, name, &bytes) != ERROR_SUCCESS
+        || _wcsicmp(name, L"Neruna") == 0) {
+        return NULL;
+    }
+    wchar_t key[256];
+    if (!format(key, 256, L"Software\\Clients\\Mail\\%ls", name)) {
+        return NULL;
+    }
+    const wchar_t *values[] = {L"DLLPathEx", L"DLLPath"};
+    for (int i = 0; i < 2 && !module; i++) {
+        wchar_t path[MAX_PATH];
+        bytes = sizeof(path);
+        if (RegGetValueW(HKEY_LOCAL_MACHINE, key, values[i], RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, NULL, path, &bytes) == ERROR_SUCCESS
+            && *path) {
+            module = LoadLibraryW(path);
+        }
+    }
+    trace("other mail program loaded", module != NULL);
+    return module;
+}
+
+/* At the start of each function: not chosen → the same call to the computer's mail program. */
+#define FORWARD(name, type, ...)                                                                                   \
+    if (!user_chose_neruna()) {                                                                                    \
+        HMODULE other = other_client();                                                                            \
+        type call = other ? (type)(void (*)(void))GetProcAddress(other, #name) : NULL;                             \
+        trace("forwarded " #name, call != NULL);                                                                   \
+        return call ? call(__VA_ARGS__) : MAPI_E_FAILURE;                                                          \
+    }
+
+typedef ULONG(WINAPI *LogonFn)(ULONG_PTR, LPSTR, LPSTR, ULONG, ULONG, LHANDLE *);
+typedef ULONG(WINAPI *LogoffFn)(LHANDLE, ULONG_PTR, ULONG, ULONG);
+typedef ULONG(WINAPI *SendMailWFn)(LHANDLE, ULONG_PTR, MapiMessageW *, ULONG, ULONG);
+typedef ULONG(WINAPI *SendMailFn)(LHANDLE, ULONG_PTR, MapiMessageA *, ULONG, ULONG);
+typedef ULONG(WINAPI *SendDocumentsFn)(ULONG_PTR, LPSTR, LPSTR, LPSTR, ULONG);
+typedef ULONG(WINAPI *ResolveNameFn)(LHANDLE, ULONG_PTR, LPSTR, ULONG, ULONG, MapiRecipDescA **);
+typedef ULONG(WINAPI *FreeBufferFn)(LPVOID);
+typedef ULONG(WINAPI *FindNextFn)(LHANDLE, ULONG_PTR, LPSTR, LPSTR, ULONG, ULONG, LPSTR);
+typedef ULONG(WINAPI *ReadMailFn)(LHANDLE, ULONG_PTR, LPSTR, ULONG, ULONG, MapiMessageA **);
+typedef ULONG(WINAPI *SaveMailFn)(LHANDLE, ULONG_PTR, MapiMessageA *, ULONG, ULONG, LPSTR);
+typedef ULONG(WINAPI *DeleteMailFn)(LHANDLE, ULONG_PTR, LPSTR, ULONG, ULONG);
+typedef ULONG(WINAPI *AddressFn)(LHANDLE, ULONG_PTR, LPSTR, ULONG, LPSTR, ULONG, MapiRecipDescA *, ULONG, ULONG, ULONG *, MapiRecipDescA **);
+typedef ULONG(WINAPI *DetailsFn)(LHANDLE, ULONG_PTR, MapiRecipDescA *, ULONG, ULONG);
+
 /* ── Simple MAPI ── */
 
 EXPORT ULONG WINAPI MAPILogon(ULONG_PTR ulUIParam, LPSTR lpszProfileName, LPSTR lpszPassword, ULONG flFlags,
                               ULONG ulReserved, LHANDLE *lplhSession)
 {
     trace("MAPILogon", flFlags);
+    FORWARD(MAPILogon, LogonFn, ulUIParam, lpszProfileName, lpszPassword, flFlags, ulReserved, lplhSession)
     (void)ulUIParam; (void)lpszProfileName; (void)lpszPassword; (void)flFlags; (void)ulReserved;
     if (lplhSession) {
         *lplhSession = 1;
@@ -520,6 +591,7 @@ EXPORT ULONG WINAPI MAPILogon(ULONG_PTR ulUIParam, LPSTR lpszProfileName, LPSTR 
 EXPORT ULONG WINAPI MAPILogoff(LHANDLE lhSession, ULONG_PTR ulUIParam, ULONG flFlags, ULONG ulReserved)
 {
     trace("MAPILogoff", flFlags);
+    FORWARD(MAPILogoff, LogoffFn, lhSession, ulUIParam, flFlags, ulReserved)
     (void)lhSession; (void)ulUIParam; (void)flFlags; (void)ulReserved;
     return SUCCESS_SUCCESS;
 }
@@ -528,6 +600,7 @@ EXPORT ULONG WINAPI MAPISendMailW(LHANDLE lhSession, ULONG_PTR ulUIParam, MapiMe
                                   ULONG ulReserved)
 {
     trace("MAPISendMailW", flFlags);
+    FORWARD(MAPISendMailW, SendMailWFn, lhSession, ulUIParam, lpMessage, flFlags, ulReserved)
     (void)lhSession; (void)ulUIParam; (void)ulReserved;
     if (!lpMessage) {
         return MAPI_E_FAILURE;
@@ -569,6 +642,7 @@ EXPORT ULONG WINAPI MAPISendMail(LHANDLE lhSession, ULONG_PTR ulUIParam, MapiMes
                                  ULONG ulReserved)
 {
     trace("MAPISendMail", flFlags);
+    FORWARD(MAPISendMail, SendMailFn, lhSession, ulUIParam, lpMessage, flFlags, ulReserved)
     (void)lhSession; (void)ulUIParam; (void)ulReserved;
     if (!lpMessage) {
         return MAPI_E_FAILURE;
@@ -611,6 +685,7 @@ EXPORT ULONG WINAPI MAPISendDocuments(ULONG_PTR ulUIParam, LPSTR lpszDelimChar, 
                                       LPSTR lpszFileNames, ULONG ulReserved)
 {
     trace("MAPISendDocuments", 0);
+    FORWARD(MAPISendDocuments, SendDocumentsFn, ulUIParam, lpszDelimChar, lpszFilePaths, lpszFileNames, ulReserved)
     (void)ulUIParam; (void)lpszFileNames; (void)ulReserved;
     wchar_t *paths = from_ansi(lpszFilePaths);
     if (!paths) {
@@ -656,6 +731,7 @@ EXPORT ULONG WINAPI MAPIResolveName(LHANDLE lhSession, ULONG_PTR ulUIParam, LPST
                                     ULONG ulReserved, MapiRecipDescA **lppRecip)
 {
     trace("MAPIResolveName", flFlags);
+    FORWARD(MAPIResolveName, ResolveNameFn, lhSession, ulUIParam, lpszName, flFlags, ulReserved, lppRecip)
     (void)lhSession; (void)ulUIParam; (void)flFlags; (void)ulReserved;
     if (!lpszName || !*lpszName || !lppRecip) {
         return MAPI_E_UNKNOWN_RECIPIENT;
@@ -683,6 +759,7 @@ EXPORT ULONG WINAPI MAPIResolveName(LHANDLE lhSession, ULONG_PTR ulUIParam, LPST
 
 EXPORT ULONG WINAPI MAPIFreeBuffer(LPVOID pv)
 {
+    FORWARD(MAPIFreeBuffer, FreeBufferFn, pv)
     if (pv) {
         HeapFree(GetProcessHeap(), 0, pv);
     }
@@ -693,6 +770,7 @@ EXPORT ULONG WINAPI MAPIFreeBuffer(LPVOID pv)
 EXPORT ULONG WINAPI MAPIFindNext(LHANDLE a, ULONG_PTR b, LPSTR c, LPSTR d, ULONG e, ULONG f, LPSTR g)
 {
     trace("MAPIFindNext", 0);
+    FORWARD(MAPIFindNext, FindNextFn, a, b, c, d, e, f, g)
     (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g;
     return MAPI_E_NOT_SUPPORTED;
 }
@@ -700,6 +778,7 @@ EXPORT ULONG WINAPI MAPIFindNext(LHANDLE a, ULONG_PTR b, LPSTR c, LPSTR d, ULONG
 EXPORT ULONG WINAPI MAPIReadMail(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, ULONG e, MapiMessageA **f)
 {
     trace("MAPIReadMail", 0);
+    FORWARD(MAPIReadMail, ReadMailFn, a, b, c, d, e, f)
     (void)a; (void)b; (void)c; (void)d; (void)e; (void)f;
     return MAPI_E_NOT_SUPPORTED;
 }
@@ -707,6 +786,7 @@ EXPORT ULONG WINAPI MAPIReadMail(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, ULONG
 EXPORT ULONG WINAPI MAPISaveMail(LHANDLE a, ULONG_PTR b, MapiMessageA *c, ULONG d, ULONG e, LPSTR f)
 {
     trace("MAPISaveMail", 0);
+    FORWARD(MAPISaveMail, SaveMailFn, a, b, c, d, e, f)
     (void)a; (void)b; (void)c; (void)d; (void)e; (void)f;
     return MAPI_E_NOT_SUPPORTED;
 }
@@ -714,6 +794,7 @@ EXPORT ULONG WINAPI MAPISaveMail(LHANDLE a, ULONG_PTR b, MapiMessageA *c, ULONG 
 EXPORT ULONG WINAPI MAPIDeleteMail(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, ULONG e)
 {
     trace("MAPIDeleteMail", 0);
+    FORWARD(MAPIDeleteMail, DeleteMailFn, a, b, c, d, e)
     (void)a; (void)b; (void)c; (void)d; (void)e;
     return MAPI_E_NOT_SUPPORTED;
 }
@@ -722,6 +803,7 @@ EXPORT ULONG WINAPI MAPIAddress(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, LPSTR 
                                 ULONG h, ULONG i, ULONG *j, MapiRecipDescA **k)
 {
     trace("MAPIAddress", 0);
+    FORWARD(MAPIAddress, AddressFn, a, b, c, d, e, f, g, h, i, j, k)
     (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g; (void)h; (void)i; (void)j; (void)k;
     return MAPI_E_NOT_SUPPORTED;
 }
@@ -729,6 +811,7 @@ EXPORT ULONG WINAPI MAPIAddress(LHANDLE a, ULONG_PTR b, LPSTR c, ULONG d, LPSTR 
 EXPORT ULONG WINAPI MAPIDetails(LHANDLE a, ULONG_PTR b, MapiRecipDescA *c, ULONG d, ULONG e)
 {
     trace("MAPIDetails", 0);
+    FORWARD(MAPIDetails, DetailsFn, a, b, c, d, e)
     (void)a; (void)b; (void)c; (void)d; (void)e;
     return MAPI_E_NOT_SUPPORTED;
 }
