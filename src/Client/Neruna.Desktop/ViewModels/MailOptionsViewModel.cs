@@ -186,9 +186,14 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
 
         try
         {
-            MapiHint = await Infrastructure.MapiSetup.SetUpAsync()
-                ? null
-                : T("Ohne Administratorrechte lässt sich das nicht einrichten. Bitte erneut versuchen und bei der Frage von Windows «Ja» wählen.");
+            var result = await Infrastructure.MapiSetup.SetUpAsync();
+            MapiHint = result switch
+            {
+                { Ok: true } => null,
+                { Declined: true } => T("Ohne Administratorrechte lässt sich das nicht einrichten. Bitte erneut versuchen und bei der Frage von Windows «Ja» wählen."),
+                { Detail: { } detail } => F("Einrichten fehlgeschlagen: {0}", detail),
+                _ => T("Einrichten fehlgeschlagen. Details stehen im Log."),
+            };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
@@ -208,9 +213,14 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
 
         try
         {
-            MapiHint = await Infrastructure.MapiSetup.RemoveAsync()
-                ? null
-                : T("Ihre Programme verwenden wieder das bisherige Mailprogramm. Für alle Benutzer entfernen braucht Administratorrechte.");
+            var result = await Infrastructure.MapiSetup.RemoveAsync();
+            MapiHint = result switch
+            {
+                { Ok: true } => null,
+                { Declined: true } => T("Ihre Programme verwenden wieder das bisherige Mailprogramm. Für alle Benutzer entfernen braucht Administratorrechte."),
+                { Detail: { } detail } => F("Entfernen fehlgeschlagen: {0}", detail),
+                _ => T("Entfernen fehlgeschlagen. Details stehen im Log."),
+            };
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 
 namespace Neruna.Desktop.Infrastructure;
@@ -57,36 +58,42 @@ internal static class MapiSetup
 
     /// <summary>
     /// Copies and registers the DLLs (one confirmation by Windows), then makes Neruna this user's MAPI program.
+    /// Whether it worked is read from the registry afterwards (not from the exit code of the elevated cmd).
     /// </summary>
-    /// <returns>False when the user declined the administrator rights.</returns>
-    public static async Task<bool> SetUpAsync()
+    public static async Task<MapiSetupResult> SetUpAsync()
     {
         if (!IsRegistered(RegistryView.Registry64, Dll64) || !IsRegistered(RegistryView.Registry32, Dll32) || IsOutdated())
         {
-            var commands = new[]
-            {
-                $"mkdir \"{Folder}\" 2>nul",
+            var ran = await RunElevatedAsync(
+            [
+                // In brackets: "if" would otherwise take everything after it as its own command.
+                $"(if not exist \"{Folder}\" mkdir \"{Folder}\")",
                 $"copy /y \"{Shipped(Dll64)}\" \"{Path.Combine(Folder, Dll64)}\"",
                 $"copy /y \"{Shipped(Dll32)}\" \"{Path.Combine(Folder, Dll32)}\"",
-                Reg(64, $"/ve /d Neruna"),
+                Reg(64, "/ve /d Neruna"),
                 Reg(64, $"/v DLLPath /d \"{Path.Combine(Folder, Dll64)}\""),
-                Reg(32, $"/ve /d Neruna"),
+                Reg(32, "/ve /d Neruna"),
                 Reg(32, $"/v DLLPath /d \"{Path.Combine(Folder, Dll32)}\""),
-            };
-            if (!await RunElevatedAsync(commands))
+            ]);
+            if (ran.Declined)
             {
-                return false;
+                return ran;
+            }
+
+            if (!IsRegistered(RegistryView.Registry64, Dll64) || !IsRegistered(RegistryView.Registry32, Dll32))
+            {
+                return ran with { Ok = false };
             }
         }
 
         // This user's programs: Neruna (Windows reads the user's choice before the computer's).
         Registry.CurrentUser.CreateSubKey(ClientsKey).SetValue(string.Empty, "Neruna");
         DefaultMailApp.Current?.Refresh();
-        return true;
+        return new MapiSetupResult(true, false, null);
     }
 
     /// <summary>This user's programs use the computer's mail program again; with administrator rights also unregistered.</summary>
-    public static async Task<bool> RemoveAsync()
+    public static async Task<MapiSetupResult> RemoveAsync()
     {
         using (var user = Registry.CurrentUser.OpenSubKey(ClientsKey, writable: true))
         {
@@ -96,13 +103,13 @@ internal static class MapiSetup
             }
         }
 
-        return await RunElevatedAsync(
+        var ran = await RunElevatedAsync(
         [
-            $"reg delete \"HKLM\\{NerunaKey}\" /v DLLPath /f /reg:64 >nul 2>&1",
-            $"reg delete \"HKLM\\{NerunaKey}\" /v DLLPath /f /reg:32 >nul 2>&1",
-            $"rmdir /s /q \"{Folder}\" 2>nul",
-            "exit /b 0",
-        ]);
+            $"reg delete \"HKLM\\{NerunaKey}\" /v DLLPath /f /reg:64",
+            $"reg delete \"HKLM\\{NerunaKey}\" /v DLLPath /f /reg:32",
+            $"rmdir /s /q \"{Folder}\"",
+        ], stopOnError: false);
+        return ran.Declined ? ran : ran with { Ok = !IsRegistered(RegistryView.Registry64, Dll64) && !IsRegistered(RegistryView.Registry32, Dll32) };
     }
 
     private static string Reg(int bits, string value) => $"reg add \"HKLM\\{NerunaKey}\" {value} /t REG_SZ /f /reg:{bits}";
@@ -121,10 +128,17 @@ internal static class MapiSetup
         new[] { Dll64, Dll32 }.Any(dll => !File.Exists(Path.Combine(Folder, dll))
                                           || !File.ReadAllBytes(Shipped(dll)).AsSpan().SequenceEqual(File.ReadAllBytes(Path.Combine(Folder, dll))));
 
-    // One prompt by Windows for all commands (cmd as administrator, no window).
-    private static async Task<bool> RunElevatedAsync(IEnumerable<string> commands)
+    // What the elevated cmd wrote (also when it ran as another user, an administrator signing in): ProgramData is
+    // writable for administrators and readable for everyone.
+    private static string LogFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Neruna", "mapi-setup.log");
+
+    // One prompt by Windows for all commands (cmd as administrator, no window); its output goes to LogFile.
+    private static async Task<MapiSetupResult> RunElevatedAsync(IEnumerable<string> commands, bool stopOnError = true)
     {
-        var start = new ProcessStartInfo("cmd.exe", "/c \"" + string.Join(" && ", commands) + "\"")
+        var log = LogFile;
+        var logFolder = Path.GetDirectoryName(log)!;
+        var script = $"(if not exist \"{logFolder}\" mkdir \"{logFolder}\") & ({string.Join(stopOnError ? " && " : " & ", commands)}) > \"{log}\" 2>&1";
+        var start = new ProcessStartInfo("cmd.exe", "/c \"" + script + "\"")
         {
             UseShellExecute = true,
             Verb = "runas",
@@ -135,15 +149,37 @@ internal static class MapiSetup
             using var process = Process.Start(start);
             if (process is null)
             {
-                return false;
+                return new MapiSetupResult(false, false, null);
             }
 
             await process.WaitForExitAsync();
-            return process.ExitCode == 0;
+            var output = ReadLog(log);
+            CrashHandler.Logger?.LogInformation("MAPI setup: exit code {Code}, output: {Output}", process.ExitCode, output);
+            return new MapiSetupResult(process.ExitCode == 0, false, output);
         }
-        catch (System.ComponentModel.Win32Exception)
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            return false; // declined
+            return new MapiSetupResult(false, true, null); // ERROR_CANCELLED: the user said no
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            return new MapiSetupResult(false, false, ex.Message);
+        }
+    }
+
+    private static string? ReadLog(string log)
+    {
+        try
+        {
+            var text = File.ReadAllText(log).Trim();
+            return text.Length == 0 ? null : text.Length > 600 ? text[^600..] : text;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 }
+
+/// <summary>The outcome of setting up or removing; <see cref="Detail"/> is what Windows answered (for the hint).</summary>
+internal sealed record MapiSetupResult(bool Ok, bool Declined, string? Detail);
