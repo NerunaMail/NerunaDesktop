@@ -104,8 +104,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="x:String">
-                    <Button Classes="swatch" Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{Binding}"
-                            Command="{Binding $parent[UserControl].((ed:FormattingViewModel)DataContext).ApplyTextColorCommand}" CommandParameter="{Binding}" />
+                    <Button Classes="swatch" Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{Binding}" />
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
@@ -130,13 +129,11 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="x:String">
-                    <Button Classes="swatch" Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{Binding}"
-                            Command="{Binding $parent[UserControl].((ed:FormattingViewModel)DataContext).ApplyHighlightCommand}" CommandParameter="{Binding}" />
+                    <Button Classes="swatch" Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{Binding}" />
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Button Content="{l:T 'Keine Farbe'}" FontSize="12" Click="OnHighlightPicked"
-                      Command="{Binding ApplyHighlightCommand}" CommandParameter="{x:Null}" />
+              <Button Content="{l:T 'Keine Farbe'}" FontSize="12" Click="OnHighlightPicked" />
             </StackPanel>
           </Flyout>
         </SplitButton.Flyout>
