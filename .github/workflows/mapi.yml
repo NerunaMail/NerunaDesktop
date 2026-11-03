@@ -16,7 +16,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
       - name: Build
         run: |
-          bash native/mapi/build.sh out
+          # The compiler's messages as an annotation too (readable without access to the logs).
+          if ! bash native/mapi/build.sh out > build.log 2>&1; then
+            cat build.log
+            echo "::error title=MAPI build::$(head -c 3500 build.log | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+            exit 1
+          fi
           ls -la out
           x86_64-w64-mingw32-objdump -p out/NerunaMapi64.dll | grep -A20 "Ordinal/Name Pointer" | head -25
           i686-w64-mingw32-objdump -p out/NerunaMapi32.dll | grep -A20 "Ordinal/Name Pointer" | head -25
