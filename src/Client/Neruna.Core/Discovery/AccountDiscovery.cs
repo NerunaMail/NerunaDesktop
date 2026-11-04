@@ -33,26 +33,27 @@ public sealed class AccountDiscovery(HttpClient http, ILogger<AccountDiscovery> 
 
         foreach (var server in OrganizationServers.Distinct())
         {
-            var neruna = await TryAsync(token => FetchNerunaAsync(new Uri(server, $"api/v1/discovery?email={email}"), token), server.Host, cancellationToken);
+            var neruna = await TryAsync(token => FetchNerunaAsync(new Uri(server, $"api/v1/discovery?email={email}"), token), "organization", cancellationToken);
             if (neruna is not null)
             {
                 return neruna;
             }
         }
 
-        string[] autoconfigUrls =
+        // The step's name goes to the log, not its host: that would carry the user's domain.
+        (string Step, string Url)[] autoconfigUrls =
         [
-            $"https://autoconfig.{domain}/mail/config-v1.1.xml?emailaddress={email}",
-            $"https://{domain}/.well-known/autoconfig/mail/config-v1.1.xml?emailaddress={email}",
+            ("autoconfig host", $"https://autoconfig.{domain}/mail/config-v1.1.xml?emailaddress={email}"),
+            ("well-known", $"https://{domain}/.well-known/autoconfig/mail/config-v1.1.xml?emailaddress={email}"),
             // Neruna's directory and – if it cannot be reached – Mozilla's ISP database only learn the domain, never the address.
-            new Uri(Directory, Uri.EscapeDataString(domain)).AbsoluteUri,
-            $"https://autoconfig.thunderbird.net/v1.1/{domain}",
+            ("directory", new Uri(Directory, Uri.EscapeDataString(domain)).AbsoluteUri),
+            ("ISP database", $"https://autoconfig.thunderbird.net/v1.1/{domain}"),
         ];
 
-        foreach (var url in autoconfigUrls)
+        foreach (var (step, url) in autoconfigUrls)
         {
             var uri = new Uri(url);
-            var result = await TryAsync(token => FetchAutoconfigAsync(uri, token), uri.Host, cancellationToken);
+            var result = await TryAsync(token => FetchAutoconfigAsync(uri, token), step, cancellationToken);
             if (result is not null)
             {
                 return result;
@@ -93,18 +94,19 @@ public sealed class AccountDiscovery(HttpClient http, ILogger<AccountDiscovery> 
     }
 
     // Each step gets its own time limit, so a server that does not answer does not hold up the next one.
-    private async Task<DiscoveryResult?> TryAsync(Func<CancellationToken, Task<DiscoveryResult>> step, string source, CancellationToken cancellationToken)
+    private async Task<DiscoveryResult?> TryAsync(Func<CancellationToken, Task<DiscoveryResult>> fetch, string step, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(StepTimeout);
         try
         {
-            return await step(timeout.Token);
+            return await fetch(timeout.Token);
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidDataException or FormatException or System.Xml.XmlException or System.Text.Json.JsonException
                                    || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
-            logger.LogDebug(ex, "Discovery via {Source} failed", source);
+            // Only the kind of failure: an exception's message may name the host or URL (the address is in its query).
+            logger.LogDebug("Discovery via {Step} failed: {Error}", step, ex.GetType().Name);
             return null;
         }
     }
