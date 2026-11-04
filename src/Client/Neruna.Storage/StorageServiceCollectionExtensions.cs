@@ -35,6 +35,7 @@ public static class StorageServiceCollectionExtensions
         services.AddSingleton<ISettingsStore, SqliteSettingsStore>();
         services.AddSingleton<ISignatureStore, SqliteSignatureStore>();
         services.AddSingleton<ITextTemplateStore, SqliteTextTemplateStore>();
+        services.AddSingleton<Neruna.Core.Notes.INoteStore, SqliteNoteStore>();
         services.AddSingleton<Neruna.Core.Chat.IChatStore, SqliteChatStore>();
         services.AddSingleton<Neruna.Core.Calendar.IReminderStore, SqliteReminderStore>();
         services.AddSingleton(new LocalCredentialStore(dataDirectory));

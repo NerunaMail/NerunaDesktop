@@ -535,6 +535,29 @@ Logdateien pro Tag unter `<Datenordner>/logs`. `--protocol-log` schreibt zusätz
 6. DNS-SRV für IMAP/SMTP (RFC 6186) *(folgt)*
 7. Raten + Verbindungstest (heute: Vorschlag `mail.<domain>`, Benutzer kann alles anpassen)
 
+### Notizen
+
+Eigene Seite «Notizen» (Notizbücher | Liste | Editor). Die Oberfläche spricht nur mit dem `NoteController`
+(`Neruna.Core/Notes`); Neruna hostet auch hier nichts.
+
+- **Speicherorte:** «Auf diesem Computer» (nur SQLite) und jedes Postfach, das Nachrichten ablegen kann (IMAP
+  APPEND). Wer ein gemeinsames Postfach (info@…) eingebunden hat, teilt dessen Notizen.
+- **Format im Postfach:** das der Notizen-Apps von iPhone und Mac (auch ImapNotes3 auf Android): Ordner `Notes` (oben,
+  bei Dovecot mit «INBOX.»-Präfix unter dem Posteingang), je Notiz eine Nachricht mit HTML-Body, Header
+  `X-Uniform-Type-Identifier: com.apple.mail-note`, Kennung in `X-Universally-Unique-Identifier`, Betreff = Titel.
+  Unterordner von `Notes` sind die Notizbücher, `\Flagged` = angeheftet, IMAP-Keywords = Schlagwörter (dieselben wie bei
+  der Mail). Der Notizordner erscheint nicht in der Mailansicht (`NoteFolders.WithoutNotes`).
+- **Text:** HTML-Teilumfang des Mail-Editors; die erste Zeile ist der Titel (wie bei den Notizen-Apps und Nextcloud).
+- **Speichern:** zuerst lokal (`NotePending.Save`), dann neue Fassung per APPEND und erst danach die alte löschen.
+  Synchronisiert wird mit der Mail (`MailController.FolderSynced`) und beim Öffnen der Seite.
+- **Konflikte:** Wurde die bekannte Fassung auf dem Server inzwischen ersetzt, wird die eigene als Konfliktkopie
+  (neue Kennung, `ConflictOf`) hochgeladen – nie überschrieben. Mehrere Nachrichten mit derselben Kennung: die neueste
+  ist die Notiz, die anderen erscheinen als Kopien.
+- **Verknüpfungen** stehen in der Notiz selbst: Mail als `mid:`-URL (RFC 2392, Message-ID), Kontakt und Termin als
+  `neruna://contact?uid=…&email=…` bzw. `neruna://event?uid=…`. Daraus und aus Adressen im Text hält der Speicher
+  Schlüssel (`NoteLinks.Keys`), um die Notizen eines Kontakts oder einer Mail zu finden.
+- **Später:** Nextcloud Notes (REST, Markdown), `$hasmemo` (RFC 9979), verschlüsselte Notizen, NerunaMobile.
+
 ### UI
 
 Klassisches Groupware-Muster: Navigationsleiste (Mail/Kalender/Kontakte), Ordnerbaum, Nachrichtenliste nach Datum gruppiert

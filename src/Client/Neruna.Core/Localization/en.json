@@ -2494,5 +2494,10 @@
  "Neruna ist das Mailprogramm für alle Benutzer dieses Computers": "Neruna is the mail program for all users of this computer",
  "Nötig, wenn ein Programm trotz Einrichten ein anderes Mailprogramm verwendet (z. B. auf einem Terminalserver mit installiertem Office). Benutzer ohne Neruna erhalten weiterhin ihr bisheriges Mailprogramm.": "Needed when a program still uses another mail program after setup (e.g. on a terminal server with Office installed). Users without Neruna keep getting their previous mail program.",
  "Profile und Workspaces": "Profiles and workspaces",
- "Integration": "Integration"
+ "Integration": "Integration",
+ "Auf diesem Computer": "On this computer",
+ "Das Notizbuch enthält noch Notizen.": "The notebook still contains notes.",
+ "Der Notizordner konnte nicht angelegt werden.": "The notes folder could not be created.",
+ "Notizbuch «{0}» konnte nicht angelegt werden.": "Notebook “{0}” could not be created.",
+ "Das Konto dieser Notizen gibt es nicht mehr.": "The account of these notes no longer exists."
 }

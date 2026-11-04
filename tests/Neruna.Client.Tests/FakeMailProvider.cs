@@ -31,6 +31,16 @@ internal sealed class FakeMailServer
 
     public int MessageDownloads { get; set; }
 
+    /// <summary>The server keeps tags (IMAP keywords) on messages.</summary>
+    public bool SupportsTags { get; set; }
+
+    public void SetKeywords(string folder, string remoteId, IReadOnlyList<string> keywords)
+    {
+        var list = Folders[folder];
+        var index = list.FindIndex(m => m.RemoteId == remoteId);
+        list[index] = list[index] with { Keywords = keywords };
+    }
+
     public int SearchTextRequests { get; set; }
 
     /// <summary>Awaited at every folder listing (= every sync of a connection): lets a test hold a sync open.</summary>
@@ -155,8 +165,9 @@ internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server)
     }
 
     private IReadOnlyList<MailFolder> Folders() =>
+        // "Notes/Kunden" is "Kunden" under "Notes".
         [.. server.Folders.Keys
-            .Select(name => new MailFolder(connectionId, name, name, null, name switch
+            .Select(name => new MailFolder(connectionId, name, name[(name.LastIndexOf('/') + 1)..], name.Contains('/', StringComparison.Ordinal) ? name[..name.LastIndexOf('/')] : null, name switch
             {
                 "INBOX" => FolderRole.Inbox,
                 "Trash" => FolderRole.Trash,
@@ -175,8 +186,11 @@ internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server)
         var added = isFull ? messages : messages.Where(m => !known.Contains(m.RemoteId)).ToList();
         var flags = isFull ? [] : messages.Where(m => known.Contains(m.RemoteId)).ToDictionary(m => m.RemoteId, m => m.Flags);
         var removed = isFull ? [] : known.Except(messages.Select(m => m.RemoteId)).ToList();
+        var keywords = server.SupportsTags && !isFull
+            ? messages.Where(m => known.Contains(m.RemoteId)).ToDictionary(m => m.RemoteId, m => m.Keywords ?? (IReadOnlyList<string>)[])
+            : null;
 
-        return Task.FromResult(new FolderSyncResult(state, isFull, added, flags, removed, messages.Count, messages.Count(m => !m.Flags.HasFlag(MessageFlags.Seen))));
+        return Task.FromResult(new FolderSyncResult(state, isFull, added, flags, removed, messages.Count, messages.Count(m => !m.Flags.HasFlag(MessageFlags.Seen)), keywords));
     }
 
     public Task<MimeMessage> GetMessageAsync(MailFolder folder, string remoteId, CancellationToken cancellationToken = default)
@@ -244,6 +258,32 @@ internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server)
         }
 
         _seenVersion = server.Version;
+    }
+
+    public bool SupportsTags => server.SupportsTags;
+
+    public Task SetTagAsync(MailFolder folder, IReadOnlyCollection<string> remoteIds, MailTag tag, bool add, CancellationToken cancellationToken = default)
+    {
+        foreach (var id in remoteIds)
+        {
+            var current = server.Folders[folder.RemoteId].Single(m => m.RemoteId == id).Keywords ?? [];
+            server.SetKeywords(folder.RemoteId, id, add ? [.. current.Append(tag.Keyword).Distinct()] : [.. current.Where(k => k != tag.Keyword)]);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<MailFolder> CreateSubfolderAsync(string name, MailFolder? parent, CancellationToken cancellationToken = default)
+    {
+        var full = parent is null ? name : parent.RemoteId + "/" + name;
+        server.Folders.Add(full, []);
+        return Task.FromResult(new MailFolder(connectionId, full, name, parent?.RemoteId, FolderRole.None));
+    }
+
+    public Task DeleteFolderAsync(MailFolder folder, CancellationToken cancellationToken = default)
+    {
+        server.Folders.Remove(folder.RemoteId);
+        return Task.CompletedTask;
     }
 
     public Task<MailFolder> CreateFolderAsync(string name, FolderRole role, CancellationToken cancellationToken = default)

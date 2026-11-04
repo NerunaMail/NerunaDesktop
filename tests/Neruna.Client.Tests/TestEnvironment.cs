@@ -66,6 +66,7 @@ internal sealed class TestEnvironment : IAsyncDisposable
         services.AddSingleton<TaskController>();
         services.AddSingleton<SyncCoordinator>();
         services.AddSingleton<ContactController>();
+        services.AddSingleton<Neruna.Core.Notes.NoteController>();
         services.AddSingleton<AccountSetupService>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<Neruna.Core.Security.CertificateManager>();

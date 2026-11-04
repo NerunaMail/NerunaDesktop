@@ -372,6 +372,67 @@ namespace Neruna.Storage.Migrations
                     b.ToTable("Messages");
                 });
 
+            modelBuilder.Entity("Neruna.Storage.NoteEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ConflictOf")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ConnectionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedUnixMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Html")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Keys")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("ModifiedUnixMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("NoteId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notebook")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Pending")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Pinned")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RemoteFolder")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RemoteId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tags")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConnectionId", "NoteId");
+
+                    b.ToTable("Notes");
+                });
+
             modelBuilder.Entity("Neruna.Storage.ReminderStateEntity", b =>
                 {
                     b.Property<string>("Key")
@@ -520,6 +581,14 @@ namespace Neruna.Storage.Migrations
                         .HasForeignKey("FolderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Neruna.Storage.NoteEntity", b =>
+                {
+                    b.HasOne("Neruna.Storage.ConnectionEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("Neruna.Storage.AccountEntity", b =>

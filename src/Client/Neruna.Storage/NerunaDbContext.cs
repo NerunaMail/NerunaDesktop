@@ -43,11 +43,19 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
 
     internal DbSet<ChatMessageEntity> ChatMessages => Set<ChatMessageEntity>();
 
+    internal DbSet<NoteEntity> Notes => Set<NoteEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AccountEntity>(e =>
         {
             e.HasMany(a => a.Connections).WithOne().HasForeignKey(c => c.AccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NoteEntity>(e =>
+        {
+            e.HasIndex(n => new { n.ConnectionId, n.NoteId });
+            e.HasOne<ConnectionEntity>().WithMany().HasForeignKey(n => n.ConnectionId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<MailFolderEntity>(e =>
@@ -351,4 +359,41 @@ internal sealed class SignatureEntity
     public required string Source { get; set; }
 
     public long UpdatedUnixMs { get; set; }
+}
+
+/// <summary>A note (Neruna.Core.Notes.Note); <see cref="ConnectionId"/> null: only on this computer.</summary>
+internal sealed class NoteEntity
+{
+    public long Id { get; set; }
+
+    public required string NoteId { get; set; }
+
+    public Guid? ConnectionId { get; set; }
+
+    public required string Notebook { get; set; }
+
+    public required string Html { get; set; }
+
+    /// <summary>The plain text, for the search.</summary>
+    public required string Text { get; set; }
+
+    public long CreatedUnixMs { get; set; }
+
+    public long ModifiedUnixMs { get; set; }
+
+    public bool Pinned { get; set; }
+
+    /// <summary>Tag keywords, one per line.</summary>
+    public required string Tags { get; set; }
+
+    /// <summary>Link keys (NoteLinks.Keys), one per line, with a line break before and after each.</summary>
+    public required string Keys { get; set; }
+
+    public string? ConflictOf { get; set; }
+
+    public string? RemoteFolder { get; set; }
+
+    public string? RemoteId { get; set; }
+
+    public int Pending { get; set; }
 }
