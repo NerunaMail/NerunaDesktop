@@ -31,6 +31,9 @@ public interface IMailStore
 
     Task<IReadOnlyCollection<string>> GetMessageIdsAsync(Guid connectionId, string folderRemoteId, CancellationToken cancellationToken = default);
 
+    /// <summary>Where a message with this Message-ID (with or without &lt;&gt;) is stored, in any account; newest first.</summary>
+    Task<IReadOnlyList<(Guid ConnectionId, string FolderRemoteId, string RemoteId)>> FindByMessageIdAsync(string messageId, CancellationToken cancellationToken = default);
+
     Task ApplySyncResultAsync(MailFolder folder, FolderSyncResult result, CancellationToken cancellationToken = default);
 
     /// <summary>Removes messages locally right after they were moved or deleted on the server.</summary>

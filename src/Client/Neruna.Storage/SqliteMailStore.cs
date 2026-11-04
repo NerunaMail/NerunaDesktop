@@ -69,6 +69,24 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         return await db.Messages.Where(m => m.FolderId == folderId).Select(m => m.RemoteId).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<(Guid ConnectionId, string FolderRemoteId, string RemoteId)>> FindByMessageIdAsync(string messageId, CancellationToken cancellationToken = default)
+    {
+        var bare = (messageId ?? string.Empty).Trim().Trim('<', '>');
+        if (bare.Length == 0)
+        {
+            return [];
+        }
+
+        var bracketed = "<" + bare + ">";
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var found = await db.Messages.AsNoTracking()
+            .Where(m => m.MessageId == bare || m.MessageId == bracketed)
+            .Join(db.MailFolders, m => m.FolderId, f => f.Id, (m, f) => new { f.ConnectionId, Folder = f.RemoteId, m.RemoteId, m.DateUnixMs })
+            .OrderByDescending(x => x.DateUnixMs)
+            .ToListAsync(cancellationToken);
+        return [.. found.Select(x => (x.ConnectionId, x.Folder, x.RemoteId))];
+    }
+
     public async Task ApplySyncResultAsync(MailFolder folder, FolderSyncResult result, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(folder);

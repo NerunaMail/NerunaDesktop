@@ -495,6 +495,10 @@
                               ToolTip.Tip="{l:T 'Als gelesen / ungelesen markieren (Ctrl+Q)'}" />
               <ctl:ToolButton Icon="{StaticResource IconAi}" Label="{l:T 'Zusammenfassen'}" Command="{Binding SummarizeCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}"
                               IsVisible="{Binding AiAvailable}" ToolTip.Tip="{l:T 'Mit KI zusammenfassen'}" />
+              <ctl:ToolButton Icon="{StaticResource IconNote}" Label="{l:T 'Notiz'}" Command="{Binding NewNoteCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}"
+                              ToolTip.Tip="{l:T 'Neue Notiz zu dieser E-Mail'}" />
+              <ctl:ToolButton Icon="{StaticResource IconNote}" Label="{Binding LinkedNotesText}" Command="{Binding ShowNotesCommand}" IsVisible="{Binding HasLinkedNotes}" ShowLabel="True"
+                              ToolTip.Tip="{l:T 'Notizen zu dieser E-Mail anzeigen'}" />
             </WrapPanel>
           </Border>
           <Panel>

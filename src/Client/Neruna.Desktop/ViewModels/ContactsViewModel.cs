@@ -15,8 +15,21 @@ namespace Neruna.Desktop.ViewModels;
 /// Contacts: address books on the left (shown/hidden, own color), contacts and groups in
 /// the middle (colored by address book), details on the right.
 /// </summary>
-internal sealed partial class ContactsViewModel(ContactController contacts, ISettingsStore settings, IFileService files, Neruna.Core.Workspaces.WorkspaceService workspaces) : ViewModelBase
+internal sealed partial class ContactsViewModel(ContactController contacts, ISettingsStore settings, IFileService files, Neruna.Core.Workspaces.WorkspaceService workspaces,
+    Neruna.Core.Notes.NoteController notes) : ViewModelBase
 {
+    /// <summary>A note of the selected contact was clicked: the shell opens it on the notes page.</summary>
+    public event EventHandler<Neruna.Core.Notes.Note>? NoteOpenRequested;
+
+    /// <summary>"Neue Notiz" for the selected contact: the shell opens the notes page with a note linked to it.</summary>
+    public event EventHandler<ContactEntry>? NewNoteRequested;
+
+    /// <summary>Notes linking to the selected contact or mentioning one of its addresses.</summary>
+    public ObservableCollection<Neruna.Core.Notes.Note> LinkedNotes { get; } = [];
+
+    [ObservableProperty]
+    public partial bool HasLinkedNotes { get; set; }
+
     private static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
     private IReadOnlyList<ContactEntry> _all = [];
@@ -156,7 +169,65 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
 
     partial void OnSearchTextChanged(string value) => Filter();
 
-    partial void OnSelectedChanged(ContactItem? value) => _ = LoadMembersAsync(value);
+    partial void OnSelectedChanged(ContactItem? value)
+    {
+        _ = LoadMembersAsync(value);
+        _ = LoadNotesAsync(value);
+    }
+
+    private async Task LoadNotesAsync(ContactItem? item)
+    {
+        var keys = item is null ? [] : NoteKeys(item.Entry.Card);
+        var found = keys.Count == 0 ? [] : await notes.FindLinkedAsync(keys);
+        if (Selected != item)
+        {
+            return;
+        }
+
+        LinkedNotes.Clear();
+        foreach (var note in found.OrderByDescending(n => n.Modified))
+        {
+            LinkedNotes.Add(note);
+        }
+
+        HasLinkedNotes = LinkedNotes.Count > 0;
+    }
+
+    private static List<string> NoteKeys(ContactCard card) =>
+        [.. card.EmailAddresses.Select(Neruna.Core.Notes.NoteLinks.AddressKey).Append(Neruna.Core.Notes.NoteLinks.ContactKey(card.Uid)).Where(k => k.Length > 8)];
+
+    /// <summary>Notes were changed (also elsewhere): the selected contact's list again.</summary>
+    public Task RefreshNotesAsync() => LoadNotesAsync(Selected);
+
+    [RelayCommand]
+    private void OpenNote(Neruna.Core.Notes.Note note) => NoteOpenRequested?.Invoke(this, note);
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void NewNote() => NewNoteRequested?.Invoke(this, Selected!.Entry);
+
+    /// <summary>Shows the contact with this UID (or else address); false when it is not on the page (hidden address book).</summary>
+    public async Task<bool> RevealAsync(string? uid, string? email)
+    {
+        if (Items.Count == 0 && _all.Count == 0)
+        {
+            await ReloadAsync();
+        }
+
+        if (SearchText.Length > 0)
+        {
+            SearchText = string.Empty;
+        }
+
+        var item = Items.FirstOrDefault(i => !string.IsNullOrEmpty(uid) && i.Entry.Card.Uid == uid)
+                   ?? Items.FirstOrDefault(i => !string.IsNullOrEmpty(email) && i.Entry.Card.EmailAddresses.Any(a => string.Equals(a, email, StringComparison.OrdinalIgnoreCase)));
+        if (item is null)
+        {
+            return false;
+        }
+
+        Selected = item;
+        return true;
+    }
 
     [RelayCommand]
     private void Manage() => ManageRequested?.Invoke(this, EventArgs.Empty);

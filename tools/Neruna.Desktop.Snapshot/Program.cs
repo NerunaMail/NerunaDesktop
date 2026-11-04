@@ -1039,6 +1039,22 @@ internal static class Snapshots
         demoTasks.ShowTasks = false;
         vm.CalendarPage.IsTimeGrid = false;
 
+        // Notes: notebooks, list, the open note in the mail editor with its links below.
+        var noteController = services.GetRequiredService<Neruna.Core.Notes.NoteController>();
+        await noteController.CreateNotebookAsync(null, "Kunden");
+        await noteController.CreateNotebookAsync(null, "Projekte");
+        await noteController.SaveAsync(Neruna.Core.Notes.Note.New(null, "Projekte", "<h2>Ideen Website</h2><div>Startseite kürzer, Kontaktformular oben</div>"));
+        await noteController.SaveAsync(Neruna.Core.Notes.Note.New(null, string.Empty, "<div>Einkauf</div><ul><li>Druckerpapier</li><li>Toner</li></ul>") with { Pinned = true });
+        await noteController.SaveAsync(Neruna.Core.Notes.Note.New(null, "Kunden",
+            "<h2>Offerte Müller AG</h2><div>E-Mail: " + Neruna.Core.Notes.NoteLinks.Anchor(Neruna.Core.Notes.NoteLinks.MailHref("offerte@example.com"), "Anfrage Offerte") + "</div>"
+            + "<div>Kontakt: " + Neruna.Core.Notes.NoteLinks.Anchor(Neruna.Core.Notes.NoteLinks.ContactHref(null, "anna@example.com"), "Anna Müller") + "</div>"
+            + "<div><br></div><div>Preis bis Freitag bestätigen, Lieferung im Dezember.</div>") with { Tags = ["$label1"] });
+        vm.NavigateCommand.Execute(Section.Notes);
+        await vm.NotesPage.ReloadAsync();
+        vm.NotesPage.SelectedNote = vm.NotesPage.Notes.First(n => n.Title == "Offerte Müller AG");
+        await Task.Delay(1500);
+        await SaveAsync(window, output, "notes.png");
+
         vm.NavigateCommand.Execute(Section.Contacts);
         await SaveAsync(window, output, "contacts.png");
         vm.ContactsPage.Selected = vm.ContactsPage.Items.First(i => i.IsGroup);

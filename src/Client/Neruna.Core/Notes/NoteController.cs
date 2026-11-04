@@ -111,6 +111,12 @@ public sealed class NoteController
     {
         ArgumentNullException.ThrowIfNull(note);
         var saved = note with { Modified = DateTimeOffset.Now, Pending = note.IsLocal ? NotePending.None : NotePending.Save };
+
+        // Where it is on the server comes from the store: an upload since the caller read the note moved it there.
+        if (!saved.IsLocal && await _store.GetNoteAsync(saved.ConnectionId, saved.Id, cancellationToken) is { } stored)
+        {
+            saved = saved with { RemoteFolder = stored.RemoteFolder, RemoteId = stored.RemoteId };
+        }
         await _store.SaveNoteAsync(saved, cancellationToken);
         Changed?.Invoke(this, EventArgs.Empty);
         if (upload && saved.ConnectionId is { } connection)
@@ -443,7 +449,13 @@ public sealed class NoteController
                 await _mail.SyncFolderAsync(connection, folder, cancellationToken);
             }
 
-            await _store.SaveNoteAsync(upload with { RemoteFolder = stored is null ? null : folder.RemoteId, RemoteId = stored?.RemoteId, Pending = NotePending.None }, cancellationToken);
+            // Changed again here meanwhile: that newer version stays waiting (it replaces this one with the next sync).
+            var remoteFolder = stored is null ? null : folder.RemoteId;
+            var latest = await _store.GetNoteAsync(connection.Id, upload.Id, cancellationToken);
+            var done = latest is not null && (latest.Pending == NotePending.Delete || latest.Modified > upload.Modified)
+                ? latest with { RemoteFolder = remoteFolder, RemoteId = stored?.RemoteId }
+                : upload with { RemoteFolder = remoteFolder, RemoteId = stored?.RemoteId, Pending = NotePending.None };
+            await _store.SaveNoteAsync(done, cancellationToken);
         }
 
         return true;

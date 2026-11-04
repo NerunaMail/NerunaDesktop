@@ -143,6 +143,7 @@ internal sealed partial class CalendarView : UserControl
         if (!item.Occurrence.IsTask)
         {
             menu.Items.Add(new Separator());
+            menu.Items.Add(new MenuItem { Header = T("Notiz zum Termin"), Command = vm.NewNoteCommand, CommandParameter = item });
             menu.Items.Add(new MenuItem { Header = T("Duplizieren"), Command = vm.DuplicateEventCommand, CommandParameter = item });
             menu.Items.Add(new MenuItem { Header = T("Löschen"), Command = vm.DeleteEventCommand, CommandParameter = item, IsEnabled = canChange });
         }

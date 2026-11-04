@@ -20,6 +20,7 @@ internal enum Section
     Calendar,
     Contacts,
     Tasks,
+    Notes,
     Chat,
     Settings,
 }
@@ -64,6 +65,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarViewModel calendarPage,
         ContactsViewModel contactsPage,
         TasksViewModel tasksPage,
+        NotesViewModel notesPage,
         ChatViewModel chatPage,
         SettingsViewModel settingsPage,
         MailController mail,
@@ -95,8 +97,10 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Infrastructure.IFileService files,
         Neruna.Core.Workspaces.WorkspaceService workspaces,
         Neruna.Core.Mail.QuickActionSuggestions suggestions,
+        Neruna.Core.Notes.NoteController noteController,
         ILogger<MainWindowViewModel> logger)
     {
+        _noteController = noteController;
         _suggestions = suggestions;
         _workspacesToLoad = workspaces;
         settingsPage.Workspaces.DisplayChanged += (_, display) => WorkspaceDisplay = display;
@@ -106,6 +110,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarPage = calendarPage;
         ContactsPage = contactsPage;
         TasksPage = tasksPage;
+        NotesPage = notesPage;
         ChatPage = chatPage;
         SettingsPage = settingsPage;
         Layout = layout;
@@ -144,6 +149,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         WireMailPage();
         WireCalendarAndTasks();
         WireContacts();
+        WireNotes();
         WireChat();
         WireSettings();
         WireBackground();
@@ -264,6 +270,110 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             await MailPage.ComposeToAsync(recipients);
         };
     }
+
+    private void WireNotes()
+    {
+        MailPage.NoteRequested += async (_, message) =>
+        {
+            CurrentPage = NotesPage;
+            await NotesPage.NewNoteAsync(NoteAboutMail(message));
+        };
+        MailPage.NotesRequested += async (_, notes) =>
+        {
+            CurrentPage = NotesPage;
+            await NotesPage.ShowLinkedAsync(notes);
+        };
+        ContactsPage.NewNoteRequested += async (_, contact) =>
+        {
+            CurrentPage = NotesPage;
+            await NotesPage.NewNoteAsync(NoteAboutContact(contact.Card));
+        };
+        ContactsPage.NoteOpenRequested += async (_, note) =>
+        {
+            CurrentPage = NotesPage;
+            await NotesPage.OpenAsync(note);
+        };
+        CalendarPage.NoteRequested += async (_, item) =>
+        {
+            CurrentPage = NotesPage;
+            await NotesPage.NewNoteAsync(NoteAboutEvent(item));
+        };
+        NotesPage.StatusMessage += (_, message) => StatusText = message;
+        NotesPage.MailLinkRequested += async (_, messageId) =>
+        {
+            if (await _mail.FindByMessageIdAsync(messageId) is { } found)
+            {
+                await OpenMessageAsync(found.Folder, found.RemoteId);
+            }
+            else
+            {
+                StatusText = T("Diese E-Mail ist auf diesem Computer nicht vorhanden (gelöscht oder in einem anderen Konto).");
+            }
+        };
+        NotesPage.ContactLinkRequested += async (_, link) =>
+        {
+            CurrentPage = ContactsPage;
+            if (!await ContactsPage.RevealAsync(link.Value, link.Address))
+            {
+                StatusText = link.Address is { Length: > 0 } address
+                    ? F("Kein Kontakt mit der Adresse {0} gefunden.", address)
+                    : T("Der Kontakt wurde nicht gefunden.");
+            }
+        };
+        NotesPage.EventLinkRequested += async (_, uid) =>
+        {
+            if (!await CalendarPage.OpenByUidAsync(uid))
+            {
+                StatusText = T("Der Termin wurde nicht gefunden.");
+            }
+        };
+        _noteController.Changed += (_, _) => Dispatcher.UIThread.Post(async () =>
+        {
+            await MailPage.RefreshLinkedNotesAsync();
+            await ContactsPage.RefreshNotesAsync();
+        });
+    }
+
+    private static string NoteAboutMail(MessageSummary message)
+    {
+        var subject = message.Subject.Length > 0 ? message.Subject : T("(kein Betreff)");
+        var lines = new List<string>();
+        if (message.MessageId is { Length: > 0 } id)
+        {
+            lines.Add(T("E-Mail") + ": " + Neruna.Core.Notes.NoteLinks.Anchor(Neruna.Core.Notes.NoteLinks.MailHref(id), subject));
+        }
+
+        if (message.From is { } from)
+        {
+            lines.Add(T("Von") + ": " + Neruna.Core.Notes.NoteLinks.Anchor(Neruna.Core.Notes.NoteLinks.ContactHref(null, from.Address),
+                string.IsNullOrWhiteSpace(from.Name) ? from.Address : from.Name));
+        }
+
+        return NoteHtml(subject, lines);
+    }
+
+    private static string NoteAboutContact(ContactCard card)
+    {
+        var name = card.DisplayName.Length > 0 ? card.DisplayName : card.EmailAddresses.FirstOrDefault() ?? T("Kontakt");
+        return NoteHtml(name, [T("Kontakt") + ": " + Neruna.Core.Notes.NoteLinks.Anchor(Neruna.Core.Notes.NoteLinks.ContactHref(card.Uid, card.EmailAddresses.FirstOrDefault()), name)]);
+    }
+
+    private static string NoteAboutEvent(CalendarEventItem item)
+    {
+        var occurrence = item.Occurrence;
+        var title = string.IsNullOrWhiteSpace(occurrence.Summary) ? T("Besprechung") : occurrence.Summary;
+        var when = occurrence.Start.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+        var lines = new List<string>();
+        if (occurrence.Uid is { Length: > 0 } uid && !occurrence.IsTask)
+        {
+            lines.Add(T("Termin") + ": " + Neruna.Core.Notes.NoteLinks.Anchor(Neruna.Core.Notes.NoteLinks.EventHref(uid), title + ", " + when));
+        }
+
+        return NoteHtml(F("Notizen: {0}", title), lines);
+    }
+
+    private static string NoteHtml(string title, IEnumerable<string> lines) =>
+        "<h2>" + System.Net.WebUtility.HtmlEncode(title) + "</h2>" + string.Concat(lines.Select(l => "<div>" + l + "</div>")) + "<div><br></div>";
 
     private void WireChat()
     {
@@ -400,10 +510,14 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     public TasksViewModel TasksPage { get; }
 
+    public NotesViewModel NotesPage { get; }
+
+    private readonly Neruna.Core.Notes.NoteController _noteController;
+
     public SettingsViewModel SettingsPage { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsMail), nameof(IsCalendar), nameof(IsContacts), nameof(IsTasks), nameof(IsChat), nameof(IsSettings), nameof(SectionTitle))]
+    [NotifyPropertyChangedFor(nameof(IsMail), nameof(IsCalendar), nameof(IsContacts), nameof(IsTasks), nameof(IsNotes), nameof(IsChat), nameof(IsSettings), nameof(SectionTitle))]
     public partial ViewModelBase CurrentPage { get; set; }
 
     private void UpdateChatBadge()
@@ -427,10 +541,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     public bool IsTasks => CurrentPage == TasksPage;
 
+    public bool IsNotes => CurrentPage == NotesPage;
+
     public bool IsSettings => CurrentPage == SettingsPage;
 
     /// <summary>Shown in the header bar; the window title already says "Neruna".</summary>
-    public string SectionTitle => IsCalendar ? T("Kalender") : IsContacts ? T("Kontakte") : IsTasks ? T("Aufgaben") : IsChat ? "Chat" : IsSettings ? T("Einstellungen") : T("E-Mails");
+    public string SectionTitle => IsCalendar ? T("Kalender") : IsContacts ? T("Kontakte") : IsTasks ? T("Aufgaben") : IsNotes ? T("Notizen") : IsChat ? "Chat" : IsSettings ? T("Einstellungen") : T("E-Mails");
 
     /// <summary>Modal content shown above the shell, or null.</summary>
     [ObservableProperty]
@@ -593,7 +709,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private Section? SectionOf(ViewModelBase page) =>
         page == MailPage ? Section.Mail : page == CalendarPage ? Section.Calendar : page == ContactsPage ? Section.Contacts
-        : page == TasksPage ? Section.Tasks : page == ChatPage ? Section.Chat : page == SettingsPage ? Section.Settings : null;
+        : page == TasksPage ? Section.Tasks : page == NotesPage ? Section.Notes : page == ChatPage ? Section.Chat : page == SettingsPage ? Section.Settings : null;
 
     [RelayCommand]
     private void Navigate(Section section) => CurrentPage = section switch
@@ -601,6 +717,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Section.Calendar => CalendarPage,
         Section.Contacts => ContactsPage,
         Section.Tasks => TasksPage,
+        Section.Notes => NotesPage,
         Section.Chat => ChatPage,
         Section.Settings => SettingsPage,
         _ => MailPage,
@@ -832,6 +949,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     public async Task<bool> PrepareCloseAsync(Func<IReadOnlyList<string>, Task<CloseChoice>> ask)
     {
         ArgumentNullException.ThrowIfNull(ask);
+        await NotesPage.LeaveAsync();
         var drafts = MailPage.UnsavedDrafts;
         if (drafts.Count == 0)
         {
@@ -1227,8 +1345,22 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    // Leaving the notes: what was typed is saved and goes to the server.
+    partial void OnCurrentPageChanging(ViewModelBase oldValue, ViewModelBase newValue)
+    {
+        if (oldValue == NotesPage && newValue != NotesPage)
+        {
+            _ = NotesPage.LeaveAsync();
+        }
+    }
+
     partial void OnCurrentPageChanged(ViewModelBase value)
     {
+        if (value == NotesPage)
+        {
+            _ = NotesPage.ActivateAsync();
+        }
+
         foreach (var item in MailPage.Preferences.NavigationItems)
         {
             item.IsActive = SectionOf(value) == item.Section;

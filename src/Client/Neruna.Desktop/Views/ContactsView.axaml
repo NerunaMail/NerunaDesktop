@@ -2,6 +2,7 @@
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:notes="using:Neruna.Core.Notes"
              xmlns:app="using:Neruna.Desktop"
              x:Class="Neruna.Desktop.Views.ContactsView"
              x:DataType="vm:ContactsViewModel">
@@ -293,6 +294,34 @@
                 <Border Width="10" Height="10" CornerRadius="2" Background="{Binding Selected.Brush, FallbackValue={x:Null}}" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding Selected.AddressBook, FallbackValue={x:Null}}" />
               </StackPanel>
+            </StackPanel>
+
+            <!-- Notes about the contact (linked to it or mentioning its address) -->
+            <StackPanel Spacing="4" Margin="0,18,0,0" IsVisible="{Binding IsContactSelected}">
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="command" Command="{Binding NewNoteCommand}">
+                  <StackPanel Orientation="Horizontal">
+                    <PathIcon Data="{StaticResource IconAdd}" />
+                    <TextBlock Text="{l:T 'Neue Notiz'}" />
+                  </StackPanel>
+                </Button>
+                <TextBlock Classes="label" Text="{l:T 'Notizen'}" VerticalAlignment="Center" />
+              </DockPanel>
+              <TextBlock Classes="subtle" FontSize="12" Text="{l:T 'Keine Notizen zu diesem Kontakt.'}" IsVisible="{Binding !HasLinkedNotes}" />
+              <ItemsControl ItemsSource="{Binding LinkedNotes}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="notes:Note">
+                    <Button Command="{Binding $parent[UserControl].((vm:ContactsViewModel)DataContext).OpenNoteCommand}" CommandParameter="{Binding}"
+                            Background="Transparent" BorderThickness="0" Padding="4,3" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{StaticResource IconNote}" Width="14" Height="14" />
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" MaxWidth="300" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Preview}" Classes="subtle" FontSize="12" MaxWidth="320" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
             </StackPanel>
           </StackPanel>
         </ScrollViewer>

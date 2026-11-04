@@ -43,8 +43,51 @@ internal sealed partial class MailViewModel(
     AddressCollector addressCollector,
     MailTagService tagService,
     CalendarCategoryService categories,
+    Neruna.Core.Notes.NoteController notes,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
+    /// <summary>"Notiz": a new note about the open message (the shell opens the notes page).</summary>
+    public event EventHandler<MessageSummary>? NoteRequested;
+
+    /// <summary>The notes about the open message (by its Message-ID): the shell shows them on the notes page.</summary>
+    public event EventHandler<IReadOnlyList<Neruna.Core.Notes.Note>>? NotesRequested;
+
+    private IReadOnlyList<Neruna.Core.Notes.Note> _linkedNotes = [];
+
+    /// <summary>"2 Notizen" in the message actions, when notes link to the open message.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLinkedNotes))]
+    public partial string? LinkedNotesText { get; set; }
+
+    public bool HasLinkedNotes => LinkedNotesText is not null;
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void NewNote()
+    {
+        if (SelectedMessage is { } message)
+        {
+            NoteRequested?.Invoke(this, message.Summary);
+        }
+    }
+
+    [RelayCommand]
+    private void ShowNotes() => NotesRequested?.Invoke(this, _linkedNotes);
+
+    private async Task LoadLinkedNotesAsync(MessageSummary summary)
+    {
+        var found = summary.MessageId is { Length: > 0 } id ? await notes.FindLinkedAsync([Neruna.Core.Notes.NoteLinks.MailKey(id)]) : [];
+        if (SelectedMessage?.Summary != summary)
+        {
+            return;
+        }
+
+        _linkedNotes = found;
+        LinkedNotesText = found.Count switch { 0 => null, 1 => T("1 Notiz"), _ => F("{0} Notizen", found.Count) };
+    }
+
+    /// <summary>Notes were changed: the count for the open message again.</summary>
+    public Task RefreshLinkedNotesAsync() => SelectedMessage is { } message ? LoadLinkedNotesAsync(message.Summary) : Task.CompletedTask;
+
     /// <summary>An AI provider is connected (Settings → KI): the AI functions show.</summary>
     public bool AiAvailable => ai.IsConnected;
 
@@ -1755,6 +1798,8 @@ internal sealed partial class MailViewModel(
         var token = _readingCts.Token;
         _opened = null;
         ReadingPane = ReadingPaneViewModel.Loading(message.Summary);
+        LinkedNotesText = null;
+        _ = LoadLinkedNotesAsync(message.Summary);
 
         try
         {

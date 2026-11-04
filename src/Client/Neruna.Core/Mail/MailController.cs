@@ -278,8 +278,23 @@ public sealed class MailController(
         await SyncConnectionAsync(connection, cancellationToken);
     }
 
-    public Task<IReadOnlyList<MailFolder>> GetFoldersAsync(Guid connectionId, CancellationToken cancellationToken = default) =>
-        store.GetFoldersAsync(connectionId, cancellationToken);
+    /// <summary>The newest stored message with this Message-ID (a link in a note), in any account; null when none is here.</summary>
+    public async Task<(MailFolder Folder, string RemoteId)?> FindByMessageIdAsync(string messageId, CancellationToken cancellationToken = default)
+    {
+        foreach (var (connectionId, folderRemoteId, remoteId) in await store.FindByMessageIdAsync(messageId, cancellationToken))
+        {
+            if ((await store.GetFoldersAsync(connectionId, cancellationToken)).FirstOrDefault(f => f.RemoteId == folderRemoteId) is { } folder)
+            {
+                return (folder, remoteId);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The mail folders – without the notes folder, which belongs to the notes page.</summary>
+    public async Task<IReadOnlyList<MailFolder>> GetFoldersAsync(Guid connectionId, CancellationToken cancellationToken = default) =>
+        Notes.NoteFolders.WithoutNotes(await store.GetFoldersAsync(connectionId, cancellationToken));
 
     /// <summary>Characters the account's server does not take in folder names (checked while typing).</summary>
     public async Task<string> GetForbiddenFolderCharactersAsync(ServiceConnection connection)

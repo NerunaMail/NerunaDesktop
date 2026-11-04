@@ -1,0 +1,191 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:core="using:Neruna.Core.Mail"
+             xmlns:ed="using:Neruna.Desktop.Editor"
+             xmlns:views="using:Neruna.Desktop.Views"
+             xmlns:app="using:Neruna.Desktop"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
+             x:Class="Neruna.Desktop.Views.NotesView"
+             x:DataType="vm:NotesViewModel">
+
+  <Grid RowDefinitions="Auto,*">
+
+    <!-- Command bar: new note, new notebook, search -->
+    <Border Classes="pane" Padding="8,6" Margin="0,0,0,6">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+        <Button Classes="accent" Command="{Binding NewNoteCommand}" Padding="12,6" Margin="0,0,8,0" HotKey="Ctrl+N">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+            <TextBlock Text="{l:T 'Neue Notiz'}" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="1" Command="{Binding NewNotebookCommand}" Padding="10,6">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" />
+            <TextBlock Text="{l:T 'Neues Notizbuch'}" />
+          </StackPanel>
+        </Button>
+        <TextBox Grid.Column="3" Text="{Binding SearchText}" PlaceholderText="{l:T 'Notizen durchsuchen'}" Width="240" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="230,6,300,6,*">
+
+      <!-- Places and notebooks -->
+      <Border Classes="pane" Padding="6,8">
+        <DockPanel>
+          <Button DockPanel.Dock="Bottom" Content="{l:T 'Notizbuch löschen'}" Command="{Binding DeleteNotebookCommand}" IsVisible="{Binding CanDeleteNotebook}"
+                  HorizontalAlignment="Left" Margin="6,6,0,0" />
+          <ListBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:NoteSourceItem">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="{Binding Indent}" Background="Transparent">
+                  <StackPanel.ContextMenu>
+                    <ContextMenu IsVisible="{Binding IsPlace}">
+                      <MenuItem Header="{l:T 'Neue Notizen hier speichern'}"
+                                Command="{Binding $parent[UserControl].((vm:NotesViewModel)DataContext).MakeDefaultPlaceCommand}" CommandParameter="{Binding}" />
+                    </ContextMenu>
+                  </StackPanel.ContextMenu>
+                  <PathIcon Data="{Binding IconKey, Converter={x:Static app:Converters.Icon}}" Width="14" Height="14" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Label}" FontWeight="{Binding IsPlace, Converter={x:Static app:Converters.BoldIf}}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" />
+
+      <!-- The notes -->
+      <Border Grid.Column="2" Classes="pane" Padding="4,6">
+        <Panel>
+          <TextBlock Classes="subtle" Text="{l:T 'Keine Notizen'}" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsEmpty}" />
+          <ListBox x:Name="NoteList" ItemsSource="{Binding Notes}" SelectedItem="{Binding SelectedNote}" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:NoteItem">
+                <StackPanel Spacing="2" Margin="2,4">
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Classes="subtle" FontSize="12" Text="{Binding DateText}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                    <PathIcon DockPanel.Dock="Left" Data="{StaticResource IconPin}" Width="12" Height="12" Margin="0,0,5,0" IsVisible="{Binding IsPinned}" />
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  </DockPanel>
+                  <TextBlock Classes="subtle" FontSize="12" Text="{Binding Preview}" TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Classes="subtle" FontSize="11" Text="{Binding PlaceName}" TextTrimming="CharacterEllipsis" MaxWidth="160" />
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ErrorTextBrush}" Text="{l:T 'Konfliktkopie'}" IsVisible="{Binding IsConflict}" />
+                    <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <StackPanel Orientation="Horizontal" Spacing="3" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="core:MailTag">
+                          <Border Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" CornerRadius="3" Padding="5,0,5,1">
+                            <TextBlock Text="{Binding Name}" FontSize="10.5" Foreground="White" MaxWidth="80" TextTrimming="CharacterEllipsis" />
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Panel>
+      </Border>
+
+      <GridSplitter Grid.Column="3" Background="Transparent" ResizeDirection="Columns" />
+
+      <!-- The open note -->
+      <Border Grid.Column="4" Classes="pane" Padding="12,8">
+        <Panel>
+          <TextBlock Classes="subtle" Text="{l:T 'Wählen Sie eine Notiz aus oder legen Sie eine neue an'}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     IsVisible="{Binding !HasNote}" />
+          <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" IsVisible="{Binding HasNote}">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,6">
+              <ComboBox ItemsSource="{Binding Notebooks}" SelectedItem="{Binding SelectedNotebook}" MinWidth="220" MaxWidth="420" ToolTip.Tip="{l:T 'Notizbuch'}" />
+              <ToggleButton Grid.Column="1" IsChecked="{Binding IsPinned, Mode=OneWay}" Command="{Binding TogglePinCommand}" Margin="8,0,0,0" ToolTip.Tip="{l:T 'Anheften'}">
+                <PathIcon Data="{StaticResource IconPin}" Width="14" Height="14" />
+              </ToggleButton>
+              <Button Grid.Column="2" x:Name="TagButton" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Schlagwörter'}">
+                <PathIcon Data="{StaticResource IconTag}" Width="14" Height="14" />
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight">
+                    <ItemsControl ItemsSource="{Binding TagChoices}" MinWidth="200">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NoteTagChoice">
+                          <CheckBox IsChecked="{Binding IsSet, Mode=OneWay}" Command="{Binding $parent[UserControl].((vm:NotesViewModel)DataContext).ToggleTagCommand}" CommandParameter="{Binding}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <Border Width="12" Height="12" CornerRadius="3" Background="{Binding Tag.Color, Converter={x:Static app:Converters.ColorBrush}}" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding Tag.Name}" />
+                            </StackPanel>
+                          </CheckBox>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+              <Button Grid.Column="3" Command="{Binding DeleteCommand}" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Notiz löschen'}">
+                <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" />
+              </Button>
+            </Grid>
+
+            <Border Grid.Row="1" Background="{DynamicResource WarnBackgroundBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6" IsVisible="{Binding IsConflictCopy}">
+              <TextBlock TextWrapping="Wrap" FontSize="12"
+                         Text="{l:T 'Diese Notiz wurde gleichzeitig auf einem anderen Gerät geändert. Neruna hat beide Fassungen behalten – übernehmen Sie, was Sie brauchen, und löschen Sie die überzählige.'}" />
+            </Border>
+
+            <views:FormattingToolbar Grid.Row="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
+
+            <Border Grid.Row="3" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
+              <ed:HtmlEditor x:Name="Editor" />
+            </Border>
+
+            <!-- Links in the note: open the mail, contact or appointment -->
+            <ItemsControl Grid.Row="4" ItemsSource="{Binding Links}" IsVisible="{Binding HasLinks}" Margin="0,6,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="4" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:NoteLinkItem">
+                  <Button Command="{Binding $parent[UserControl].((vm:NotesViewModel)DataContext).OpenLinkCommand}" CommandParameter="{Binding}" Padding="8,3"
+                          ToolTip.Tip="{l:T 'Öffnen'}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <PathIcon Data="{Binding IconKey, Converter={x:Static app:Converters.Icon}}" Width="12" Height="12" />
+                      <TextBlock Text="{Binding Text}" FontSize="12" MaxWidth="260" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+              <ItemsControl ItemsSource="{Binding CurrentTags}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="3" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="core:MailTag">
+                    <Border Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" CornerRadius="3" Padding="6,1">
+                      <TextBlock Text="{Binding Name}" FontSize="11" Foreground="White" />
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="subtle" FontSize="12" Text="{Binding NoteInfo}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Grid>
+        </Panel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

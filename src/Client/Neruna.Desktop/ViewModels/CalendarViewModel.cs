@@ -521,6 +521,24 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         await ShowEditorAsync(EventDraft.FromICalendar(stored.ICalendarData), (occurrence.Calendar, occurrence.ObjectRemoteId));
     }
 
+    /// <summary>"Notiz zum Termin": the shell opens the notes page with a note linked to the event.</summary>
+    public event EventHandler<CalendarEventItem>? NoteRequested;
+
+    [RelayCommand]
+    private void NewNote(CalendarEventItem item) => NoteRequested?.Invoke(this, item);
+
+    /// <summary>Opens the event with this iCalendar UID in the editor (a link in a note); false when it is not here.</summary>
+    public async Task<bool> OpenByUidAsync(string uid)
+    {
+        if (string.IsNullOrEmpty(uid) || await calendar.FindByUidAsync(uid) is not { } found)
+        {
+            return false;
+        }
+
+        await ShowEditorAsync(EventDraft.FromICalendar(found.Item.ICalendarData), (found.Calendar, found.Item.RemoteId));
+        return true;
+    }
+
     // ---- Right-click on an event ---------------------------------------------------------------------------------
 
     /// <summary>What the context menu of an event offers: its online meeting's link, and whether it may be deleted.</summary>
