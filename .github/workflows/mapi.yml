@@ -7,6 +7,10 @@ on:
     paths: ['native/mapi/**', '.github/workflows/mapi.yml']
   workflow_dispatch:
 
+# Only compiles and checks: reading the code is enough.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
