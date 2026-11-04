@@ -316,7 +316,7 @@ internal sealed partial class MessageBodyView : UserControl
             if (command && (key === "c" || key === "C" || key === "a" || key === "A")) return;
             if (!command && !e.altKey && !/^(Delete|Escape|F\d+)$/.test(key)) return;
             e.preventDefault();
-            post({ type: "key", key: key, ctrl: command, shift: e.shiftKey, alt: e.altKey });
+            post({ type: "key", key: key, code: e.code || "", ctrl: command, shift: e.shiftKey, alt: e.altKey });
           }, true);
         })();
         """;
@@ -340,6 +340,29 @@ internal sealed partial class MessageBodyView : UserControl
         _written = true;
         CrashHandler.Logger?.LogInformation("Mail page ready in the web view after {Elapsed} ms", _shownAt?.ElapsedMilliseconds);
         _web.InvokeScript("document.open();document.write(" + System.Text.Json.JsonSerializer.Serialize(page) + ");document.close();" + KeyScript + ";\"ok\"").Forget(); // a result WebKitGTK can return (undefined fails there)
+    }
+
+    /// <summary>
+    /// The Avalonia key of a key press in the page. A letter by the character typed (the keyboard layout: Z on a
+    /// Swiss keyboard is Z); everything else by the physical key – with Shift, Alt or AltGr the character is another
+    /// one ("+" for Ctrl+Shift+1), and a digit's character would parse as a key number.
+    /// </summary>
+    internal static Avalonia.Input.Key? WebKey(string? key, string? code)
+    {
+        if (key is { Length: 1 } && char.IsAsciiLetter(key[0]))
+        {
+            return Enum.Parse<Avalonia.Input.Key>(key.ToUpperInvariant());
+        }
+
+        var name = code switch
+        {
+            { Length: 6 } when code.StartsWith("Digit", StringComparison.Ordinal) => "D" + code[5],
+            { Length: 7 } when code.StartsWith("Numpad", StringComparison.Ordinal) && char.IsAsciiDigit(code[6]) => "NumPad" + code[6],
+            { Length: 4 } when code.StartsWith("Key", StringComparison.Ordinal) => code[3..],
+            { Length: > 0 } => code,
+            _ => key,
+        };
+        return name is { Length: > 0 } && !char.IsAsciiDigit(name[0]) && Enum.TryParse<Avalonia.Input.Key>(name, ignoreCase: true, out var parsed) ? parsed : null;
     }
 
     private void OnWebMessage(object? sender, WebMessageReceivedEventArgs e)
@@ -368,8 +391,7 @@ internal sealed partial class MessageBodyView : UserControl
             }
 
             if (message.TryGetProperty("type", out var type) && type.GetString() == "key"
-                && message.TryGetProperty("key", out var name) && name.GetString() is { Length: > 0 } text
-                && Enum.TryParse<Avalonia.Input.Key>(text.Length == 1 ? text.ToUpperInvariant() : text, ignoreCase: true, out var key))
+                && WebKey(message.TryGetProperty("key", out var name) ? name.GetString() : null, message.TryGetProperty("code", out var code) ? code.GetString() : null) is { } key)
             {
                 var modifiers = Avalonia.Input.KeyModifiers.None;
                 modifiers |= message.TryGetProperty("ctrl", out var ctrl) && ctrl.ValueKind == System.Text.Json.JsonValueKind.True ? Avalonia.Input.KeyModifiers.Control : 0;

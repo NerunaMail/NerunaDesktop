@@ -15,7 +15,6 @@
     <KeyBinding Gesture="Ctrl+R" Command="{Binding ReplyCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" />
     <KeyBinding Gesture="Ctrl+F" Command="{Binding ForwardCommand}" />
-    <KeyBinding Gesture="Delete" Command="{Binding DeleteCommand}" />
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding ToggleReadCommand}" />
     <KeyBinding Gesture="Ctrl+P" Command="{Binding PrintCommand}" />
   </UserControl.KeyBindings>

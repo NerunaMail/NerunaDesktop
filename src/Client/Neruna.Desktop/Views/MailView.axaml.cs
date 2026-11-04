@@ -59,6 +59,11 @@ internal sealed partial class MailView : UserControl
                 this.FindControl<TextBox>("QuickSearch")?.Focus();
                 e.Handled = true;
             }
+            else if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None && !e.Handled && ViewModel is { } current && DeletesMessage(current))
+            {
+                current.DeleteCommand.Execute(null);
+                e.Handled = true;
+            }
             else if (!e.Handled && ViewModel is { } vm && Infrastructure.Shortcuts.Of(e) is { } shortcut && vm.RunQuickActionShortcut(shortcut))
             {
                 e.Handled = true; // a quick action's own key combination (Einstellungen → Schnellaktionen)
@@ -386,5 +391,29 @@ internal sealed partial class MailView : UserControl
         _highlighted?.Classes.Remove("drop-target");
         _highlighted = item;
         _highlighted?.Classes.Add("drop-target");
+    }
+
+    // Delete removes the message only from the list or while reading it – never while typing in a field (a draft's
+    // "An" or "Betreff", the search …), where it deletes characters.
+    private bool DeletesMessage(MailViewModel vm)
+    {
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual;
+        if (focused is null)
+        {
+            return vm.Compose is null; // nothing focused, e.g. after a click into the shown message
+        }
+
+        if (focused is TextBox || focused.FindAncestorOfType<TextBox>() is not null)
+        {
+            return false;
+        }
+
+        if (focused.FindAncestorOfType<ListBox>(includeSelf: true) is { Name: "MessageList" })
+        {
+            return true;
+        }
+
+        return vm.Compose is null && this.FindControl<Border>("ReadingPaneBox") is { } pane
+               && (focused == pane || focused.GetVisualAncestors().Contains(pane));
     }
 }
