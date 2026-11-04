@@ -7,8 +7,8 @@ Stand: 2026-10-18 · lebendes Dokument, wird mit dem Code nachgeführt.
 | Produkt | Art | Lizenz / Modell | Zweck |
 |---|---|---|---|
 | **Neruna Desktop** | Desktop-App (Windows, macOS, Linux) | Open Source, gratis | Mail-, Kalender- und Kontakt-Client im vertrauten Büro-Stil für offene Standards |
-| **Neruna Cloud** | SaaS, mandantenfähig | Abo pro User/Domain | Zentrale Konfiguration: Autoconfig, Signaturen, Kalender-Abos, Richtlinien, Config-Tresor |
-| **Neruna Control** | Self-hosted (Docker) | Abo/Lizenz pro User/Domain | Gleiche Software wie Cloud, im Single-Tenant-Modus beim Kunden |
+| **Neruna Cloud** | SaaS, mandantenfähig | Privat (Einzelperson 1, Family 5, Family+ 10 Benutzer; nicht kommerziell, ohne Logo und Chat) oder Business pro Benutzer; übrige Limits abgeleitet (siehe `server/app/Models/License.php`) | Zentrale Konfiguration: Autoconfig, Signaturen, Kalender-Abos, Richtlinien, Config-Tresor |
+| **Neruna Control** | Self-hosted (Docker) | Vorerst gleiche Werte wie Business; Verrechnung offen | Gleiche Software wie Cloud, im Single-Tenant-Modus beim Kunden |
 
 ### Leitplanken
 
@@ -572,7 +572,7 @@ Kontaktliste mit Detailansicht. Screenshots: `docs/screenshots/` (erzeugt mit `t
 | Discovery-API `/api/v1/discovery` | ✔ inkl. Vertragstest |
 | Thunderbird-Autoconfig (beide Pfade) | ✔ inkl. Vertragstest |
 | Autoconfig-Verzeichnis `/v1/<domain>` | ✔ ISPDB-Spiegel (täglich, Cron), Ergänzungen und eigene Einträge unter Admin → Autoconfig, MX-Suche, Abfrage-Statistik pro Domain |
-| Admin und Kundenportal | ✔ Filament 5: `/admin` (Mandanten, Lizenz, Limits, Addons, Logins), `/portal` (Firmendaten, Benutzer, Verbindungscodes, Geräte) |
+| Admin und Kundenportal | ✔ Filament 5: `/admin` (Mandanten, Lizenz: Abo, Benutzer, Zusatz-Mailboxen, Geräte-Stufe; Logins), `/portal` (Firmendaten, Benutzer, Verbindungscodes, Geräte) |
 | Signaturvorlagen, Kalender-Abos, Richtlinien | offen |
 | Config-Tresor-Ablage | ✔ `/api/v1/vault`: verpackte Schlüssel + max. 20 verschlüsselte Sicherungen pro Person (Abschnitt 6) |
 | Geräte verbinden | ✔ Einmal-Code + separate PIN, Geräteschlüssel (ECDSA P-256), signierte Anmeldung, Tokens; Geräte im Portal sperrbar |
