@@ -411,7 +411,8 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             if (status != SignatureStatus.Invalid && certificate is not null
                 && await certificates.CollectAsync(certificate, verified: status == SignatureStatus.Valid && matches, cancellationToken))
             {
-                logger.LogInformation("Collected S/MIME certificate of {Signer}", string.Join(", ", emails));
+                // The thumbprint, not the sender's addresses: other people's addresses stay out of the log.
+                logger.LogInformation("Collected S/MIME certificate {Thumbprint}", CertificateParser.Thumbprint(certificate));
             }
         }
 
