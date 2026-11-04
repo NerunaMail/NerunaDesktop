@@ -122,8 +122,11 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     /// <summary>Index of the «Cloud» tab (the chat sends people there to connect).</summary>
     public const int CloudTab = 7;
 
+    /// <summary>«Über Neruna»: the settings open on it (first in the list).</summary>
+    public const int AboutTab = 9;
+
     [ObservableProperty]
-    public partial int SelectedTab { get; set; }
+    public partial int SelectedTab { get; set; } = AboutTab;
 
     /// <summary>
     /// The list on the left: areas, the mail ones under a heading. <see cref="SettingsNavItem.Tab"/> keeps the old tab
@@ -131,6 +134,13 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     /// </summary>
     public static IReadOnlyList<SettingsNavItem> Navigation { get; } =
     [
+        new(-1, T("Programm"), null, IsHeading: true),
+        new(AboutTab, T("Über Neruna"), "IconInfo"),
+        new(NewsTab, T("News"), "IconRss"),
+        new(6, T("Darstellung"), "IconPalette"),
+        new(15, T("Workspaces"), "IconFolder"),
+        new(ProfilesTab, T("Profile"), "IconPeople"),
+        new(8, T("KI"), "IconAi"),
         new(-1, T("Konten"), null, IsHeading: true),
         new(0, T("Konten"), "IconPeople"),
         new(ServerRulesTab, T("Serverregeln"), "IconInbox"),
@@ -152,17 +162,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(12, T("Suchindex"), "IconSearch"),
         new(10, T("Datensicherung"), "IconArchive"),
         new(13, T("Lokale Daten"), "IconFolder"),
-        new(-1, T("Programm"), null, IsHeading: true),
-        new(6, T("Darstellung"), "IconPalette"),
-        new(15, T("Workspaces"), "IconFolder"),
-        new(ProfilesTab, T("Profile"), "IconPeople"),
-        new(8, T("KI"), "IconAi"),
-        new(9, T("Über Neruna"), "IconInfo"),
-        new(NewsTab, T("News"), "IconRss"),
     ];
 
     [ObservableProperty]
-    public partial SettingsNavItem? SelectedNav { get; set; } = Navigation[1];
+    public partial SettingsNavItem? SelectedNav { get; set; } = Navigation.First(n => n.Tab == AboutTab);
 
     partial void OnSelectedTabChanged(int value)
     {
