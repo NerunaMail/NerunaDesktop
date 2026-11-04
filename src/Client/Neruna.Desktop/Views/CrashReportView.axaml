@@ -20,7 +20,7 @@
 
     <CheckBox IsChecked="{Binding AlwaysSend}" Margin="0,12,0,0" Content="{l:T 'Künftig ohne Nachfrage senden'}" />
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"
-               Text="{l:T 'Änderbar unter Einstellungen → Info.'}" />
+               Text="{l:T 'Änderbar unter Einstellungen → Über Neruna.'}" />
 
     <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0" TextWrapping="Wrap"
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />

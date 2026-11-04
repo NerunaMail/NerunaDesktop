@@ -286,7 +286,7 @@
           <Button Classes="command" Command="{Binding ShowBackupChangesCommand}" Padding="2,1" ToolTip.Tip="{l:T 'Anzeigen, was sich seit der letzten Sicherung geändert hat'}">
             <TextBlock FontSize="12" Text="{l:T 'Einstellungen geändert – neue Sicherung erstellen?'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
           </Button>
-          <Button Classes="command" Command="{Binding BackupNowCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="{l:T 'Einstellungen → Cloud → Sicherung'}">
+          <Button Classes="command" Command="{Binding BackupNowCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="{l:T 'Einstellungen → Neruna Cloud → Sicherung'}">
             <TextBlock Text="{l:T 'Sichern'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
           </Button>
           <Button Classes="command" Command="{Binding BackupLaterCommand}" Padding="6,1" FontSize="12" ToolTip.Tip="{l:T 'Erst nach der nächsten Änderung wieder fragen'}">

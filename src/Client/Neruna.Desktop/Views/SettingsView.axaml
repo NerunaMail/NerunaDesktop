@@ -42,12 +42,34 @@
         <ContentControl Content="{Binding Cloud}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=7}" />
         <ContentControl Content="{Binding Ai}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=8}" />
         <ContentControl Content="{Binding QuickActions}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=11}" />
-        <ContentControl Content="{Binding FileBackup}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=10}" />
-        <ContentControl Content="{Binding SearchIndex}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=12}" />
-        <ContentControl Content="{Binding LocalData}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=13}" />
+        <!-- Daten: backup, search index, local database and the folders, one under the other -->
+        <ScrollViewer IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=10}">
+          <StackPanel Spacing="28" Margin="0,0,0,20">
+            <ContentControl Content="{Binding FileBackup}" />
+            <ContentControl Content="{Binding SearchIndex}" />
+            <ContentControl Content="{Binding LocalData}" />
+            <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
+              <TextBlock Text="{l:T 'Ordner'}" FontSize="18" FontWeight="SemiBold" />
+              <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="6">
+                <TextBlock Text="{l:T 'Datenordner'}" Classes="subtle" VerticalAlignment="Center" />
+                <SelectableTextBlock Grid.Column="1" Text="{Binding Accounts.DataDirectory}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <Button Grid.Column="2" Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Accounts.OpenDataFolderCommand}" />
+                <TextBlock Grid.Row="1" Text="{l:T 'Logs'}" Classes="subtle" VerticalAlignment="Center" />
+                <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Accounts.LogDirectory}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <Button Grid.Row="1" Grid.Column="2" Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Accounts.OpenLogFolderCommand}" />
+              </Grid>
+              <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding Accounts.ProtocolLogText}" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
         <ContentControl Content="{Binding Privacy}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=14}" />
-        <ContentControl Content="{Binding Workspaces}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=15}" />
-        <ContentControl Content="{Binding Profiles}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=22}" />
+        <!-- Profile und Workspaces: the profiles (each its own Neruna) on top, the workspaces of this one below -->
+        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=15}">
+          <ContentControl Content="{Binding Profiles}" MaxHeight="360" />
+          <TextBlock Grid.Row="1" Text="{l:T 'Workspaces'}" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,10" />
+          <ContentControl Grid.Row="2" Content="{Binding Workspaces}" />
+        </Grid>
+        <views:IntegrationView DataContext="{Binding MailOptions}" IsVisible="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=23}" />
         <ContentControl Content="{Binding News}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=16}" />
         <ContentControl Content="{Binding Meetings}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=18}" />
         <ContentControl Content="{Binding Pdf}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=19}" />

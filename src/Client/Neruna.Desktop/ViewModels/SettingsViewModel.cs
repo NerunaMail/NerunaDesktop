@@ -48,7 +48,14 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     /// <summary>Settings → Profile.</summary>
     public ProfilesViewModel Profiles => profiles;
 
-    public const int ProfilesTab = 22;
+    /// <summary>Profiles share the page with the workspaces.</summary>
+    public const int ProfilesTab = WorkspacesTab;
+
+    /// <summary>«Integration»: default mail program, sending from other programs.</summary>
+    public const int IntegrationTab = 23;
+
+    /// <summary>«Daten»: backup, search index, the local database and the data and log folders on one page.</summary>
+    public const int DataTab = 10;
 
     /// <summary>Index of the «Workspaces» tab (the switcher's "Workspaces verwalten").</summary>
     public const int WorkspacesTab = 15;
@@ -57,6 +64,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     public void ShowWorkspaces()
     {
         SelectedTab = WorkspacesTab;
+        Profiles.Reload();
         _ = Workspaces.ReloadAsync();
     }
 
@@ -138,9 +146,9 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(AboutTab, T("Über Neruna"), "IconInfo"),
         new(NewsTab, T("News"), "IconRss"),
         new(6, T("Darstellung"), "IconPalette"),
-        new(15, T("Workspaces"), "IconFolder"),
-        new(ProfilesTab, T("Profile"), "IconPeople"),
+        new(WorkspacesTab, T("Profile und Workspaces"), "IconWorkspaces"),
         new(8, T("KI"), "IconAi"),
+        .. MailOptionsViewModel.CanBeDefaultApp || MailOptionsViewModel.CanOfferMapi ? [new SettingsNavItem(IntegrationTab, T("Integration"), "IconLink")] : Array.Empty<SettingsNavItem>(),
         new(-1, T("Konten"), null, IsHeading: true),
         new(0, T("Konten"), "IconPeople"),
         new(ServerRulesTab, T("Serverregeln"), "IconInbox"),
@@ -152,16 +160,15 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(4, T("Textvorlagen"), "IconTextTemplate"),
         new(MailTagsTab, T("Schlagwörter"), "IconTag"),
         new(11, T("Schnellaktionen"), "IconFlash"),
-        new(PdfTab, "PDF", "IconLock"),
-        new(5, T("Zertifikate (S/MIME)"), "IconCertificate"),
+        new(-1, T("Sicherheit"), null, IsHeading: true),
         new(14, T("Datenschutz"), "IconShield"),
+        new(5, T("Zertifikate (S/MIME)"), "IconCertificate"),
+        new(PdfTab, "PDF", "IconLock"),
         new(-1, T("Kalender"), null, IsHeading: true),
         new(2, T("Kalender"), "IconCalendar"),
         new(MeetingsTab, T("Besprechungen"), "IconVideo"),
         new(-1, T("Daten"), null, IsHeading: true),
-        new(12, T("Suchindex"), "IconSearch"),
-        new(10, T("Datensicherung"), "IconArchive"),
-        new(13, T("Lokale Daten"), "IconFolder"),
+        new(DataTab, T("Daten"), "IconArchive"),
     ];
 
     [ObservableProperty]
@@ -180,12 +187,9 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         if (value is { IsHeading: false } item)
         {
             SelectedTab = item.Tab;
-            if (item.Tab == 12)
+            if (item.Tab == DataTab)
             {
                 _ = SearchIndex.ReloadAsync();
-            }
-            else if (item.Tab == 13)
-            {
                 LocalData.ShowDatabaseSize();
             }
             else if (item.Tab == ServerRulesTab && _ruleAccount is null)
@@ -208,9 +212,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
             {
                 _ = News.ShowAsync();
             }
-            else if (item.Tab == ProfilesTab)
+            else if (item.Tab == WorkspacesTab)
             {
                 Profiles.Reload();
+                _ = Workspaces.ReloadAsync();
             }
         }
     }

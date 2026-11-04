@@ -10,7 +10,7 @@
     <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left" Margin="0,0,0,20">
       <TextBlock Text="Neruna Cloud" FontSize="18" FontWeight="SemiBold" />
       <TextBlock Classes="subtle" TextWrapping="Wrap"
-                 Text="{l:T 'Verbindet Neruna mit dem Portal deiner Organisation – für zentral verwaltete Signaturen, Textvorlagen, S/MIME-Zertifikate und den Chat. Deine Mails, Termine und Kontakte bleiben auf deinem Mailserver.'}" />
+                 Text="{l:T 'Verbindet Neruna mit dem Portal Ihrer Organisation – für zentral verwaltete Signaturen, Textvorlagen, S/MIME-Zertifikate und den Chat. Ihre Mails, Termine und Kontakte bleiben auf Ihrem Mailserver.'}" />
 
       <!-- Connected: one more organisation, on its own above the organisations -->
       <Button Content="{l:T 'Weitere Organisation verbinden …'}" Command="{Binding AddConnectionCommand}" Margin="0,4,0,0">
@@ -67,10 +67,10 @@
         <TextBox Text="{Binding Server}" PlaceholderText="{l:T 'https://neruna.cloud'}" />
         <TextBlock Text="{l:T 'Verbindungscode'}" FontWeight="SemiBold" Margin="0,6,0,0" />
         <TextBox Text="{Binding Code}" PlaceholderText="{l:T 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX'}" FontFamily="Consolas, Cascadia Mono, monospace" />
-        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Aus der Mail «Neruna Desktop verbinden» oder direkt von deiner Administratorin bzw. deinem Administrator.'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Aus der Mail «Neruna Desktop verbinden» oder direkt von Ihrer Administratorin bzw. Ihrem Administrator.'}" />
         <TextBlock Text="PIN" FontWeight="SemiBold" Margin="0,6,0,0" />
         <TextBox Text="{Binding Pin}" PlaceholderText="{l:T '6 Ziffern'}" Width="160" HorizontalAlignment="Left" PasswordChar="•" MaxLength="12" />
-        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Die PIN erhältst du separat – nicht per Mail.'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{l:T 'Die PIN erhalten Sie separat – nicht per Mail.'}" />
         <TextBlock Text="{l:T 'Gerätename'}" FontWeight="SemiBold" Margin="0,6,0,0" />
         <TextBox Text="{Binding DeviceName}" MaxLength="120" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Text="{Binding DeviceDescription, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Im Portal sichtbar: {0}'}" />
@@ -205,7 +205,7 @@
         <TextBlock Text="{Binding BackupOrganizationText}" FontWeight="SemiBold" TextWrapping="Wrap"
                    IsVisible="{Binding BackupOrganizationText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <TextBlock Classes="subtle" TextWrapping="Wrap"
-                   Text="{l:T 'Sichert deine persönlichen Einstellungen – Konten samt Passwörtern, eigene Signaturen, Textvorlagen und Zertifikate, Einstellungen – verschlüsselt mit deinem Tresor-Passwort. Die Cloud kann sie nicht lesen. Was von deiner Organisation kommt, ist nicht dabei: Es kommt nach dem Verbinden automatisch wieder.'}" />
+                   Text="{l:T 'Sichert Ihre persönlichen Einstellungen – Konten samt Passwörtern, eigene Signaturen, Textvorlagen und Zertifikate, Einstellungen – verschlüsselt mit Ihrem Tresor-Passwort. Die Cloud kann sie nicht lesen. Was von Ihrer Organisation kommt, ist nicht dabei: Es kommt nach dem Verbinden automatisch wieder.'}" />
 
         <!-- No vault yet -->
         <StackPanel Spacing="8" IsVisible="{Binding ShowVaultSetup}">
@@ -213,7 +213,7 @@
           <TextBox Text="{Binding VaultPassword}" PasswordChar="•" PlaceholderText="{l:T 'Mindestens 10 Zeichen'}" />
           <TextBox Text="{Binding VaultPasswordRepeat}" PasswordChar="•" PlaceholderText="{l:T 'Passwort wiederholen'}" />
           <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
-                     Text="{l:T 'Ohne dieses Passwort oder den Wiederherstellungscode kann niemand die Sicherungen öffnen – auch deine Organisation und Neruna nicht.'}" />
+                     Text="{l:T 'Ohne dieses Passwort oder den Wiederherstellungscode kann niemand die Sicherungen öffnen – auch Ihre Organisation und Neruna nicht.'}" />
           <Button Classes="accent" Content="{l:T 'Tresor einrichten'}" Command="{Binding SetUpVaultCommand}" HorizontalAlignment="Left" />
         </StackPanel>
 
@@ -221,7 +221,7 @@
         <Border IsVisible="{Binding HasRecoveryCode}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="16,14">
           <StackPanel Spacing="10">
             <TextBlock Text="{l:T 'Dein Wiederherstellungscode'}" FontWeight="SemiBold" />
-            <TextBlock TextWrapping="Wrap" Text="{l:T 'Er öffnet den Tresor, wenn du das Passwort vergisst. Er wird nur jetzt angezeigt – schreib ihn auf oder speichere ihn in einem Passwortmanager.'}" />
+            <TextBlock TextWrapping="Wrap" Text="{l:T 'Er öffnet den Tresor, wenn Sie das Passwort vergessen. Er wird nur jetzt angezeigt – schreiben Sie ihn auf oder speichern Sie ihn in einem Passwortmanager.'}" />
             <SelectableTextBlock Text="{Binding RecoveryCode}" FontFamily="Consolas, Cascadia Mono, monospace" FontSize="15" TextWrapping="Wrap" />
             <CheckBox Content="{l:T 'Ich habe den Code sicher aufbewahrt'}" IsChecked="{Binding RecoveryStored}" />
             <Button Classes="accent" Content="{l:T 'Weiter'}" Command="{Binding ConfirmRecoveryCodeCommand}" IsEnabled="{Binding RecoveryStored}" HorizontalAlignment="Left" />
@@ -289,7 +289,7 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
               <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
-                         Text="{l:T 'Mails, Termine und Kontakte bleiben auf den Servern und werden danach neu geladen. Einstellungen und Zertifikate deiner Organisation sind nicht betroffen.'}" />
+                         Text="{l:T 'Mails, Termine und Kontakte bleiben auf den Servern und werden danach neu geladen. Einstellungen und Zertifikate Ihrer Organisation sind nicht betroffen.'}" />
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Classes="accent" Content="{l:T 'Sicherung wiederherstellen'}" Command="{Binding RestoreCommand}" />
                 <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelRestoreCommand}" />

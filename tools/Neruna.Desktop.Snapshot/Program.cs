@@ -1135,6 +1135,14 @@ internal static class Snapshots
         await vm.SettingsPage.ReloadAsync();
         vm.SettingsPage.SelectedTab = 1;
         await SaveAsync(window, output, "settings-mail.png");
+        // The pages that bring several areas together.
+        foreach (var (tab, file) in new[] { (Neruna.Desktop.ViewModels.SettingsViewModel.WorkspacesTab, "settings-profiles-workspaces.png"), (Neruna.Desktop.ViewModels.SettingsViewModel.DataTab, "settings-data.png"), (Neruna.Desktop.ViewModels.SettingsViewModel.IntegrationTab, "settings-integration.png"), (Neruna.Desktop.ViewModels.SettingsViewModel.PdfTab, "settings-pdf.png") })
+        {
+            vm.SettingsPage.SelectedNav = Neruna.Desktop.ViewModels.SettingsViewModel.Navigation.FirstOrDefault(n => n.Tab == tab);
+            vm.SettingsPage.SelectedTab = tab;
+            await Task.Delay(300);
+            await SaveAsync(window, output, file);
+        }
         vm.SettingsPage.SelectedTab = 2;
         await SaveAsync(window, output, "settings-calendar.png");
         if (window.GetVisualDescendants().OfType<CalendarCategoriesView>().FirstOrDefault(v => v.IsEffectivelyVisible) is { } categoriesView)

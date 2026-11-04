@@ -240,7 +240,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
         IsAvailable = snapshot.Available;
         RetentionText = snapshot.RetentionDays == 1 ? T("Nachrichten werden 1 Tag aufbewahrt") : F("Nachrichten werden {0} Tage aufbewahrt", snapshot.RetentionDays);
         RetentionDetails = RetentionText + T(" und danach gelöscht – auf dem Server und auf diesem Computer. ")
-                           + T("Die Dauer legt deine Organisation im Portal fest. Der Chat ist nicht für vertrauliche Daten gedacht.");
+                           + T("Die Dauer legt Ihre Organisation im Portal fest. Der Chat ist nicht für vertrauliche Daten gedacht.");
         TotalUnread = snapshot.TotalUnread;
 
         var people = snapshot.People.ToDictionary(p => p.Id);

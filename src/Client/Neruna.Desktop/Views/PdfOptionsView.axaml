@@ -2,6 +2,7 @@
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:v="using:Neruna.Desktop.Views"
              xmlns:sys="using:System"
              x:Class="Neruna.Desktop.Views.PdfOptionsView"
              x:DataType="vm:PdfOptionsViewModel">
@@ -92,6 +93,17 @@
         </StackPanel>
       </Border>
       <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+      <!-- «Speichern unter …» as PDF: the option lives with the mail options -->
+      <StackPanel Spacing="6" Margin="0,12,0,0" DataContext="{Binding $parent[v:SettingsView].((vm:SettingsViewModel)DataContext).MailOptions}" x:DataType="vm:MailOptionsViewModel">
+        <TextBlock Classes="section" Text="{l:T 'Als PDF speichern'}" Margin="0,0,0,4" />
+        <TextBlock Classes="subtle" Text="{l:T 'Anhänge einer Mail, die als PDF gespeichert wird'}" />
+        <RadioButton GroupName="PdfAttachments" Content="{l:T 'Bilder und PDFs als Seiten ins PDF'}" IsChecked="{Binding PdfAttachmentsInside}" />
+        <RadioButton GroupName="PdfAttachments" Content="{l:T 'Als eigene Dateien daneben speichern'}" IsChecked="{Binding PdfAttachmentsBeside}" />
+        <RadioButton GroupName="PdfAttachments" Content="{l:T 'Nicht speichern'}" IsChecked="{Binding PdfAttachmentsNone}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T '«Speichern unter …» (Rechtsklick auf eine Mail oder ⋮ beim Betreff) bietet EML und PDF an – das zuletzt gewählte Format zuerst. PDF eignet sich zum Archivieren.'}" />
+      </StackPanel>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

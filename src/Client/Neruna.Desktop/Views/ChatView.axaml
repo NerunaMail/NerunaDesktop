@@ -83,7 +83,7 @@
         <PathIcon Data="{StaticResource IconChat}" Width="44" Height="44" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Center" />
         <TextBlock Text="{l:T 'Der Chat braucht Neruna Cloud oder Control'}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
         <TextBlock Classes="subtle" TextWrapping="Wrap" TextAlignment="Center"
-                   Text="{l:T 'Räume, private Nachrichten und der Online-Status laufen über den Server deiner Organisation. Ohne Verbindung zu Neruna Cloud oder einem Neruna-Control-Server funktioniert der Chat nicht – Neruna allein (ohne Server) hat keinen Chat.'}" />
+                   Text="{l:T 'Räume, private Nachrichten und der Online-Status laufen über den Server Ihrer Organisation. Ohne Verbindung zu Neruna Cloud oder einem Neruna-Control-Server funktioniert der Chat nicht – Neruna allein (ohne Server) hat keinen Chat.'}" />
         <Button Classes="accent" Content="{l:T 'Mit der Cloud verbinden …'}" HorizontalAlignment="Center" Command="{Binding OpenCloudSetupCommand}" Margin="0,6,0,0" />
       </StackPanel>
     </Border>
@@ -206,7 +206,7 @@
 
           <ScrollViewer x:Name="MessageScroller" Grid.Row="1" Padding="16,8,16,8">
             <StackPanel>
-              <TextBlock Classes="subtle" Text="{l:T 'Noch keine Nachrichten – schreib die erste.'}" HorizontalAlignment="Center" Margin="0,24"
+              <TextBlock Classes="subtle" Text="{l:T 'Noch keine Nachrichten – schreiben Sie die erste.'}" HorizontalAlignment="Center" Margin="0,24"
                          IsVisible="{Binding !Messages.Count}" />
               <ItemsControl ItemsSource="{Binding Messages}">
                 <ItemsControl.ItemTemplate>

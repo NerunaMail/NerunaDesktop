@@ -64,7 +64,7 @@ internal sealed class ProfileChooserWindow : Window
                 buttons,
                 new TextBlock
                 {
-                    Text = T("Abfrage ausschalten: Einstellungen → Profile."), FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap,
+                    Text = T("Abfrage ausschalten: Einstellungen → Profile und Workspaces."), FontSize = 12, Opacity = 0.7, TextWrapping = TextWrapping.Wrap,
                 },
             },
         };
