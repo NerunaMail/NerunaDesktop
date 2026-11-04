@@ -146,6 +146,10 @@
       <ToggleButton Classes="fmt" IsChecked="{Binding IsNumberedList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertOrderedList" ToolTip.Tip="{l:T 'Nummerierung'}">
         <PathIcon Data="{StaticResource IconNumbering}" />
       </ToggleButton>
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsChecklist, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="checklist" IsVisible="{Binding ShowChecklist}"
+                    ToolTip.Tip="{l:T 'Checkliste'}">
+        <PathIcon Data="{StaticResource IconTasks}" />
+      </ToggleButton>
       <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="outdent" ToolTip.Tip="{l:T 'Einzug verkleinern (Shift+Tab)'}">
         <PathIcon Data="{StaticResource IconOutdent}" />
       </Button>

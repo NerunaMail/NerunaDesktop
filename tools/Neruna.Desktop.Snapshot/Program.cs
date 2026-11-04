@@ -1048,7 +1048,9 @@ internal static class Snapshots
         await noteController.SaveAsync(Neruna.Core.Notes.Note.New(null, "Kunden",
             "<h2>Offerte Müller AG</h2><div>E-Mail: " + Neruna.Core.Notes.NoteLinks.Anchor(Neruna.Core.Notes.NoteLinks.MailHref("offerte@example.com"), "Anfrage Offerte") + "</div>"
             + "<div>Kontakt: " + Neruna.Core.Notes.NoteLinks.Anchor(Neruna.Core.Notes.NoteLinks.ContactHref(null, "anna@example.com"), "Anna Müller") + "</div>"
-            + "<div><br></div><div>Preis bis Freitag bestätigen, Lieferung im Dezember.</div>") with { Tags = ["$label1"] });
+            + "<div><br></div><div>Preis bis Freitag bestätigen, Lieferung im Dezember.</div>"
+            + "<ul class=\"neruna-checklist\"><li data-checked=\"true\" style=\"text-decoration: line-through; color: #808080\">Masse prüfen</li>"
+            + "<li data-checked=\"false\">Offerte senden</li><li data-checked=\"false\">Termin für Montage vereinbaren</li></ul>") with { Tags = ["$label1"] });
         vm.NavigateCommand.Execute(Section.Notes);
         await vm.NotesPage.ReloadAsync();
         vm.NotesPage.SelectedNote = vm.NotesPage.Notes.First(n => n.Title == "Offerte Müller AG");

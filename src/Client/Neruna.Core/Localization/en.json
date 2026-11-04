@@ -2540,5 +2540,6 @@
  "Verknüpfte Notizen": "Linked notes",
  "Wählen Sie eine Notiz aus oder legen Sie eine neue an": "Select a note or create a new one",
  "{0} · geändert {1}": "{0} · changed {1}",
- "{0} · geändert {1} · wird noch übertragen": "{0} · changed {1} · not uploaded yet"
+ "{0} · geändert {1} · wird noch übertragen": "{0} · changed {1} · not uploaded yet",
+ "Checkliste": "Checklist"
 }

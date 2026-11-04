@@ -2540,5 +2540,6 @@
  "Verknüpfte Notizen": "Notes liées",
  "Wählen Sie eine Notiz aus oder legen Sie eine neue an": "Sélectionnez une note ou créez-en une nouvelle",
  "{0} · geändert {1}": "{0} · modifiée {1}",
- "{0} · geändert {1} · wird noch übertragen": "{0} · modifiée {1} · pas encore transférée"
+ "{0} · geändert {1} · wird noch übertragen": "{0} · modifiée {1} · pas encore transférée",
+ "Checkliste": "Liste de contrôle"
 }

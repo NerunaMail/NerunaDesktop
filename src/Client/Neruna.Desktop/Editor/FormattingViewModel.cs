@@ -67,6 +67,12 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
     [ObservableProperty]
     public partial bool IsNumberedList { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsChecklist { get; set; }
+
+    /// <summary>The checklist button (notes; a mail shows a checklist as a bulleted list).</summary>
+    public bool ShowChecklist { get; init; }
+
     /// <summary>Last color applied with the "A" button, shown as its underline (as in word processors).</summary>
     [ObservableProperty]
     public partial string LastTextColor { get; set; } = "#C00000";
@@ -279,6 +285,7 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
             IsStrikethrough = state.Strikethrough;
             IsBulletList = state.BulletList;
             IsNumberedList = state.NumberedList;
+            IsChecklist = state.Checklist;
             SelectedFont = FontCatalog.Find(state.Font);
             CurrentFontName = state.Font;
             SelectedSize = FontCatalog.Sizes.Contains(state.Size) ? state.Size : null;

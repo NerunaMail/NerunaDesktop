@@ -18,7 +18,8 @@ internal sealed record EditorState(
     bool NumberedList,
     string Font,
     double Size,
-    string Color);
+    string Color,
+    bool Checklist = false);
 
 /// <summary>What the compose view model needs from the editor, independent of how it is implemented.</summary>
 internal interface IHtmlEditor
@@ -292,7 +293,7 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
     // renderer ignores a changed base stylesheet once it has shown text.
     private void ShowPreview()
     {
-        var (html, dark) = Infrastructure.MailPaper.Prepare(PreviewHtml(), Infrastructure.MailPaper.IsDarkTheme);
+        var (html, dark) = Infrastructure.MailPaper.Prepare(ShowChecklists(PreviewHtml()), Infrastructure.MailPaper.IsDarkTheme);
         var paper = dark ? Infrastructure.MailPaper.DarkBrush : Avalonia.Media.Brushes.White;
         _preview = new TheArtOfDev.HtmlRenderer.Avalonia.HtmlPanel
         {
@@ -303,6 +304,14 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         _previewBorder.Child = _preview;
         _preview.Text = html;
     }
+
+    // The preview has no CSS boxes: ticked and open items get a box character (only shown, never saved).
+    private static string ShowChecklists(string html) =>
+        System.Text.RegularExpressions.Regex.Replace(
+            html.Replace("class=\"neruna-checklist\"", "class=\"neruna-checklist\" style=\"list-style: none; padding-left: 0.3em\"", StringComparison.Ordinal),
+            "(<li\\b[^>]*data-checked=\"(true|false)\"[^>]*>)", m => (m.Groups[1].Value.Contains("style=\"", StringComparison.Ordinal)
+                ? m.Groups[1].Value.Replace("style=\"", "style=\"list-style-type: none; ", StringComparison.Ordinal)
+                : m.Groups[1].Value.Replace("<li", "<li style=\"list-style-type: none\"", StringComparison.Ordinal)) + (m.Groups[2].Value == "true" ? "☑ " : "☐ "));
 
     private string PreviewHtml() => _content is { } c
         ? $"<div style=\"font-family:{c.Font};font-size:{c.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}pt\">{c.Html}</div>"
@@ -713,7 +722,8 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                     Bool(message, "numberedList"),
                     message.TryGetProperty("font", out var font) ? font.GetString() ?? string.Empty : string.Empty,
                     message.TryGetProperty("size", out var size) && size.TryGetDouble(out var pt) ? pt : 0,
-                    message.TryGetProperty("color", out var color) ? color.GetString() ?? "#000000" : "#000000"));
+                    message.TryGetProperty("color", out var color) ? color.GetString() ?? "#000000" : "#000000",
+                    Bool(message, "checklist")));
                 break;
         }
     }

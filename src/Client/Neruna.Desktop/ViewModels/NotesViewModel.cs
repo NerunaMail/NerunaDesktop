@@ -157,7 +157,7 @@ internal sealed partial class NotesViewModel : ViewModelBase
         _tagService = tagService;
         _settings = settings;
         _logger = logger;
-        Formatting = new FormattingViewModel(files);
+        Formatting = new FormattingViewModel(files) { ShowChecklist = true };
         _saveTimer = new DispatcherTimer { Interval = SaveDelay };
         _saveTimer.Tick += async (_, _) =>
         {

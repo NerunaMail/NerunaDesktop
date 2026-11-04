@@ -22,6 +22,17 @@
   /* An empty cell (a form from a text template) stays wide enough to click into. */
   #editor td, #editor th { min-width: 3em; }
   #editor a { color: #0f6cbd; }
+  /* Checklists (notes): a box in front of each item, clicked to tick it. Ticked items are struck through inline, so
+     other programs show them as done too; elsewhere the list is an ordinary bulleted list. */
+  #editor ul.neruna-checklist { list-style: none; padding-left: 0.3em; }
+  #editor ul.neruna-checklist > li { position: relative; padding-left: 1.7em; }
+  #editor ul.neruna-checklist > li::before {
+    content: ""; position: absolute; left: 0; top: 0.15em; width: 0.95em; height: 0.95em; box-sizing: border-box;
+    border: 1.5px solid #6b6b6b; border-radius: 3px; background: #ffffff; cursor: pointer;
+  }
+  #editor ul.neruna-checklist > li[data-checked="true"]::before {
+    content: "✓"; background: #0f6cbd; border-color: #0f6cbd; color: #ffffff; font: bold 0.75em/1.25em sans-serif; text-align: center;
+  }
   #editor:empty::before { content: attr(data-placeholder); color: #8a8a8a; }
   /* Dark theme: the page is shown inverted (so quoted mails with their own colours turn dark too), pictures are turned
      back. The mail itself is not changed – it is sent as written, dark text on white. */
@@ -98,7 +109,8 @@
       italic: document.queryCommandState("italic"),
       underline: document.queryCommandState("underline"),
       strikethrough: document.queryCommandState("strikeThrough"),
-      bulletList: document.queryCommandState("insertUnorderedList"),
+      bulletList: document.queryCommandState("insertUnorderedList") && !checklistAt(el),
+      checklist: !!checklistAt(el),
       numberedList: document.queryCommandState("insertOrderedList"),
       font: firstFamily(style.fontFamily),
       size: Math.round(parseFloat(style.fontSize) * 0.75 * 2) / 2,
@@ -154,7 +166,52 @@
     post({ type: "changed" });
   }
 
+  function checklistAt(el) {
+    var list = el && el.closest ? el.closest("ul") : null;
+    return list && editor.contains(list) && list.classList.contains("neruna-checklist") ? list : null;
+  }
+
+  function setChecked(li, on) {
+    li.setAttribute("data-checked", on ? "true" : "false");
+    li.style.textDecoration = on ? "line-through" : "";
+    li.style.color = on ? "#808080" : "";
+    if (!li.getAttribute("style")) li.removeAttribute("style");
+  }
+
+  // The current lines become a checklist (a bulleted list becomes one); in a checklist the lines become text again.
+  function toggleChecklist() {
+    editor.focus();
+    var el = selectionElement();
+    if (checklistAt(el)) {
+      document.execCommand("insertUnorderedList", false, null);
+    } else {
+      var list = el.closest ? el.closest("ul") : null;
+      if (!list || !editor.contains(list)) {
+        document.execCommand("insertUnorderedList", false, null);
+        el = selectionElement();
+        list = el.closest ? el.closest("ul") : null;
+      }
+      if (list && editor.contains(list)) {
+        list.classList.add("neruna-checklist");
+        Array.prototype.forEach.call(list.children, function (li) { if (!li.hasAttribute("data-checked")) setChecked(li, false); });
+      }
+    }
+    scheduleState();
+    post({ type: "changed" });
+  }
+
+  // A click on an item's box ticks it (or not); the caret stays where it was.
+  editor.addEventListener("mousedown", function (e) {
+    var li = e.target && e.target.closest ? e.target.closest("li") : null;
+    if (!li || !checklistAt(li) || li.parentNode !== checklistAt(li)) return;
+    if (e.clientX - li.getBoundingClientRect().left > parseFloat(window.getComputedStyle(li).paddingLeft)) return;
+    e.preventDefault();
+    setChecked(li, li.getAttribute("data-checked") !== "true");
+    post({ type: "changed" });
+  });
+
   function exec(command, value) {
+    if (command === "checklist") { toggleChecklist(); return; }
     editor.focus();
     document.execCommand("styleWithCSS", false, true);
     document.execCommand(command, false, value === undefined ? null : value);
@@ -379,6 +436,9 @@
   editor.addEventListener("input", function (e) {
     if (!expanding && e.inputType === "insertText" && e.data === ":") expandShortcut("::");
     if (autoLists && !expanding && e.inputType === "insertText" && e.data === " ") autoList();
+    // A new item (Enter) in a checklist starts unticked, also after a ticked one.
+    var item = selectionElement().closest ? selectionElement().closest("li") : null;
+    if (item && checklistAt(item) && (!item.hasAttribute("data-checked") || (e.inputType === "insertParagraph" && !item.textContent.trim()))) setChecked(item, false);
     ensureBlocks(); post({ type: "changed" }); scheduleState();
   });
   document.addEventListener("selectionchange", scheduleState);
