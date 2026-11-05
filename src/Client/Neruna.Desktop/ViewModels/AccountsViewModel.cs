@@ -107,16 +107,60 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         }
     }
 
-    private IReadOnlySet<Guid> _signInNeeded = new HashSet<Guid>();
+    private IReadOnlyDictionary<Guid, string?> _signInNeeded = new Dictionary<Guid, string?>();
+    private readonly HashSet<Guid> _signingIn = [];
 
-    /// <summary>The accounts whose sign-in expired or whose password was refused: shown in red with "Wieder anmelden".</summary>
-    public void ShowSignInProblems(IReadOnlySet<Guid> accounts)
+    // Signed in again, but the sync after it still failed: the server's error is shown with the button.
+    private readonly HashSet<Guid> _signInFailed = [];
+
+    /// <summary>
+    /// The accounts whose sign-in expired or whose password was refused (with the server's error): shown in red with
+    /// "Wieder anmelden". One being signed in again keeps showing that until <see cref="SignedIn"/>.
+    /// </summary>
+    public void ShowSignInProblems(IReadOnlyDictionary<Guid, string?> accounts)
     {
         _signInNeeded = accounts;
         foreach (var item in Items)
         {
-            item.NeedsSignIn = accounts.Contains(item.Account.Id);
+            Apply(item);
         }
+    }
+
+    /// <summary>Signed in again (browser or password): "Wird angemeldet …" until the next sync of it has run.</summary>
+    public void SigningIn(Guid accountId)
+    {
+        _signingIn.Add(accountId);
+        foreach (var item in Items.Where(i => i.Account.Id == accountId))
+        {
+            Apply(item);
+        }
+    }
+
+    /// <summary>The sync after signing in again ran: the warning goes, or comes back with the error.</summary>
+    public void SignedIn(Guid accountId)
+    {
+        _signingIn.Remove(accountId);
+        if (_signInNeeded.ContainsKey(accountId))
+        {
+            _signInFailed.Add(accountId);
+        }
+
+        foreach (var item in Items.Where(i => i.Account.Id == accountId))
+        {
+            Apply(item);
+        }
+    }
+
+    private void Apply(AccountItem item)
+    {
+        if (!_signInNeeded.ContainsKey(item.Account.Id))
+        {
+            _signInFailed.Remove(item.Account.Id);
+        }
+
+        item.IsSigningIn = _signingIn.Contains(item.Account.Id);
+        item.SignInError = _signInFailed.Contains(item.Account.Id) ? _signInNeeded.GetValueOrDefault(item.Account.Id) : null;
+        item.NeedsSignIn = _signInNeeded.ContainsKey(item.Account.Id);
     }
 
     private bool HasAutoReply(Account account) => account.ConnectionsOf(ServiceKind.Mail).Any(c => _autoReplies.Contains(c.Id));
@@ -127,7 +171,8 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         var organisations = await cloud.GetConnectionsAsync();
         foreach (var account in await accounts.GetAccountsAsync())
         {
-            var item = new AccountItem(account, setup.Summary) { HasAutoReply = HasAutoReply(account), NeedsSignIn = _signInNeeded.Contains(account.Id) };
+            var item = new AccountItem(account, setup.Summary) { HasAutoReply = HasAutoReply(account) };
+            Apply(item);
             if (account.CloudId is { } cloudId && organisations.Count > 1 && organisations.FirstOrDefault(c => c.Owns(cloudId)) is { } organisation)
             {
                 item.ManagedBy = F("Von {0} verwaltet", organisation.OrganizationName);
@@ -238,7 +283,25 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
 
     /// <summary>The last sync failed because the sign-in expired or the password was refused.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSignIn))]
     public partial bool NeedsSignIn { get; set; }
+
+    /// <summary>Signed in again, the sync that shows whether it worked is still running.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowSignIn), nameof(CanSignIn))]
+    public partial bool IsSigningIn { get; set; }
+
+    /// <summary>What the server said after signing in again did not help (under the hint).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSignInError))]
+    public partial string? SignInError { get; set; }
+
+    public bool HasSignInError => !string.IsNullOrEmpty(SignInError);
+
+    /// <summary>The red box: the sign-in is needed, or one is being checked.</summary>
+    public bool ShowSignIn => NeedsSignIn || IsSigningIn;
+
+    public bool CanSignIn => !IsSigningIn;
 
     /// <summary>What the button does: sign in with the provider, or enter the password anew.</summary>
     public string SignInText => UsesProviderSignIn ? T("Wieder anmelden") : T("Passwort eingeben");

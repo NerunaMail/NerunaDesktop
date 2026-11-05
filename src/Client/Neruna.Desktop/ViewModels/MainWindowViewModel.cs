@@ -596,7 +596,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     // From the last run of every connection: the accounts whose sign-in expired or whose password was refused.
     private void ShowSignInProblems()
     {
-        var accounts = _syncActivity.Entries.Where(e => e.NeedsSignIn).Select(e => e.AccountId).ToHashSet();
+        var accounts = _syncActivity.Entries.Where(e => e.NeedsSignIn).GroupBy(e => e.AccountId).ToDictionary(g => g.Key, g => g.Select(e => e.Error).FirstOrDefault(e => e is not null));
         NeedsSignIn = accounts.Count > 0;
         SettingsPage.AccountsNeedSignIn = NeedsSignIn;
         SettingsPage.Accounts.ShowSignInProblems(accounts);
@@ -1071,10 +1071,20 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             Overlay = null;
             if (created && editing is not null)
             {
-                // Changed names or servers: every page reloads, then a sync with the new settings.
+                // Changed names or servers: every page reloads, then a sync with the new settings. A card asking to
+                // sign in again says "Wird angemeldet …" until that sync shows whether it worked.
+                SettingsPage.Accounts.SigningIn(editing.Id);
                 await SettingsPage.Accounts.ReloadAsync();
                 await RefreshPagesAsync();
-                await SyncAsync();
+                try
+                {
+                    await SyncAsync();
+                }
+                finally
+                {
+                    SettingsPage.Accounts.SignedIn(editing.Id);
+                }
+
                 return;
             }
 

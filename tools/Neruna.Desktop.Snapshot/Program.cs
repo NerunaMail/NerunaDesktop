@@ -1340,12 +1340,20 @@ internal static class Snapshots
         await SaveAsync(window, output, "settings-accounts.png");
         // The sign-in of the first account expired: its card in red with "Wieder anmelden", a "!" on "Konten" and on the
         // settings button.
-        vm.SettingsPage.Accounts.ShowSignInProblems(new HashSet<Guid> { editedAccount.Id });
+        vm.SettingsPage.Accounts.ShowSignInProblems(new Dictionary<Guid, string?> { [editedAccount.Id] = "Die Anmeldung ist abgelaufen – bitte erneut anmelden." });
         vm.SettingsPage.AccountsNeedSignIn = true;
         vm.NeedsSignIn = true;
         await Task.Delay(200);
         await SaveAsync(window, output, "settings-accounts-signin.png");
-        vm.SettingsPage.Accounts.ShowSignInProblems(new HashSet<Guid>());
+        // Signed in again: "Wird angemeldet …" until the sync has run.
+        vm.SettingsPage.Accounts.SigningIn(editedAccount.Id);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "settings-accounts-signing-in.png");
+        // The sync after it still failed: the error, and the button again.
+        vm.SettingsPage.Accounts.SignedIn(editedAccount.Id);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "settings-accounts-signin-failed.png");
+        vm.SettingsPage.Accounts.ShowSignInProblems(new Dictionary<Guid, string?>());
         vm.SettingsPage.AccountsNeedSignIn = false;
         vm.NeedsSignIn = false;
         // A color chosen for the account the way a user does it: the round swatch opens the picker, a click on a color.

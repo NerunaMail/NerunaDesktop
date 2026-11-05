@@ -2582,5 +2582,21 @@
  "Die Anmeldung ist abgelaufen – bitte wieder anmelden, sonst wird dieses Konto nicht mehr synchronisiert.": "The sign-in has expired – please sign in again, otherwise this account is no longer synchronised.",
  "Der Server lehnt die Anmeldung ab – wurde das Passwort geändert? Bitte neu eingeben, sonst wird dieses Konto nicht mehr synchronisiert.": "The server refuses the sign-in – was the password changed? Please enter it again, otherwise this account is no longer synchronised.",
  "Ein Konto muss wieder angemeldet werden": "An account needs to be signed in again",
- "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Synchronised at {0:t} – {1}: please sign in again under Settings → Accounts"
+ "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Synchronised at {0:t} – {1}: please sign in again under Settings → Accounts",
+ "Wird angemeldet …": "Signing in …",
+ "Ablage": "Stored in",
+ "Der Termin wurde inzwischen auf dem Server geändert. Bitte synchronisieren und erneut bearbeiten.": "The event was changed on the server in the meantime. Please synchronise and edit it again.",
+ "Die Teilnehmer erhalten keine Nachricht über Änderungen von hier – dafür den Termin am Computer ändern.": "Attendees are not notified of changes made here – to notify them, change the event on the computer.",
+ "Die erste Zeile ist der Titel …": "The first line is the title …",
+ "Dieser Termin kann hier nicht bearbeitet werden.": "This event cannot be edited here.",
+ "Ganze Serie löschen": "Delete whole series",
+ "Gespeichert wird beim Zurückgehen.": "Saved when you go back.",
+ "Kein Kalender, in den Termine geschrieben werden können.": "No calendar that events can be written to.",
+ "Noch keine Notizen. Mit + schreiben Sie die erste.": "No notes yet. Write the first one with +.",
+ "Notiz gelöscht.": "Note deleted.",
+ "Notiz konnte nicht gespeichert werden: ": "The note could not be saved: ",
+ "Notizen konnten nicht abgeglichen werden: ": "Notes could not be synchronised: ",
+ "Termin gelöscht.": "Event deleted.",
+ "Termin löschen": "Delete event",
+ "Änderungen gelten für die ganze Serie.": "Changes apply to the whole series."
 }

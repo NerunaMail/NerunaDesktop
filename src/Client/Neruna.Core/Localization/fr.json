@@ -2582,5 +2582,21 @@
  "Die Anmeldung ist abgelaufen – bitte wieder anmelden, sonst wird dieses Konto nicht mehr synchronisiert.": "La connexion a expiré – veuillez vous reconnecter, sinon ce compte ne sera plus synchronisé.",
  "Der Server lehnt die Anmeldung ab – wurde das Passwort geändert? Bitte neu eingeben, sonst wird dieses Konto nicht mehr synchronisiert.": "Le serveur refuse la connexion – le mot de passe a-t-il été changé ? Veuillez le saisir à nouveau, sinon ce compte ne sera plus synchronisé.",
  "Ein Konto muss wieder angemeldet werden": "Un compte doit être reconnecté",
- "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Synchronisé à {0:t} – {1} : veuillez vous reconnecter sous Paramètres → Comptes"
+ "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Synchronisé à {0:t} – {1} : veuillez vous reconnecter sous Paramètres → Comptes",
+ "Wird angemeldet …": "Connexion en cours …",
+ "Ablage": "Emplacement",
+ "Der Termin wurde inzwischen auf dem Server geändert. Bitte synchronisieren und erneut bearbeiten.": "Le rendez-vous a été modifié entre-temps sur le serveur. Veuillez synchroniser et le modifier à nouveau.",
+ "Die Teilnehmer erhalten keine Nachricht über Änderungen von hier – dafür den Termin am Computer ändern.": "Les participants ne sont pas informés des modifications faites ici – pour cela, modifiez le rendez-vous sur l'ordinateur.",
+ "Die erste Zeile ist der Titel …": "La première ligne est le titre …",
+ "Dieser Termin kann hier nicht bearbeitet werden.": "Ce rendez-vous ne peut pas être modifié ici.",
+ "Ganze Serie löschen": "Supprimer toute la série",
+ "Gespeichert wird beim Zurückgehen.": "Enregistré lorsque vous revenez en arrière.",
+ "Kein Kalender, in den Termine geschrieben werden können.": "Aucun agenda dans lequel des rendez-vous peuvent être créés.",
+ "Noch keine Notizen. Mit + schreiben Sie die erste.": "Pas encore de notes. Écrivez la première avec +.",
+ "Notiz gelöscht.": "Note supprimée.",
+ "Notiz konnte nicht gespeichert werden: ": "La note n'a pas pu être enregistrée : ",
+ "Notizen konnten nicht abgeglichen werden: ": "Les notes n'ont pas pu être synchronisées : ",
+ "Termin gelöscht.": "Rendez-vous supprimé.",
+ "Termin löschen": "Supprimer le rendez-vous",
+ "Änderungen gelten für die ganze Serie.": "Les modifications s'appliquent à toute la série."
 }

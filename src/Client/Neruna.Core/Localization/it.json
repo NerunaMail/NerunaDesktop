@@ -2582,5 +2582,21 @@
  "Die Anmeldung ist abgelaufen – bitte wieder anmelden, sonst wird dieses Konto nicht mehr synchronisiert.": "L'accesso è scaduto – accedi di nuovo, altrimenti questo account non verrà più sincronizzato.",
  "Der Server lehnt die Anmeldung ab – wurde das Passwort geändert? Bitte neu eingeben, sonst wird dieses Konto nicht mehr synchronisiert.": "Il server rifiuta l'accesso – la password è stata cambiata? Inseriscila di nuovo, altrimenti questo account non verrà più sincronizzato.",
  "Ein Konto muss wieder angemeldet werden": "Un account deve accedere di nuovo",
- "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Sincronizzato alle {0:t} – {1}: accedi di nuovo in Impostazioni → Account"
+ "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Sincronizzato alle {0:t} – {1}: accedi di nuovo in Impostazioni → Account",
+ "Wird angemeldet …": "Accesso in corso …",
+ "Ablage": "Posizione",
+ "Der Termin wurde inzwischen auf dem Server geändert. Bitte synchronisieren und erneut bearbeiten.": "L'appuntamento è stato modificato nel frattempo sul server. Sincronizza e modificalo di nuovo.",
+ "Die Teilnehmer erhalten keine Nachricht über Änderungen von hier – dafür den Termin am Computer ändern.": "I partecipanti non ricevono notifiche delle modifiche fatte qui – per avvisarli, modifica l'appuntamento sul computer.",
+ "Die erste Zeile ist der Titel …": "La prima riga è il titolo …",
+ "Dieser Termin kann hier nicht bearbeitet werden.": "Questo appuntamento non può essere modificato qui.",
+ "Ganze Serie löschen": "Elimina l'intera serie",
+ "Gespeichert wird beim Zurückgehen.": "Viene salvata quando torni indietro.",
+ "Kein Kalender, in den Termine geschrieben werden können.": "Nessun calendario in cui poter scrivere appuntamenti.",
+ "Noch keine Notizen. Mit + schreiben Sie die erste.": "Ancora nessuna nota. Scrivi la prima con +.",
+ "Notiz gelöscht.": "Nota eliminata.",
+ "Notiz konnte nicht gespeichert werden: ": "Impossibile salvare la nota: ",
+ "Notizen konnten nicht abgeglichen werden: ": "Impossibile sincronizzare le note: ",
+ "Termin gelöscht.": "Appuntamento eliminato.",
+ "Termin löschen": "Elimina appuntamento",
+ "Änderungen gelten für die ganze Serie.": "Le modifiche valgono per l'intera serie."
 }
