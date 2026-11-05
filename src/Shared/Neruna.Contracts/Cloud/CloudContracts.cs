@@ -180,7 +180,8 @@ public sealed record VaultBackupRequest(Guid VaultId, int Version, string Nonce,
 /// </summary>
 public sealed record MailAccountsResponse(bool Available, CloudOrganizationKey? OrganizationKey, CloudCertificateDevice Device, IReadOnlyList<CloudMailAccount> Accounts);
 
-public sealed record CloudMailAccount(string Id, string Email, string DisplayName, string Payload, string PayloadSignature, string? Envelope);
+/// <param name="Kind">imap, exchange, microsoft365, google, proton, nextcloud or dav (absent: imap, from older servers).</param>
+public sealed record CloudMailAccount(string Id, string Email, string DisplayName, string Payload, string PayloadSignature, string? Envelope, string? Kind = null);
 
 /// <summary>
 /// POST /api/v1/crash-reports – only with the user's consent, already cleaned of addresses, hosts and paths.

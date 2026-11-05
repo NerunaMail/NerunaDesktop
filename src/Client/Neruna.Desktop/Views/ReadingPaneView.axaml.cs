@@ -7,9 +7,64 @@ namespace Neruna.Desktop.Views;
 
 internal sealed partial class ReadingPaneView : UserControl
 {
+    private bool _recipientsExpanded;
+
     public ReadingPaneView()
     {
         InitializeComponent();
+        // Another mail: one line again. A new width can cut the lines (or no longer): the hint follows.
+        DataContextChanged += (_, _) => ShowRecipients(expanded: false);
+        RecipientLines.SizeChanged += (_, _) => UpdateRecipientsHint();
+        ToLine.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == TextBlock.TextProperty)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(UpdateRecipientsHint, Avalonia.Threading.DispatcherPriority.Background);
+            }
+        };
+    }
+
+    private void OnRecipientsTapped(object? sender, TappedEventArgs e)
+    {
+        if (_recipientsExpanded || IsCut(ToLine) || IsCut(CcLine))
+        {
+            ShowRecipients(!_recipientsExpanded);
+            e.Handled = true;
+        }
+    }
+
+    private void ShowRecipients(bool expanded)
+    {
+        _recipientsExpanded = expanded;
+        foreach (var line in new[] { ToLine, CcLine })
+        {
+            line.TextWrapping = expanded ? Avalonia.Media.TextWrapping.Wrap : Avalonia.Media.TextWrapping.NoWrap;
+            line.TextTrimming = expanded ? Avalonia.Media.TextTrimming.None : Avalonia.Media.TextTrimming.CharacterEllipsis;
+        }
+
+        UpdateRecipientsHint();
+    }
+
+    private void UpdateRecipientsHint()
+    {
+        var clickable = _recipientsExpanded || IsCut(ToLine) || IsCut(CcLine);
+        RecipientLines.Cursor = clickable ? new Cursor(StandardCursorType.Hand) : Cursor.Default;
+        ToolTip.SetTip(RecipientLines, !clickable ? null
+            : _recipientsExpanded ? Neruna.Core.Localization.Texts.T("Klicken für eine Zeile")
+            : Neruna.Core.Localization.Texts.T("Klicken für alle Empfänger"));
+    }
+
+    /// <summary>The line shows less than its text (cut off with "…").</summary>
+    private static bool IsCut(TextBlock line)
+    {
+        if (!line.IsVisible || string.IsNullOrEmpty(line.Text) || line.Bounds.Width <= 0 || line.TextWrapping != Avalonia.Media.TextWrapping.NoWrap)
+        {
+            return false;
+        }
+
+        using var full = new Avalonia.Media.TextFormatting.TextLayout(line.Text, new Avalonia.Media.Typeface(line.FontFamily, line.FontStyle, line.FontWeight),
+            line.FontSize, null);
+        return full.WidthIncludingTrailingWhitespace > line.Bounds.Width + 0.5;
     }
 
     private async void OnCopyHeaders(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

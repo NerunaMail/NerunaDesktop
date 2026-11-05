@@ -388,3 +388,54 @@ def test_linux_caret_stays_when_the_mouse_only_passes_over_the_text(page):
     page.evaluate(move_caret_to_start)
     page.wait_for_timeout(80)
     assert caret_box(page)["left"] < at_end["left"] - 30
+
+
+def links(page):
+    return page.evaluate("Array.from(document.querySelectorAll('#editor a')).map(a => [a.getAttribute('href'), a.textContent])")
+
+
+def test_a_typed_address_becomes_a_link_on_space_and_enter(page):
+    page.keyboard.type("Siehe https://neruna.org/preise. Und ")
+    page.keyboard.type("www.neruna.org")
+    page.keyboard.press("Enter")
+    page.keyboard.type("weiter")
+    assert links(page) == [["https://neruna.org/preise", "https://neruna.org/preise"], ["https://www.neruna.org", "www.neruna.org"]]
+    text = page.evaluate("document.getElementById('editor').innerText")
+    assert "preise. Und" in text and "weiter" in text
+    # The text typed after the link is not part of it.
+    assert page.evaluate("Array.from(document.querySelectorAll('#editor a')).every(a => !a.textContent.includes('Und') && !a.textContent.includes('weiter'))")
+
+
+def test_typing_on_does_not_link_ordinary_words(page):
+    page.keyboard.type("Hallo Anna, bis bald. ")
+    assert links(page) == []
+
+
+def test_undo_takes_the_link_back(page):
+    page.keyboard.type("https://neruna.org ")
+    assert len(links(page)) == 1
+    page.keyboard.press("Control+z" if page.context.browser.browser_type.name == "chromium" else "Meta+z")
+    page.wait_for_timeout(50)
+    # Chromium undoes the link (the text stays); WebKit's Ctrl/Meta mapping varies, so only Chromium is strict.
+    if page.context.browser.browser_type.name == "chromium":
+        assert links(page) == []
+        assert "https://neruna.org" in page.evaluate("document.getElementById('editor').innerText")
+
+
+def paste_text(page, text):
+    page.evaluate("""t => { const d = new DataTransfer(); d.setData('text/plain', t);
+                    document.getElementById('editor').dispatchEvent(new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true })); }""", text)
+
+
+def test_pasted_addresses_become_links(page):
+    page.keyboard.type("Link: ")
+    paste_text(page, "https://neruna.org/de/ und <b>www.example.com</b>")
+    assert links(page) == [["https://neruna.org/de/", "https://neruna.org/de/"], ["https://www.example.com", "www.example.com"]]
+    assert page.evaluate("document.querySelectorAll('#editor b').length") == 0  # plain text stays plain
+
+
+def test_an_address_pasted_onto_a_selection_links_the_selection(page):
+    page.keyboard.type("Preise")
+    select_all(page)
+    paste_text(page, "https://neruna.org/preise")
+    assert links(page) == [["https://neruna.org/preise", "Preise"]]

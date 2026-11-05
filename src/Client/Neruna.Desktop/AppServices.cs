@@ -26,6 +26,9 @@ namespace Neruna.Desktop;
 internal sealed record AppOptions(string DataDirectory, bool Demo, LogLevel LogLevel = LogLevel.Information, bool ProtocolLog = false, string? Root = null, Neruna.Storage.Profile? Profile = null,
     bool AskForProfile = false)
 {
+    /// <summary>More services or replacements, after Neruna's own (the snapshot tool's demo chats).</summary>
+    public Action<IServiceCollection>? Configure { get; init; }
+
     /// <summary>The options for the profile chosen at the start.</summary>
     public AppOptions WithProfile(Neruna.Storage.Profile profile) =>
         this with { DataDirectory = Neruna.Storage.ProfileList.Load(Root!).DirectoryOf(profile), Profile = profile, AskForProfile = false };
@@ -96,6 +99,9 @@ internal static class AppServices
         services.AddSingleton<IProviderFactory<ICalendarProvider>>(sp => new CalDavProviderFactory(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("dav"), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ILoggerFactory>()));
         services.AddSingleton<IProviderFactory<IContactProvider>>(sp => new CardDavProviderFactory(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("dav"), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ILoggerFactory>()));
+        // Nextcloud Talk as a chat of a Nextcloud account (switched on in the chat page).
+        services.AddSingleton<Neruna.Core.Chat.IAccountChatFactory>(sp => new NextcloudTalkFactory(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("dav"), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ILoggerFactory>()));
         services.AddSingleton<IProviderFactory<ICalendarProvider>, IcsProviderFactory>();
         // Calendars Neruna computes itself: birthdays from the contacts, public holidays.
@@ -231,6 +237,7 @@ internal static class AppServices
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
 
+        options.Configure?.Invoke(services);
         var provider = services.BuildServiceProvider();
         await provider.InitializeNerunaStorageAsync();
 

@@ -499,6 +499,106 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     private async Task NewEventAtAsync(DateTime start) =>
         await ShowEditorAsync(EventDraft.New(start, await settings.GetDefaultReminderAsync()), null);
 
+    /// <summary>Dragged across free time in the time grid: the editor opens with that time.</summary>
+    public async Task NewEventInRangeAsync(DateTime start, DateTime end) =>
+        await ShowEditorAsync(EventDraft.New(start, await settings.GetDefaultReminderAsync()) with { End = end }, null);
+
+    /// <summary>
+    /// An event dragged in the time grid (moved, or its start or end): saved right away. Only the organizer changes the
+    /// time; attendees get the update as from the editor, after asking. Of a series, the whole series moves (after asking).
+    /// </summary>
+    /// <returns>False when nothing was changed (not allowed, cancelled, failed).</returns>
+    internal async Task<bool> ChangeEventTimeAsync(CalendarEventItem item, DateTime start, DateTime end)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var occurrence = item.Occurrence;
+        var oldStart = occurrence.Start.LocalDateTime;
+        var oldEnd = occurrence.End.LocalDateTime;
+        if (occurrence.IsTask || occurrence.IsAllDay || (start == oldStart && end == oldEnd))
+        {
+            return false;
+        }
+
+        if (occurrence.Calendar.IsReadOnly)
+        {
+            StatusMessage?.Invoke(this, T("Dieser Kalender kann nicht geändert werden."));
+            return false;
+        }
+
+        if (await calendar.GetObjectAsync(occurrence.Calendar, occurrence.ObjectRemoteId) is not { } stored)
+        {
+            return false;
+        }
+
+        var draft = EventDraft.FromICalendar(stored.ICalendarData);
+        var me = (await calendar.GetSourcesAsync()).FirstOrDefault(s => s.Connection.Id == occurrence.Calendar.ConnectionId)?.Account.EmailAddress;
+        var isOrganizer = draft.Organizer is null || string.Equals(draft.Organizer, me, StringComparison.OrdinalIgnoreCase);
+        if (!isOrganizer)
+        {
+            StatusMessage?.Invoke(this, T("Die Zeit einer Einladung kann nur der Organisator ändern."));
+            return false;
+        }
+
+        var title = string.IsNullOrWhiteSpace(item.Title) ? T("Termin") : item.Title;
+        var others = (draft.Attendees ?? []).Count(a => !string.Equals(a.Email, draft.Organizer, StringComparison.OrdinalIgnoreCase));
+        var questions = new List<string>();
+        if (occurrence.IsRecurring)
+        {
+            questions.Add(T("Wiederkehrender Termin – es wird die ganze Serie geändert."));
+        }
+
+        if (others > 0)
+        {
+            questions.Add(F("Die {0} Teilnehmer erhalten die neue Zeit.", others));
+        }
+
+        if (questions.Count > 0 && !await Views.ChoiceDialog.ShowInFrontAsync(F("«{0}» ändern", title), string.Join("\n\n", questions),
+                (T("Ändern"), true, true), (T("Abbrechen"), false, false)))
+        {
+            return false;
+        }
+
+        // A series keeps its rhythm: its first event moves by as much as this one did.
+        var changed = draft with { Start = draft.Start + (start - oldStart), End = draft.End + (end - oldEnd) };
+        try
+        {
+            var saved = await calendar.SaveEventAsync(occurrence.Calendar, changed, (occurrence.Calendar, occurrence.ObjectRemoteId));
+            var message = F("«{0}» geändert: {1}", title, $"{start:ddd d.M. HH:mm}–{end:HH:mm}");
+            if (others > 0)
+            {
+                try
+                {
+                    var sent = await invitations.SendAfterSaveAsync(occurrence.Calendar, stored.ICalendarData, saved.ICalendarData);
+                    if (sent > 0)
+                    {
+                        message += " – " + F("Änderung an {0} Person(en) gesendet.", sent);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    message = T("Gespeichert, aber die Einladungen konnten nicht gesendet werden: ") + ex.Message;
+                }
+            }
+
+            StatusMessage?.Invoke(this, message);
+            return true;
+        }
+        catch (RemoteConflictException)
+        {
+            StatusMessage?.Invoke(this, T("Der Termin wurde inzwischen auf dem Server geändert. Bitte synchronisieren (F5) und erneut bearbeiten."));
+            return false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            StatusMessage?.Invoke(this, T("Speichern fehlgeschlagen: ") + ex.Message);
+            return false;
+        }
+        finally
+        {
+            await ReloadAsync();
+        }
+    }
+
     [RelayCommand]
     private Task EditEventAsync(CalendarEventItem item) => OpenOccurrenceAsync(item.Occurrence);
 
@@ -889,6 +989,18 @@ internal sealed class TimedEventItem(CalendarEventItem item, double top, double 
     /// <summary>Short events show title and time on one line.</summary>
     public bool IsShort => Height < 44;
 
+    /// <summary>May be dragged (moved, start or end changed): an event in a calendar that may be changed.</summary>
+    public bool CanChange => !Item.Occurrence.IsTask && !Item.Occurrence.Calendar.IsReadOnly;
+
+    /// <summary>The event starts on this day (not continued from the day before): its start may be dragged here.</summary>
+    public bool CanResizeStart => CanChange && Item.Occurrence.Start.LocalDateTime >= Day;
+
+    /// <summary>The event ends on this day: its end may be dragged here.</summary>
+    public bool CanResizeEnd => CanChange && Item.Occurrence.End.LocalDateTime <= Day.AddDays(1);
+
+    /// <summary>The day (midnight) whose column shows this event.</summary>
+    public DateTime Day { get; private init; }
+
     /// <summary>
     /// Clips events to the day, then assigns columns: events that overlap form a cluster sharing the width,
     /// each one taking the first free column (the usual calendar layout).
@@ -913,7 +1025,7 @@ internal sealed class TimedEventItem(CalendarEventItem item, double top, double 
             {
                 var top = (c.Start - day).TotalHours * HourHeight;
                 var height = Math.Max(MinHeight, (c.End - c.Start).TotalHours * HourHeight);
-                result.Add(new TimedEventItem(c.Item, top, Math.Min(height, 24 * HourHeight - top), c.Column, columns));
+                result.Add(new TimedEventItem(c.Item, top, Math.Min(height, 24 * HourHeight - top), c.Column, columns) { Day = day });
             }
 
             cluster.Clear();

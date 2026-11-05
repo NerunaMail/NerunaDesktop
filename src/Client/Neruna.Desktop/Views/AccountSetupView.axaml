@@ -66,7 +66,7 @@
       </Button>
       <Button Classes="choice" Command="{Binding ChooseNextcloudCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="16,12">
         <StackPanel Spacing="2">
-          <TextBlock Text="{l:T 'Nextcloud (Kalender und Kontakte)'}" FontWeight="SemiBold" FontSize="15" />
+          <TextBlock Text="{l:T 'Nextcloud (Kalender, Kontakte und Talk)'}" FontWeight="SemiBold" FontSize="15" />
           <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{l:T 'Anmeldung im Browser – auch mit Zwei-Faktor-Anmeldung, ohne App-Passwort abzutippen.'}" />
         </StackPanel>
       </Button>
@@ -96,6 +96,7 @@
       <TextBox Text="{Binding Label}" PlaceholderText="Nextcloud" />
       <TextBlock Classes="label" Text="{l:T 'Ihre E-Mail-Adresse (optional, für Einladungen)'}" />
       <TextBox Text="{Binding Email}" PlaceholderText="name@example.com" />
+      <CheckBox IsChecked="{Binding NextcloudTalk}" Margin="0,10,0,0" Content="{l:T 'Nextcloud Talk im Chat anzeigen (eigener Tab; Anrufe öffnen sich im Browser)'}" />
       <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,10,0,0"
                  Text="{l:T 'Die Anmeldung öffnet sich im Browser. Nextcloud erstellt dabei ein App-Passwort nur für Neruna – Sie sehen und widerrufen es in Nextcloud unter Einstellungen → Sicherheit.'}" />
       <Button Classes="accent" Margin="0,12,0,0" HorizontalAlignment="Left" Command="{Binding SignInNextcloudCommand}"

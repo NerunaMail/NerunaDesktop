@@ -136,6 +136,16 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _backup = backup;
         _cloudAccounts = cloudAccounts;
         _browser = browser;
+
+        // What the organisation may set up here beyond IMAP, Exchange and CalDAV/CardDAV: accounts signed in in the
+        // browser (when this build has the sign-in) and Proton Mail Bridge.
+        cloudAccounts.InteractiveKinds =
+        [
+            .. setup.CanSignIn(Neruna.Core.Providers.ProviderIds.Graph) ? new[] { Neruna.Core.Cloud.CloudAccountKinds.Microsoft365 } : [],
+            .. setup.CanSignIn(Neruna.Core.Providers.ProviderIds.Google) ? new[] { Neruna.Core.Cloud.CloudAccountKinds.Google } : [],
+            Neruna.Core.Cloud.CloudAccountKinds.Proton,
+            Neruna.Core.Cloud.CloudAccountKinds.Nextcloud,
+        ];
         _crashReports = crashReports;
         _logger = logger;
 
@@ -840,12 +850,24 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        var prompt = new CloudAccountPasswordViewModel(pending, _cloudAccounts);
+        var prompt = new CloudAccountPasswordViewModel(pending, _cloudAccounts)
+        {
+            Setup = _setup,
+            Browser = _browser,
+            Web = _http.CreateClient("neruna"),
+        };
         prompt.Finished += async (_, done) =>
         {
             Overlay = null;
             if (done)
             {
+                // A Nextcloud of the organisation: its Talk in the chat, as when added by hand.
+                if (pending.Kind == Neruna.Core.Cloud.CloudAccountKinds.Nextcloud
+                    && (await _accounts.GetAccountsAsync()).FirstOrDefault(a => a.CloudId == pending.CloudId) is { } nextcloud)
+                {
+                    await ChatPage.EnableAccountChatAsync(nextcloud);
+                }
+
                 await CloudAccountsChangedAsync(sync: true);
             }
             else
@@ -1043,6 +1065,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 HasAccounts = true;
                 if (setup.CreatedAccount is { } account)
                 {
+                    if (setup.WantsChat)
+                    {
+                        await ChatPage.EnableAccountChatAsync(account);
+                    }
+
                     await ShowNewAccountAsync(account);
                 }
 

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:app="using:Neruna.Desktop"
              x:Class="Neruna.Desktop.Views.CalendarSelectionView"
@@ -45,7 +46,7 @@
                     Command="{Binding $parent[UserControl].((vm:CalendarSelectionViewModel)DataContext).SelectAllCommand}" />
           </StackPanel>
         </Grid>
-        <TextBox Text="{Binding $parent[UserControl].((vm:CalendarSelectionViewModel)DataContext).Filter}" PlaceholderText="{l:T 'Kalender suchen …'}" />
+        <TextBox ctl:SearchBox.Clearable="True" Text="{Binding $parent[UserControl].((vm:CalendarSelectionViewModel)DataContext).Filter}" PlaceholderText="{l:T 'Kalender suchen …'}" />
         <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
 
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="8,4" Height="250">

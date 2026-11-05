@@ -67,6 +67,18 @@
     <Style Selector="TextBlock.sender.mine">
       <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
+    <!-- A tab per chat (organisation, Nextcloud Talk account); the open one on the pane colour -->
+    <Style Selector="Button.chattab">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="Button.chattab.selected">
+      <Setter Property="Background" Value="{DynamicResource PaneBackgroundBrush}" />
+    </Style>
+    <Style Selector="Button.chattab.selected TextBlock.tabtitle">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
     <!-- Not focusable: a click must leave the caret and the selection in the text field -->
     <Style Selector="Button.format">
       <Setter Property="Focusable" Value="False" />
@@ -75,16 +87,84 @@
       <Setter Property="MinWidth" Value="30" />
     </Style>
   </UserControl.Styles>
-
+  <DockPanel>
+    <!-- The chats: one tab per organisation (Neruna Cloud/Control) and per Nextcloud account with Talk switched on.
+         The own status (window header) is the same in all of them. -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,6" IsVisible="{Binding ShowTabs}">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ItemsControl ItemsSource="{Binding Tabs}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="4" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ChatTabItem">
+              <Button Classes="chattab" Classes.selected="{Binding IsSelected}" ToolTip.Tip="{Binding KindText}"
+                      Command="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).SelectTabCommand}" CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center"
+                            IsVisible="{Binding !IsTalk}" />
+                  <PathIcon Data="{StaticResource IconVideo}" Width="14" Height="14" Foreground="{DynamicResource AccentTextBrush}" VerticalAlignment="Center"
+                            IsVisible="{Binding IsTalk}" />
+                  <TextBlock Classes="tabtitle" Text="{Binding Title}" VerticalAlignment="Center" MaxWidth="240" TextTrimming="CharacterEllipsis" />
+                  <!-- The own status in this chat -->
+                  <Ellipse Width="8" Height="8" Fill="{Binding PresenceBrush}" VerticalAlignment="Center" />
+                  <PathIcon Data="{StaticResource IconWarning}" Width="12" Height="12" Foreground="#CA5010" VerticalAlignment="Center" IsVisible="{Binding HasError}" />
+                  <Border Classes="badge" IsVisible="{Binding HasUnread}">
+                    <TextBlock Text="{Binding UnreadText}" />
+                  </Border>
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <!-- Nextcloud Talk per Nextcloud account: switched on here, then a tab of its own -->
+      <Button Grid.Column="1" Classes="chattab" IsVisible="{Binding HasAccountChats}" VerticalAlignment="Center"
+              ToolTip.Tip="{l:T 'Nextcloud Talk eines Nextcloud-Kontos als eigenen Tab anzeigen'}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <PathIcon Data="{StaticResource IconAdd}" Width="12" Height="12" VerticalAlignment="Center" />
+          <TextBlock Text="{l:T 'Nextcloud Talk'}" VerticalAlignment="Center" />
+        </StackPanel>
+        <Button.Flyout>
+          <Flyout Placement="BottomEdgeAlignedRight">
+            <StackPanel Spacing="6" MaxWidth="360">
+              <TextBlock Text="{l:T 'Nextcloud Talk im Chat anzeigen'}" FontWeight="SemiBold" />
+              <ItemsControl ItemsSource="{Binding AccountChats}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AccountChatChoice">
+                    <CheckBox Content="{Binding Title}" IsChecked="{Binding IsEnabled}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                         Text="{l:T 'Mit derselben Anmeldung wie Kalender und Kontakte. Anrufe öffnen sich in Nextcloud Talk im Browser.'}" />
+            </StackPanel>
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+    </Grid>
   <Panel>
     <!-- Without Neruna Cloud/Control there is no chat: say so, offer to connect -->
     <Border Classes="pane" IsVisible="{Binding ShowNotConnected}">
       <StackPanel MaxWidth="520" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Margin="24">
         <PathIcon Data="{StaticResource IconChat}" Width="44" Height="44" Foreground="{DynamicResource AccentTextBrush}" HorizontalAlignment="Center" />
-        <TextBlock Text="{l:T 'Der Chat braucht Neruna Cloud oder Control'}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+        <TextBlock Text="{l:T 'Der Chat braucht Neruna Cloud, Control oder Nextcloud Talk'}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
         <TextBlock Classes="subtle" TextWrapping="Wrap" TextAlignment="Center"
-                   Text="{l:T 'Räume, private Nachrichten und der Online-Status laufen über den Server Ihrer Organisation. Ohne Verbindung zu Neruna Cloud oder einem Neruna-Control-Server funktioniert der Chat nicht – Neruna allein (ohne Server) hat keinen Chat.'}" />
+                   Text="{l:T 'Räume, private Nachrichten und der Online-Status laufen über einen Server: den Ihrer Organisation (Neruna Cloud oder Control) oder Ihre Nextcloud mit Talk. Neruna allein (ohne Server) hat keinen Chat.'}" />
         <Button Classes="accent" Content="{l:T 'Mit der Cloud verbinden …'}" HorizontalAlignment="Center" Command="{Binding OpenCloudSetupCommand}" Margin="0,6,0,0" />
+        <!-- A Nextcloud account is there: its Talk can be switched on right here -->
+        <StackPanel Spacing="6" IsVisible="{Binding HasAccountChats}" HorizontalAlignment="Center" Margin="0,12,0,0">
+          <TextBlock Text="{l:T 'Nextcloud Talk im Chat anzeigen'}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+          <ItemsControl ItemsSource="{Binding AccountChats}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AccountChatChoice">
+                <CheckBox Content="{Binding Title}" IsChecked="{Binding IsEnabled}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
       </StackPanel>
     </Border>
 
@@ -102,11 +182,45 @@
 
       <!-- Left: rooms and private conversations, below the people of the open room -->
       <Border Classes="pane" Padding="6,4">
-        <Grid RowDefinitions="*,Auto,*">
-          <ScrollViewer>
+        <Grid RowDefinitions="Auto,*,Auto,*">
+          <!-- The own status: with several chats for this one only or for all (e.g. offline at work, available in private) -->
+          <Button x:Name="TabPresenceButton" Classes="conversation" Margin="0,2,0,4" ToolTip.Tip="{l:T 'Mein Online-Status in diesem Chat'}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Ellipse Width="10" Height="10" Fill="{Binding TabPresenceBrush}" VerticalAlignment="Center" Margin="2,0,10,0" />
+              <TextBlock Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                <Run Text="{l:T 'Mein Status: '}" Foreground="{DynamicResource SubtleTextBrush}" /><Run Text="{Binding TabPresenceLabel, Mode=OneWay}" />
+              </TextBlock>
+              <PathIcon Grid.Column="2" Data="{StaticResource IconChevronDown}" Width="10" Height="10" VerticalAlignment="Center" />
+            </Grid>
+            <Button.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft">
+                <ItemsControl ItemsSource="{x:Static vm:ChatViewModel.PresenceChoices}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PresenceChoice">
+                      <!-- Click only (no Command binding): the list closes on the click -->
+                      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" Margin="0,1">
+                        <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Background="Transparent" Padding="8,6" MinWidth="170"
+                                Click="OnPresenceForAll" ToolTip.Tip="{l:T 'Für alle Chats setzen'}">
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Ellipse Width="10" Height="10" Fill="{Binding Brush}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Label}" />
+                          </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Padding="8,4" FontSize="12" Click="OnPresenceHere" Content="{l:T 'Nur dieser Chat'}"
+                                IsVisible="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).HasSeveralChats}" />
+                        <Button Grid.Column="2" Padding="8,4" FontSize="12" Click="OnPresenceForAll" Content="{l:T 'Alle Chats'}"
+                                IsVisible="{Binding $parent[UserControl].((vm:ChatViewModel)DataContext).HasSeveralChats}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+          <ScrollViewer Grid.Row="1">
             <StackPanel>
               <TextBlock Classes="section" Text="{l:T 'Räume'}" />
-              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="{l:T 'Noch keine Räume – sie werden im Portal angelegt.'}"
+              <TextBlock Classes="subtle" FontSize="12" Margin="8,0,8,6" TextWrapping="Wrap" Text="{Binding RoomsEmptyText}"
                          IsVisible="{Binding !Rooms.Count}" />
               <ItemsControl ItemsSource="{Binding Rooms}">
                 <ItemsControl.ItemTemplate>
@@ -153,12 +267,12 @@
             </StackPanel>
           </ScrollViewer>
 
-          <Border Grid.Row="1" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0" Margin="4,6,4,0">
+          <Border Grid.Row="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0" Margin="4,6,4,0">
             <TextBlock Classes="section" Text="{Binding PeopleTitle}" Margin="4,8,4,4" />
           </Border>
 
           <!-- The people of the room (online first); a click opens a private conversation -->
-          <ScrollViewer Grid.Row="2">
+          <ScrollViewer Grid.Row="3">
             <ItemsControl ItemsSource="{Binding People}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ChatPersonItem">
@@ -173,7 +287,7 @@
                       <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Classes="subtle" FontSize="11" TextTrimming="CharacterEllipsis">
-                          <Run Text="{Binding PresenceLabel, Mode=OneWay}" /><Run Text="{Binding Position, Mode=OneWay, StringFormat=' · {0}'}" />
+                          <Run Text="{Binding PresenceLabel, Mode=OneWay}" /><Run Text="{Binding PositionSuffix, Mode=OneWay}" />
                         </TextBlock>
                       </StackPanel>
                     </Grid>
@@ -195,11 +309,21 @@
                 <TextBlock Classes="subtle" FontSize="12" Text="{Binding Subtitle}" IsVisible="{Binding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                            TextTrimming="CharacterEllipsis" />
               </StackPanel>
-              <!-- The organisation's retention: how long messages are kept -->
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0" Background="Transparent"
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="12,0,0,0">
+              <!-- Audio and video calls: in Nextcloud Talk (the browser) – its conference functions without a call client here -->
+              <Button Command="{Binding CallCommand}" IsVisible="{Binding CanCall}" Padding="10,5"
+                      ToolTip.Tip="{l:T 'Audio- oder Videoanruf in Nextcloud Talk starten (öffnet sich im Browser)'}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Data="{StaticResource IconVideo}" Width="14" Height="14" VerticalAlignment="Center" />
+                  <TextBlock Text="{l:T 'Anruf'}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <!-- How long messages are kept (the organisation's retention; Talk: the Nextcloud's) -->
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Background="Transparent"
                           ToolTip.Tip="{Binding RetentionDetails}">
                 <PathIcon Data="{StaticResource IconClock}" Width="13" Height="13" Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" />
                 <TextBlock Classes="subtle" FontSize="12" Text="{Binding RetentionText}" VerticalAlignment="Center" />
+              </StackPanel>
               </StackPanel>
             </Grid>
           </Border>
@@ -291,4 +415,5 @@
       </Border>
     </Grid>
   </Panel>
+  </DockPanel>
 </UserControl>

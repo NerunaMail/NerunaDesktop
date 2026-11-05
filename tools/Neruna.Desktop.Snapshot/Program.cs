@@ -116,7 +116,14 @@ internal static class Snapshots
         // Screenshots of the compose editor: formatted preview instead of the plain-text fallback (no WebView here).
         HtmlEditor.ScreenshotPreview = true;
         var dataDir = Path.Combine(Path.GetTempPath(), "neruna-snapshot-" + Guid.NewGuid().ToString("N"));
-        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: true));
+        await using var services = await AppServices.BuildAsync(new AppOptions(dataDir, Demo: true)
+        {
+            Configure = s =>
+            {
+                s.AddSingleton<Neruna.Core.Chat.IAccountChatFactory>(new DemoChatFactory(Neruna.Core.Chat.ChatKind.NerunaCloud));
+                s.AddSingleton<Neruna.Core.Chat.IAccountChatFactory>(new DemoChatFactory(Neruna.Core.Chat.ChatKind.NextcloudTalk));
+            },
+        });
         var vm = services.GetRequiredService<MainWindowViewModel>();
         var window = new MainWindow { DataContext = vm, Width = 1440, Height = 880 };
         window.Show();
@@ -137,6 +144,20 @@ internal static class Snapshots
         vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
+
+        // Many Cc: one line cut off; a click shows every address.
+        if (vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault(m => m.Summary.Subject.Contains("Teamausflug", StringComparison.Ordinal)) is { } teamMail)
+        {
+            vm.MailPage.SelectedEntry = teamMail;
+            await Task.Delay(300);
+            await SaveAsync(window, output, "mail-cc-cut.png");
+            var lines = window.GetVisualDescendants().OfType<StackPanel>().First(p => p.Name == "RecipientLines");
+            Console.WriteLine($"Recipients clickable: {lines.Cursor != Avalonia.Input.Cursor.Default}");
+            lines.RaiseEvent(new Avalonia.Input.TappedEventArgs(Avalonia.Input.InputElement.TappedEvent, null!));
+            await SaveAsync(window, output, "mail-cc-all.png");
+            vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+            await Task.Delay(300);
+        }
 
         // A sender with a contact picture: the picture instead of the initials.
         if (vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault(m => m.Summary.From?.Address == "nadia.rossi@example.com") is { } nadia)
@@ -774,6 +795,24 @@ internal static class Snapshots
         await vm.CalendarPage.RenameAsync(renamedItem, null);
         Console.WriteLine($"Reset: list shows '{vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "team").Name}'");
         await SaveAsync(window, output, "calendar.png");
+
+        // Dragging over free time on Tuesday from 9:00 to 10:30: the preview with that time (released, the editor opens).
+        if (Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(window).OfType<Panel>().FirstOrDefault(p => p.Name == "TimeGrid") is { } timeGrid
+            && vm.CalendarPage.Days.Count > 1)
+        {
+            var hour = Neruna.Desktop.ViewModels.TimedEventItem.HourHeight;
+            var column = timeGrid.Bounds.Width / vm.CalendarPage.Days.Count;
+            Point On(double hours) => timeGrid.TranslatePoint(new Point(column * 1.5, hours * hour), window)!.Value;
+            window.MouseDown(On(9.1), Avalonia.Input.MouseButton.Left);
+            window.MouseMove(On(9.6), Avalonia.Input.RawInputModifiers.LeftMouseButton);
+            window.MouseMove(On(10.4), Avalonia.Input.RawInputModifiers.LeftMouseButton);
+            await Task.Delay(100);
+            await SaveAsync(window, output, "calendar-drag-new.png");
+            window.KeyPress(Avalonia.Input.Key.Escape, Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.Escape, null);
+            window.MouseUp(On(10.4), Avalonia.Input.MouseButton.Left);
+            await Task.Delay(100);
+        }
+
         vm.CalendarPage.NavigatorMonthCount = 2;
         await SaveAsync(window, output, "calendar-2-months.png");
         vm.CalendarPage.NavigatorMonthCount = 1;
@@ -1480,8 +1519,8 @@ internal static class Snapshots
             await vm.ChatPage.RefreshNowAsync();
             await Task.Delay(400);
             await SaveAsync(window, output, "chat.png");
-            // The status list in the header is a popup: its buttons must reach the command (and set the status).
-            var presenceButton = window.GetVisualDescendants().OfType<Button>().First(b => b.Name == "PresenceButton");
+            // The status list (chat page) is a popup: its buttons must reach the view model (and set the status).
+            var presenceButton = window.GetVisualDescendants().OfType<Button>().First(b => b.Name == "TabPresenceButton");
             presenceButton.Flyout!.ShowAt(presenceButton);
             await Task.Delay(300);
             var choices = TopLevel.GetTopLevel(window)!.GetVisualDescendants().OfType<Button>().ToList();
@@ -1591,6 +1630,36 @@ internal static class Snapshots
         dav.Username = "anna";
         dav.Email = "anna.muster@example.com";
         await SaveAsync(window, output, "account-setup-dav.png");
+        vm.NavigateCommand.Execute(Section.Calendar);
+        vm.ShowAccountSetupCommand.Execute(null);
+        var nextcloud = (AccountSetupViewModel)vm.Overlay!;
+        nextcloud.ChooseNextcloudCommand.Execute(null);
+        nextcloud.NextcloudServer = "cloud.muster.ch";
+        nextcloud.Label = "Privat";
+        nextcloud.Email = "anna.muster@example.com";
+        await SaveAsync(window, output, "account-setup-nextcloud.png");
+        vm.Overlay = null;
+
+        // Several chats as tabs: the team chat and Nextcloud Talk, each with its own status and its own counter.
+        DemoChatFactory.Offered = true;
+        await vm.ChatPage.EnableAccountChatAsync(Neruna.Providers.Demo.DemoData.CreateAccount());
+        vm.NavigateCommand.Execute(Section.Chat);
+        await vm.ChatPage.RefreshNowAsync();
+        vm.ChatPage.SelectCommand.Execute(vm.ChatPage.Rooms.FirstOrDefault());
+        await vm.ChatPage.SetTabPresenceAsync(Neruna.Core.Chat.Presence.Available, onlyHere: false);
+        await SaveAsync(window, output, "chat-tabs.png");
+        Console.WriteLine($"Chat tabs: {string.Join(", ", vm.ChatPage.Tabs.Select(t => $"{t.Title} ({t.Unread})"))}");
+        window.GetVisualDescendants().OfType<Button>().First(b => b.Name == "TabPresenceButton").Flyout!.ShowAt(
+            window.GetVisualDescendants().OfType<Button>().First(b => b.Name == "TabPresenceButton"));
+        await SaveAsync(window, output, "chat-status.png");
+        window.GetVisualDescendants().OfType<Button>().First(b => b.Name == "TabPresenceButton").Flyout!.Hide();
+        vm.ChatPage.SelectedTab = vm.ChatPage.Tabs.Last().Key;
+        await vm.ChatPage.SetTabPresenceAsync(Neruna.Core.Chat.Presence.Available, onlyHere: true);
+        vm.ChatPage.SelectedTab = vm.ChatPage.Tabs.First().Key;
+        await vm.ChatPage.SetTabPresenceAsync(Neruna.Core.Chat.Presence.Offline, onlyHere: true);
+        vm.ChatPage.SelectedTab = vm.ChatPage.Tabs.Last().Key;
+        vm.ChatPage.SelectCommand.Execute(vm.ChatPage.Rooms.FirstOrDefault());
+        await SaveAsync(window, output, "chat-talk.png");
 
         window.Close();
         Directory.Delete(dataDir, recursive: true);

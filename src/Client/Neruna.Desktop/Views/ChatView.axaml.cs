@@ -29,12 +29,37 @@ internal sealed partial class ChatView : UserControl
         if (_viewModel is not null)
         {
             _viewModel.Messages.CollectionChanged -= OnMessagesChanged;
+            _viewModel.CallRequested -= OnCallRequested;
         }
 
         _viewModel = DataContext as ChatViewModel;
         if (_viewModel is not null)
         {
             _viewModel.Messages.CollectionChanged += OnMessagesChanged;
+            _viewModel.CallRequested += OnCallRequested;
+        }
+    }
+
+    private void OnPresenceHere(object? sender, RoutedEventArgs e) => PickPresence(sender, onlyHere: true);
+
+    // The status row itself, or "Alle Chats" (with one chat the row is all there is).
+    private void OnPresenceForAll(object? sender, RoutedEventArgs e) => PickPresence(sender, onlyHere: false);
+
+    private async void PickPresence(object? sender, bool onlyHere)
+    {
+        if (sender is Control { DataContext: PresenceChoice choice } && _viewModel is not null)
+        {
+            TabPresenceButton.Flyout?.Hide();
+            await _viewModel.SetTabPresenceAsync(choice.Key, onlyHere);
+        }
+    }
+
+    // A call: Nextcloud Talk in the browser, where the conference functions are.
+    private async void OnCallRequested(object? sender, Uri url)
+    {
+        if (TopLevel.GetTopLevel(this) is { } top)
+        {
+            await top.Launcher.LaunchUriAsync(url);
         }
     }
 

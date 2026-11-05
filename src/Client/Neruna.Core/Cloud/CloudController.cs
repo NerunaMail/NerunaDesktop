@@ -292,8 +292,12 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         await AuthorizedAsync<CertificatesResponse>(connection, "api/v1/certificates", cancellationToken);
 
     /// <summary>The mail accounts the organisation set up for this person, encrypted for this device.</summary>
-    public async Task<MailAccountsResponse> GetMailAccountsAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
-        await AuthorizedAsync<MailAccountsResponse>(connection, "api/v1/mail-accounts", cancellationToken);
+    public Task<MailAccountsResponse> GetMailAccountsAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
+        GetMailAccountsAsync(connection, null, cancellationToken);
+
+    /// <param name="kinds">The kinds of account this app can set up (comma-separated); null: IMAP only, as older apps.</param>
+    public async Task<MailAccountsResponse> GetMailAccountsAsync(CloudConnection connection, string? kinds, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<MailAccountsResponse>(connection, kinds is null ? "api/v1/mail-accounts" : "api/v1/mail-accounts?kinds=" + Uri.EscapeDataString(kinds), cancellationToken);
 
     /// <summary>The config vault (wrapped keys) and the list of backups.</summary>
     public async Task<VaultResponse> GetVaultAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>

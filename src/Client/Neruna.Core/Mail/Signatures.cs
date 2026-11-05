@@ -48,8 +48,13 @@ public sealed class SignatureService(ISignatureStore store, ISettingsStore setti
     public async Task<SignatureAssignment> GetAssignmentAsync(Guid accountId, CancellationToken cancellationToken = default) =>
         new(await GetIdAsync(NewKey(accountId), cancellationToken), await GetIdAsync(ReplyKey(accountId), cancellationToken));
 
-    public async Task SetAssignmentAsync(Guid accountId, SignatureAssignment assignment, CancellationToken cancellationToken = default)
+    public Task SetAssignmentAsync(Guid accountId, SignatureAssignment assignment, CancellationToken cancellationToken = default) =>
+        AssignAsync(settings, accountId, assignment, cancellationToken);
+
+    /// <summary>Sets an account's default signatures (also for those the organisation names, see CloudAccountSync).</summary>
+    public static async Task AssignAsync(ISettingsStore settings, Guid accountId, SignatureAssignment assignment, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(assignment);
         await settings.SetAsync(NewKey(accountId), assignment.NewMessages?.ToString(), cancellationToken);
         await settings.SetAsync(ReplyKey(accountId), assignment.RepliesAndForwards?.ToString(), cancellationToken);

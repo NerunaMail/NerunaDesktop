@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:notes="using:Neruna.Core.Notes"
              xmlns:app="using:Neruna.Desktop"
@@ -125,7 +126,7 @@
           <StackPanel Margin="12,12,12,6" Spacing="8">
             <TextBlock Text="{l:T 'Kontakte und Gruppen'}" FontSize="16" FontWeight="SemiBold" />
             <Grid ColumnDefinitions="*,Auto" Width="{Binding IsCardView, Converter={x:Static app:Converters.CardSearchWidth}}" HorizontalAlignment="Left">
-              <TextBox Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}">
+              <TextBox ctl:SearchBox.Clearable="True" Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}">
                 <TextBox.InnerLeftContent>
                   <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
                 </TextBox.InnerLeftContent>

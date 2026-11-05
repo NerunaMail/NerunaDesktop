@@ -99,7 +99,9 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
 
         modelBuilder.Entity<ChatMessageEntity>(e =>
         {
+            e.HasKey(m => new { m.Source, m.Id });
             e.Property(m => m.Id).ValueGeneratedNever();
+            e.Property(m => m.Source).HasDefaultValue(string.Empty);
             e.HasIndex(m => m.SentUnixMs);
         });
 
@@ -319,6 +321,9 @@ internal sealed class ReminderStateEntity
 /// <summary>A chat message from Neruna Cloud/Control (id from the server; deleted after the organisation's retention).</summary>
 internal sealed class ChatMessageEntity
 {
+    /// <summary>The chat it belongs to ("cloud:&lt;connection&gt;"); empty: kept by a version with one chat only.</summary>
+    public string Source { get; set; } = string.Empty;
+
     public long Id { get; set; }
 
     public string? RoomId { get; set; }

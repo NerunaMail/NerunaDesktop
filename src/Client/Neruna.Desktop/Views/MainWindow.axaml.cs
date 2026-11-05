@@ -44,17 +44,6 @@ internal sealed partial class MainWindow : Window
         };
     }
 
-    // A status picked in the header: set it, then close the list.
-    private void OnPresencePicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (sender is Control { DataContext: PresenceChoice choice } && DataContext is MainWindowViewModel vm)
-        {
-            vm.ChatPage.SetPresenceCommand.Execute(choice.Key);
-        }
-
-        PresenceButton.Flyout?.Hide();
-    }
-
     private void OnAutoReplyMore(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         // Which account – before the list closes: closing detaches it, and with it the row it belonged to.

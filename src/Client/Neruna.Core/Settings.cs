@@ -58,13 +58,22 @@ public static class SettingKeys
     /// </summary>
     public const string CloudOrganizationSigningKey = "cloud.organizationSigningKey";
 
-    /// <summary>Chat: rooms, people, read markers and retention from the last answer (JSON), for a start without network.</summary>
+    /// <summary>
+    /// Chat: rooms, people, read markers and retention from the last answer (JSON), for a start without network – per
+    /// organisation under "chat.state.&lt;connection&gt;"; the key alone is what versions with one chat kept (removed).
+    /// </summary>
     public const string ChatState = "chat.state";
 
-    /// <summary>Id of the cloud connection the kept chat belongs to (another one chosen: it is emptied).</summary>
+    /// <summary>Versions with one chat: the cloud connection the kept chat belonged to (removed with <see cref="ChatState"/>).</summary>
     public const string ChatConnection = "chat.connection";
 
-    /// <summary>Own online status chosen in the header (available, away, brb, dnd, offline; default: available).</summary>
+    /// <summary>Account connections whose chat is switched on (Nextcloud Talk), comma-separated ids.</summary>
+    public const string ChatAccounts = "chat.accounts";
+
+    /// <summary>
+    /// Own online status chosen in the header (available, away, brb, dnd, offline; default: available). A chat with a
+    /// status of its own keeps it under "chat.presence.&lt;chat&gt;".
+    /// </summary>
     public const string ChatPresence = "chat.presence";
 
     /// <summary>The agenda (today's and the next days' appointments) is shown beside the mail (default: off).</summary>

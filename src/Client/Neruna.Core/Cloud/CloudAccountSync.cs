@@ -11,9 +11,34 @@ using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Core.Cloud;
 
-/// <summary>An account of the organisation that came without a password: the user enters it to finish the setup.</summary>
+/// <summary>
+/// An account of the organisation that needs the user once: a password (IMAP, Exchange, CalDAV/CardDAV), the password
+/// from Proton Mail Bridge, or a sign-in in the browser (Microsoft 365, Google, Nextcloud – see <see cref="SignsIn"/>).
+/// </summary>
 /// <param name="CloudId">The local id (<see cref="CloudConnection.LocalId"/>), as in <c>Account.CloudId</c>.</param>
-public sealed record PendingCloudAccount(string CloudId, string DisplayName, string Email, Account Account, string ConnectionId = CloudConnection.FirstId);
+/// <param name="Kind">One of <see cref="CloudAccountKinds"/>.</param>
+/// <param name="Server">Nextcloud: its address.</param>
+public sealed record PendingCloudAccount(string CloudId, string DisplayName, string Email, Account Account, string ConnectionId = CloudConnection.FirstId,
+    string Kind = CloudAccountKinds.Imap, string? Server = null, CloudAccountData? Data = null)
+{
+    /// <summary>Set up by signing in in the browser (no password to type).</summary>
+    public bool SignsIn => CloudAccountKinds.SignsIn(Kind);
+}
+
+/// <summary>The kinds of account an organisation sets up in Neruna Cloud (Portal → E-Mail-Konten).</summary>
+public static class CloudAccountKinds
+{
+    public const string Imap = "imap";
+    public const string Exchange = "exchange";
+    public const string Microsoft365 = "microsoft365";
+    public const string Google = "google";
+    public const string Proton = "proton";
+    public const string Nextcloud = "nextcloud";
+    public const string Dav = "dav";
+
+    /// <summary>The person signs in on the device; the organisation gives only who and the defaults.</summary>
+    public static bool SignsIn(string kind) => kind is Microsoft365 or Google or Nextcloud;
+}
 
 /// <summary>Where the organisation's accounts stand on this device (Einstellungen → Cloud).</summary>
 /// <param name="Elsewhere">Not set up: another organisation already brought an account with that address.</param>
@@ -35,8 +60,37 @@ public sealed class CloudAccountSync(
     AccountSetupService setup,
     ICredentialStore credentials,
     ISettingsStore settings,
-    ILogger<CloudAccountSync> logger)
+    ILogger<CloudAccountSync> logger,
+    Discovery.AccountDiscovery? discovery = null)
 {
+    /// <summary>
+    /// Kinds this app sets up with the user's help (sign-in in the browser, Proton Mail Bridge): set by the app that
+    /// can (Neruna Desktop). IMAP and – with their providers – Exchange and CalDAV/CardDAV need nothing of it.
+    /// </summary>
+    public IReadOnlyCollection<string> InteractiveKinds { get; set; } = [];
+
+    /// <summary>What the server is told this app can set up (it lists only those accounts).</summary>
+    public string SupportedKinds
+    {
+        get
+        {
+            var capabilities = setup.Capabilities.Split(',');
+            var kinds = new List<string> { CloudAccountKinds.Imap };
+            if (capabilities.Contains("mail:" + Providers.ProviderIds.Ews))
+            {
+                kinds.Add(CloudAccountKinds.Exchange);
+            }
+
+            if (capabilities.Contains("calendar:" + Providers.ProviderIds.CalDav) || capabilities.Contains("contacts:" + Providers.ProviderIds.CardDav))
+            {
+                kinds.Add(CloudAccountKinds.Dav);
+            }
+
+            kinds.AddRange(InteractiveKinds.Where(k => !kinds.Contains(k)));
+            return string.Join(",", kinds);
+        }
+    }
+
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CloudAccountStatus> _status = new();
 
     /// <summary>All organisations together (the shell asks for the passwords of <see cref="CloudAccountStatus.Pending"/>).</summary>
@@ -70,7 +124,7 @@ public sealed class CloudAccountSync(
     private async Task<bool> SyncAsync(CloudConnection connection, CancellationToken cancellationToken)
     {
         using var deviceKey = await CloudCertificateSync.DeviceKeyAsync(credentials, connection, logger, cancellationToken);
-        var response = await cloud.GetMailAccountsAsync(connection, cancellationToken);
+        var response = await cloud.GetMailAccountsAsync(connection, SupportedKinds, cancellationToken);
         var signingKey = response.OrganizationKey?.SigningPublicKey;
         var pinnedKey = connection.SettingKey(SettingKeys.CloudOrganizationSigningKey);
         var pinned = await settings.GetAsync(pinnedKey, cancellationToken);
@@ -147,16 +201,48 @@ public sealed class CloudAccountSync(
                 continue;
             }
 
-            var account = Build(localId, data, local.GetValueOrDefault(localId));
-            var password = data.Password ?? await credentials.GetSecretAsync(CloudAccountPasswords.SecretId(localId), cancellationToken);
-            if (password is null)
+            var kind = data.Kind ?? CloudAccountKinds.Imap;
+            var existing = local.GetValueOrDefault(localId);
+            if (CloudAccountKinds.SignsIn(kind))
             {
-                // Finished once the user typed the password (see CompleteAsync).
-                pending.Add(new PendingCloudAccount(localId, data.DisplayName, data.Email, account, connection.Id));
+                if (existing is null)
+                {
+                    // Finished once the user signed in (see AdoptAsync).
+                    pending.Add(new PendingCloudAccount(localId, data.DisplayName, data.Email, Placeholder(localId, data), connection.Id, kind, data.NextcloudUrl, data));
+                    continue;
+                }
+
+                // Signed in already: only names, reply address and signatures follow the organisation.
+                await ApplyAsync(Identity(existing, data), data, connection, cancellationToken);
+                state[localId] = fingerprint;
+                received++;
+                changed = true;
                 continue;
             }
 
-            await SaveAsync(account, local.GetValueOrDefault(localId), password, cancellationToken);
+            Account account;
+            try
+            {
+                account = await BuildAsync(localId, data, existing, cancellationToken);
+            }
+            catch (AccountSetupException ex)
+            {
+                logger.LogWarning("Account {Email} of the organisation not set up: {Reason}", data.Email, ex.Message);
+                waiting++;
+                continue;
+            }
+
+            // Proton: the Bridge password is this computer's own – never from the organisation.
+            var password = (kind == CloudAccountKinds.Proton ? null : data.Password) ?? await credentials.GetSecretAsync(CloudAccountPasswords.SecretId(localId), cancellationToken);
+            if (password is null)
+            {
+                // Finished once the user typed the password (see CompleteAsync).
+                pending.Add(new PendingCloudAccount(localId, data.DisplayName, data.Email, account, connection.Id, kind, Data: data));
+                continue;
+            }
+
+            await SaveAsync(account, existing, password, cancellationToken);
+            await AssignSignaturesAsync(account, data, connection, cancellationToken);
             state[localId] = fingerprint;
             received++;
             changed = true;
@@ -188,6 +274,53 @@ public sealed class CloudAccountSync(
         ArgumentNullException.ThrowIfNull(pending);
         await setup.CreateAsync(pending.Account, password, cancellationToken);
         await CloudAccountPasswords.SetAsync(credentials, accounts, pending.CloudId, password, cancellationToken);
+        await ForgetPendingAsync(pending, cancellationToken);
+        await SyncAsync(cancellationToken);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// An account of the organisation the user just signed in to (Microsoft 365, Google, Nextcloud – set up and saved by
+    /// the sign-in): it becomes the organisation's, with its names, reply address and signatures. Microsoft and Google
+    /// must have signed in with the organisation's address.
+    /// </summary>
+    /// <exception cref="AccountSetupException">Signed in with another address (the account is removed again).</exception>
+    public async Task AdoptAsync(PendingCloudAccount pending, Account signedIn, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pending);
+        ArgumentNullException.ThrowIfNull(signedIn);
+        if (pending.Kind != CloudAccountKinds.Nextcloud && !string.Equals(signedIn.EmailAddress, pending.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            await RemoveAsync(signedIn with { CloudId = pending.CloudId }, cancellationToken);
+            throw new AccountSetupException(F("Angemeldet als {0} – Ihre Organisation hat das Konto für {1} eingerichtet. Bitte mit dieser Adresse anmelden.",
+                signedIn.EmailAddress ?? "?", pending.Email));
+        }
+
+        var connection = await cloud.GetConnectionAsync(pending.ConnectionId, cancellationToken);
+        var data = pending.Data;
+        var account = signedIn with
+        {
+            CloudId = pending.CloudId,
+            DisplayName = pending.Account.DisplayName,
+            EmailAddress = signedIn.EmailAddress ?? pending.Account.EmailAddress,
+            Label = pending.Kind == CloudAccountKinds.Nextcloud ? signedIn.Label : null,
+        };
+        if (data is not null && connection is not null)
+        {
+            await ApplyAsync(account, data, connection, cancellationToken);
+        }
+        else
+        {
+            await accounts.SaveAccountAsync(account, cancellationToken);
+        }
+
+        await ForgetPendingAsync(pending, cancellationToken);
+        await SyncAsync(cancellationToken);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task ForgetPendingAsync(PendingCloudAccount pending, CancellationToken cancellationToken)
+    {
         if (await cloud.GetConnectionAsync(pending.ConnectionId, cancellationToken) is { } connection)
         {
             var state = await LoadStateAsync(connection, cancellationToken);
@@ -198,9 +331,6 @@ public sealed class CloudAccountSync(
                 _status[connection.Id] = status with { Pending = [.. status.Pending.Where(p => p.CloudId != pending.CloudId)] };
             }
         }
-
-        await SyncAsync(cancellationToken);
-        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Disconnected: the accounts of organisations no longer connected leave this device (with their passwords).</summary>
@@ -221,40 +351,141 @@ public sealed class CloudAccountSync(
         return cloudAccounts.Count > 0;
     }
 
+    /// <summary>EWS: how to sign in (Neruna.Providers.Ews.EwsSettings.AuthenticationKey).</summary>
+    private const string EwsAuthenticationKey = "ews.auth";
+
     // The account as the organisation describes it; an existing one keeps its id, connection ids (offline data) and label.
-    private Account Build(string cloudId, CloudAccountData data, Account? existing)
+    private async Task<Account> BuildAsync(string cloudId, CloudAccountData data, Account? existing, CancellationToken cancellationToken)
     {
+        var kind = data.Kind ?? CloudAccountKinds.Imap;
+        var username = string.IsNullOrWhiteSpace(data.Username) ? data.Email : data.Username;
+        var incoming = new List<MailServerSettings>();
+        var outgoing = new List<MailServerSettings>();
         var dav = new List<DavServerSettings>();
+        var options = new Dictionary<string, string>();
+        switch (kind)
+        {
+            case CloudAccountKinds.Exchange:
+                var ews = Uri.TryCreate(data.Ews?.Url, UriKind.Absolute, out var given) ? given : null;
+                if (ews is null && discovery is not null)
+                {
+                    // No address given: as when adding it by hand – the domain's configuration or Neruna's directory.
+                    ews = (await discovery.DiscoverAsync(data.Email, cancellationToken))?.Config.Ews?.ServerUrl;
+                }
+
+                dav.Add(new DavServerSettings(ServerProtocol.Ews, ews ?? throw new AccountSetupException(T("Der Exchange-Server wurde nicht gefunden.")), username));
+                if (data.Ews?.Authentication is { Length: > 0 } auth && auth != "Automatic")
+                {
+                    options[EwsAuthenticationKey] = auth;
+                }
+
+                break;
+            case CloudAccountKinds.Proton:
+                // Proton Mail Bridge on this computer, at its usual ports (the app finds the actual ones when asking for
+                // the Bridge password); a rebuilt account keeps what was found then (see below).
+                incoming.Add(new MailServerSettings(ServerProtocol.Imap, ProtonHost, 1143, SocketSecurity.StartTls, AuthScheme.PasswordCleartext, username));
+                outgoing.Add(new MailServerSettings(ServerProtocol.Smtp, ProtonHost, 1025, SocketSecurity.StartTls, AuthScheme.PasswordCleartext, username));
+                break;
+            case CloudAccountKinds.Dav:
+                AddDav(dav, data, username);
+                if (dav.Count == 0)
+                {
+                    throw new AccountSetupException(T("Keine CalDAV- oder CardDAV-Adresse."));
+                }
+
+                break;
+            default:
+                if (data.Imap is null || data.Smtp is null)
+                {
+                    throw new AccountSetupException(T("Keine Servereinstellungen."));
+                }
+
+                incoming.Add(new MailServerSettings(ServerProtocol.Imap, data.Imap.Host, data.Imap.Port, Security(data.Imap.Security), AuthScheme.PasswordCleartext, username));
+                outgoing.Add(new MailServerSettings(ServerProtocol.Smtp, data.Smtp.Host, data.Smtp.Port, Security(data.Smtp.Security), AuthScheme.PasswordCleartext, username));
+                AddDav(dav, data, username);
+                break;
+        }
+
+        var config = new MailProviderConfig(data.Email.Split('@').Last(), null, incoming, outgoing, dav);
+        var built = setup.BuildAccount(data.DisplayName, data.Email, config, options: options);
+        var connections = built.Connections
+            .Select(c => existing?.ConnectionsOf(c.Kind).FirstOrDefault(e => e.ProviderId == c.ProviderId) is { } kept
+                // Proton: what this computer found (ports, the Bridge's certificate) stays with the connection.
+                ? c with { Id = kept.Id, Settings = kind == CloudAccountKinds.Proton ? Merge(c.Settings, kept.Settings) : c.Settings }
+                : c)
+            .ToList();
+        return Identity(built with { Id = existing?.Id ?? built.Id, Connections = connections, Label = existing?.Label }, data) with { CloudId = cloudId };
+    }
+
+    private const string ProtonHost = "127.0.0.1";
+
+    private static Dictionary<string, string> Merge(IReadOnlyDictionary<string, string> kept, IReadOnlyDictionary<string, string> given)
+    {
+        var merged = new Dictionary<string, string>(kept);
+        foreach (var (key, value) in given)
+        {
+            merged[key] = value;
+        }
+
+        return merged;
+    }
+
+    private static void AddDav(List<DavServerSettings> dav, CloudAccountData data, string username)
+    {
         if (Uri.TryCreate(data.CaldavUrl, UriKind.Absolute, out var caldav))
         {
-            dav.Add(new DavServerSettings(ServerProtocol.CalDav, caldav, data.Username));
+            dav.Add(new DavServerSettings(ServerProtocol.CalDav, caldav, username));
         }
 
         if (Uri.TryCreate(data.CarddavUrl, UriKind.Absolute, out var carddav))
         {
-            dav.Add(new DavServerSettings(ServerProtocol.CardDav, carddav, data.Username));
+            dav.Add(new DavServerSettings(ServerProtocol.CardDav, carddav, username));
+        }
+    }
+
+    /// <summary>What the organisation decides of any account: sender name, aliases and the fixed reply address.</summary>
+    private static Account Identity(Account account, CloudAccountData data)
+    {
+        var connections = account.Connections
+            .Select(c => c.Kind != ServiceKind.Mail ? c
+                : string.IsNullOrWhiteSpace(data.ReplyTo)
+                    ? c with { Settings = Without(c.Settings, Mail.ReplyAddress.CloudSetting) }
+                    : c with { Settings = new Dictionary<string, string>(c.Settings) { [Mail.ReplyAddress.CloudSetting] = data.ReplyTo.Trim() } }) // the organisation's: fixed here
+            .ToList();
+        return account with
+        {
+            DisplayName = data.DisplayName,
+            Connections = connections,
+            Aliases = data.Aliases is { Count: > 0 } aliases ? aliases : null,
+        };
+    }
+
+    private static Dictionary<string, string> Without(IReadOnlyDictionary<string, string> settings, string key) =>
+        settings.Where(p => p.Key != key).ToDictionary(p => p.Key, p => p.Value);
+
+    // Until the user signed in: who it is for (no connections yet).
+    private static Account Placeholder(string cloudId, CloudAccountData data) =>
+        new Account(Guid.NewGuid(), data.DisplayName, data.Email, []) with { CloudId = cloudId };
+
+    // A signed-in account: names, reply address and signatures as the organisation set them.
+    private async Task ApplyAsync(Account account, CloudAccountData data, CloudConnection connection, CancellationToken cancellationToken)
+    {
+        var updated = Identity(account, data);
+        await accounts.SaveAccountAsync(updated, cancellationToken);
+        await AssignSignaturesAsync(updated, data, connection, cancellationToken);
+    }
+
+    // The account's default signatures, when the organisation names them (its signatures, see CloudSignatureSync).
+    private async Task AssignSignaturesAsync(Account account, CloudAccountData data, CloudConnection connection, CancellationToken cancellationToken)
+    {
+        if (data.SignatureNew is null && data.SignatureReply is null)
+        {
+            return;
         }
 
-        var config = new MailProviderConfig(
-            data.Email.Split('@').Last(), null,
-            [new MailServerSettings(ServerProtocol.Imap, data.Imap.Host, data.Imap.Port, Security(data.Imap.Security), AuthScheme.PasswordCleartext, data.Username)],
-            [new MailServerSettings(ServerProtocol.Smtp, data.Smtp.Host, data.Smtp.Port, Security(data.Smtp.Security), AuthScheme.PasswordCleartext, data.Username)],
-            dav);
-        var built = setup.BuildAccount(data.DisplayName, data.Email, config);
-        var connections = built.Connections
-            .Select(c => existing?.ConnectionsOf(c.Kind).FirstOrDefault(e => e.ProviderId == c.ProviderId) is { } kept ? c with { Id = kept.Id } : c)
-            .Select(c => c.Kind == ServiceKind.Mail && !string.IsNullOrWhiteSpace(data.ReplyTo)
-                ? c with { Settings = new Dictionary<string, string>(c.Settings) { [Mail.ReplyAddress.CloudSetting] = data.ReplyTo.Trim() } } // the organisation's: fixed here
-                : c)
-            .ToList();
-        return built with
-        {
-            Id = existing?.Id ?? built.Id,
-            Connections = connections,
-            Label = existing?.Label,
-            Aliases = data.Aliases is { Count: > 0 } aliases ? aliases : null,
-            CloudId = cloudId,
-        };
+        await Mail.SignatureService.AssignAsync(settings, account.Id, new Mail.SignatureAssignment(
+            data.SignatureNew is { } forNew ? CloudSignatureSync.LocalId(forNew, connection) : null,
+            data.SignatureReply is { } forReply ? CloudSignatureSync.LocalId(forReply, connection) : null), cancellationToken);
     }
 
     private async Task SaveAsync(Account account, Account? previous, string password, CancellationToken cancellationToken)
@@ -299,17 +530,27 @@ public sealed class CloudAccountSync(
         Enum.TryParse<SocketSecurity>(value, ignoreCase: true, out var security) ? security : SocketSecurity.SslOnConnect;
 }
 
-/// <summary>The account as the portal encrypted it (public/js/neruna-certificates.js, encryptAccount).</summary>
-internal sealed record CloudAccountData(
+/// <summary>
+/// The account as the portal encrypted it (Portal → E-Mail-Konten, public/js/neruna-certificates.js, encryptAccount).
+/// Which fields come depends on <see cref="Kind"/> (absent: imap) – see the contract, /api/v1/mail-accounts.
+/// </summary>
+public sealed record CloudAccountData(
     string DisplayName,
     string Email,
-    string Username,
-    string? Password,
-    IReadOnlyList<MailIdentity>? Aliases,
-    CloudServer Imap,
-    CloudServer Smtp,
-    string? CaldavUrl,
-    string? CarddavUrl,
-    string? ReplyTo = null);
+    string? Username = null,
+    string? Password = null,
+    IReadOnlyList<MailIdentity>? Aliases = null,
+    CloudServer? Imap = null,
+    CloudServer? Smtp = null,
+    string? CaldavUrl = null,
+    string? CarddavUrl = null,
+    string? ReplyTo = null,
+    string? Kind = null,
+    CloudEws? Ews = null,
+    string? NextcloudUrl = null,
+    string? SignatureNew = null,
+    string? SignatureReply = null);
 
-internal sealed record CloudServer(string Host, int Port, string? Security);
+public sealed record CloudEws(string? Url, string? Authentication);
+
+public sealed record CloudServer(string Host, int Port, string? Security);

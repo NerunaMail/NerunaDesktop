@@ -27,7 +27,7 @@
             <TextBlock Text="{l:T 'Neues Notizbuch'}" />
           </StackPanel>
         </Button>
-        <TextBox Grid.Column="3" Text="{Binding SearchText}" PlaceholderText="{l:T 'Notizen durchsuchen'}" Width="240" VerticalAlignment="Center" />
+        <TextBox ctl:SearchBox.Clearable="True" Grid.Column="3" Text="{Binding SearchText}" PlaceholderText="{l:T 'Notizen durchsuchen'}" Width="240" VerticalAlignment="Center" />
       </Grid>
     </Border>
 

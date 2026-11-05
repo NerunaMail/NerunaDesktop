@@ -32,6 +32,26 @@ public class ChatTests
         more = false,
     });
 
+    private static ChatController Hub(TestEnvironment env, CloudController cloud, params IAccountChatFactory[] accountChats) =>
+        new(cloud, env.Get<IChatStore>(), env.Get<ISettingsStore>(), env.Accounts, accountChats, TimeProvider.System, NullLoggerFactory.Instance);
+
+    [Fact]
+    public async Task Messages_kept_by_a_version_with_one_chat_are_removed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var store = env.Get<IChatStore>();
+        await store.AddAsync(string.Empty, [new ChatMessage(1, Room, Beat, null, "alt", DateTimeOffset.UtcNow)], ct);
+        await env.Get<ISettingsStore>().SetAsync(SettingKeys.ChatState, "{}", ct);
+        var cloud = new CloudController(new HttpClient(env.Http), env.Get<ISettingsStore>(), env.Get<ICredentialStore>(), NullLogger<CloudController>.Instance);
+        using var chat = Hub(env, cloud);
+
+        await chat.LoadAsync(ct);
+
+        Assert.Empty(await store.GetAllAsync(string.Empty, ct));
+        Assert.Null(await env.Get<ISettingsStore>().GetAsync(SettingKeys.ChatState, ct));
+    }
+
     private static object Message(long id, string? room, string sender, string? recipient, string text, DateTimeOffset sentAt) =>
         new { id, roomId = room, senderId = sender, recipientId = recipient, text, sentAt };
 
@@ -43,11 +63,11 @@ public class ChatTests
         var settings = env.Get<ISettingsStore>();
         var store = env.Get<IChatStore>();
         var cloud = new CloudController(new HttpClient(env.Http), settings, env.Get<ICredentialStore>(), NullLogger<CloudController>.Instance);
-        using var chat = new ChatController(cloud, store, settings, TimeProvider.System, NullLogger<ChatController>.Instance);
+        using var chat = Hub(env, cloud);
 
         // Without a cloud connection there is no chat.
         await chat.LoadAsync(ct);
-        Assert.False(chat.Current.Connected);
+        Assert.Empty(chat.Services);
         Assert.False(await chat.RefreshAsync(ct));
 
         using var key = DeviceKey.Create();
@@ -66,10 +86,13 @@ public class ChatTests
         var changes = 0;
         chat.Changed += (_, _) => changes++;
         Assert.True(await chat.RefreshAsync(ct));
-        var current = chat.Current;
+        var organisation = Assert.Single(chat.Services);
+        Assert.Equal(("cloud:" + CloudConnection.FirstId, "Example AG", ChatKind.NerunaCloud), (organisation.Key, organisation.Title, organisation.Kind));
+        var current = organisation.Current;
         Assert.True(current.Connected && current.Available);
         Assert.Equal([41L, 42L], current.Messages.Select(m => m.Id));
-        Assert.Equal([41L, 42L], (await store.GetAllAsync(ct)).Select(m => m.Id));
+        Assert.Equal([41L, 42L], (await store.GetAllAsync(organisation.Key, ct)).Select(m => m.Id));
+        Assert.Equal(2, chat.TotalUnread);
         Assert.Equal(2, current.TotalUnread);
         Assert.Equal(1, current.UnreadOf(ChatConversation.Private(Beat)));
         Assert.Contains(env.Http.Sent, s => s.Method == "PUT" && s.Url == Server + "api/v1/presence" && s.Body.Contains("\"available\"", StringComparison.Ordinal));
@@ -81,27 +104,27 @@ public class ChatTests
         // Answering Beat privately: the own message counts as read.
         env.Http.Responses[Server + "api/v1/chat/messages"] = (HttpStatusCode.Created, JsonSerializer.Serialize(
             Message(43, null, Anna, Beat, "Gerne __gleich__ ☕", now)));
-        await chat.SendAsync(ChatConversation.Private(Beat), "Gerne __gleich__ ☕", ct);
+        await organisation.SendAsync(ChatConversation.Private(Beat), "Gerne __gleich__ ☕", ct);
         Assert.Contains(env.Http.Sent, s => s.Url == Server + "api/v1/chat/messages" && s.Body.Contains($"\"recipientId\":\"{Beat}\"", StringComparison.Ordinal));
-        Assert.Equal(0, chat.Current.UnreadOf(ChatConversation.Private(Beat)));
-        Assert.Equal(1, chat.Current.TotalUnread);
+        Assert.Equal(0, organisation.Current.UnreadOf(ChatConversation.Private(Beat)));
+        Assert.Equal(1, chat.TotalUnread);
 
         env.Http.Responses[Server + "api/v1/chat/read"] = (HttpStatusCode.NoContent, string.Empty);
-        await chat.MarkReadAsync(ChatConversation.Room(Room), ct);
-        Assert.Equal(0, chat.Current.TotalUnread);
+        await organisation.MarkReadAsync(ChatConversation.Room(Room), ct);
+        Assert.Equal(0, chat.TotalUnread);
         Assert.Contains(env.Http.Sent, s => s.Url == Server + "api/v1/chat/read" && s.Body.Contains("\"lastId\":41", StringComparison.Ordinal));
 
         // The next start shows the same without network.
-        using var restarted = new ChatController(cloud, store, settings, TimeProvider.System, NullLogger<ChatController>.Instance);
+        using var restarted = Hub(env, cloud);
         await restarted.LoadAsync(ct);
-        Assert.Equal([41L, 42L, 43L], restarted.Current.Messages.Select(m => m.Id));
-        Assert.Equal("Beat Beispiel", restarted.Current.People[1].Name);
+        Assert.Equal([41L, 42L, 43L], restarted.Services[0].Current.Messages.Select(m => m.Id));
+        Assert.Equal("Beat Beispiel", restarted.Services[0].Current.People[1].Name);
 
         // Disconnected: the chat is gone here, too.
         await settings.SetAsync(SettingKeys.CloudConnection, null, ct);
         Assert.True(await chat.RefreshAsync(ct));
-        Assert.False(chat.Current.Connected);
-        Assert.Empty(await store.GetAllAsync(ct));
+        Assert.Empty(chat.Services);
+        Assert.Empty(await store.GetAllAsync(organisation.Key, ct));
         Assert.True(changes >= 4);
     }
 
@@ -112,7 +135,7 @@ public class ChatTests
         await using var env = await TestEnvironment.CreateAsync();
         var settings = env.Get<ISettingsStore>();
         var cloud = new CloudController(new HttpClient(env.Http), settings, env.Get<ICredentialStore>(), NullLogger<CloudController>.Instance);
-        using var chat = new ChatController(cloud, env.Get<IChatStore>(), settings, TimeProvider.System, NullLogger<ChatController>.Instance);
+        using var chat = Hub(env, cloud);
 
         Assert.Equal(Presence.Available, await chat.GetPresenceAsync(ct));
         await chat.SetPresenceAsync(Presence.DoNotDisturb, ct); // not connected: only remembered

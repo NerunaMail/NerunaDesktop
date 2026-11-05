@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:contacts="using:Neruna.Core.Contacts"
              x:Class="Neruna.Desktop.Views.GroupEditorView"
@@ -78,7 +79,7 @@
 
       <StackPanel Grid.Column="2" IsVisible="{Binding !IsReadOnly}">
         <TextBlock Classes="label" Text="{l:T 'Kontakte'}" />
-        <TextBox Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}" Margin="0,0,0,6" />
+        <TextBox ctl:SearchBox.Clearable="True" Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}" Margin="0,0,0,6" />
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Height="378">
           <Panel>
             <TextBlock Classes="subtle" Text="{Binding AvailableHint}" TextWrapping="Wrap"

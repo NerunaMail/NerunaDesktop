@@ -39,17 +39,10 @@
         </ListBox.ItemTemplate>
       </ListBox>
 
-      <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8" IsVisible="{Binding HasSeveral}" Margin="0,4,0,0">
-        <TextBlock Text="{l:T 'Chat von'}" VerticalAlignment="Center" />
-        <ComboBox Grid.Column="1" ItemsSource="{Binding Connections}" SelectedItem="{Binding ChatConnection}" MinWidth="260">
-          <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="cloud:CloudConnection">
-              <TextBlock Text="{Binding OrganizationName}" />
-            </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
-        <TextBlock Grid.Row="1" Text="{l:T 'Sicherungen standardmässig bei'}" VerticalAlignment="Center" />
-        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Connections}" SelectedItem="{Binding BackupConnection}" MinWidth="260">
+      <!-- Each organisation's chat has a tab of its own in the chat page -->
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding HasSeveral}" Margin="0,4,0,0">
+        <TextBlock Text="{l:T 'Sicherungen standardmässig bei'}" VerticalAlignment="Center" />
+        <ComboBox Grid.Column="1" ItemsSource="{Binding Connections}" SelectedItem="{Binding BackupConnection}" MinWidth="260">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="cloud:CloudConnection">
               <TextBlock Text="{Binding OrganizationName}" />

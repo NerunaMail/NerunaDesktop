@@ -239,6 +239,13 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
                 UseCardDav ? (allowed.Contains(carddav) && carddav is not null ? carddav.Url.AbsoluteUri : root) : null);
     }
 
+    /// <summary>Nextcloud: its Talk as a tab of its own in the chat (on by default; also switchable in the chat page).</summary>
+    [ObservableProperty]
+    public partial bool NextcloudTalk { get; set; } = true;
+
+    /// <summary>Set once a Nextcloud account was made with <see cref="NextcloudTalk"/> on: the shell switches its chat on.</summary>
+    public bool WantsChat { get; private set; }
+
     /// <summary>
     /// Nextcloud Login Flow v2: the browser opens, the user signs in and allows access; Nextcloud gives Neruna an app
     /// password. Then calendars and contacts are set up as an account of their own (the mail stays where it is).
@@ -269,6 +276,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             };
             await setup.CreateAsync(account, login.AppPassword);
             CreatedAccount = account;
+            WantsChat = NextcloudTalk;
             Finished?.Invoke(this, true);
         }
         catch (NextcloudLoginException ex)
@@ -523,7 +531,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
                 ? T("Namen, Passwort und Adressen ändern. Die Verbindungen werden vor dem Speichern geprüft; Termine und Kontakte bleiben erhalten. Leeres Kalender- oder Kontaktfeld entfernt diesen Dienst.")
                 : T("Nur Kalender (CalDAV), nur Kontakte (CardDAV) oder beides – ohne E-Mail. Einladungen verschickt der Server, wenn er das kann (z. B. SOGo, Nextcloud).")
             : IsNextcloud
-            ? T("Kalender und Kontakte Ihrer Nextcloud – angemeldet wird im Browser, auch mit Zwei-Faktor-Anmeldung. Die E-Mail richten Sie als eigenes Konto ein.")
+            ? T("Kalender, Kontakte und Talk Ihrer Nextcloud – angemeldet wird im Browser, auch mit Zwei-Faktor-Anmeldung. Die E-Mail richten Sie als eigenes Konto ein.")
             : IsProton
             ? T("Proton Mail über die Proton Mail Bridge auf diesem Computer. Die Bridge braucht ein kostenpflichtiges Proton-Abo; Kalender und Kontakte bietet sie nicht an.")
             : IsExchange && !IsCloud

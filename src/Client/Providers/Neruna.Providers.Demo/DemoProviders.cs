@@ -139,6 +139,17 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
         message.From.Add(new MailboxAddress(m.FromName, m.FromAddress));
         var to = Recipient(m.Folder);
         message.To.Add(new MailboxAddress(to.Name, to.Address));
+        if (m.Subject.Contains("Teamausflug", StringComparison.Ordinal))
+        {
+            // A reply to all: more Cc than one line holds.
+            foreach (var (name, address) in new[] { ("Beat Beispiel", "beat.beispiel@example.com"), ("Carla Rossi", "carla.rossi@example.com"),
+                         ("David Meier", "david.meier@example.com"), ("Elena Weber", "elena.weber@example.com"), ("Fabio Bernasconi", "fabio.bernasconi@example.com"),
+                         ("Gina Huber", "gina.huber@example.com"), ("Hans Keller", "hans.keller@example.com") })
+            {
+                message.Cc.Add(new MailboxAddress(name, address));
+            }
+        }
+
         message.Body = m.Subject.StartsWith("Einladung:", StringComparison.Ordinal)
             ? new MultipartAlternative { new TextPart("plain") { Text = m.Body }, InvitationPart() }
             : new TextPart("plain") { Text = m.Body };

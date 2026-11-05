@@ -49,8 +49,11 @@
               <PathIcon Data="{StaticResource IconAccountAdd}" Width="15" Height="15" Margin="0" />
             </Button>
           </StackPanel>
-          <TextBlock Classes="subtle" FontSize="12" Text="{Binding To, Converter={x:Static l:Fmt.Instance}, ConverterParameter='An: {0}'}" TextTrimming="CharacterEllipsis" />
-          <TextBlock Classes="subtle" FontSize="12" Text="{Binding Cc, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
+          <!-- An/Cc: cut off after one line; when cut, a click shows every address (and another click one line again) -->
+          <StackPanel x:Name="RecipientLines" Background="Transparent" Spacing="2" Tapped="OnRecipientsTapped">
+            <TextBlock x:Name="ToLine" Classes="subtle" FontSize="12" Text="{Binding To, Converter={x:Static l:Fmt.Instance}, ConverterParameter='An: {0}'}" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="CcLine" Classes="subtle" FontSize="12" Text="{Binding Cc, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
+          </StackPanel>
           <TextBlock Classes="subtle" FontSize="12" Text="{Binding Date}" />
         </StackPanel>
         <!-- Security check: sender, envelope, display name, links, attachments -->

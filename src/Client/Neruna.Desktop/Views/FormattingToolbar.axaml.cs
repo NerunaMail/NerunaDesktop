@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.Interactivity;
 using static Neruna.Core.Localization.Texts;
 
@@ -36,5 +38,35 @@ internal sealed partial class FormattingToolbar : UserControl
         }
 
         this.FindControl<SplitButton>("HighlightButton")?.Flyout?.Hide();
+    }
+
+    // The field is empty (the hint shows the forms): ready for typing or pasting at once.
+    private void OnLinkFlyoutOpened(object? sender, EventArgs e) =>
+        Dispatcher.UIThread.Post(() => ((sender as Flyout)?.Content as Panel)?.Children.OfType<TextBox>().FirstOrDefault()?.Focus(),
+            DispatcherPriority.Input);
+
+    private void OnLinkUrlKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            InsertLink();
+        }
+    }
+
+    private void OnInsertLink(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        InsertLink();
+    }
+
+    private void InsertLink()
+    {
+        if (DataContext is Editor.FormattingViewModel formatting)
+        {
+            formatting.InsertLinkCommand.Execute(null);
+        }
+
+        this.FindControl<Button>("LinkButton")?.Flyout?.Hide();
     }
 }

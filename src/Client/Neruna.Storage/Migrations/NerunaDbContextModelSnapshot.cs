@@ -181,6 +181,11 @@ namespace Neruna.Storage.Migrations
 
             modelBuilder.Entity("Neruna.Storage.ChatMessageEntity", b =>
                 {
+                    b.Property<string>("Source")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("");
+
                     b.Property<long>("Id")
                         .HasColumnType("INTEGER");
 
@@ -201,7 +206,7 @@ namespace Neruna.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.HasKey("Id");
+                    b.HasKey("Source", "Id");
 
                     b.HasIndex("SentUnixMs");
 

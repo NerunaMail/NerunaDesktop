@@ -5,16 +5,16 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
-using Neruna.Contracts.Cloud;
 using Neruna.Core.Chat;
-using Neruna.Core.Cloud;
 using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>
-/// Chat: rooms and private conversations on the left, the people of the room below, messages on the right. Asks the
-/// server every few seconds while the chat is in front and every 20 seconds otherwise (badge, online status).
+/// Chat: a tab per chat (each Neruna Cloud/Control organisation, Nextcloud Talk per account); in the tab rooms and
+/// private conversations on the left, the people of the room below, messages on the right. Asks the servers every few
+/// seconds while the chat is in front and every 20 seconds otherwise (badge, online status). The own status (window
+/// header) is the same in all chats.
 /// </summary>
 internal sealed partial class ChatViewModel : ViewModelBase
 {
@@ -24,7 +24,9 @@ internal sealed partial class ChatViewModel : ViewModelBase
     private readonly ChatController _chat;
     private readonly ILogger<ChatViewModel> _logger;
     private readonly DispatcherTimer _timer;
+    private readonly Dictionary<string, string> _selectedPerTab = [];
     private bool _polling;
+    private bool _polled;
     private string? _shownConversation;
 
     public ChatViewModel(ChatController chat, ILogger<ChatViewModel> logger)
@@ -39,6 +41,19 @@ internal sealed partial class ChatViewModel : ViewModelBase
     /// <summary>"Cloud verbinden": the shell opens Einstellungen → Cloud.</summary>
     public event EventHandler? CloudSetupRequested;
 
+    /// <summary>"Anruf": Nextcloud Talk opens in the browser at this address.</summary>
+    public event EventHandler<Uri>? CallRequested;
+
+    /// <summary>The chats as tabs (shown when there is more than one).</summary>
+    public ObservableCollection<ChatTabItem> Tabs { get; } = [];
+
+    public bool ShowTabs => Tabs.Count > 1 || AccountChats.Count > 0;
+
+    /// <summary>Nextcloud accounts whose Talk can be shown as a tab of its own (switched on or off here).</summary>
+    public ObservableCollection<AccountChatChoice> AccountChats { get; } = [];
+
+    public bool HasAccountChats => AccountChats.Count > 0;
+
     public ObservableCollection<ChatConversationItem> Rooms { get; } = [];
 
     public ObservableCollection<ChatConversationItem> Directs { get; } = [];
@@ -48,21 +63,23 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
     public ObservableCollection<ChatMessageItem> Messages { get; } = [];
 
+    /// <summary>A chat is set up (Neruna Cloud/Control connected, or Nextcloud Talk switched on).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowNotConnected), nameof(ShowNotIncluded), nameof(ShowChat), nameof(ShowPresence))]
     public partial bool IsConnected { get; set; }
 
+    /// <summary>At least one chat may be used (Neruna Cloud: included in the licence).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowNotIncluded), nameof(ShowChat), nameof(ShowPresence))]
     public partial bool IsAvailable { get; set; }
 
     public bool ShowNotConnected => !IsConnected;
 
-    public bool ShowNotIncluded => IsConnected && !IsAvailable;
+    public bool ShowNotIncluded => IsConnected && !IsAvailable && _polled;
 
     public bool ShowChat => IsConnected && IsAvailable;
 
-    /// <summary>The status switch in the header: only with a chat to show it in (and its button not hidden).</summary>
+    /// <summary>The own status counts: a chat to show it in, and its button not hidden.</summary>
     public bool ShowPresence => ShowChat && IsEnabled;
 
     /// <summary>False while the chat button is hidden (Einstellungen → Design): no polling, shown offline to others.</summary>
@@ -87,29 +104,28 @@ internal sealed partial class ChatViewModel : ViewModelBase
         else
         {
             _timer.Stop();
-            await GoOfflineAsync();
-        }
-    }
-
-    private async Task GoOfflineAsync()
-    {
-        try
-        {
             await _chat.GoOfflineAsync();
         }
-        catch (Exception ex) when (ex is CloudException or HttpRequestException or TaskCanceledException)
-        {
-            // Unreachable: the server shows offline anyway after 5 minutes without contact.
-            _logger.LogDebug(ex, "Offline status not sent");
-        }
     }
 
-    /// <summary>How long the organisation keeps messages (shown above the conversation).</summary>
+    /// <summary>The tab shown (<see cref="IChatService.Key"/>).</summary>
+    [ObservableProperty]
+    public partial string? SelectedTab { get; set; }
+
+    private IChatService? Service => SelectedTab is { } key ? _chat.Find(key) : null;
+
+    public bool IsTalk => Service?.Kind == ChatKind.NextcloudTalk;
+
+    /// <summary>How long the messages are kept (shown above the conversation).</summary>
     [ObservableProperty]
     public partial string RetentionText { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial string RetentionDetails { get; set; } = string.Empty;
+
+    public string RoomsEmptyText => IsTalk
+        ? T("Noch keine Unterhaltungen – sie werden in Nextcloud Talk angelegt.")
+        : T("Noch keine Räume – sie werden im Portal angelegt.");
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasUnread), nameof(UnreadText))]
@@ -121,7 +137,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
     /// <summary>The open conversation ("room:…" / "pm:…"); both lists on the left show it as selected.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(CallCommand))]
     public partial string? SelectedKey { get; set; }
 
     public ChatConversationItem? Selected => Rooms.Concat(Directs).FirstOrDefault(c => c.Key == SelectedKey);
@@ -134,12 +150,18 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
     public string PeopleTitle => Selected is { IsRoom: false } ? T("Unterhaltung") : T("Im Raum");
 
+    /// <summary>Audio and video calls: in Nextcloud Talk (the browser), for its conversations.</summary>
+    public bool CanCall => SelectedKey is { } key && Service?.CallUrl(key) is not null;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
     public partial string Draft { get; set; } = string.Empty;
 
+    /// <summary>What went wrong: sending here, or the last refresh of this tab's chat.</summary>
     [ObservableProperty]
     public partial string? Error { get; set; }
+
+    private string? _sendError;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PresenceLabel), nameof(PresenceBrush))]
@@ -148,6 +170,44 @@ internal sealed partial class ChatViewModel : ViewModelBase
     public string PresenceLabel => Neruna.Core.Chat.Presence.Label(Presence);
 
     public IBrush PresenceBrush => PresenceBrushes.Of(Presence);
+
+    partial void OnPresenceChanged(string value) => Rebuild();
+
+    // ---- The own status: the same in every chat, or one of its own (e.g. offline at work, available in private) ----
+
+    /// <summary>More than one chat: a status can be set for this one only or for all.</summary>
+    public bool HasSeveralChats => Tabs.Count > 1;
+
+    /// <summary>What the others see in the open chat.</summary>
+    public string TabPresence => SelectedTab is { } key ? _chat.PresenceOverrideOf(key) ?? Presence : Presence;
+
+    public string TabPresenceLabel => Neruna.Core.Chat.Presence.Label(TabPresence);
+
+    public IBrush TabPresenceBrush => PresenceBrushes.Of(TabPresence);
+
+    /// <summary>Sets the status in the open chat only, or in all of them (statuses of their own are dropped).</summary>
+    public async Task SetTabPresenceAsync(string presence, bool onlyHere)
+    {
+        presence = Neruna.Core.Chat.Presence.Normalize(presence);
+        try
+        {
+            if (onlyHere && HasSeveralChats && SelectedTab is { } key)
+            {
+                await Task.Run(() => _chat.SetPresenceOfAsync(key, presence));
+            }
+            else
+            {
+                Presence = presence;
+                await Task.Run(() => _chat.SetPresenceForAllAsync(presence));
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Presence not saved");
+        }
+
+        Rebuild();
+    }
 
     /// <summary>Smileys offered beside the text field (any other emoji can be typed or pasted).</summary>
     public static IReadOnlyList<string> Emojis { get; } =
@@ -177,6 +237,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
             {
                 _ = MarkShownReadAsync();
                 _ = PollAsync();
+                _ = LoadAccountChatsAsync();
             }
         }
     }
@@ -193,10 +254,11 @@ internal sealed partial class ChatViewModel : ViewModelBase
             _logger.LogWarning(ex, "Local chat not loaded");
         }
 
+        await LoadAccountChatsAsync();
         _started = true;
         if (!IsEnabled)
         {
-            await GoOfflineAsync();
+            await _chat.GoOfflineAsync();
             return;
         }
 
@@ -204,8 +266,12 @@ internal sealed partial class ChatViewModel : ViewModelBase
         await PollAsync();
     }
 
-    /// <summary>Asks the server now (e.g. right after connecting the cloud).</summary>
-    public Task RefreshNowAsync() => PollAsync();
+    /// <summary>Asks the servers now (e.g. right after connecting the cloud).</summary>
+    public async Task RefreshNowAsync()
+    {
+        await PollAsync();
+        await LoadAccountChatsAsync();
+    }
 
     private async Task PollAsync()
     {
@@ -218,47 +284,169 @@ internal sealed partial class ChatViewModel : ViewModelBase
         try
         {
             await Task.Run(() => _chat.RefreshAsync());
-            Error = null;
         }
-        catch (Exception ex) when (ex is CloudException or HttpRequestException or TaskCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Offline or server away: the chat shows what it has and tries again with the next tick.
-            Error = T("Keine Verbindung zum Chat-Server – neuer Versuch läuft.");
-            _logger.LogDebug(ex, "Chat not refreshed");
+            // Each chat keeps what it has and says why (ErrorOf); this is only the list of chats itself.
+            _logger.LogWarning(ex, "Chats not refreshed");
         }
         finally
         {
             _polling = false;
+            if (!_polled)
+            {
+                _polled = true;
+                OnPropertyChanged(nameof(ShowNotIncluded));
+            }
         }
     }
 
-    // Everything from the snapshot; the selection, and the messages already shown, stay.
+    private async Task LoadAccountChatsAsync()
+    {
+        try
+        {
+            var options = await _chat.GetAccountChatsAsync();
+            Sync(AccountChats, options.Select(o => new AccountChatChoice(o.ConnectionId, o.Title, o.IsEnabled, Toggle)).ToList());
+            OnPropertyChanged(nameof(HasAccountChats));
+            OnPropertyChanged(nameof(ShowTabs));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Account chats not listed");
+        }
+    }
+
+    /// <summary>A new Nextcloud account with "Nextcloud Talk im Chat anzeigen": its tab comes at once.</summary>
+    public async Task EnableAccountChatAsync(Neruna.Core.Accounts.Account account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        try
+        {
+            foreach (var option in (await _chat.GetAccountChatsAsync()).Where(o => account.Connections.Any(c => c.Id == o.ConnectionId)))
+            {
+                await Task.Run(() => _chat.SetAccountChatAsync(option.ConnectionId, true));
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Chat of the new account not switched on");
+        }
+
+        await LoadAccountChatsAsync();
+    }
+
+    // Nextcloud Talk of an account switched on (a tab of its own, shown right away) or off.
+    private async void Toggle(AccountChatChoice choice, bool enabled)
+    {
+        try
+        {
+            await Task.Run(() => _chat.SetAccountChatAsync(choice.ConnectionId, enabled));
+            if (enabled)
+            {
+                SelectedTab = ChatController.KeyFor(ChatKind.NextcloudTalk, choice.ConnectionId);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Account chat not switched");
+        }
+
+        await LoadAccountChatsAsync();
+        Rebuild();
+    }
+
+    // Everything from the chats; the selection, and the messages already shown, stay.
     private void Rebuild()
     {
-        var snapshot = _chat.Current;
-        IsConnected = snapshot.Connected;
-        IsAvailable = snapshot.Available;
-        RetentionText = snapshot.RetentionDays == 1 ? T("Nachrichten werden 1 Tag aufbewahrt") : F("Nachrichten werden {0} Tage aufbewahrt", snapshot.RetentionDays);
-        RetentionDetails = RetentionText + T(" und danach gelöscht – auf dem Server und auf diesem Computer. ")
-                           + T("Die Dauer legt Ihre Organisation im Portal fest. Der Chat ist nicht für vertrauliche Daten gedacht.");
-        TotalUnread = snapshot.TotalUnread;
+        // Organisations whose licence leaves the chat out get no tab; Nextcloud Talk always (also to say what is wrong).
+        var services = _chat.Services;
+        var visible = services.Where(s => s.Current.Available || s.Kind != ChatKind.NerunaCloud).ToList();
+        IsConnected = services.Count > 0;
+        IsAvailable = visible.Count > 0;
+        TotalUnread = visible.Sum(s => s.Current.TotalUnread);
+
+        var tab = SelectedTab;
+        if (tab is null || visible.All(s => s.Key != tab))
+        {
+            tab = visible.FirstOrDefault()?.Key;
+        }
+
+        Sync(Tabs, visible.Select(s => new ChatTabItem(s.Key, s.Title, s.Kind, _chat.PresenceOverrideOf(s.Key) ?? Presence)
+        {
+            Unread = s.Current.TotalUnread,
+            IsSelected = s.Key == tab,
+            HasError = _chat.ErrorOf(s.Key) is not null,
+        }).ToList());
+        OnPropertyChanged(nameof(ShowTabs));
+        OnPropertyChanged(nameof(HasSeveralChats));
+        OnPropertyChanged(nameof(TabPresence));
+        OnPropertyChanged(nameof(TabPresenceLabel));
+        OnPropertyChanged(nameof(TabPresenceBrush));
+
+        if (tab != SelectedTab)
+        {
+            SelectedTab = tab; // builds again
+            return;
+        }
+
+        RebuildTab();
+    }
+
+    partial void OnSelectedTabChanged(string? value)
+    {
+        _shownConversation = null;
+        Messages.Clear();
+        _sendError = null;
+        SelectedKey = value is not null ? _selectedPerTab.GetValueOrDefault(value) : null;
+        OnPropertyChanged(nameof(IsTalk));
+        OnPropertyChanged(nameof(RoomsEmptyText));
+        Rebuild();
+    }
+
+    private void RebuildTab()
+    {
+        var service = Service;
+        var snapshot = service?.Current ?? ChatSnapshot.Empty;
+        if (service?.Kind == ChatKind.NextcloudTalk)
+        {
+            RetentionText = T("Nachrichten bleiben auf Ihrer Nextcloud");
+            RetentionDetails = T("Die Nachrichten liegen auf Ihrer Nextcloud und werden dort aufbewahrt. Neruna zeigt sie nur an und speichert sie nicht auf diesem Computer.");
+        }
+        else
+        {
+            RetentionText = snapshot.RetentionDays == 1 ? T("Nachrichten werden 1 Tag aufbewahrt") : F("Nachrichten werden {0} Tage aufbewahrt", snapshot.RetentionDays);
+            RetentionDetails = RetentionText + T(" und danach gelöscht – auf dem Server und auf diesem Computer. ")
+                               + T("Die Dauer legt Ihre Organisation im Portal fest. Der Chat ist nicht für vertrauliche Daten gedacht.");
+        }
+
+        Error = _sendError ?? (service is null ? null : _chat.ErrorOf(service.Key));
 
         var people = snapshot.People.ToDictionary(p => p.Id);
         var me = snapshot.Me;
         var selectedKey = SelectedKey;
-        // A room that is gone (or none chosen yet): the first room.
+        var groups = snapshot.Rooms.Where(r => !r.IsDirect).ToList();
+        var directRooms = snapshot.Rooms.Where(r => r.IsDirect).ToList();
+        // A conversation that is gone (or none chosen yet): the first room.
         if (selectedKey is null || (ChatConversation.IsRoom(selectedKey) && snapshot.Rooms.All(r => ChatConversation.Room(r.Id) != selectedKey)))
         {
-            selectedKey = snapshot.Rooms.Count > 0 ? ChatConversation.Room(snapshot.Rooms[0].Id) : null;
+            selectedKey = (groups.Count > 0 ? groups : directRooms).Select(r => ChatConversation.Room(r.Id)).FirstOrDefault();
         }
 
-        var rooms = snapshot.Rooms.Select(r => new ChatConversationItem(ChatConversation.Room(r.Id), r.Name, r.Description, true, null)
+        var rooms = groups.Select(r => new ChatConversationItem(ChatConversation.Room(r.Id), r.Name, r.Description, true, null)
         {
             Unread = snapshot.UnreadOf(ChatConversation.Room(r.Id)),
             IsSelected = ChatConversation.Room(r.Id) == selectedKey,
         }).ToList();
 
-        // Private conversations: everyone written with (newest first), plus the one just opened.
+        // Private conversations: Talk's one-to-one conversations; in Neruna Cloud everyone written with (newest first),
+        // plus the one just opened.
+        var directs = directRooms.Select(r => new ChatConversationItem(ChatConversation.Room(r.Id), r.Name,
+            Neruna.Core.Chat.Presence.Label(r.Presence ?? Neruna.Core.Chat.Presence.Offline), false, r.Presence ?? Neruna.Core.Chat.Presence.Offline)
+        {
+            Unread = snapshot.UnreadOf(ChatConversation.Room(r.Id)),
+            IsSelected = ChatConversation.Room(r.Id) == selectedKey,
+        }).ToList();
+
         var directIds = me is null ? [] : snapshot.Messages.Where(m => m.RoomId is null)
             .OrderByDescending(m => m.Id)
             .Select(m => m.SenderId == me ? m.RecipientId : m.SenderId)
@@ -270,7 +458,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
             directIds.Insert(0, ChatConversation.IdOf(selectedKey));
         }
 
-        var directs = directIds.Where(people.ContainsKey).Select(id =>
+        directs.AddRange(directIds.Where(people.ContainsKey).Select(id =>
         {
             var person = people[id];
             return new ChatConversationItem(ChatConversation.Private(id), person.Name, Neruna.Core.Chat.Presence.Label(person.Presence), false, person.Presence)
@@ -278,7 +466,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
                 Unread = snapshot.UnreadOf(ChatConversation.Private(id)),
                 IsSelected = ChatConversation.Private(id) == selectedKey,
             };
-        }).ToList();
+        }));
 
         Sync(Rooms, rooms);
         Sync(Directs, directs);
@@ -294,10 +482,38 @@ internal sealed partial class ChatViewModel : ViewModelBase
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));
         OnPropertyChanged(nameof(PeopleTitle));
+        OnPropertyChanged(nameof(CanCall));
+        CallCommand.NotifyCanExecuteChanged();
         ShowConversation();
     }
 
-    partial void OnSelectedKeyChanged(string? value) => Rebuild();
+    partial void OnSelectedKeyChanged(string? value)
+    {
+        if (SelectedTab is { } tab && value is not null)
+        {
+            _selectedPerTab[tab] = value;
+        }
+
+        // Nextcloud Talk loads a conversation's messages when it is opened.
+        if (Service is { } service && value is not null)
+        {
+            _ = OpenAsync(service, value);
+        }
+
+        RebuildTab();
+    }
+
+    private async Task OpenAsync(IChatService service, string conversation)
+    {
+        try
+        {
+            await Task.Run(() => service.OpenAsync(conversation));
+        }
+        catch (Exception ex) when (ChatController.IsUnreachable(ex))
+        {
+            _logger.LogDebug(ex, "Conversation not loaded");
+        }
+    }
 
     // Clicked: the person looks at it – read, whatever the window activation says (a popup just closed may leave it
     // reported as inactive).
@@ -311,9 +527,19 @@ internal sealed partial class ChatViewModel : ViewModelBase
         }
     }
 
+    [RelayCommand]
+    private void SelectTab(ChatTabItem? tab)
+    {
+        if (tab is not null)
+        {
+            SelectedTab = tab.Key;
+            _ = MarkShownReadAsync();
+        }
+    }
+
     private void ShowConversation()
     {
-        var snapshot = _chat.Current;
+        var snapshot = Service?.Current ?? ChatSnapshot.Empty;
         var key = SelectedKey;
         if (key is null || snapshot.Me is not { } me)
         {
@@ -341,7 +567,7 @@ internal sealed partial class ChatViewModel : ViewModelBase
         foreach (var message in messages.Where(m => m.Id > lastShown))
         {
             var previous = Messages.Count == 0 ? null : Messages[^1];
-            Messages.Add(ChatMessageItem.Create(message, previous, people.GetValueOrDefault(message.SenderId)?.Name ?? "(ehemalig)", message.SenderId == me));
+            Messages.Add(ChatMessageItem.Create(message, previous, people.GetValueOrDefault(message.SenderId)?.Name ?? T("(ehemalig)"), message.SenderId == me));
         }
 
         if (IsActive)
@@ -352,39 +578,47 @@ internal sealed partial class ChatViewModel : ViewModelBase
 
     private async Task MarkShownReadAsync()
     {
-        if (SelectedKey is not { } key || _chat.Current.UnreadOf(key) == 0)
+        if (Service is not { } service || SelectedKey is not { } key || service.Current.UnreadOf(key) == 0)
         {
             return;
         }
 
         try
         {
-            await _chat.MarkReadAsync(key);
+            await service.MarkReadAsync(key);
         }
-        catch (Exception ex) when (ex is CloudException or HttpRequestException or TaskCanceledException)
+        catch (Exception ex) when (ChatController.IsUnreachable(ex))
         {
             _logger.LogDebug(ex, "Read marker not sent");
         }
     }
 
     [RelayCommand]
-    private void OpenPrivate(ChatPersonItem? person)
+    private async Task OpenPrivateAsync(ChatPersonItem? person)
     {
-        if (person is null || person.IsMe)
+        if (person is null || person.IsMe || Service is not { } service)
         {
             return;
         }
 
-        // Not written with yet: the list shows it at the top until there are messages.
-        SelectedKey = ChatConversation.Private(person.Id);
-        _ = MarkShownReadAsync();
+        // Not written with yet: the list shows it at the top until there are messages (Talk makes the conversation).
+        try
+        {
+            SelectedKey = await service.OpenPrivateAsync(person.Id);
+            _ = MarkShownReadAsync();
+        }
+        catch (Exception ex) when (ChatController.IsUnreachable(ex))
+        {
+            _logger.LogWarning(ex, "Private conversation not opened");
+            Error = T("Die private Unterhaltung konnte nicht geöffnet werden: ") + ex.Message;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanSend))]
     private async Task SendAsync()
     {
         var text = Draft.Trim();
-        if (SelectedKey is not { } key || text.Length == 0)
+        if (Service is not { } service || SelectedKey is not { } key || text.Length == 0)
         {
             return;
         }
@@ -392,33 +626,32 @@ internal sealed partial class ChatViewModel : ViewModelBase
         Draft = string.Empty;
         try
         {
-            await _chat.SendAsync(key, text);
-            Error = null;
+            await service.SendAsync(key, text);
+            _sendError = null;
+            Error = _chat.ErrorOf(service.Key);
         }
-        catch (Exception ex) when (ex is CloudException or HttpRequestException or TaskCanceledException)
+        catch (Exception ex) when (ChatController.IsUnreachable(ex))
         {
             _logger.LogWarning(ex, "Chat message not sent");
             Draft = text;
-            Error = T("Nicht gesendet: ") + ex.Message;
+            Error = _sendError = T("Nicht gesendet: ") + ex.Message;
         }
     }
 
     private bool CanSend() => SelectedKey is not null && !string.IsNullOrWhiteSpace(Draft) && Draft.Length <= 4000;
 
-    [RelayCommand]
-    private async Task SetPresenceAsync(string? presence)
+    [RelayCommand(CanExecute = nameof(CanCall))]
+    private void Call()
     {
-        Presence = Neruna.Core.Chat.Presence.Normalize(presence);
-        try
+        if (SelectedKey is { } key && Service?.CallUrl(key) is { } url)
         {
-            await _chat.SetPresenceAsync(Presence);
-        }
-        catch (Exception ex) when (ex is CloudException or HttpRequestException or TaskCanceledException)
-        {
-            // Remembered here; sent with the next successful contact.
-            _logger.LogWarning(ex, "Presence not sent");
+            CallRequested?.Invoke(this, url);
         }
     }
+
+    /// <summary>The same status in every chat.</summary>
+    [RelayCommand]
+    private Task SetPresenceAsync(string? presence) => SetTabPresenceAsync(presence ?? Neruna.Core.Chat.Presence.Available, onlyHere: false);
 
     [RelayCommand]
     private void OpenCloudSetup() => CloudSetupRequested?.Invoke(this, EventArgs.Empty);
@@ -448,6 +681,53 @@ internal sealed partial class ChatViewModel : ViewModelBase
     }
 }
 
+/// <summary>A chat as a tab: the organisation or the Nextcloud account, with its unread messages.</summary>
+/// <param name="Presence">What the others see in this chat (its own status or the header's).</param>
+internal sealed record ChatTabItem(string Key, string Title, ChatKind Kind, string Presence)
+{
+    public IBrush PresenceBrush => PresenceBrushes.Of(Presence);
+
+    public int Unread { get; init; }
+
+    public bool IsSelected { get; init; }
+
+    /// <summary>Its last refresh failed (the tab says why when open).</summary>
+    public bool HasError { get; init; }
+
+    public bool HasUnread => Unread > 0;
+
+    public string UnreadText => Unread > 99 ? "99+" : Unread.ToString(CultureInfo.InvariantCulture);
+
+    public bool IsTalk => Kind == ChatKind.NextcloudTalk;
+
+    public string KindText => IsTalk ? T("Nextcloud Talk") : T("Neruna Cloud");
+}
+
+/// <summary>A Nextcloud account whose Talk can be switched on as a tab.</summary>
+internal sealed class AccountChatChoice(Guid connectionId, string title, bool isEnabled, Action<AccountChatChoice, bool> toggle)
+{
+    public Guid ConnectionId { get; } = connectionId;
+
+    public string Title { get; } = title;
+
+    public bool IsEnabled
+    {
+        get => isEnabled;
+        set
+        {
+            if (value != isEnabled)
+            {
+                isEnabled = value;
+                toggle(this, value);
+            }
+        }
+    }
+
+    public override bool Equals(object? obj) => obj is AccountChatChoice other && other.ConnectionId == ConnectionId && other.Title == Title && other.IsEnabled == IsEnabled;
+
+    public override int GetHashCode() => HashCode.Combine(ConnectionId, Title, IsEnabled);
+}
+
 /// <summary>A room or a private conversation in the list on the left.</summary>
 /// <param name="Presence">Of the other person (private conversations).</param>
 internal sealed record ChatConversationItem(string Key, string Title, string? Subtitle, bool IsRoom, string? Presence)
@@ -468,7 +748,7 @@ internal sealed record ChatConversationItem(string Key, string Title, string? Su
 /// <summary>A person in the room list or the list of everyone; a click opens a private conversation.</summary>
 internal sealed record ChatPersonItem(string Id, string Name, string? Position, string Presence, bool IsMe)
 {
-    public ChatPersonItem(CloudChatPerson person, bool isMe)
+    public ChatPersonItem(ChatPerson person, bool isMe)
         : this(person.Id, person.Name, person.Position, person.Presence, isMe)
     {
     }
@@ -478,6 +758,9 @@ internal sealed record ChatPersonItem(string Id, string Name, string? Position, 
     public string DisplayName => IsMe ? Name + " (ich)" : Name;
 
     public string PresenceLabel => Neruna.Core.Chat.Presence.Label(Presence);
+
+    /// <summary>" · Position", or nothing without one (Nextcloud Talk knows none).</summary>
+    public string PositionSuffix => string.IsNullOrWhiteSpace(Position) ? string.Empty : " · " + Position;
 
     public IBrush PresenceBrush => PresenceBrushes.Of(Presence);
 

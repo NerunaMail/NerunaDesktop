@@ -4,7 +4,11 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.LogicalTree;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Neruna.Core.Calendar;
 using Neruna.Desktop.ViewModels;
 using static Neruna.Core.Localization.Texts;
 
@@ -29,7 +33,26 @@ internal sealed partial class CalendarView : UserControl
                 this.FindControl<TextBox>("EventSearch")?.Focus();
                 e.Handled = true;
             }
+            else if (e.Key == Key.Escape && _drag is { IsActive: true })
+            {
+                CancelDrag();
+                e.Handled = true;
+            }
         };
+
+        // Drag in the time grid: tunnelling, so a press on an event is seen before its button takes the pointer.
+        // The button keeps working for a plain click; once the pointer has moved a few pixels, the grid takes it over.
+        var grid = this.FindControl<Panel>("TimeGrid")!;
+        grid.AddHandler(PointerPressedEvent, OnGridPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        grid.AddHandler(PointerMovedEvent, OnGridPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
+        grid.AddHandler(PointerReleasedEvent, OnGridPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
+        grid.AddHandler(PointerCaptureLostEvent, (_, _) =>
+        {
+            if (_drag is { IsActive: true })
+            {
+                CancelDrag();
+            }
+        });
 
         // The chosen hours (Einstellungen → Kalender, 07:00–21:00) fill the view; the time grid opens at their start.
         // Afterwards the user's scroll position stays – also when the window is resized.
@@ -158,6 +181,258 @@ internal sealed partial class CalendarView : UserControl
         {
             _ = vm.OpenOccurrenceAsync(occurrence);
             e.Handled = true;
+        }
+    }
+
+    // ---- Drag in the time grid ------------------------------------------------------------------------------------
+
+    /// <summary>A press in the time grid that may become a drag (after a few pixels).</summary>
+    private sealed class DragState(CalendarDragKind kind, IPointer pointer, Point origin, int originDay, TimedEventItem? target, Control? targetControl)
+    {
+        public CalendarDragKind Kind { get; } = kind;
+        public IPointer Pointer { get; } = pointer;
+        public Point Origin { get; } = origin;
+        public int OriginDay { get; } = originDay;
+        public TimedEventItem? Target { get; } = target;
+        public Control? TargetControl { get; } = targetControl;
+        public bool IsActive { get; set; }
+        public (DateTime Start, DateTime End) Times { get; set; }
+    }
+
+    private const double DragThreshold = 4;
+    private DragState? _drag;
+    private bool _dragSaving;
+
+    private Panel TimeGridPanel => this.FindControl<Panel>("TimeGrid")!;
+
+    private int DayAt(double x)
+    {
+        var count = (DataContext as CalendarViewModel)?.Days.Count ?? 0;
+        var width = TimeGridPanel.Bounds.Width;
+        return count == 0 || width <= 0 ? 0 : Math.Clamp((int)(x / (width / count)), 0, count - 1);
+    }
+
+    private static double MinutesAt(double y) => Math.Clamp(y / TimedEventItem.HourHeight * 60, 0, 24 * 60);
+
+    private void OnGridPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var grid = TimeGridPanel;
+        if (_dragSaving || DataContext is not CalendarViewModel { Days.Count: > 0 } || e.ClickCount != 1
+            || !e.GetCurrentPoint(grid).Properties.IsLeftButtonPressed || e.KeyModifiers != KeyModifiers.None)
+        {
+            _drag = null;
+            return;
+        }
+
+        // What was hit: an edge of an event, an event, or free time.
+        var kind = CalendarDragKind.Create;
+        TimedEventItem? target = null;
+        Control? targetControl = null;
+        for (var visual = e.Source as Visual; visual is not null && visual != grid; visual = visual.GetVisualParent())
+        {
+            if (visual is StyledElement element && element.Classes.Contains("resize-start") && kind == CalendarDragKind.Create)
+            {
+                kind = CalendarDragKind.ResizeStart;
+            }
+            else if (visual is StyledElement edge && edge.Classes.Contains("resize-end") && kind == CalendarDragKind.Create)
+            {
+                kind = CalendarDragKind.ResizeEnd;
+            }
+            else if (visual is Button { DataContext: TimedEventItem timed } button)
+            {
+                target = timed;
+                targetControl = button;
+                break;
+            }
+            else if (visual is Button)
+            {
+                return; // another button: nothing to drag
+            }
+        }
+
+        if (target is not null)
+        {
+            if (!target.CanChange)
+            {
+                _drag = null;
+                return;
+            }
+
+            if (kind == CalendarDragKind.Create)
+            {
+                kind = CalendarDragKind.Move;
+            }
+        }
+
+        var origin = e.GetPosition(grid);
+        _drag = new DragState(kind, e.Pointer, origin, DayAt(origin.X), target, targetControl);
+    }
+
+    private void OnGridPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_drag is not { } drag || drag.Pointer != e.Pointer || DataContext is not CalendarViewModel vm)
+        {
+            return;
+        }
+
+        var grid = TimeGridPanel;
+        var position = e.GetPosition(grid);
+        if (!e.GetCurrentPoint(grid).Properties.IsLeftButtonPressed)
+        {
+            // Released outside the grid: that press is over.
+            CancelDrag();
+            return;
+        }
+
+        if (!drag.IsActive)
+        {
+            var moved = position - drag.Origin;
+            if (Math.Abs(moved.X) < DragThreshold && Math.Abs(moved.Y) < DragThreshold)
+            {
+                return;
+            }
+
+            drag.IsActive = true;
+            e.Pointer.Capture(grid); // the event's button lets go: no click
+            if (drag.Kind == CalendarDragKind.Move && drag.TargetControl is { } control)
+            {
+                control.Opacity = 0.4;
+            }
+        }
+
+        AutoScroll(e);
+        // Always to the quarter hour, whatever the grid shows (60, 30 or 15 minutes).
+        const int slot = 15;
+        var minutes = MinutesAt(position.Y);
+        int column;
+        if (drag.Kind == CalendarDragKind.Create)
+        {
+            column = drag.OriginDay;
+            drag.Times = CalendarDrag.Create(vm.Days[column].Date, MinutesAt(drag.Origin.Y), minutes, slot);
+        }
+        else
+        {
+            var occurrence = drag.Target!.Item.Occurrence;
+            var days = drag.Kind == CalendarDragKind.Move ? DayAt(position.X) - drag.OriginDay : 0;
+            drag.Times = CalendarDrag.Change(drag.Kind, occurrence.Start.LocalDateTime, occurrence.End.LocalDateTime,
+                minutes - MinutesAt(drag.Origin.Y), days, slot);
+            column = drag.Kind == CalendarDragKind.Move ? DayAt(position.X) : drag.OriginDay;
+        }
+
+        ShowPreview(vm, drag, column);
+        e.Handled = true;
+    }
+
+    private async void OnGridPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_drag is not { } drag || drag.Pointer != e.Pointer)
+        {
+            return;
+        }
+
+        _drag = null;
+        if (!drag.IsActive || DataContext is not CalendarViewModel vm)
+        {
+            return; // a plain click: the event's button opens it, a double-click on free time a new event
+        }
+
+        e.Handled = true;
+        e.Pointer.Capture(null);
+        var (start, end) = drag.Times;
+        if (drag.Kind == CalendarDragKind.Create)
+        {
+            HidePreview(drag);
+            await vm.NewEventInRangeAsync(start, end);
+            return;
+        }
+
+        // The preview stays where the event was put until it is saved and the week reloaded.
+        _dragSaving = true;
+        try
+        {
+            await vm.ChangeEventTimeAsync(drag.Target!.Item, start, end);
+        }
+        finally
+        {
+            _dragSaving = false;
+            HidePreview(drag);
+        }
+    }
+
+    private void CancelDrag()
+    {
+        if (_drag is not { } drag)
+        {
+            return;
+        }
+
+        _drag = null;
+        HidePreview(drag);
+        if (drag.Pointer.Captured is not null)
+        {
+            drag.Pointer.Capture(null);
+        }
+    }
+
+    // Near the top or bottom edge of the visible hours, the grid scrolls along.
+    private void AutoScroll(PointerEventArgs e)
+    {
+        var scroll = this.FindControl<ScrollViewer>("TimeScroll")!;
+        var y = e.GetPosition(scroll).Y;
+        var step = TimedEventItem.HourHeight / 4;
+        var delta = y < 16 ? -step : y > scroll.Viewport.Height - 16 ? step : 0;
+        if (delta != 0)
+        {
+            var max = Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height);
+            scroll.Offset = new Vector(scroll.Offset.X, Math.Clamp(scroll.Offset.Y + delta, 0, max));
+        }
+    }
+
+    private void ShowPreview(CalendarViewModel vm, DragState drag, int column)
+    {
+        var preview = this.FindControl<Border>("DragPreview")!;
+        var text = this.FindControl<TextBlock>("DragPreviewText")!;
+        var width = TimeGridPanel.Bounds.Width / vm.Days.Count;
+        var (start, end) = drag.Times;
+        var day = vm.Days[column].Date;
+        // Of an event reaching into another day, the part on the column's day.
+        var from = start < day ? day : start;
+        var to = end > day.AddDays(1) ? day.AddDays(1) : end;
+        var top = Math.Max(0, (from - day).TotalHours * TimedEventItem.HourHeight);
+        var height = Math.Max(18, (to - from).TotalHours * TimedEventItem.HourHeight);
+
+        if (drag.Target is { } target)
+        {
+            preview.Background = target.Item.Background;
+            preview.BorderBrush = target.Item.Brush;
+            text.Text = $"{target.Item.Title}\n{TimeRange(start, end, drag.Kind == CalendarDragKind.Move && start.Date != target.Item.Occurrence.Start.LocalDateTime.Date)}";
+        }
+        else
+        {
+            var accent = this.TryFindResource("AccentTextBrush", ActualThemeVariant, out var brush) && brush is ISolidColorBrush solid
+                ? solid.Color : Colors.SteelBlue;
+            preview.Background = new SolidColorBrush(accent, 0.2);
+            preview.BorderBrush = new SolidColorBrush(accent);
+            text.Text = TimeRange(start, end, false);
+        }
+
+        Canvas.SetLeft(preview, column * width + 1);
+        Canvas.SetTop(preview, top + 1);
+        preview.Width = Math.Max(0, width - 3);
+        preview.Height = height - 1;
+        preview.IsVisible = true;
+    }
+
+    private static string TimeRange(DateTime start, DateTime end, bool withDay) =>
+        (withDay ? start.ToString("ddd d.M. ", System.Globalization.CultureInfo.CurrentCulture) : string.Empty)
+        + $"{start:HH:mm}–{(end.Date > start.Date && end.TimeOfDay == TimeSpan.Zero ? "24:00" : end.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))}";
+
+    private void HidePreview(DragState drag)
+    {
+        this.FindControl<Border>("DragPreview")!.IsVisible = false;
+        if (drag.TargetControl is { } control)
+        {
+            control.Opacity = 1;
         }
     }
 

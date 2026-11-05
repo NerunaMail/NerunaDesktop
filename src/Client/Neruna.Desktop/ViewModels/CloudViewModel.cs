@@ -11,7 +11,7 @@ namespace Neruna.Desktop.ViewModels;
 
 /// <summary>
 /// Einstellungen → Cloud: connect Neruna with the Neruna Cloud/Control of one or more organisations (server, one-time
-/// code and PIN from the portal), show the profile kept there, choose whose chat is shown and where the backups go,
+/// code and PIN from the portal), show the profile kept there, choose where the backups go,
 /// disconnect. The selected connection (<see cref="Connection"/>) is the one shown in detail.
 /// </summary>
 internal sealed partial class CloudViewModel(
@@ -23,8 +23,7 @@ internal sealed partial class CloudViewModel(
     AccountDiscovery discovery,
     SettingsBackupService backup,
     CloudAccountSync accounts,
-    CloudPairingService pairing,
-    Neruna.Core.Chat.ChatController chat) : ViewModelBase
+    CloudPairingService pairing) : ViewModelBase
 {
     // ── Handy verbinden: QR code + PIN for the Neruna app; this desktop then re-encrypts for the phone ──
 
@@ -537,10 +536,6 @@ internal sealed partial class CloudViewModel(
 
     public bool HasSeveral => Connections.Count > 1;
 
-    /// <summary>Whose chat is shown (only offered with several connections).</summary>
-    [ObservableProperty]
-    public partial CloudConnection? ChatConnection { get; set; }
-
     /// <summary>Whose vault a backup goes to by default – the hint "Neue Sicherung erstellen?" (only offered with several connections).</summary>
     [ObservableProperty]
     public partial CloudConnection? BackupConnection { get; set; }
@@ -565,30 +560,7 @@ internal sealed partial class CloudViewModel(
         IsAdding = false;
     }
 
-    partial void OnChatConnectionChanged(CloudConnection? oldValue, CloudConnection? newValue)
-    {
-        if (!_loadingConnections && newValue is not null && newValue.Id != oldValue?.Id)
-        {
-            _ = SwitchChatAsync(oldValue, newValue);
-        }
-    }
-
-    private async Task SwitchChatAsync(CloudConnection? previous, CloudConnection chosen)
-    {
-        try
-        {
-            await cloud.SetChatConnectionAsync(chosen.Id);
-            await chat.SwitchAsync(previous);
-        }
-        catch (Exception ex) when (ex is CloudException or HttpRequestException)
-        {
-            Error = ex.Message;
-        }
-
-        ChatChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>Another organisation's chat was chosen (the chat page reloads).</summary>
+    /// <summary>Connections changed (the chat page reloads its tabs).</summary>
     public event EventHandler? ChatChanged;
 
     partial void OnBackupConnectionChanged(CloudConnection? oldValue, CloudConnection? newValue)
@@ -620,7 +592,6 @@ internal sealed partial class CloudViewModel(
             }
 
             Connection = all.FirstOrDefault(c => c.Id == selected) ?? all.FirstOrDefault();
-            ChatConnection = await cloud.GetChatConnectionAsync();
             BackupConnection = await cloud.GetBackupConnectionAsync();
 
             // The organisations' servers also answer "which mail server?" when an account is added.

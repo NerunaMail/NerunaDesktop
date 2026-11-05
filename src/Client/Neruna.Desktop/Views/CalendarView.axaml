@@ -353,7 +353,8 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Panel Grid.Column="1">
+              <!-- Drag on free time: new event; drag an event: move it (also to another day), its top or bottom edge: start or end (CalendarView.axaml.cs) -->
+              <Panel x:Name="TimeGrid" Grid.Column="1">
                 <!-- Grid lines: solid per hour, lighter for 30/15-minute subdivisions -->
                 <ItemsControl ItemsSource="{Binding GridLines}" IsHitTestVisible="False">
                   <ItemsControl.ItemTemplate>
@@ -375,7 +376,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:CalendarDay">
                       <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0" Background="Transparent"
-                              Classes.today="{Binding IsToday}" DoubleTapped="OnTimeGridDoubleTapped" ToolTip.Tip="{l:T 'Doppelklick: neuer Termin'}">
+                              Classes.today="{Binding IsToday}" DoubleTapped="OnTimeGridDoubleTapped" ToolTip.Tip="{l:T 'Doppelklick oder ziehen: neuer Termin'}">
                         <Border.Styles>
                           <Style Selector="Border.today">
                             <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
@@ -394,7 +395,16 @@
                                         HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Background="Transparent" BorderThickness="0"
                                         ToolTip.Tip="{Binding Item.Tooltip}"
                                         Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).EditEventCommand}" CommandParameter="{Binding Item}"
-                                        ContextRequested="OnEventContextRequested">
+                                        ContextRequested="OnEventContextRequested" Classes.movable="{Binding CanChange}">
+                                  <Button.Styles>
+                                    <Style Selector="Button.movable">
+                                      <Setter Property="Cursor" Value="SizeAll" />
+                                    </Style>
+                                  </Button.Styles>
+                                  <Panel>
+                                  <!-- Edges: drag to change start or end -->
+                                  <Border Classes="resize-start" Height="5" VerticalAlignment="Top" Background="Transparent" Cursor="SizeNorthSouth" ZIndex="1" IsVisible="{Binding CanResizeStart}" />
+                                  <Border Classes="resize-end" Height="5" VerticalAlignment="Bottom" Background="Transparent" Cursor="SizeNorthSouth" ZIndex="1" IsVisible="{Binding CanResizeEnd}" />
                                   <Border Background="{Binding Item.Background}" BorderBrush="{Binding Item.Brush}" BorderThickness="3,0,0,0" CornerRadius="3" Padding="6,2" ClipToBounds="True">
                                     <DockPanel>
                               <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Item.CategoryBrushes}" IsVisible="{Binding Item.HasCategories}" Margin="4,-2,-6,-2" IsHitTestVisible="False">
@@ -414,6 +424,7 @@
                                     </Panel>
                                     </DockPanel>
                                   </Border>
+                                  </Panel>
                                 </Button>
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -426,6 +437,12 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <!-- While dragging: where the event goes, with its time -->
+                <Canvas IsHitTestVisible="False">
+                  <Border x:Name="DragPreview" IsVisible="False" BorderThickness="3,0,0,0" CornerRadius="3" Padding="6,2" Opacity="0.9" ClipToBounds="True">
+                    <TextBlock x:Name="DragPreviewText" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  </Border>
+                </Canvas>
               </Panel>
             </Grid>
           </ScrollViewer>

@@ -155,7 +155,7 @@ internal static class LiveScenario
         await Snapshots.SaveAsync(window, output, "cloud-two-1-adding.png");
         await cloud.ConnectCommand.ExecuteAsync(null);
         Console.WriteLine($"Second: {cloud.ConnectedText ?? cloud.Error}");
-        Console.WriteLine($"Organisations: {string.Join(", ", cloud.Connections.Select(c => c.OrganizationName))}; chat: {cloud.ChatConnection?.OrganizationName}; backups: {cloud.BackupConnection?.OrganizationName}");
+        Console.WriteLine($"Organisations: {string.Join(", ", cloud.Connections.Select(c => c.OrganizationName))}; backups: {cloud.BackupConnection?.OrganizationName}");
         await Task.Delay(500);
         await Snapshots.SaveAsync(window, output, "cloud-two-2-second.png");
 
@@ -181,14 +181,13 @@ internal static class LiveScenario
 
         Console.WriteLine($"Profile after {watch.ElapsedMilliseconds} ms");
 
-        cloud.ChatConnection = cloud.Connections[1];
         await Task.Delay(1500);
         await Snapshots.SaveAsync(window, output, "cloud-two-3-first-selected.png");
         var signatures = await services.GetRequiredService<Neruna.Core.Mail.SignatureService>().GetAllAsync();
         Console.WriteLine($"Signatures: {string.Join(", ", signatures.Select(s => $"{s.Name} [{s.Source}]"))}");
         var chat = services.GetRequiredService<Neruna.Core.Chat.ChatController>();
         await chat.RefreshAsync();
-        Console.WriteLine($"Chat: {chat.Current.Me} in {chat.Current.Rooms.Count} room(s)");
+        Console.WriteLine($"Chats: {string.Join(", ", chat.Services.Select(s => $"{s.Title}: {s.Current.Me} in {s.Current.Rooms.Count} room(s)"))}");
     }
 
     public static async Task CloudAccountsAsync(string output, string server, string code, string pin)

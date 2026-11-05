@@ -433,7 +433,112 @@
     exec(match[1] ? "insertUnorderedList" : "insertOrderedList");
   }
 
+  // Web addresses become links by themselves: typed (on the space or Enter after them) or pasted as plain text.
+  // Trailing punctuation belongs to the sentence ("siehe https://neruna.org."). Ctrl+Z takes the link back.
+  var URL_AT_END = /(?:^|[\s\u00a0(\[<"'])((?:https?:\/\/|www\.)[^\s\u00a0<>"]*[^\s\u00a0<>".,;:!?)\]'])([.,;:!?)\]']*)$/i;
+  var URL_ANY = /(?:https?:\/\/|www\.)[^\s\u00a0<>"]*[^\s\u00a0<>".,;:!?)\]']/gi;
+  function hrefOf(text) { return /^www\./i.test(text) ? "https://" + text : text; }
+  function insideLink(node) {
+    var el = node && (node.nodeType === 1 ? node : node.parentNode);
+    return !!(el && el.closest && el.closest("a"));
+  }
+  function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  // Links the address that ends (but for punctuation) at offset in the text node; the caret goes after the
+  // punctuation, outside the link, so typing on does not extend it. True if it made a link.
+  function linkBefore(node, offset) {
+    if (!node || node.nodeType !== 3 || insideLink(node)) return false;
+    var before = node.nodeValue.slice(0, offset);
+    var match = URL_AT_END.exec(before);
+    if (!match) return false;
+    var start = before.length - match[2].length - match[1].length;
+    var range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, start + match[1].length);
+    var href = hrefOf(match[1]);
+    var selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.execCommand("createLink", false, href);
+    // The new link: the one the selection still touches (the engines leave it in different places).
+    var touched = selection.rangeCount ? selection.getRangeAt(0) : null;
+    var link = touched ? Array.prototype.filter.call(editor.querySelectorAll("a"), function (a) {
+      return a.getAttribute("href") === href && touched.intersectsNode(a);
+    })[0] : null;
+    var caret = document.createRange();
+    if (link && link.nextSibling && link.nextSibling.nodeType === 3 && link.nextSibling.nodeValue.length >= match[2].length) {
+      caret.setStart(link.nextSibling, match[2].length);
+    } else if (link) {
+      caret.setStartAfter(link);
+    } else {
+      return false;
+    }
+    caret.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(caret);
+    return true;
+  }
+  function caretText() {
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+    var caret = selection.getRangeAt(0);
+    return caret.collapsed && caret.startContainer.nodeType === 3 ? caret : null;
+  }
+  // After a typed space: the address before it (the space itself stays outside the link).
+  function autoLinkTyped() {
+    var caret = caretText();
+    if (!caret || caret.startOffset === 0) return;
+    var node = caret.startContainer, offset = caret.startOffset;
+    if (!linkBefore(node, offset - 1)) return;
+    // The caret now sits before the space: put it back after it.
+    var selection = window.getSelection();
+    var at = selection.getRangeAt(0);
+    if (at.startContainer.nodeType === 3 && /^[\s\u00a0]/.test(at.startContainer.nodeValue.slice(at.startOffset))) {
+      var after = document.createRange();
+      after.setStart(at.startContainer, at.startOffset + 1);
+      after.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(after);
+    }
+  }
+  editor.addEventListener("keydown", function (e) {
+    // Before Enter splits the line: the address before the caret.
+    if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing) {
+      var caret = caretText();
+      if (caret) linkBefore(caret.startContainer, caret.startOffset);
+    }
+  }, true);
+  // Plain text with addresses (e.g. copied from the address bar): pasted with links. Only an address onto a
+  // selection: the selected text becomes the link. Pasted HTML keeps its own links.
+  editor.addEventListener("paste", function (e) {
+    if (e.defaultPrevented || !e.clipboardData) return;
+    if (Array.prototype.some.call(e.clipboardData.types || [], function (t) { return t === "text/html" || t === "Files"; })) return;
+    var text = e.clipboardData.getData("text/plain");
+    URL_ANY.lastIndex = 0;
+    if (!text || !URL_ANY.test(text)) return;
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || insideLink(selection.getRangeAt(0).commonAncestorContainer)) return;
+    e.preventDefault();
+    var single = text.trim();
+    URL_ANY.lastIndex = 0;
+    var whole = URL_ANY.exec(single);
+    if (!selection.getRangeAt(0).collapsed && whole && whole[0] === single) {
+      exec("createLink", hrefOf(single));
+      return;
+    }
+    var html = "", last = 0, m;
+    URL_ANY.lastIndex = 0;
+    while ((m = URL_ANY.exec(text)) !== null) {
+      html += escapeHtml(text.slice(last, m.index)) + '<a href="' + escapeHtml(hrefOf(m[0])) + '">' + escapeHtml(m[0]) + "</a>";
+      last = m.index + m[0].length;
+    }
+    html += escapeHtml(text.slice(last));
+    exec("insertHTML", html.replace(/\r?\n/g, "<br>"));
+  });
+
   editor.addEventListener("input", function (e) {
+    if (!expanding && e.inputType === "insertText" && (e.data === " " || e.data === "\u00a0")) autoLinkTyped();
     if (!expanding && e.inputType === "insertText" && e.data === ":") expandShortcut("::");
     if (autoLists && !expanding && e.inputType === "insertText" && e.data === " ") autoList();
     // A new item (Enter) in a checklist starts unticked, also after a ticked one.

@@ -81,7 +81,7 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
     public partial string LastHighlightColor { get; set; } = "#FFFF00";
 
     [ObservableProperty]
-    public partial string LinkUrl { get; set; } = "https://";
+    public partial string LinkUrl { get; set; } = string.Empty;
 
     /// <summary>False when no WebView is available: the toolbar is hidden and the text is plain.</summary>
     [ObservableProperty]
@@ -171,19 +171,18 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
         return RunAsync($"neruna.highlight({Js(color ?? "transparent")})");
     }
 
+    /// <summary>Links the selected text; "neruna.org" gets its https:// by itself. The field is empty again afterwards.</summary>
     [RelayCommand]
     private Task InsertLink()
     {
-        var url = LinkUrl.Trim();
         // Also a phone number (tel:+41…), e.g. in a signature: a click in the mail dials it.
-        if (PhoneLink.Normalize(url) is { } phone)
+        if (WebLink.Normalize(LinkUrl) is not { } url)
         {
-            return RunAsync($"neruna.link({Js(phone)})");
+            return Task.CompletedTask;
         }
 
-        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http" or "mailto"
-            ? RunAsync($"neruna.link({Js(uri.AbsoluteUri)})")
-            : Task.CompletedTask;
+        LinkUrl = string.Empty;
+        return RunAsync($"neruna.link({Js(url)})");
     }
 
     /// <summary>Embeds a picture (e.g. a logo) as data: URI; it is sent as embedded attachment.</summary>
