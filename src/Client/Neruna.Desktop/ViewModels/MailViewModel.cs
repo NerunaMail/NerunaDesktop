@@ -215,7 +215,7 @@ internal sealed partial class MailViewModel(
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedMessage), nameof(HasSelection), nameof(ShowMessageActions))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand), nameof(ForwardAsAttachmentCommand), nameof(SaveAsEmlCommand), nameof(PrintCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand), nameof(ForwardAsAttachmentCommand), nameof(SaveAsEmlCommand), nameof(PrintCommand), nameof(NewNoteCommand))]
     public partial MessageListEntry? SelectedEntry { get; set; }
 
     [ObservableProperty]
