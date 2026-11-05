@@ -203,7 +203,7 @@ internal sealed partial class MessageBodyView : UserControl
             _written = false;
             _expectedLoads++;
             _shownAt = System.Diagnostics.Stopwatch.StartNew();
-            _web.NavigateToString(MailPaper.BrowserShell(pane.AllowsRemoteContent, dark, ++_load));
+            _web.NavigateToString(MailPaper.BrowserShell(pane.AllowsRemoteContent, dark, ++_load), BlankPage);
             return true;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -411,10 +411,15 @@ internal sealed partial class MessageBodyView : UserControl
         }
     }
 
-    // NavigateToString arrives as about:blank or a data: address; anything else is a click on a link.
+    // The page's own address. Without one the macOS web view loads the page as "http://localhost:12345/" – that load
+    // was taken for a click on a link and opened that address in the browser with every mail shown.
+    private static readonly Uri BlankPage = new("about:blank");
+
+    // NavigateToString arrives as about:blank or a data: address (also the macOS default, should it come back);
+    // anything else is a click on a link.
     private void OnNavigationStarting(object? sender, WebViewNavigationStartingEventArgs e)
     {
-        if (_expectedLoads > 0 && (e.Request is null || e.Request.Scheme is "about" or "data"))
+        if (_expectedLoads > 0 && (e.Request is null || e.Request.Scheme is "about" or "data" || IsMacDefaultPage(e.Request)))
         {
             _expectedLoads--;
             return;
@@ -426,6 +431,9 @@ internal sealed partial class MessageBodyView : UserControl
             Dispatcher.UIThread.Post(() => OpenLink(link.OriginalString));
         }
     }
+
+    private static bool IsMacDefaultPage(Uri request) =>
+        request.IsAbsoluteUri && request.Scheme == "http" && request.IsLoopback && request.Port == 12345 && request.AbsolutePath == "/";
 
     // Links in mails carry target="_blank": the web view asks for a new window instead of navigating.
     private void OnNewWindowRequested(object? sender, WebViewNewWindowRequestedEventArgs e)
