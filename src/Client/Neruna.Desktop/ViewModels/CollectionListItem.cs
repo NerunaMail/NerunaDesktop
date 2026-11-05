@@ -50,6 +50,10 @@ internal abstract partial class CollectionListItem(CalendarInfo info, string col
     [ObservableProperty]
     public partial bool IsDimmed { get; set; }
 
+    /// <summary>Clicked in the calendar's list: new events go into it (the view stays as it is).</summary>
+    [ObservableProperty]
+    public partial bool IsSelected { get; set; }
+
     public abstract string SoloTip { get; }
 
     /// <summary>A calendar that is an account of its own (birthdays, holidays, an ICS subscription): it can go from here.</summary>

@@ -19,9 +19,11 @@ internal static class DavNames
 }
 
 /// <summary>A non-success WebDAV response that callers may want to react to (404, 405, 412 …).</summary>
-internal sealed class DavException(HttpStatusCode status, string message) : Exception(message)
+internal sealed class DavException(HttpStatusCode status, string message) : Exception(message), Neruna.Core.IHttpStatusError
 {
     public HttpStatusCode Status { get; } = status;
+
+    HttpStatusCode? Neruna.Core.IHttpStatusError.HttpStatus => Status;
 }
 
 /// <param name="Dav">The DAV header (compliance classes such as "calendar-auto-schedule"), if sent.</param>
@@ -154,7 +156,7 @@ internal sealed class DavClient(HttpClient http, Func<CancellationToken, Task<Au
 
             if (status == HttpStatusCode.Unauthorized)
             {
-                throw new AuthenticationException(F("Anmeldung am DAV-Server {0} fehlgeschlagen (Benutzername/Passwort prüfen).", current.Host));
+                throw new Neruna.Core.SignInRejectedException(F("Anmeldung am DAV-Server {0} fehlgeschlagen (Benutzername/Passwort prüfen).", current.Host));
             }
 
             var body = await response.Content.ReadAsStringAsync(cancellationToken);

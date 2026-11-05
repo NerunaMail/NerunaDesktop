@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -177,6 +178,15 @@ internal sealed partial class MailViewModel(
     private CancellationTokenSource? _readingCts;
     private OpenedMessage? _opened;
 
+    // Messages opened (loaded and, for S/MIME, checked and decrypted) shortly before or ahead of time: switching
+    // between mails in the list shows them without that wait. In memory only – decrypted content never goes to disk.
+    private const int PreparedCapacity = 24;
+    private const long PrefetchMaxSize = 5 * 1024 * 1024;
+    private readonly LinkedList<(string Key, Task<OpenedMessage> Task)> _prepared = new();
+    private CancellationTokenSource? _prefetchAroundCts;
+    private CancellationTokenSource? _prefetchVisibleCts;
+    private bool _watchesCertificates;
+
     /// <summary>How long a message must stay open before it counts as read in <see cref="MarkAsReadMode.AfterDelay"/>.</summary>
     public static TimeSpan ReadDelay { get; set; } = TimeSpan.FromSeconds(10);
 
@@ -274,6 +284,12 @@ internal sealed partial class MailViewModel(
     public void Dispose()
     {
         _readingCts?.Dispose();
+        foreach (var prefetch in new[] { _prefetchAroundCts, _prefetchVisibleCts })
+        {
+            prefetch?.Cancel();
+            prefetch?.Dispose();
+        }
+
         _search?.Dispose();
     }
 
@@ -1805,15 +1821,8 @@ internal sealed partial class MailViewModel(
         {
             // Where the time goes when a mail is slow to show: in the log, per step.
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            var mime = await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId, token);
-            var loaded = watch.ElapsedMilliseconds;
-            if (token.IsCancellationRequested)
-            {
-                return;
-            }
-
-            // Checking signatures takes a moment of CPU: not on the UI thread, the reading pane stays responsive.
-            var opened = _opened = await Task.Run(() => secureMime.OpenAsync(mime, token), token);
+            var (task, prepared) = Prepared(folder, message.Summary);
+            var opened = _opened = await task.WaitAsync(token);
             var secured = watch.ElapsedMilliseconds;
             var view = await ViewForAsync(message.Summary, opened, await IsRemoteContentAllowedAsync(message.Summary));
             var checkedAt = watch.ElapsedMilliseconds;
@@ -1823,8 +1832,9 @@ internal sealed partial class MailViewModel(
             }
 
             ShowOpened(message.Summary, view);
-            logger.LogInformation("Message opened in {Total} ms: loaded {Loaded} ms, S/MIME {Secure} ms, check {Check} ms, pane {Pane} ms",
-                watch.ElapsedMilliseconds, loaded, secured - loaded, checkedAt - secured, watch.ElapsedMilliseconds - checkedAt);
+            logger.LogInformation("Message opened in {Total} ms: loaded and S/MIME {Secure} ms{Prepared}, check {Check} ms, pane {Pane} ms",
+                watch.ElapsedMilliseconds, secured, prepared ? " (prepared before)" : string.Empty, checkedAt - secured, watch.ElapsedMilliseconds - checkedAt);
+            PrefetchAround(message);
 
             if (message.IsUnread)
             {
@@ -1853,6 +1863,157 @@ internal sealed partial class MailViewModel(
             logger.LogWarning(ex, "Loading message {RemoteId} failed", message.Summary.RemoteId);
             ReadingPane = ReadingPaneViewModel.Info(T("Die Nachricht konnte nicht geladen werden: ") + ex.Message);
         }
+    }
+
+    private static string PreparedKey(MailFolderNode folder, MessageSummary summary) =>
+        folder.Folder.ConnectionId.ToString("N") + "\n" + folder.Folder.RemoteId + "\n" + summary.RemoteId;
+
+    /// <summary>The message opened, from what was prepared or started now (true: prepared before). Never cancelled by
+    /// switching on: what is started is finished and kept for coming back.</summary>
+    private (Task<OpenedMessage> Task, bool Prepared) Prepared(MailFolderNode folder, MessageSummary summary)
+    {
+        var key = PreparedKey(folder, summary);
+        lock (_prepared)
+        {
+            if (!_watchesCertificates)
+            {
+                _watchesCertificates = true;
+                secureMime.CertificatesChanged += (_, _) => ForgetPrepared();
+            }
+
+            for (var node = _prepared.First; node is not null; node = node.Next)
+            {
+                if (node.Value.Key != key)
+                {
+                    continue;
+                }
+
+                var task = node.Value.Task;
+                // A stale entry (the folder renumbered its messages) or a failed one: opened again.
+                if (task.IsFaulted || task.IsCanceled
+                    || (task.IsCompletedSuccessfully && summary.MessageId is { } id && task.Result.Readable.MessageId is { } kept && kept != id))
+                {
+                    _prepared.Remove(node);
+                    break;
+                }
+
+                _prepared.Remove(node);
+                _prepared.AddFirst(node);
+                return (task, task.IsCompletedSuccessfully);
+            }
+
+            var connection = folder.Account.Connection;
+            var mailFolder = folder.Folder;
+            var remoteId = summary.RemoteId;
+            // Checking signatures takes a moment of CPU: not on the UI thread, the reading pane stays responsive.
+            var opening = Task.Run(async () => await secureMime.OpenAsync(await mail.GetMessageAsync(connection, mailFolder, remoteId)));
+            _prepared.AddFirst((key, opening));
+            while (_prepared.Count > PreparedCapacity)
+            {
+                _prepared.RemoveLast();
+            }
+
+            // Not kept: failures, and mails that could not be decrypted (a key imported later must count at once).
+            _ = opening.ContinueWith(t =>
+            {
+                if (!t.IsCompletedSuccessfully || t.Result.Security.DecryptionError is not null)
+                {
+                    Forget(key);
+                }
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            return (opening, false);
+        }
+    }
+
+    private void Forget(string key)
+    {
+        lock (_prepared)
+        {
+            for (var node = _prepared.First; node is not null; node = node.Next)
+            {
+                if (node.Value.Key == key)
+                {
+                    _prepared.Remove(node);
+                    return;
+                }
+            }
+        }
+    }
+
+    /// <summary>Certificates changed (a key imported or removed): what was decrypted with the old ones is opened again.</summary>
+    public void ForgetPrepared()
+    {
+        lock (_prepared)
+        {
+            _prepared.Clear();
+        }
+    }
+
+    /// <summary>The neighbours of the open message, in the order arrow keys reach them.</summary>
+    private void PrefetchAround(MessageItemViewModel message)
+    {
+        var index = Entries.IndexOf(message);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var around = new List<MessageItemViewModel>();
+        foreach (var step in new[] { 1, -1, 2, 3, -2, 4 })
+        {
+            if (index + step >= 0 && index + step < Entries.Count && Entries[index + step] is MessageItemViewModel near)
+            {
+                around.Add(near);
+            }
+        }
+
+        Prefetch(around, ref _prefetchAroundCts);
+    }
+
+    /// <summary>
+    /// The signed and encrypted mails in view (the list reports them when it scrolls): checking and decrypting those
+    /// is what takes long, so it happens ahead of the click.
+    /// </summary>
+    public void PrefetchVisible(IReadOnlyList<MessageItemViewModel> visible)
+    {
+        ArgumentNullException.ThrowIfNull(visible);
+        Prefetch([.. visible.Where(m => m.Summary.Security != MessageSecurity.None).Take(12)], ref _prefetchVisibleCts);
+    }
+
+    // One at a time in the background; a newer request of the same kind replaces the one before (what already runs
+    // is finished and kept).
+    private void Prefetch(IReadOnlyList<MessageItemViewModel> messages, ref CancellationTokenSource? slot)
+    {
+        slot?.Cancel();
+        slot?.Dispose();
+        slot = new CancellationTokenSource();
+        var token = slot.Token;
+        var work = messages.Where(m => m.Summary.Size <= PrefetchMaxSize).Select(m => (Folder: FolderOf(m), m.Summary))
+            .Where(w => w.Folder is not null).ToList();
+        if (work.Count == 0)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            foreach (var (folder, summary) in work)
+            {
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                try
+                {
+                    await Prepared(folder!, summary).Task;
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    logger.LogDebug(ex, "Message {RemoteId} not prepared ahead", summary.RemoteId);
+                }
+            }
+        }, CancellationToken.None);
     }
 
     // "Bilder laden" is remembered per message (by its Message-ID): opened again, the pictures come at once.
@@ -1900,9 +2061,31 @@ internal sealed partial class MailViewModel(
     {
         var options = await privacy.GetAsync();
         var context = await privacy.ContextAsync();
-        var assessment = await Task.Run(() => MessageAnalyzer.Analyze(opened.Readable, context, opened.Security));
+        var assessment = await AssessAsync(opened, context);
         var allow = options.LoadsRemoteContent(opened.Readable.From.Mailboxes.FirstOrDefault(), loadedBefore, assessment.SenderForged);
         return new MessageView(options, assessment, allow);
+    }
+
+    // The security check of a mail is kept for a while: again only when it is older than that, when the contacts or
+    // own addresses changed, the phishing list was updated, or the mail had to be opened again (other certificates).
+    // Tied to the opened mail: it goes when that leaves the prepared ones.
+    private static readonly TimeSpan AssessmentLifetime = TimeSpan.FromMinutes(15);
+    private readonly ConditionalWeakTable<OpenedMessage, CheckedAssessment> _assessments = new();
+
+    private sealed record CheckedAssessment(ThreatAssessment Assessment, AnalysisContext Context, (long, int) Phishing, DateTime At);
+
+    private async Task<ThreatAssessment> AssessAsync(OpenedMessage opened, AnalysisContext context)
+    {
+        var phishing = (PhishingList.Shared.Version, PhishingList.Shared.Count);
+        if (_assessments.TryGetValue(opened, out var kept) && ReferenceEquals(kept.Context, context) && kept.Phishing == phishing
+            && DateTime.UtcNow - kept.At < AssessmentLifetime)
+        {
+            return kept.Assessment;
+        }
+
+        var assessment = await Task.Run(() => MessageAnalyzer.Analyze(opened.Readable, context, opened.Security));
+        _assessments.AddOrUpdate(opened, new CheckedAssessment(assessment, context, phishing, DateTime.UtcNow));
+        return assessment;
     }
 
     private void ShowOpened(MessageSummary summary, MessageView view)

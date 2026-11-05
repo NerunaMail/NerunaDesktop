@@ -78,6 +78,17 @@ internal sealed partial class CalendarView : UserControl
         };
     }
 
+    // A click on a calendar's row chooses it for new events – not one on its tick, colour or "only this" button.
+    private void OnCalendarTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is Control { DataContext: CalendarListItem item } && DataContext is CalendarViewModel vm
+            && (e.Source as Visual)?.FindAncestorOfType<Button>(includeSelf: true) is null
+            && (e.Source as Visual)?.FindAncestorOfType<ToggleButton>(includeSelf: true) is null)
+        {
+            vm.SelectCalendarCommand.Execute(item);
+        }
+    }
+
     private async void Fit(ScrollViewer scroll, bool toStart)
     {
         if (DataContext is not CalendarViewModel calendar || scroll.Bounds.Height <= 0)

@@ -41,9 +41,24 @@ internal sealed partial class MailView : UserControl
         list.AddHandler(PointerPressedEvent, OnListPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         list.AddHandler(PointerMovedEvent, OnListPointerMoved, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         list.AddHandler(PointerReleasedEvent, OnListPointerReleased, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        // The signed and encrypted mails in view are prepared ahead, once the list has settled (also after a folder
+        // opened: its list growing scrolls too).
+        var settled = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        settled.Tick += (_, _) =>
+        {
+            settled.Stop();
+            if (ViewModel is { } vm)
+            {
+                vm.PrefetchVisible([.. list.GetRealizedContainers().Where(c => c.IsVisible && c.Bounds.Height > 0)
+                    .Select(c => c.DataContext).OfType<MessageItemViewModel>()]);
+            }
+        };
+
         // Near the end of the list the next messages load by themselves.
         list.AddHandler(ScrollViewer.ScrollChangedEvent, (_, e) =>
         {
+            settled.Stop();
+            settled.Start();
             if (e.Source is ScrollViewer viewer && viewer.Extent.Height - viewer.Offset.Y - viewer.Viewport.Height < 200
                 && ViewModel is { } vm && vm.LoadMoreCommand.CanExecute(null))
             {

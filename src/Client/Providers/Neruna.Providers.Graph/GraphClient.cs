@@ -9,9 +9,11 @@ using Neruna.Core.Auth;
 namespace Neruna.Providers.Graph;
 
 /// <summary>An answer from Graph that is not a success (status and Graph's error code and message).</summary>
-public sealed class GraphException(HttpStatusCode status, string? code, string message) : Exception(message)
+public sealed class GraphException(HttpStatusCode status, string? code, string message) : Exception(message), Neruna.Core.IHttpStatusError
 {
     public HttpStatusCode Status { get; } = status;
+
+    HttpStatusCode? Neruna.Core.IHttpStatusError.HttpStatus => Status;
 
     public string? Code { get; } = code;
 }

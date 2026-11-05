@@ -283,6 +283,61 @@ public class SecureMimeTests
         }
     }
 
+    [Fact]
+    public async Task A_signature_checked_before_is_taken_while_mail_and_certificates_are_the_same()
+    {
+        await using var annaEnv = await TestEnvironment.CreateAsync();
+        await using var bobEnv = await TestEnvironment.CreateAsync();
+        var ct = TestContext.Current.CancellationToken;
+        await annaEnv.Get<CertificateManager>().ImportAsync(TestPki.Pkcs12(Anna.Value, "a"), "a", cancellationToken: ct);
+        var bobCertificates = bobEnv.Get<CertificateManager>();
+        await bobCertificates.ImportAsync(TestPki.Ca.GetEncoded(), null, cancellationToken: ct);
+        var signed = Message("Signiert", "Hallo Bob");
+        await annaEnv.Get<SecureMimeService>().ProtectAsync(signed, sign: true, encrypt: false, ct);
+
+        var kept = new KeptChecks();
+        var service = new SecureMimeService(bobCertificates, bobEnv.Get<Neruna.Core.ISettingsStore>(), TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SecureMimeService>.Instance, checks: kept);
+
+        // Checked once and kept.
+        var first = Assert.Single((await service.OpenAsync(Reparse(signed), ct)).Security.Signatures);
+        Assert.Equal((SignatureStatus.Valid, true), (first.Status, first.EmailMatchesSender));
+        var check = Assert.Single(kept.Checks.Values);
+
+        // Opened again: the kept result counts (marked here so it shows), without checking again.
+        kept.Checks[check.Key] = check with { Json = check.Json.Replace("\"Status\":0", "\"Status\":1", StringComparison.Ordinal) };
+        Assert.Equal(SignatureStatus.ValidUntrusted, Assert.Single((await service.OpenAsync(Reparse(signed), ct)).Security.Signatures).Status);
+
+        // Another From line: the signed part is the same, but whether the signer is the sender is decided anew.
+        var otherSender = Reparse(signed);
+        otherSender.From.Clear();
+        otherSender.From.Add(new MailboxAddress("Mallory", "mallory@example.com"));
+        Assert.False(Assert.Single((await service.OpenAsync(otherSender, ct)).Security.Signatures).EmailMatchesSender);
+
+        // Changed content: another key, checked – and found broken.
+        var changed = Reparse(signed);
+        Assert.IsType<TextPart>(Assert.IsType<MultipartSigned>(changed.Body)[0]).Text = "Hallo Bob, überweise alles";
+        Assert.Equal(SignatureStatus.Invalid, Assert.Single((await service.OpenAsync(changed, ct)).Security.Signatures).Status);
+
+        // Certificates changed: checked again.
+        await bobCertificates.ImportAsync(TestPki.Pem(Bob.Value.Certificate), null, cancellationToken: ct);
+        Assert.Equal(SignatureStatus.Valid, Assert.Single((await service.OpenAsync(Reparse(signed), ct)).Security.Signatures).Status);
+    }
+
+    private sealed class KeptChecks : ISignatureCheckStore
+    {
+        public Dictionary<string, StoredSignatureCheck> Checks { get; } = [];
+
+        public Task<StoredSignatureCheck?> GetAsync(string key, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Checks.GetValueOrDefault(key));
+
+        public Task SaveAsync(StoredSignatureCheck check, DateTimeOffset dropBefore, CancellationToken cancellationToken = default)
+        {
+            Checks[check.Key] = check;
+            return Task.CompletedTask;
+        }
+    }
+
     private static MimeMessage Message(string subject, string text)
     {
         var message = new MimeMessage { Subject = subject, Body = new TextPart("plain") { Text = text } };

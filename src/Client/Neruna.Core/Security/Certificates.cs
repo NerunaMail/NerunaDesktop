@@ -268,6 +268,30 @@ public static class CertificateParser
 /// <param name="contacts">Where other people's certificates go when they have a contact; null: all stay on this device.</param>
 public sealed class CertificateManager(ICertificateStore store, ICredentialStore secrets, TimeProvider clock, IContactCertificates? contacts = null)
 {
+    /// <summary>Own certificates or keys were imported, replaced or removed (mails decrypted before are opened again).</summary>
+    public event EventHandler? Changed;
+
+    private string? _trustEpoch;
+
+    /// <summary>
+    /// The state of the certificates kept here (own, collected, imported authorities and intermediates): a kept
+    /// signature check counts only while it is the same. Changes with every certificate added or removed.
+    /// </summary>
+    public async Task<string> TrustEpochAsync(CancellationToken cancellationToken = default)
+    {
+        if (_trustEpoch is { } known)
+        {
+            return known;
+        }
+
+        var all = await store.GetAllAsync(cancellationToken);
+        var text = string.Join('\n', all.Select(c => c.Thumbprint + ":" + (int)c.Source).Order(StringComparer.Ordinal));
+        return _trustEpoch = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+    }
+
+    // Any certificate saved or deleted: the epoch is worked out again.
+    private void Touched() => _trustEpoch = null;
+
     // Opening a PKCS#12 container is slow on purpose (key derivation): done once per container and password, not with every mail.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (byte[] Pkcs12, string Password, IReadOnlyList<PrivateKeyEntry> Keys)> _keys = new(StringComparer.Ordinal);
 
@@ -300,6 +324,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
             {
                 var thumbprint = CertificateParser.Thumbprint(certificate);
                 await store.SaveAsync(new StoredCertificate(thumbprint, certificate.GetEncoded(), null, source, now), cancellationToken);
+                Touched();
                 imported.Add(CertificateParser.Describe(certificate, false, source, now));
             }
 
@@ -324,9 +349,11 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
             var thumbprint = CertificateParser.Thumbprint(entry.Certificate);
             await secrets.SetSecretAsync(SecretId(thumbprint), password ?? string.Empty, cancellationToken);
             await store.SaveAsync(new StoredCertificate(thumbprint, entry.Certificate.GetEncoded(), data, source, now), cancellationToken);
+            Touched();
             result.Add(CertificateParser.Describe(entry.Certificate, true, source, now));
         }
 
+        Changed?.Invoke(this, EventArgs.Empty);
         return result;
     }
 
@@ -342,6 +369,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         if ((await store.GetAllAsync(cancellationToken)).All(c => c.Thumbprint != thumbprint))
         {
             await store.SaveAsync(new StoredCertificate(thumbprint, certificate.GetEncoded(), null, CertificateSource.Intermediate, clock.GetUtcNow()), cancellationToken);
+            Touched();
         }
     }
 
@@ -363,6 +391,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
 
         var source = verified ? CertificateSource.CollectedVerified : CertificateSource.CollectedFromMail;
         await store.SaveAsync(new StoredCertificate(thumbprint, certificate.GetEncoded(), null, source, clock.GetUtcNow()), cancellationToken);
+        Touched();
         return true;
     }
 
@@ -389,6 +418,7 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
                 && await contacts.AddAsync(item.Der, emails, cancellationToken))
             {
                 await store.DeleteAsync(item.Thumbprint, cancellationToken);
+                Touched();
                 moved++;
             }
         }
@@ -411,7 +441,9 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         }
 
         await store.DeleteAsync(thumbprint, cancellationToken);
+        Touched();
         await secrets.DeleteSecretAsync(SecretId(thumbprint), cancellationToken);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     // The contacts' certificates that can be read and are not also kept here (those count as here).
@@ -525,11 +557,14 @@ public sealed class CertificateManager(ICertificateStore store, ICredentialStore
         foreach (var (certificate, password) in certificates)
         {
             await store.SaveAsync(certificate, cancellationToken);
+            Touched();
             if (certificate.Pkcs12 is not null && password is not null)
             {
                 await secrets.SetSecretAsync(SecretId(certificate.Thumbprint), password, cancellationToken);
             }
         }
+
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     // A stable credential-store id per certificate.

@@ -21,7 +21,7 @@
  "(keine E-Mail-Adresse)": "(nessun indirizzo e-mail)",
  "(keine)": "(nessuna)",
  "(nicht angegeben)": "(non indicato)",
- "(nur lesen)": "(sola lettura)",
+ "Nur lesen": "Sola lettura",
  "(ohne Betreff)": "(senza oggetto)",
  "(ohne Kommentar)": "(senza commento)",
  "(ohne Namen)": "(senza nome)",
@@ -2576,5 +2576,11 @@
  "«{0}» geändert: {1}": "«{0}» modificato: {1}",
  "«{0}» ändern": "Modificare «{0}»",
  "Änderung an {0} Person(en) gesendet.": "Modifica inviata a {0} persona/e.",
- "Suchbegriff löschen": "Cancella ricerca"
+ "Suchbegriff löschen": "Cancella ricerca",
+ "Wieder anmelden": "Accedi di nuovo",
+ "Passwort eingeben": "Inserisci la password",
+ "Die Anmeldung ist abgelaufen – bitte wieder anmelden, sonst wird dieses Konto nicht mehr synchronisiert.": "L'accesso è scaduto – accedi di nuovo, altrimenti questo account non verrà più sincronizzato.",
+ "Der Server lehnt die Anmeldung ab – wurde das Passwort geändert? Bitte neu eingeben, sonst wird dieses Konto nicht mehr synchronisiert.": "Il server rifiuta l'accesso – la password è stata cambiata? Inseriscila di nuovo, altrimenti questo account non verrà più sincronizzato.",
+ "Ein Konto muss wieder angemeldet werden": "Un account deve accedere di nuovo",
+ "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Sincronizzato alle {0:t} – {1}: accedi di nuovo in Impostazioni → Account"
 }

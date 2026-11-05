@@ -21,7 +21,7 @@
  "(keine E-Mail-Adresse)": "(no email address)",
  "(keine)": "(none)",
  "(nicht angegeben)": "(not given)",
- "(nur lesen)": "(read-only)",
+ "Nur lesen": "Read-only",
  "(ohne Betreff)": "(no subject)",
  "(ohne Kommentar)": "(no note)",
  "(ohne Namen)": "(no name)",
@@ -2576,5 +2576,11 @@
  "«{0}» geändert: {1}": "“{0}” changed: {1}",
  "«{0}» ändern": "Change “{0}”",
  "Änderung an {0} Person(en) gesendet.": "Update sent to {0} person(s).",
- "Suchbegriff löschen": "Clear search"
+ "Suchbegriff löschen": "Clear search",
+ "Wieder anmelden": "Sign in again",
+ "Passwort eingeben": "Enter password",
+ "Die Anmeldung ist abgelaufen – bitte wieder anmelden, sonst wird dieses Konto nicht mehr synchronisiert.": "The sign-in has expired – please sign in again, otherwise this account is no longer synchronised.",
+ "Der Server lehnt die Anmeldung ab – wurde das Passwort geändert? Bitte neu eingeben, sonst wird dieses Konto nicht mehr synchronisiert.": "The server refuses the sign-in – was the password changed? Please enter it again, otherwise this account is no longer synchronised.",
+ "Ein Konto muss wieder angemeldet werden": "An account needs to be signed in again",
+ "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Synchronised at {0:t} – {1}: please sign in again under Settings → Accounts"
 }

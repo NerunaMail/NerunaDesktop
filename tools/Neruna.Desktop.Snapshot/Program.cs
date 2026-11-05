@@ -1,4 +1,5 @@
 using Avalonia.VisualTree;
+using Avalonia.LogicalTree;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -368,6 +369,20 @@ internal static class Snapshots
         vm.NavigateCommand.Execute(Section.Settings);
         await Task.Delay(300);
         await SaveAsync(window, output, "settings-mail-tags.png");
+        // The shared colour tagPalette: opened on the first own tag, a colour picked.
+        if (window.GetVisualDescendants().OfType<ColorListEditor>().FirstOrDefault(v => v.IsEffectivelyVisible) is { } tagEditor
+            && tagEditor.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Flyout is Flyout && b.DataContext is ColorListRow) is { } tagColorButton)
+        {
+            var row = (ColorListRow)tagColorButton.DataContext!;
+            tagColorButton.Flyout!.ShowAt(tagColorButton);
+            await Task.Delay(300);
+            await SaveAsync(window, output, "settings-mail-tags-color.png");
+            var tagPalette = ((Flyout)tagColorButton.Flyout).Content as Neruna.Desktop.Controls.ColorPalette;
+            var tagSwatch = tagPalette?.GetLogicalDescendants().OfType<Button>().Skip(4).FirstOrDefault();
+            tagSwatch?.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            await Task.Delay(300);
+            Console.WriteLine($"Tag colour picked: {row.Color} (flyout open: {tagColorButton.Flyout.IsOpen})");
+        }
         vm.SettingsPage.SelectedTab = 11;
         await Task.Delay(300);
         await vm.SettingsPage.QuickActions.EditCommand.ExecuteAsync(vm.SettingsPage.QuickActions.Actions[0]);
@@ -794,6 +809,19 @@ internal static class Snapshots
         Console.WriteLine($"Renamed calendar: list shows '{renamedItem.Name}', {renamedItem.ServerNameText}");
         await vm.CalendarPage.RenameAsync(renamedItem, null);
         Console.WriteLine($"Reset: list shows '{vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "team").Name}'");
+        // A click on a calendar's row chooses it for new events (marked; the view stays as it is).
+        await Task.Delay(200);
+        if (window.GetVisualDescendants().OfType<Grid>().FirstOrDefault(g => g.Classes.Contains("calendar-row") && g.DataContext is CalendarListItem { Info.RemoteId: "team" }) is { } teamRow)
+        {
+            var at = teamRow.TranslatePoint(new Point(teamRow.Bounds.Width / 2, teamRow.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(at, Avalonia.Input.MouseButton.Left);
+            window.MouseUp(at, Avalonia.Input.MouseButton.Left);
+            await Task.Delay(200);
+            // The demo's calendars are read-only: they show a lock and are not chosen for new events.
+            Console.WriteLine($"Calendar clicked (read-only): chosen {string.Join(", ", vm.CalendarPage.Calendars.Where(c => c.IsSelected).Select(c => c.Info.RemoteId))}"
+                + $"; with lock: {string.Join(", ", vm.CalendarPage.Calendars.Where(c => c.Info.IsReadOnly).Select(c => c.Info.RemoteId))}");
+        }
+
         await SaveAsync(window, output, "calendar.png");
 
         // Dragging over free time on Tuesday from 9:00 to 10:30: the preview with that time (released, the editor opens).
@@ -1310,6 +1338,16 @@ internal static class Snapshots
         vm.SettingsPage.SelectedTab = 0;
         await vm.SettingsPage.Accounts.ReloadAsync();
         await SaveAsync(window, output, "settings-accounts.png");
+        // The sign-in of the first account expired: its card in red with "Wieder anmelden", a "!" on "Konten" and on the
+        // settings button.
+        vm.SettingsPage.Accounts.ShowSignInProblems(new HashSet<Guid> { editedAccount.Id });
+        vm.SettingsPage.AccountsNeedSignIn = true;
+        vm.NeedsSignIn = true;
+        await Task.Delay(200);
+        await SaveAsync(window, output, "settings-accounts-signin.png");
+        vm.SettingsPage.Accounts.ShowSignInProblems(new HashSet<Guid>());
+        vm.SettingsPage.AccountsNeedSignIn = false;
+        vm.NeedsSignIn = false;
         // A color chosen for the account the way a user does it: the round swatch opens the picker, a click on a color.
         var swatch = window.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is Flyout && b.DataContext == vm.SettingsPage.Accounts.Items[0]);
         swatch.Flyout!.ShowAt(swatch);

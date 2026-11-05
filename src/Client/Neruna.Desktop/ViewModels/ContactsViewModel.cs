@@ -44,8 +44,6 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     /// <summary>"E-Mail schreiben": recipients for a new message (one contact or all members of a group).</summary>
     public event EventHandler<string>? MailRequested;
 
-    public static IReadOnlyList<string> ColorChoices => CalendarViewModel.ColorChoices;
-
     public ObservableCollection<AddressBookItem> AddressBooks { get; } = [];
 
     public ObservableCollection<ContactItem> Items { get; } = [];

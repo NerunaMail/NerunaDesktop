@@ -470,6 +470,29 @@ namespace Neruna.Storage.Migrations
                     b.ToTable("Settings");
                 });
 
+            modelBuilder.Entity("Neruna.Storage.SignatureCheckEntity", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CheckedUnixMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Epoch")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Key");
+
+                    b.HasIndex("CheckedUnixMs");
+
+                    b.ToTable("SignatureChecks");
+                });
+
             modelBuilder.Entity("Neruna.Storage.SignatureEntity", b =>
                 {
                     b.Property<Guid>("Id")

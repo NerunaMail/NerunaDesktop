@@ -26,12 +26,11 @@ internal sealed partial class CollectionAppearanceEditor : UserControl
         }
     }
 
-    private async void OnColorPicked(object? sender, RoutedEventArgs e)
+    private async void OnColorPicked(object? sender, Neruna.Desktop.Controls.ColorPickedEventArgs e)
     {
-        if (sender is Button swatch && DataContext is CollectionListItem item && Host is { } host)
+        if (DataContext is CollectionListItem item && Host is { } host)
         {
-            Close();
-            await host.SetColorAsync(item, swatch.Tag as string);
+            await host.SetColorAsync(item, e.Color);
         }
     }
 

@@ -193,9 +193,18 @@ public sealed class CloudAccountSync(
                 continue;
             }
 
+            // The kind the server lists (and counts against the licence's mailboxes) must be the one in the signed,
+            // encrypted payload: an account listed as "calendars only" can never turn into a mailbox here.
+            if (!string.Equals(offered.Kind ?? CloudAccountKinds.Imap, data.Kind ?? CloudAccountKinds.Imap, StringComparison.Ordinal))
+            {
+                logger.LogWarning("Account {Id} is listed as another kind than it contains; skipped", offered.Id);
+                waiting++;
+                continue;
+            }
+
             if (otherOrganisations.Contains(data.Email))
             {
-                logger.LogInformation("Account {Email} already comes from another organisation; not set up again", data.Email);
+                logger.LogInformation("Account {Id} already comes from another organisation; not set up again", offered.Id);
                 offeredIds.Remove(localId);
                 elsewhere++;
                 continue;
@@ -227,7 +236,7 @@ public sealed class CloudAccountSync(
             }
             catch (AccountSetupException ex)
             {
-                logger.LogWarning("Account {Email} of the organisation not set up: {Reason}", data.Email, ex.Message);
+                logger.LogWarning("Account {Id} of the organisation not set up: {Reason}", offered.Id, ex.InnerException?.GetType().Name ?? "setup refused");
                 waiting++;
                 continue;
             }
@@ -246,7 +255,7 @@ public sealed class CloudAccountSync(
             state[localId] = fingerprint;
             received++;
             changed = true;
-            logger.LogInformation("Account {Email} set up from the organisation", data.Email);
+            logger.LogInformation("Account {Id} set up from the organisation", offered.Id);
         }
 
         // No longer assigned (or deleted in the portal): gone here, too.
@@ -511,7 +520,7 @@ public sealed class CloudAccountSync(
         }
 
         await credentials.DeleteSecretAsync(CloudAccountPasswords.SecretId(account.CloudId!), cancellationToken);
-        logger.LogInformation("Account {Email} of the organisation removed", account.EmailAddress);
+        logger.LogInformation("Account {Id} of the organisation removed", account.CloudId);
     }
 
     private async Task<Dictionary<string, string>> LoadStateAsync(CloudConnection connection, CancellationToken cancellationToken)

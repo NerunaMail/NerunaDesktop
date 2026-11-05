@@ -107,6 +107,18 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         }
     }
 
+    private IReadOnlySet<Guid> _signInNeeded = new HashSet<Guid>();
+
+    /// <summary>The accounts whose sign-in expired or whose password was refused: shown in red with "Wieder anmelden".</summary>
+    public void ShowSignInProblems(IReadOnlySet<Guid> accounts)
+    {
+        _signInNeeded = accounts;
+        foreach (var item in Items)
+        {
+            item.NeedsSignIn = accounts.Contains(item.Account.Id);
+        }
+    }
+
     private bool HasAutoReply(Account account) => account.ConnectionsOf(ServiceKind.Mail).Any(c => _autoReplies.Contains(c.Id));
 
     public async Task ReloadAsync()
@@ -115,7 +127,7 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         var organisations = await cloud.GetConnectionsAsync();
         foreach (var account in await accounts.GetAccountsAsync())
         {
-            var item = new AccountItem(account, setup.Summary) { HasAutoReply = HasAutoReply(account) };
+            var item = new AccountItem(account, setup.Summary) { HasAutoReply = HasAutoReply(account), NeedsSignIn = _signInNeeded.Contains(account.Id) };
             if (account.CloudId is { } cloudId && organisations.Count > 1 && organisations.FirstOrDefault(c => c.Owns(cloudId)) is { } organisation)
             {
                 item.ManagedBy = F("Von {0} verwaltet", organisation.OrganizationName);
@@ -223,6 +235,19 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     public partial bool HasAutoReply { get; set; }
 
     public string AutoReplyText => HasAutoReply ? T("Abwesend · aktiv") : T("Abwesenheit");
+
+    /// <summary>The last sync failed because the sign-in expired or the password was refused.</summary>
+    [ObservableProperty]
+    public partial bool NeedsSignIn { get; set; }
+
+    /// <summary>What the button does: sign in with the provider, or enter the password anew.</summary>
+    public string SignInText => UsesProviderSignIn ? T("Wieder anmelden") : T("Passwort eingeben");
+
+    public string SignInHint => UsesProviderSignIn
+        ? T("Die Anmeldung ist abgelaufen – bitte wieder anmelden, sonst wird dieses Konto nicht mehr synchronisiert.")
+        : T("Der Server lehnt die Anmeldung ab – wurde das Passwort geändert? Bitte neu eingeben, sonst wird dieses Konto nicht mehr synchronisiert.");
+
+    private bool UsesProviderSignIn => Account.Connections.Any(c => c.ProviderId is ProviderIds.Google or ProviderIds.Graph);
 
     public Account Account { get; } = account;
 

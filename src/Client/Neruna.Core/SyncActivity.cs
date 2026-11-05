@@ -22,6 +22,7 @@ public enum SyncState
 /// <param name="StartedAt">When the current or last run began.</param>
 /// <param name="Duration">How long the last run took; null while it runs.</param>
 /// <param name="LastSuccess">When a run last went through.</param>
+/// <param name="NeedsSignIn">The last run failed because the sign-in expired or the password was refused.</param>
 public sealed record SyncEntry(
     Guid ConnectionId,
     Guid AccountId,
@@ -32,7 +33,8 @@ public sealed record SyncEntry(
     DateTimeOffset StartedAt,
     TimeSpan? Duration,
     string? Error,
-    DateTimeOffset? LastSuccess);
+    DateTimeOffset? LastSuccess,
+    bool NeedsSignIn = false);
 
 /// <summary>
 /// What the synchronisation is doing, per connection: which runs, since when, how the last run ended – for the status
@@ -60,7 +62,7 @@ public sealed class SyncActivity(TimeProvider time)
 
     internal void Started(Account account, ServiceConnection connection) =>
         Update(connection.Id, previous => new SyncEntry(connection.Id, account.Id, account.Title, connection.Kind, connection.ProviderId,
-            SyncState.Running, time.GetUtcNow(), null, null, previous?.LastSuccess));
+            SyncState.Running, time.GetUtcNow(), null, null, previous?.LastSuccess, previous?.NeedsSignIn ?? false));
 
     internal void Finished(ServiceConnection connection, Exception? error) =>
         Update(connection.Id, previous => previous is null ? null : previous with
@@ -68,6 +70,7 @@ public sealed class SyncActivity(TimeProvider time)
             State = error is null ? SyncState.Done : SyncState.Failed,
             Duration = time.GetUtcNow() - previous.StartedAt,
             Error = error is null ? null : Describe(error),
+            NeedsSignIn = error is not null && SignInErrors.NeedsSignIn(error),
             LastSuccess = error is null ? time.GetUtcNow() : previous.LastSuccess,
         });
 

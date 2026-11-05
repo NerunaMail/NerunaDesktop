@@ -317,11 +317,13 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
         CalendarGroups.Clear();
         Calendars.Clear();
+        var selected = await settings.GetAsync(SettingKeys.CalendarSelectedCalendar);
         foreach (var group in groups)
         {
             CalendarGroups.Add(group);
             foreach (var item in group.Items)
             {
+                item.IsSelected = item.Key == selected && !item.Info.IsReadOnly;
                 Calendars.Add(item);
             }
         }
@@ -430,6 +432,26 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     {
         _solo.Toggle(item, Calendars);
         return LoadWeekAsync(dataChanged: true);
+    }
+
+    /// <summary>
+    /// A calendar clicked in the list: marked and remembered, new events made here go into it. What is shown stays as
+    /// it is; a read-only calendar cannot take events and is not marked.
+    /// </summary>
+    [RelayCommand]
+    private async Task SelectCalendarAsync(CalendarListItem item)
+    {
+        if (item.Info.IsReadOnly || item.IsSelected)
+        {
+            return;
+        }
+
+        foreach (var other in Calendars)
+        {
+            other.IsSelected = other == item;
+        }
+
+        await settings.SetAsync(SettingKeys.CalendarSelectedCalendar, item.Key);
     }
 
     private bool IsShown(CalendarListItem item) => _solo.Shows(item.Info, item.IsVisible);
@@ -748,6 +770,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         if (target is not null && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == CalendarController.CalendarKey(target)) is { } same)
         {
             editor.SelectedCalendar = same;
+        }
+        else if (existing is null && Calendars.FirstOrDefault(c => c.IsSelected) is { } chosen
+            && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == chosen.Key) is { } clicked)
+        {
+            editor.SelectedCalendar = clicked;
         }
         else if (existing is null && await settings.GetAsync(SettingKeys.CalendarDefaultCalendar) is { Length: > 0 } preferred
             && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == preferred) is { } standard)

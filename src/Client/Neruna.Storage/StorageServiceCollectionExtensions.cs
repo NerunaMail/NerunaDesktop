@@ -32,6 +32,7 @@ public static class StorageServiceCollectionExtensions
         services.AddSingleton<ICalendarStore, SqliteCalendarStore>();
         services.AddSingleton<IContactStore, SqliteContactStore>();
         services.AddSingleton<ICertificateStore, SqliteCertificateStore>();
+        services.AddSingleton<ISignatureCheckStore, SqliteSignatureCheckStore>();
         services.AddSingleton<ISettingsStore, SqliteSettingsStore>();
         services.AddSingleton<ISignatureStore, SqliteSignatureStore>();
         services.AddSingleton<ITextTemplateStore, SqliteTextTemplateStore>();

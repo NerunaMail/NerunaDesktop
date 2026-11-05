@@ -216,6 +216,11 @@
           <!-- The scroll bar lies over the content and widens under the mouse: room on the right keeps the filter icons free -->
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding CalendarGroups}" Margin="0,0,16,0">
+            <ItemsControl.Styles>
+              <Style Selector="Grid.calendar-row"><Setter Property="Background" Value="Transparent" /></Style>
+              <Style Selector="Grid.calendar-row:pointerover"><Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" /></Style>
+              <Style Selector="Grid.calendar-row.selected"><Setter Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}" /></Style>
+            </ItemsControl.Styles>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:CalendarGroup">
                 <StackPanel Margin="0,4,0,6">
@@ -234,7 +239,9 @@
                   <ItemsControl ItemsSource="{Binding Items}">
                     <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:CalendarListItem">
-                      <Grid ColumnDefinitions="Auto,Auto,*,Auto" Background="Transparent"
+                      <!-- A click on the row (not on its tick or buttons) chooses the calendar for new events -->
+                      <Grid ColumnDefinitions="Auto,Auto,*,Auto" Classes="calendar-row" Classes.selected="{Binding IsSelected}" Tapped="OnCalendarTapped"
+                            Cursor="Hand"
                             Opacity="{Binding IsDimmed, Converter={x:Static app:Converters.DimmedOpacity}}">
                         <CheckBox IsChecked="{Binding IsVisible}" MinWidth="0" Padding="0" Margin="0,0,6,0" ToolTip.Tip="{l:T 'Anzeigen'}" />
                         <!-- Color: click to choose (stored in Neruna, the server is not changed) -->
@@ -248,7 +255,8 @@
                         </Button>
                         <!-- Long names end in "…" before the filter icon -->
                         <DockPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Left">
-                          <TextBlock DockPanel.Dock="Right" Text="{l:T '(nur lesen)'}" Classes="subtle" FontSize="11" IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" Margin="6,0,0,0" />
+                          <PathIcon DockPanel.Dock="Right" Data="{StaticResource IconLock}" Width="11" Height="11" Foreground="{DynamicResource SubtleTextBrush}"
+                                    IsVisible="{Binding Info.IsReadOnly}" VerticalAlignment="Center" Margin="6,0,0,0" ToolTip.Tip="{l:T 'Nur lesen'}" />
                           <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
                         </DockPanel>
                         <Button Grid.Column="3" Classes="solo" Classes.on="{Binding IsSolo}" ToolTip.Tip="{Binding SoloTip}" VerticalAlignment="Center" Margin="4,0,0,0"

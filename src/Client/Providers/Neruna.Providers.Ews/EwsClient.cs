@@ -11,11 +11,13 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Providers.Ews;
 
 /// <summary>An answer from Exchange that is not a success: EWS's response code (e.g. ErrorItemNotFound) and message.</summary>
-public sealed class EwsException(string? code, string message, HttpStatusCode? status = null, Exception? inner = null) : Exception(message, inner)
+public sealed class EwsException(string? code, string message, HttpStatusCode? status = null, Exception? inner = null) : Exception(message, inner), Neruna.Core.IHttpStatusError
 {
     public string? Code { get; } = code;
 
     public HttpStatusCode? Status { get; } = status;
+
+    HttpStatusCode? Neruna.Core.IHttpStatusError.HttpStatus => Status;
 }
 
 /// <summary>Builds and reads EWS XML: messages (<c>m:</c>) and types (<c>t:</c>).</summary>

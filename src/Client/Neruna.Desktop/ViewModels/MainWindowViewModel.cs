@@ -119,6 +119,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _contacts = contacts;
         _sync = sync;
         _syncActivity = syncActivity;
+        _syncActivity.Changed += (_, _) => Dispatcher.UIThread.Post(ShowSignInProblems);
         _setup = setup;
         _discovery = discovery;
         _accounts = accounts;
@@ -588,6 +589,19 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool HasSyncProblems { get; set; }
 
+    /// <summary>An account has to be signed in again: the settings button carries a "!".</summary>
+    [ObservableProperty]
+    public partial bool NeedsSignIn { get; set; }
+
+    // From the last run of every connection: the accounts whose sign-in expired or whose password was refused.
+    private void ShowSignInProblems()
+    {
+        var accounts = _syncActivity.Entries.Where(e => e.NeedsSignIn).Select(e => e.AccountId).ToHashSet();
+        NeedsSignIn = accounts.Count > 0;
+        SettingsPage.AccountsNeedSignIn = NeedsSignIn;
+        SettingsPage.Accounts.ShowSignInProblems(accounts);
+    }
+
     /// <summary>Click on the status bar: what synchronises, since when, how the last runs ended.</summary>
     [RelayCommand]
     private void OpenSyncStatus()
@@ -920,7 +934,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
             var failures = reports.SelectMany(r => r.Failures).ToList();
             HasSyncProblems = failures.Count > 0;
-            StatusText = failures.Count == 0
+            var signIn = failures.Where(f => Neruna.Core.SignInErrors.NeedsSignIn(f.Error)).Select(f => f.Connection.Id).ToHashSet();
+            var signInAccounts = signIn.Count == 0 ? [] : (await _accounts.GetAccountsAsync()).Where(a => a.Connections.Any(c => signIn.Contains(c.Id))).Select(a => a.Title).ToList();
+            StatusText = signInAccounts.Count > 0
+                ? F("Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden", DateTime.Now, string.Join(", ", signInAccounts))
+                : failures.Count == 0
                 ? F("Synchronisiert um {0:t}", DateTime.Now)
                 : failures.Count == 1
                     ? F("Synchronisiert um {0:t} – 1 Verbindung fehlgeschlagen", DateTime.Now)

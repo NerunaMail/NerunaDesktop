@@ -41,7 +41,14 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AccountItem">
               <!-- Compact: who and which services; servers, offline and the rest under "Bearbeiten" and "⋯" -->
-              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,0,0,8">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,0,0,8"
+                      Classes.signin="{Binding NeedsSignIn}">
+                <Border.Styles>
+                  <Style Selector="Border.signin">
+                    <Setter Property="BorderBrush" Value="#C42B1C" />
+                    <Setter Property="BorderThickness" Value="2" />
+                  </Style>
+                </Border.Styles>
                 <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
                   <!-- The account's color in the folder list: click to choose; without one an empty, dashed swatch with a
                        palette invites to pick one (mail accounts only) -->
@@ -99,6 +106,15 @@
                       <TextBlock Text="{Binding ManagedBy}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding IsFromCloud}" VerticalAlignment="Center" Margin="0,0,10,0" />
                       <TextBlock Text="{l:T 'Abwesenheit aktiv'}" FontSize="12" Foreground="{DynamicResource AccentTextBrush}" IsVisible="{Binding HasAutoReply}" VerticalAlignment="Center" />
                     </WrapPanel>
+                    <!-- The sign-in expired or the password is refused: said here, fixed with one click -->
+                    <Border Background="#FDE7E9" CornerRadius="4" Padding="10,8" Margin="0,8,0,4" IsVisible="{Binding NeedsSignIn}">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Text="!" Foreground="#C42B1C" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" Margin="2,0,10,0" />
+                        <TextBlock Grid.Column="1" Text="{Binding SignInHint}" Foreground="#8A1C12" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Classes="accent" Content="{Binding SignInText}" Margin="10,0,0,0" VerticalAlignment="Center"
+                                Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
+                      </Grid>
+                    </Border>
                     <!-- Webmail, instructions and support of the provider -->
                     <ItemsControl ItemsSource="{Binding Links}" IsVisible="{Binding HasLinks}" Margin="0,2,0,0">
                       <ItemsControl.ItemsPanel>

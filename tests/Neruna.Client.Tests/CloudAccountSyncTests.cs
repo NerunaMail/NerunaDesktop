@@ -107,6 +107,39 @@ public class CloudAccountSyncTests
     }
 
     [Fact]
+    public async Task An_account_listed_as_another_kind_than_it_contains_is_not_set_up()
+    {
+        // "Calendars only" does not count as a mailbox: an Exchange mailbox listed that way must not slip through.
+        var ct = TestContext.Current.CancellationToken;
+        var response = ContractFixtures.Read("mail-accounts-kinds-example.json").Replace("\"kind\": \"exchange\"", "\"kind\": \"dav\"", StringComparison.Ordinal);
+        var device = JsonDocument.Parse(ContractFixtures.Read("certificates-test-device.json")).RootElement;
+        await using var env = await TestEnvironment.CreateAsync();
+        var settings = env.Get<ISettingsStore>();
+        var credentials = env.Get<ICredentialStore>();
+        using var signingKey = DeviceKey.Create();
+        await credentials.SetSecretAsync(CloudController.KeyId, signingKey.ExportPrivateKey(), ct);
+        await credentials.SetSecretAsync(CloudController.EncryptionKeyId, device.GetProperty("privateKey").GetString()!, ct);
+        var connection = new CloudConnection(new Uri(Server), device.GetProperty("deviceId").GetString()!, "Example AG", "Anna Muster", DateTimeOffset.Now);
+        await settings.SetAsync(SettingKeys.CloudConnection, JsonSerializer.Serialize(connection, NerunaJson.Options), ct);
+        env.Http.Responses[Server + "api/v1/token"] = (HttpStatusCode.OK, """{"accessToken":"t","tokenType":"Bearer","expiresIn":900}""");
+
+        var cloud = new CloudController(new HttpClient(env.Http), settings, credentials, NullLogger<CloudController>.Instance);
+        var ews = new Neruna.Providers.Ews.EwsConnectionFactory(credentials, new ClientCertificates(credentials), NullLoggerFactory.Instance);
+        var registry = new ProviderRegistry(
+            [new ImapProviderFactory(credentials, NullLoggerFactory.Instance), new Neruna.Providers.Ews.EwsMailProviderFactory(ews)],
+            [new CalDavProviderFactory(new HttpClient(env.Http), credentials, NullLoggerFactory.Instance), new Neruna.Providers.Ews.EwsCalendarProviderFactory(ews)],
+            [new Neruna.Providers.Ews.EwsContactProviderFactory(ews)]);
+        var sync = new CloudAccountSync(cloud, env.Accounts, new AccountSetupService(registry, env.Accounts, credentials, []), credentials, settings, NullLogger<CloudAccountSync>.Instance);
+        env.Http.Responses[Server + "api/v1/mail-accounts?kinds=" + Uri.EscapeDataString(sync.SupportedKinds)] = (HttpStatusCode.OK, response);
+
+        await sync.SyncAsync(ct);
+
+        var accounts = await env.Accounts.GetAccountsAsync(ct);
+        Assert.DoesNotContain(accounts, a => a.EmailAddress == "anna@exchange.example.com");
+        Assert.Contains(accounts, a => a.DisplayName == "Kalender");
+    }
+
+    [Fact]
     public async Task Other_kinds_need_the_user_once_and_keep_the_organisations_names_and_signatures()
     {
         var ct = TestContext.Current.CancellationToken;

@@ -419,7 +419,7 @@ def test_undo_takes_the_link_back(page):
     # Chromium undoes the link (the text stays); WebKit's Ctrl/Meta mapping varies, so only Chromium is strict.
     if page.context.browser.browser_type.name == "chromium":
         assert links(page) == []
-        assert "https://neruna.org" in page.evaluate("document.getElementById('editor').innerText")
+        assert page.evaluate("document.getElementById('editor').innerText").strip() == "https://neruna.org"
 
 
 def paste_text(page, text):

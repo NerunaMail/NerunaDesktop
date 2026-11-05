@@ -171,6 +171,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(DataTab, T("Daten"), "IconArchive"),
     ];
 
+    /// <summary>An account has to be signed in again: "Konten" in the list carries a "!".</summary>
+    [ObservableProperty]
+    public partial bool AccountsNeedSignIn { get; set; }
+
     [ObservableProperty]
     public partial SettingsNavItem? SelectedNav { get; set; } = Navigation.First(n => n.Tab == AboutTab);
 
@@ -251,4 +255,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
 internal sealed record SettingsNavItem(int Tab, string Title, string? IconKey, bool IsHeading = false, bool IsIndented = false)
 {
     public Avalonia.Thickness Indent => IsIndented ? new Avalonia.Thickness(14, 0, 0, 0) : default;
+
+    /// <summary>The accounts page (where a "!" can show an account to sign in again).</summary>
+    public bool IsAccounts => Tab == 0;
 }

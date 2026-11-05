@@ -25,6 +25,16 @@
                 <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding !IsHeading}">
                   <PathIcon Data="{Binding IconKey, Converter={x:Static app:Converters.Icon}}" Width="16" Height="16" VerticalAlignment="Center" />
                   <TextBlock Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" />
+                  <!-- An account has to be signed in again -->
+                  <Border Background="#C50F1F" CornerRadius="8" Width="16" Height="16" VerticalAlignment="Center">
+                    <Border.IsVisible>
+                      <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="IsAccounts" />
+                        <Binding Path="$parent[UserControl].((vm:SettingsViewModel)DataContext).AccountsNeedSignIn" />
+                      </MultiBinding>
+                    </Border.IsVisible>
+                    <TextBlock Text="!" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
                 </StackPanel>
               </Panel>
             </DataTemplate>

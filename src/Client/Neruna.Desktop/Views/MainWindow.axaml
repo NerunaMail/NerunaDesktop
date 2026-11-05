@@ -157,7 +157,14 @@
           <Border Height="1" Width="28" Background="{DynamicResource DividerBrush}" Margin="0,2" />
           <Button Classes="rail" Classes.active="{Binding IsSettings}" HorizontalAlignment="Center"
                   Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:Section.Settings}" ToolTip.Tip="{l:T 'Einstellungen: Konten, Zertifikate, Diagnose'}">
-            <PathIcon Data="{StaticResource IconSettings}" />
+            <Panel>
+              <PathIcon Data="{StaticResource IconSettings}" />
+              <!-- An account has to be signed in again -->
+              <Border Background="#C50F1F" CornerRadius="8" Width="16" Height="16" Margin="0,-7,-11,0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                      IsVisible="{Binding NeedsSignIn}" ToolTip.Tip="{l:T 'Ein Konto muss wieder angemeldet werden'}">
+                <TextBlock Text="!" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+            </Panel>
           </Button>
         </StackPanel>
         <!-- E-Mail, Kalender, Kontakte, Chat: order and visibility from Einstellungen → Design -->

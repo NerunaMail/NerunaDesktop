@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:app="using:Neruna.Desktop"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
+             x:Class="Neruna.Desktop.Views.ColorListEditor"
+             x:DataType="vm:ColorListViewModel">
+
+  <!-- Names with a colour (tags of mails, categories of events): the rows, then the field for a new one. -->
+  <StackPanel Spacing="8">
+    <ItemsControl ItemsSource="{Binding Rows}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ColorListRow">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,3">
+            <Button Width="22" Height="22" MinWidth="0" Padding="0" CornerRadius="3" BorderThickness="0" VerticalAlignment="Center"
+                    Background="{Binding Color, Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{l:T 'Farbe ändern'}">
+              <Button.Flyout>
+                <Flyout Placement="RightEdgeAlignedTop">
+                  <ctl:ColorPalette Picked="OnColorPicked" />
+                </Flyout>
+              </Button.Flyout>
+            </Button>
+            <TextBox Grid.Column="1" Text="{Binding Name}" Margin="8,0,0,0" LostFocus="OnNameLeft" KeyDown="OnNameKey" />
+            <Button Grid.Column="2" Content="↑" Padding="6,2" Margin="6,0,0,0" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Nach oben'}"
+                    Command="{Binding $parent[UserControl].((vm:ColorListViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+            <Button Grid.Column="3" Content="{l:T 'Entfernen'}" Margin="6,0,0,0" VerticalAlignment="Center"
+                    Command="{Binding $parent[UserControl].((vm:ColorListViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+      <TextBox Text="{Binding NewName}" PlaceholderText="{Binding NewPlaceholder}" KeyDown="OnNewKey" />
+      <Button Grid.Column="1" Classes="accent" Content="{l:T 'Hinzufügen'}" Command="{Binding AddCommand}" Margin="6,0,0,0" />
+    </Grid>
+    <TextBlock Text="{Binding Error}" Foreground="#C42B1C" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+  </StackPanel>
+</UserControl>

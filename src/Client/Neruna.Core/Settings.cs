@@ -170,6 +170,12 @@ public static class SettingKeys
     /// <summary>Calendar preselected for new events (<see cref="Calendar.CalendarController.CalendarKey"/>); the first writable one when unset or gone.</summary>
     public const string CalendarDefaultCalendar = "calendar.defaultCalendar";
 
+    /// <summary>
+    /// The calendar last clicked in the calendar's list (<see cref="Calendar.CalendarController.CalendarKey"/>): new
+    /// events made there go into it; <see cref="CalendarDefaultCalendar"/> when unset, read-only or gone.
+    /// </summary>
+    public const string CalendarSelectedCalendar = "calendar.selectedCalendar";
+
     /// <summary>After answering an invitation (or removing a cancelled event), its mail goes to the trash. Default: on.</summary>
     public const string DeleteAnsweredInvitations = "calendar.deleteAnsweredInvitations";
 

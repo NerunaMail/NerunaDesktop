@@ -21,7 +21,7 @@
  "(keine E-Mail-Adresse)": "(pas d'adresse e-mail)",
  "(keine)": "(aucune)",
  "(nicht angegeben)": "(non indiqué)",
- "(nur lesen)": "(lecture seule)",
+ "Nur lesen": "Lecture seule",
  "(ohne Betreff)": "(sans objet)",
  "(ohne Kommentar)": "(sans commentaire)",
  "(ohne Namen)": "(sans nom)",
@@ -2576,5 +2576,11 @@
  "«{0}» geändert: {1}": "« {0} » modifié : {1}",
  "«{0}» ändern": "Modifier « {0} »",
  "Änderung an {0} Person(en) gesendet.": "Modification envoyée à {0} personne(s).",
- "Suchbegriff löschen": "Effacer la recherche"
+ "Suchbegriff löschen": "Effacer la recherche",
+ "Wieder anmelden": "Se reconnecter",
+ "Passwort eingeben": "Saisir le mot de passe",
+ "Die Anmeldung ist abgelaufen – bitte wieder anmelden, sonst wird dieses Konto nicht mehr synchronisiert.": "La connexion a expiré – veuillez vous reconnecter, sinon ce compte ne sera plus synchronisé.",
+ "Der Server lehnt die Anmeldung ab – wurde das Passwort geändert? Bitte neu eingeben, sonst wird dieses Konto nicht mehr synchronisiert.": "Le serveur refuse la connexion – le mot de passe a-t-il été changé ? Veuillez le saisir à nouveau, sinon ce compte ne sera plus synchronisé.",
+ "Ein Konto muss wieder angemeldet werden": "Un compte doit être reconnecté",
+ "Synchronisiert um {0:t} – {1}: bitte unter Einstellungen → Konten wieder anmelden": "Synchronisé à {0:t} – {1} : veuillez vous reconnecter sous Paramètres → Comptes"
 }

@@ -62,23 +62,12 @@ internal sealed partial class ContactsView : UserControl
         }
     }
 
-    // A swatch (or "Standardfarbe") in an address book's color flyout; the color is in Tag.
-    private async void OnColorPicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    // A colour (or "Standardfarbe") in an address book's colour flyout; the palette has the book as DataContext.
+    private async void OnColorPicked(object? sender, Neruna.Desktop.Controls.ColorPickedEventArgs e)
     {
-        if (sender is not Button swatch || DataContext is not ContactsViewModel vm)
+        if (sender is Neruna.Desktop.Controls.ColorPalette { DataContext: AddressBookItem book } && DataContext is ContactsViewModel vm)
         {
-            return;
-        }
-
-        var book = swatch.GetLogicalAncestors().OfType<Control>().Select(c => c.DataContext).OfType<AddressBookItem>().FirstOrDefault();
-        if (swatch.FindLogicalAncestorOfType<Popup>() is { } popup)
-        {
-            popup.IsOpen = false;
-        }
-
-        if (book is not null)
-        {
-            await vm.SetColorAsync(book, swatch.Tag as string);
+            await vm.SetColorAsync(book, e.Color);
         }
     }
 }

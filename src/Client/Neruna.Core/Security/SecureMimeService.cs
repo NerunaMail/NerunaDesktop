@@ -31,6 +31,22 @@ public sealed record SignatureInfo(
     DateTimeOffset? SignedAt,
     string? Detail);
 
+/// <summary>
+/// The result of checking a clear-signed mail, kept so it need not be checked again (only signed ones; the content of
+/// encrypted mails is never kept). <paramref name="Key"/> is the SHA-256 of the signed part, signature included;
+/// <paramref name="Epoch"/> the state of the certificates it was checked against.
+/// </summary>
+public sealed record StoredSignatureCheck(string Key, string Epoch, DateTimeOffset CheckedAt, string Json);
+
+/// <summary>Kept results of signature checks (see <see cref="StoredSignatureCheck"/>).</summary>
+public interface ISignatureCheckStore
+{
+    Task<StoredSignatureCheck?> GetAsync(string key, CancellationToken cancellationToken = default);
+
+    /// <summary>Saves (or replaces) a result; results older than <paramref name="dropBefore"/> go.</summary>
+    Task SaveAsync(StoredSignatureCheck check, DateTimeOffset dropBefore, CancellationToken cancellationToken = default);
+}
+
 /// <param name="DecryptionError">Set if the message was encrypted and could not be decrypted (e.g. no matching private key).</param>
 public sealed record MessageSecurityInfo(bool WasEncrypted, string? DecryptionError, IReadOnlyList<SignatureInfo> Signatures)
 {
@@ -79,8 +95,22 @@ public static class SecureMimeAlgorithms
 }
 
 /// <param name="http">Fetches intermediate certificates a signature leaves out (null: none are fetched).</param>
-public sealed class SecureMimeService(CertificateManager certificates, ISettingsStore settings, TimeProvider clock, ILogger<SecureMimeService> logger, HttpClient? http = null)
+/// <param name="checks">Keeps the results of signature checks (null: every signed mail is checked each time it opens).</param>
+public sealed class SecureMimeService(CertificateManager certificates, ISettingsStore settings, TimeProvider clock, ILogger<SecureMimeService> logger, HttpClient? http = null,
+    ISignatureCheckStore? checks = null)
 {
+    /// <summary>A kept check counts this long; then the mail is checked again (e.g. a root the system no longer trusts).</summary>
+    public static readonly TimeSpan SignatureCheckLifetime = TimeSpan.FromDays(3);
+
+    private static readonly TimeSpan SignatureCheckKeptFor = TimeSpan.FromDays(30);
+
+    /// <summary>Own certificates or keys changed: what was opened with the ones before may read differently now.</summary>
+    public event EventHandler? CertificatesChanged
+    {
+        add => certificates.Changed += value;
+        remove => certificates.Changed -= value;
+    }
+
     private readonly IssuerDownloader? _issuers = http is null ? null : new IssuerDownloader(http);
 
     public async Task<SecureMimeCapabilities> GetCapabilitiesAsync(string fromAddress, IEnumerable<string> recipients, CancellationToken cancellationToken = default)
@@ -162,7 +192,10 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         return encrypted;
     }
 
-    /// <summary>Decrypts and verifies; signer certificates of good signatures are collected for later encryption.</summary>
+    /// <summary>
+    /// Decrypts and verifies; signer certificates of good signatures are collected for later encryption. A clear-signed
+    /// mail checked before against the same certificates (within <see cref="SignatureCheckLifetime"/>) takes that result.
+    /// </summary>
     public async Task<OpenedMessage> OpenAsync(MimeMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -170,6 +203,58 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         {
             return new OpenedMessage(message, MessageSecurityInfo.None);
         }
+
+        if (checks is null || message.Body is not MultipartSigned { Count: > 0 } signed || IsSecure(signed[0]))
+        {
+            return await OpenCoreAsync(message, cancellationToken);
+        }
+
+        var key = await HashAsync(signed, cancellationToken);
+        var sender = message.From.Mailboxes.FirstOrDefault()?.Address;
+        var now = clock.GetUtcNow();
+        try
+        {
+            if (await checks.GetAsync(key, cancellationToken) is { } stored && now >= stored.CheckedAt && now - stored.CheckedAt < SignatureCheckLifetime
+                && stored.Epoch == await certificates.TrustEpochAsync(cancellationToken)
+                && System.Text.Json.JsonSerializer.Deserialize<List<SignatureInfo>>(stored.Json) is { Count: > 0 } kept)
+            {
+                // The From line is not part of what was signed: whether the signer is the sender is decided anew.
+                var signatures = kept.Select(k => k with { EmailMatchesSender = sender is not null && k.SignerEmails.Contains(sender, StringComparer.OrdinalIgnoreCase) }).ToList();
+                logger.LogInformation("S/MIME signature taken from the check of {CheckedAt:yyyy-MM-dd}", stored.CheckedAt);
+                return new OpenedMessage(WithBody(message, signed[0]), new MessageSecurityInfo(false, null, signatures));
+            }
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            logger.LogDebug(ex, "Kept signature check unreadable; checked again");
+        }
+
+        var opened = await OpenCoreAsync(message, cancellationToken);
+        if (opened.Security.Signatures.Count > 0)
+        {
+            // The certificates as they are after the check (it may have fetched missing issuers).
+            var epoch = await certificates.TrustEpochAsync(cancellationToken);
+            await checks.SaveAsync(new StoredSignatureCheck(key, epoch, now, System.Text.Json.JsonSerializer.Serialize(opened.Security.Signatures)),
+                now - SignatureCheckKeptFor, cancellationToken);
+        }
+
+        return opened;
+    }
+
+    // The signed part with its signature, byte for byte: any change to the content or the signature gives another key.
+    private static async Task<string> HashAsync(MimeEntity signed, CancellationToken cancellationToken)
+    {
+        using var hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        await using (var stream = new HashingStream(hash))
+        {
+            await signed.WriteToAsync(FormatOptions.Default, stream, cancellationToken);
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset());
+    }
+
+    private async Task<OpenedMessage> OpenCoreAsync(MimeMessage message, CancellationToken cancellationToken)
+    {
 
         var watch = System.Diagnostics.Stopwatch.StartNew();
         using var context = await CreateContextAsync(cancellationToken);
@@ -521,4 +606,48 @@ internal sealed class NerunaSecureMimeContext : TemporarySecureMimeContext
 
         return roots;
     }
+}
+
+/// <summary>A write-only stream that feeds a hash (a large signed mail is not copied into memory for it).</summary>
+internal sealed class HashingStream(System.Security.Cryptography.IncrementalHash hash) : Stream
+{
+    public override bool CanRead => false;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => true;
+
+    public override long Length => throw new NotSupportedException();
+
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
+
+    public override void Write(byte[] buffer, int offset, int count) => hash.AppendData(buffer, offset, count);
+
+    public override void Write(ReadOnlySpan<byte> buffer) => hash.AppendData(buffer);
+
+    public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    {
+        hash.AppendData(buffer, offset, count);
+        return Task.CompletedTask;
+    }
+
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        hash.AppendData(buffer.Span);
+        return ValueTask.CompletedTask;
+    }
+
+    public override void Flush()
+    {
+    }
+
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
 }

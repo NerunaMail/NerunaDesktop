@@ -43,6 +43,8 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
 
     internal DbSet<ChatMessageEntity> ChatMessages => Set<ChatMessageEntity>();
 
+    internal DbSet<SignatureCheckEntity> SignatureChecks => Set<SignatureCheckEntity>();
+
     internal DbSet<NoteEntity> Notes => Set<NoteEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -96,6 +98,12 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
         modelBuilder.Entity<CertificateEntity>(e => e.HasKey(c => c.Thumbprint));
         modelBuilder.Entity<SettingEntity>(e => e.HasKey(s => s.Key));
         modelBuilder.Entity<ReminderStateEntity>(e => e.HasKey(r => r.Key));
+
+        modelBuilder.Entity<SignatureCheckEntity>(e =>
+        {
+            e.HasKey(c => c.Key);
+            e.HasIndex(c => c.CheckedUnixMs);
+        });
 
         modelBuilder.Entity<ChatMessageEntity>(e =>
         {
@@ -401,4 +409,16 @@ internal sealed class NoteEntity
     public string? RemoteId { get; set; }
 
     public int Pending { get; set; }
+}
+
+/// <summary>The result of a signature check of a clear-signed mail (see Neruna.Core.Security.StoredSignatureCheck).</summary>
+internal sealed class SignatureCheckEntity
+{
+    public required string Key { get; set; }
+
+    public required string Epoch { get; set; }
+
+    public long CheckedUnixMs { get; set; }
+
+    public required string Json { get; set; }
 }

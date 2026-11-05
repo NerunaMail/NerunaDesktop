@@ -13,6 +13,7 @@ internal sealed class PrivacyService(ISettingsStore settings, IAccountStore acco
 {
     private static readonly TimeSpan PhishingInterval = TimeSpan.FromHours(12);
     private PrivacyOptions? _options;
+    private (IReadOnlyList<Neruna.Core.Contacts.RecipientEntry> Recipients, string Own, AnalysisContext Context)? _context;
     private PhishingListUpdater? _phishing;
     private Avalonia.Threading.DispatcherTimer? _phishingTimer;
 
@@ -131,11 +132,33 @@ internal sealed class PrivacyService(ISettingsStore settings, IAccountStore acco
     {
         try
         {
-            return AnalysisContext.From(await accounts.GetAccountsAsync(), await recipients.GetAllAsync());
+            var all = await accounts.GetAccountsAsync();
+            var known = await recipients.GetAllAsync();
+            var own = string.Join('\n', all.SelectMany(a => a.Identities.Select(i => i.Email).Append(a.EmailAddress)));
+            // The directory hands out the same list until it reads the address books again: then built once more,
+            // and kept as the same context if nothing in it changed (checks made with it stay valid, see MailViewModel).
+            if (_context is { } kept && ReferenceEquals(kept.Recipients, known) && kept.Own == own)
+            {
+                return kept.Context;
+            }
+
+            var context = AnalysisContext.From(all, known);
+            if (_context is { } before && SameContent(before.Context, context))
+            {
+                context = before.Context;
+            }
+
+            _context = (known, own, context);
+            return context;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return AnalysisContext.Empty;
         }
     }
+
+    private static bool SameContent(AnalysisContext a, AnalysisContext b) =>
+        a.OwnAddresses.SequenceEqual(b.OwnAddresses, StringComparer.OrdinalIgnoreCase)
+        && a.Contacts.Count == b.Contacts.Count
+        && a.Contacts.Zip(b.Contacts).All(p => p.First.Name == p.Second.Name && p.First.Addresses.SequenceEqual(p.Second.Addresses, StringComparer.OrdinalIgnoreCase));
 }
