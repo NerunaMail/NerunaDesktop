@@ -636,22 +636,26 @@ bei Resellern). Schnittstelle in `server/contract/openapi.yaml`, nur additiv.
 | Form | Git: `scripts/deploy.sh` (pull, composer, migrate, optimize); ZIP aus `scripts/package-shared-hosting.sh` nur für Hostings ohne Git | Docker-Image auf GHCR (`ghcr.io/nerunamail/neruna-server:<version>`) |
 | Gebaut von | Deploy auf dem Hosting | GitHub Actions bei jedem Release-Tag (Tests, dann Image) |
 | Inhalt | ganzes Repo inkl. `app/NerunaCloud` | ohne `app/NerunaCloud`, Migrationen beim Start |
-| Update | `scripts/deploy.sh` | `docker compose pull && docker compose up -d` |
+| Update | `scripts/deploy.sh` | `./neruna-update` (fragt neruna.cloud nach Version und Quelle, holt, startet neu; `rollback`) |
 
 GHCR: Container-Images sind zurzeit gratis (Speicher und Download; Änderungen kündigt GitHub einen Monat vorher an).
 Image komprimiert ca. 270–290 MB, davon gut 210 MB Grundimage; Updates laden nur geänderte Schichten (ca. 40–60 MB).
 
-**Zugang zu den Images.** Privates Repo `NerunaMail/neruna-server-dist` ohne Quellcode (`docker-compose.yml`,
-`.env.example`, Installationsanleitung, Changelog); das Image erbt dessen Zugriffsrechte. Der Provider wird dort
-per GitHub-API als Mitarbeitender mit Leserecht eingeladen (`PUT /repos/…/collaborators/{name}`) und bei Ende oder
-Nichtzahlung entfernt (`DELETE`); verwaltet im Admin von neruna.cloud beim Provider-Mandanten (GitHub-Benutzer,
-Status eingeladen/aktiv/gesperrt), automatisch entzogen bei Sperre oder überfälliger Rechnung. Token mit Rechten nur
-für dieses Repo, in `.env`. Vor dem Bau von Hand prüfen: externer Mitarbeitender erbt den Image-Zugriff
-(einladen, `docker login ghcr.io`, pull, entfernen).
+**Zugang zu den Images.** Die Instanz kennt nur ihren Schlüssel (Admin → Verrechnung → Instanzen, als Hash
+gespeichert) und neruna.cloud. `./neruna-update` fragt `GET /api/dist/v1/release` und erhält Version, Quelle
+(`registry` oder später `archive`), Image und Zugangsdaten; es meldet sich nur für diesen Pull an (eigene
+Docker-Konfiguration, nichts bleibt auf dem Host) und gibt dem Image den lokalen Namen `neruna/server:current`, den
+die ausgelieferte `docker-compose.yml` verwendet. Skript und `docker-compose.yml` holt es jedes Mal neu von
+`neruna.cloud/dist/`; eigene Anpassungen des Providers gehören in `docker-compose.override.yml`. So kann die Quelle
+(GHCR, eigene Registry, Download) wechseln, ohne dass der Provider etwas ändert. Für GHCR liefert neruna.cloud die
+Zugangsdaten eines eigenen GitHub-Kontos mit Leserecht nur auf das Paket (Token classic, `read:packages`): Provider
+brauchen kein GitHub-Konto, und Zugang gibt und entzieht allein der Schlüssel der Instanz. Weil alle dasselbe Token
+erhalten, wird es nach dem Sperren einer Instanz erneuert. Wird GHCR kostenpflichtig, reicht ein bezahlter Plan
+(oder ein Wechsel der Quelle).
 
 **Reihenfolge.** 1. Code-Trennung nach `app/NerunaCloud` und Modus `provider` (ohne neue Funktion). 2. Image-Build in
-der CI und GHCR mit `neruna-server-dist`. 3. Instanz-Registrierung, Lizenz, Nutzungsmeldung, Verrechnung an den
-Provider. 4. GitHub-Zugang im Admin. 5. Branding des Portals pro Instanz. 6. Vertrag und Dokumentation für Provider.
+der CI, GHCR, Instanzen mit Schlüssel und `neruna-update`. 3. Instanz-Registrierung, Lizenz, Nutzungsmeldung, Verrechnung an den
+Provider. 4. (entfällt: Zugang über den Instanz-Schlüssel.) 5. Branding des Portals pro Instanz. 6. Vertrag und Dokumentation für Provider.
 
 ## 6. Config-Tresor (Zero-Knowledge)
 
