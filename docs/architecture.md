@@ -613,21 +613,52 @@ neruna.cloud liegen in `tests/Feature/NerunaCloud` oder rufen `$this->cloudOnly(
 | Chat | liegt auf dem Server des Providers |
 | Clients | Server frei wählbar (Einstellungen → Cloud); später bringt der Verbindungscode den Server mit. Autoconfig-Verzeichnis, Phishing-Liste und Absturzberichte bleiben zentral auf neruna.cloud |
 
-**Lizenz pro Instanz.** neruna.cloud stellt jeder Provider- und Control-Instanz eine Lizenz aus, signiert mit dem
-privaten Schlüssel von Neruna (öffentlicher Schlüssel im Image): Modus (`provider`/`control`), Inhaber, bei Control
-die erlaubten Organisationen, Gültigkeit. Der Modus kommt aus der Lizenz, nicht aus einem frei änderbaren Flag. Die
-Lizenz wird mit der Nutzungsmeldung erneuert; ohne gültige Lizenz legt die Instanz keine neuen Organisationen und
-Geräte-Kopplungen mehr an und zeigt einen Hinweis; nach einer Übergangsfrist von 6 Monaten ohne gültige Lizenz
-sperrt der Server. Absoluter Schutz ist bei selbst gehosteter Software nicht möglich: Umgehen heisst den Code
-verändern. Änderungen am Code müssen offengelegt und von Neruna bewilligt werden (Vertrag: Prüfrecht,
-Vertragsstrafe).
+**Lizenzpläne.** `control` und `provider` (selbst gehostet) setzt nur der Neruna-Admin beim Mandanten; im Portal
+gibt es dafür weder Bestellen noch Verlängern noch eine Testzeit. Ein Provider hat Obergrenzen: höchstens
+`max_tenants` Mandanten und `max_members` Benutzer über alle zusammen. Verrechnet wird die gemeldete Nutzung, nicht
+ein Jahrespreis. Die Lizenzseite im Portal zeigt die Grenzen und verlinkt die Anleitung «Eigenen Server einrichten»
+(`app/NerunaCloud/Filament/Portal/Pages/ServerGuide.php`). Auf seinem Server vergibt der Provider seinen Kunden die
+normalen Pläne (Admin → Mandanten); `control` und `provider` stehen dort nicht zur Wahl.
+Die Selbstregistrierung kann ein Provider in Admin → Einstellungen öffnen (standardmässig aus; geschlossen verweist
+die Seite neutral an den Betreiber, nicht an Neruna); Control hat keine.
 
-**Nutzungsmeldung.** Die Instanz registriert sich bei neruna.cloud wie ein Gerät (Schlüsselpaar, signierte
-Anmeldung) und meldet täglich pro Organisation (pseudonyme ID, keine Namen): Plan, Benutzer, verwaltete Postfächer,
-Addons. Verrechnet wird der Stand am letzten Tag des Monats (Stichtag). Benutzer und Postfächer, die am Stichtag
-jünger als ein Monat sind, zählen erst ab dem nächsten Stichtag – ein Testkunde, der am 5. wieder gelöscht wird,
-kostet nichts. neruna.cloud verrechnet über die Sammelrechnung des Provider-Mandanten (Kreditlimit, Guthaben wie
-bei Resellern). Schnittstelle in `server/contract/openapi.yaml`, nur additiv.
+**Lizenz pro Instanz** (`App\Support\InstanceLicence`, auf neruna.cloud `App\NerunaCloud\Dist\LicenceSigner`).
+- Die Instanz fragt alle 6 Stunden mit ihrem Schlüssel (`NERUNA_LICENCE_KEY`) `POST /api/dist/v1/licence` und
+  bringt die Nutzung mit. Die Antwort ist mit Ed25519 signiert (privater Schlüssel nur in der `.env` von
+  neruna.cloud, einmalig erzeugt mit `php artisan neruna:licence-keys`; öffentlicher Schlüssel im Image unter
+  `resources/licence/neruna.pub`). Inhalt: Instanz, Hash des Instanzschlüssels (eine kopierte Lizenz gilt auf keinem
+  anderen Server), Inhaber, Modus, Plan, `max_tenants` (Control: 1), `max_members`, bei Control die ganze Lizenz
+  (Postfächer, Geräte-Addons, Addons, Laufzeit), aktiv, `expires_at` = ausgestellt + 6 Monate.
+- Der Modus (`provider`/`control`) kommt aus der Lizenz, nicht aus `NERUNA_MODE`.
+- Bis eine Lizenz eingegangen ist, sind die Grenzen 0. Durchgesetzt: keine Mandanten über `max_tenants` (Admin und
+  Selbstregistrierung), keine Benutzer über `max_members` über alle Mandanten (`Tenant::effectiveLicense()`
+  → `seatLimit`), ohne gültige Lizenz keine neuen Geräteverbindungen.
+- Die Lizenz endet, wenn sie abläuft (`expires_at` – also 6 Monate ohne erfolgreiche Abfrage – oder `valid_until`),
+  der Schlüssel abgelehnt wird oder sie inaktiv ist. Dann nichts Neues mehr. 6 Monate danach (ohne je eine Lizenz:
+  6 Monate nach dem ersten Start) sperrt der Server Portal, API und Apps (`RequireInstanceLicence`, HTTP 503); der
+  Admin bleibt erreichbar. Eine neue gültige Lizenz hebt die Sperre sofort auf.
+- Control übernimmt die Lizenz 1:1 auf seinen einen Mandanten; im Admin ist sie dort nicht änderbar.
+- Absoluter Schutz ist bei selbst gehosteter Software nicht möglich: Umgehen heisst den Code verändern. Änderungen am
+  Code müssen offengelegt und von Neruna bewilligt werden (Vertrag: Prüfrecht, Vertragsstrafe).
+- Das Admin-Dashboard der Instanz zeigt «Mandanten n / max», «Benutzer n / max» und den Lizenzstand.
+
+**Nutzungsmeldung und Verrechnung** (`App\NerunaCloud\Support\ProviderUsage`). Mit jeder Lizenzabfrage meldet die
+Instanz Mandanten, Benutzer, verwaltete Postfächer und Geräte-Addons – gesamt und «verrechenbar» (am Stichtag
+mindestens einen Monat alt) –, pro Organisation nur eine pseudonyme Referenz (HMAC), keine Namen. neruna.cloud
+behält pro Tag die neueste Meldung (`instance_usages`). Am Monatsanfang entsteht pro Provider-Instanz ein Auftrag
+der Art `usage` mit dem Stand der letzten Meldung des Vormonats: 1/12 der Jahrespreise (Admin → Lizenzen & Preise,
+inkl. Mengenrabatt nach Benutzern; Postfächer über den inbegriffenen hinaus), abzüglich des Kundenrabatts des
+Provider-Mandanten. Er geht in die Sammelrechnung des Providers (Kreditlimit, Guthaben wie bei Resellern), datiert
+auf den letzten Tag des Monats. Control wird über seine Lizenz verrechnet, nicht über die Nutzung.
+
+**Servereinstellungen** (`App\Support\EnvSettings`, Admin → Einstellungen). Mailserver, Kontaktadresse, Name,
+Sprache, Zeitzone, Lizenzschlüssel, Protokolldauer, Cron-Token – auf neruna.cloud zusätzlich Zahlungs- und
+Auslieferungswerte – kommen aus der `.env` oder, wo die `.env` sie nicht setzt, aus dem Admin (DB, geheime Werte
+mit APP_KEY verschlüsselt, nicht im Protokoll). Die `.env` gewinnt und wird nur angezeigt (geheime Werte teilweise).
+Auf neruna.cloud bleiben geheime Werte nur in der `.env`. Was vor der Datenbank nötig ist (APP_KEY, APP_URL, DB_*,
+TRUSTED_PROXIES), gibt es nur in der `.env`. Die Kontaktadresse (`NERUNA_CONTACT_EMAIL`, sonst info@neruna.org bzw.
+auf Instanzen die Absenderadresse) füllt `:contact` in allen Texten; `:ordering` verweist auf neruna.cloud auf die
+Bestellung im Portal, auf Instanzen an die Kontaktadresse (`App\Support\ContactTranslator`).
 
 **Auslieferung.**
 
