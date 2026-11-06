@@ -613,12 +613,15 @@ neruna.cloud liegen in `tests/Feature/NerunaCloud` oder rufen `$this->cloudOnly(
 | Chat | liegt auf dem Server des Providers; Chat-Räume pro Mandant legt sein Admin fest (`licenses.chat_rooms`, leer = unbegrenzt, privat = keine), Control unbegrenzt. Die Regel «halb so viele wie Benutzer» gilt nur auf neruna.cloud, weil Neruna dort die Chatdaten speichert |
 | Clients | Server frei wählbar (Einstellungen → Cloud); später bringt der Verbindungscode den Server mit. Autoconfig-Verzeichnis, Phishing-Liste und Absturzberichte bleiben zentral auf neruna.cloud |
 
-**Lizenzpläne.** `control` und `provider` (selbst gehostet) setzt nur der Neruna-Admin beim Mandanten; im Portal
-gibt es dafür weder Bestellen noch Verlängern noch eine Testzeit. Ein Provider hat Obergrenzen: höchstens
-`max_tenants` Mandanten und `max_members` Benutzer über alle zusammen. Verrechnet wird die gemeldete Nutzung, nicht
-ein Jahrespreis. Die Lizenzseite im Portal zeigt die Grenzen und verlinkt die Anleitung «Eigenen Server einrichten»
-(`app/NerunaCloud/Filament/Portal/Pages/ServerGuide.php`). Auf seinem Server vergibt der Provider seinen Kunden die
-normalen Pläne (Admin → Mandanten); `control` und `provider` stehen dort nicht zur Wahl.
+**Lizenz des eigenen Servers.** Ob ein Kunde Control (eine Organisation) oder Provider (mehrere) ist, legt seine
+Instanz fest (Admin → Verrechnung → Instanzen), nicht sein Cloud-Plan. Die Lizenz gehört zur Instanz: Provider
+`max_tenants` und `max_members` über alle Mandanten; Control `max_members`, weitere Postfächer, Geräte-Addons; dazu
+Laufzeit (von/bis). Beim Mandanten erscheinen seine Server im Abschnitt «Eigene Server (Control / Provider)», dort
+ebenfalls bearbeitbar. So kann derselbe Kunde für seine Kunden Provider sein und sich selbst weiter auf neruna.cloud
+verwalten (Cloud-Plan z. B. Business); ist er auf seinen eigenen Server umgezogen, läuft die Cloud-Lizenz aus. Die
+Pläne `control`/`provider` beim Mandanten gibt es nur noch für bestehende Lizenzen (nicht mehr wählbar, im Portal
+weder Bestellen noch Verlängern). Das Portal (Lizenz, Anleitung «Eigenen Server einrichten») zeigt die Server mit
+ihren Grenzen. Auf seinem Server vergibt der Provider seinen Kunden die normalen Pläne.
 Die Selbstregistrierung kann ein Provider in Admin → Einstellungen öffnen (standardmässig aus; geschlossen verweist
 die Seite neutral an den Betreiber, nicht an Neruna); Control hat keine.
 
