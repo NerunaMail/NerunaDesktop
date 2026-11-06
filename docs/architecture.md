@@ -610,7 +610,7 @@ neruna.cloud liegen in `tests/Feature/NerunaCloud` oder rufen `$this->cloudOnly(
 | Registrierung | aus; einschaltbar, aber ohne Gratis-Testlizenz |
 | Admin | abgespeckt: Mandanten (Lizenz setzen, sperren, Reseller-Zuordnung), Logins, API-Schlüssel, Protokoll, Einstellungen (Mailversand, Branding: Name, Logo, Domain; Chat-Aufbewahrung), neu «Neruna-Verbindung» (Registrierung, letzte Meldung, gemeldete Nutzung) |
 | API | ✔ Hauptwerkzeug des Providers; Reseller-Zuordnung bleibt (eigene Partner), Verrechnung macht er selbst |
-| Chat | liegt auf dem Server des Providers |
+| Chat | liegt auf dem Server des Providers; Chat-Räume pro Mandant legt sein Admin fest (`licenses.chat_rooms`, leer = unbegrenzt, privat = keine), Control unbegrenzt. Die Regel «halb so viele wie Benutzer» gilt nur auf neruna.cloud, weil Neruna dort die Chatdaten speichert |
 | Clients | Server frei wählbar (Einstellungen → Cloud); später bringt der Verbindungscode den Server mit. Autoconfig-Verzeichnis, Phishing-Liste und Absturzberichte bleiben zentral auf neruna.cloud |
 
 **Lizenzpläne.** `control` und `provider` (selbst gehostet) setzt nur der Neruna-Admin beim Mandanten; im Portal
