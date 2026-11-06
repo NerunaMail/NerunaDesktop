@@ -7,9 +7,8 @@ Stand: 2026-11-06 · lebendes Dokument, wird mit dem Code nachgeführt.
 | Produkt | Art | Lizenz / Modell | Zweck |
 |---|---|---|---|
 | **Neruna Desktop** | Desktop-App (Windows, macOS, Linux) | Open Source, gratis | Mail-, Kalender- und Kontakt-Client im vertrauten Büro-Stil für offene Standards |
-| **Neruna Cloud** | SaaS, mandantenfähig | Privat (Einzelperson 1, Family 5, Family+ 10 Benutzer; nicht kommerziell, ohne Logo und Chat) oder Business pro Benutzer; übrige Limits abgeleitet (siehe `server/app/Models/License.php`) | Zentrale Konfiguration: Autoconfig, Signaturen, Kalender-Abos, Richtlinien, Config-Tresor |
-| **Neruna Control** | Self-hosted (Docker) | Vorerst gleiche Werte wie Business; Verrechnung offen | Gleiche Software wie Cloud, im Single-Tenant-Modus beim Kunden |
-| **Neruna beim Provider** (geplant) | Beim Provider gehostet (Docker), mandantenfähig | Provider meldet die Nutzung monatlich an neruna.cloud und erhält eine Sammelrechnung; seine Kunden verrechnet er selbst | Kundenportal und API für die Kunden des Providers, abgespecktes Admin; siehe Abschnitt 5b |
+| **Neruna Cloud** | Dienst, gehostet in der Schweiz | kostenpflichtig (Privat und Business) | Zentrale Konfiguration: Autoconfig, Signaturen, Konten, Zertifikate, Config-Tresor |
+| **Neruna Control** | auf dem eigenen Server oder beim Provider | auf Anfrage | Gleiche Software wie Cloud |
 
 ### Leitplanken
 
@@ -21,7 +20,7 @@ Stand: 2026-11-06 · lebendes Dokument, wird mit dem Code nachgeführt.
 2. **Der Client ist ohne Cloud vollwertig.** Die Cloud ist Mehrwert für Organisationen, nie Voraussetzung.
 3. **Zero-Knowledge für Geheimnisse.** Passwörter und Tokens verlassen den Client nur clientseitig verschlüsselt.
 4. **Offene Standards vor eigenen Protokollen** (Thunderbird-Autoconfig, RFC 6186/6764, iCalendar, vCard).
-5. **Cloud und Control sind eine Codebasis** (`NERUNA_MODE=cloud|control`).
+5. **Cloud und Control sind eine Codebasis.**
 6. **Provider-Architektur:** Mail, Kalender und Kontakte haben je einen eigenen Controller; dahinter hängen
    austauschbare Provider (IMAP, CalDAV, ICS, EWS …). Neue Protokolle erfordern keine Änderung an UI oder Speicher.
 
@@ -33,7 +32,7 @@ abschaltbares Modul – die einzige mögliche Ausnahme von Leitplanke 1.
 | Teil | Stack |
 |---|---|
 | Desktop | .NET 10, Avalonia 12 (Fluent), CommunityToolkit.Mvvm, MailKit/MimeKit, Ical.Net, EF Core + SQLite |
-| Server | PHP 8.4, Laravel 13, MariaDB 11.8, FrankenPHP (Docker); Admin-UI voraussichtlich Filament |
+| Server | proprietär, privates Repo (siehe Abschnitt 5) |
 | Vertrag | `server/contract/openapi.yaml` + Beispieldokumente in `server/contract/fixtures/`, gegen die **beide** Seiten testen (Desktop findet sie als `../server/contract`, sonst werden diese Tests übersprungen) |
 
 ## 3. Repository-Struktur
@@ -57,7 +56,7 @@ src/
       Neruna.Providers.Pst    Outlook-Datendateien (.pst/.ost) als Mailkonto, nur lesend (XstReader.Api, MS-PL)
       Neruna.Providers.Demo   Beispieldaten (--demo, Screenshots)
     Neruna.Desktop        Avalonia-App (Composition Root)
-server/                   → proprietär: Laravel-App (Neruna Cloud/Control)
+server/                   → proprietär, eigenes privates Repo (Neruna Cloud/Control)
 tests/                    .NET-Tests (Server-Tests liegen in server/tests)
 tools/                    Neruna.Desktop.Snapshot (headless Screenshots, Live-E2E), testlab/ (GreenMail + Radicale)
 scripts/                  publish.sh (eigenständige Builds, auch Windows-Cross-Build)
@@ -565,131 +564,11 @@ Klassisches Groupware-Muster: Navigationsleiste (Mail/Kalender/Kontakte), Ordner
 (Heute/Gestern/Diese Woche …), Lesebereich mit Inline-Verfassen, Wochenansicht über alle Kalender,
 Kontaktliste mit Detailansicht. Screenshots: `docs/screenshots/` (erzeugt mit `tools/Neruna.Desktop.Snapshot`).
 
-## 5. Neruna Cloud / Control (Laravel)
+## 5. Neruna Cloud / Control
 
-| Bereich | Stand |
-|---|---|
-| Mandanten, Domains, Server-Profile | ✔ Portal → Domains: Bestätigung per TXT `_neruna-verify.<domain>`; mehrere Organisationen dürfen eine Domain eintragen, nur eine bestätigen; bestätigte mit Serverprofil liefern Discovery, Autoconfig und das Verzeichnis |
-| Discovery-API `/api/v1/discovery` | ✔ inkl. Vertragstest |
-| Thunderbird-Autoconfig (beide Pfade) | ✔ inkl. Vertragstest |
-| Autoconfig-Verzeichnis `/v1/<domain>` | ✔ ISPDB-Spiegel (täglich, Cron), Ergänzungen und eigene Einträge unter Admin → Autoconfig, MX-Suche, Abfrage-Statistik pro Domain |
-| Admin und Kundenportal | ✔ Filament 5: `/admin` (Mandanten, Lizenz: Abo, Benutzer, Zusatz-Mailboxen, Geräte-Stufe; Logins), `/portal` (Firmendaten, Benutzer, Verbindungscodes, Geräte) |
-| Signaturvorlagen, Kalender-Abos, Richtlinien | offen |
-| Config-Tresor-Ablage | ✔ `/api/v1/vault`: verpackte Schlüssel + max. 20 verschlüsselte Sicherungen pro Person (Abschnitt 6) |
-| Geräte verbinden | ✔ Einmal-Code + separate PIN, Geräteschlüssel (ECDSA P-256), signierte Anmeldung, Tokens; Geräte im Portal sperrbar |
-| Betrieb | ✔ Shared Hosting (PHP 8.4+, MySQL/MariaDB, ohne Worker/Redis/Node), Paket per `scripts/package-shared-hosting.sh` |
-
-Server-Profile beschreiben die Endpunkte beim Kunden (IMAP/SMTP/CalDAV/CardDAV). Für EWS & Co. wird das Profil
-später um weitere Diensttypen ergänzt – analog zu den Client-Providern.
-
-## 5b. Gehostet beim Provider (geplant)
-
-Ein Provider betreibt den Server selbst für seine Kunden: mandantenfähig, mit Kundenportal und API, ohne die
-Website, Zahlungen und Verrechnung von neruna.cloud. Seine Kunden verwaltet er vor allem über die API und verrechnet
-sie in seinem eigenen System. Neruna verrechnet dem Provider die gemeldete Nutzung.
-
-**Betriebsmodi** (`NERUNA_MODE`): `cloud` (neruna.cloud), `provider` (beim Provider, mandantenfähig), `control`
-(beim Kunden, eine Organisation). Eine Codebasis, kein zweites Repo.
-
-**Code-Trennung.** Alles, was nur neruna.cloud als Anbieter braucht, liegt unter `server/app/NerunaCloud/` (Namespace
-`App\NerunaCloud`; `app/Cloud` enthält dagegen gemeinsame Dienste wie Geräte-Anmeldung und Chat) und wird von
-`NerunaCloudServiceProvider` nur im Modus `cloud` registriert – samt Routen (`app/NerunaCloud/routes.php`), Views
-(`cloud::…`) und Filament-Seiten. Dazu gehören: Website und Registrierung,
-Nutzungsbedingungen, Paddle/Payrexx, Bestellungen, Rechnungen, Steuerregeln, Lizenzpreise, Rabatte,
-Reseller-Programm (Anträge, Sammelrechnung, Kreditlimit, Guthaben), Testzeit-Anfragen, Autoconfig-Verzeichnis und
-Absturzberichte. Die Trennung geht durch beide Panels: auch Abschnitte einzelner Seiten (z. B. Rabatt und
-Reseller-Konto im Mandanten, Rechnungen auf der Lizenzseite) gehören dazu. Der Code ausserhalb von `app/NerunaCloud`
-darf nichts daraus brauchen; gemeinsame Seiten bieten dafür Erweiterungspunkte (`App\Support\Extensions`, z. B.
-`portal.license.data`, `admin.tenant.sections`, `maintenance`). Die Tests laufen komplett im Modus `cloud`
-(`php artisan test`) und ohne `app/NerunaCloud` im Modus `provider` (`scripts/test-provider.sh`); Tests nur für
-neruna.cloud liegen in `tests/Feature/NerunaCloud` oder rufen `$this->cloudOnly()` auf.
-
-| Bereich | Beim Provider |
-|---|---|
-| Kundenportal | ✔ fast vollständig: Signaturen, Textbausteine, Schlagwörter, Mitglieder, Gruppen, Logins, Geräte, Freigaben, Mailkonten, Zertifikate, Domains, Serverprofile, Chat, API-Schlüssel, Protokoll, Firmendaten. Lizenzseite nur mit Lizenz und Nutzung («Änderungen über Ihren Anbieter»); ohne Bestellen, Rechnungen, Reseller-Antrag, Testzeit |
-| Registrierung | aus; einschaltbar, aber ohne Gratis-Testlizenz |
-| Admin | abgespeckt: Mandanten (Lizenz setzen, sperren, Reseller-Zuordnung), Logins, API-Schlüssel, Protokoll, Einstellungen (Mailversand, Branding: Name, Logo, Domain; Chat-Aufbewahrung), neu «Neruna-Verbindung» (Registrierung, letzte Meldung, gemeldete Nutzung) |
-| API | ✔ Hauptwerkzeug des Providers; Reseller-Zuordnung bleibt (eigene Partner), Verrechnung macht er selbst |
-| Chat | liegt auf dem Server des Providers; Chat-Räume pro Mandant legt sein Admin fest (`licenses.chat_rooms`, leer = unbegrenzt, privat = keine), Control unbegrenzt. Die Regel «halb so viele wie Benutzer» gilt nur auf neruna.cloud, weil Neruna dort die Chatdaten speichert |
-| Clients | Server frei wählbar (Einstellungen → Cloud); später bringt der Verbindungscode den Server mit. Autoconfig-Verzeichnis, Phishing-Liste und Absturzberichte bleiben zentral auf neruna.cloud |
-
-**Lizenz des eigenen Servers.** Ob ein Kunde Control (eine Organisation) oder Provider (mehrere) ist, legt seine
-Instanz fest (Admin → Verrechnung → Instanzen), nicht sein Cloud-Plan. Die Lizenz gehört zur Instanz: Provider
-`max_tenants` und `max_members` über alle Mandanten; Control `max_members`, weitere Postfächer, Geräte-Addons; dazu
-Laufzeit (von/bis). Beim Mandanten erscheinen seine Server im Abschnitt «Eigene Server (Control / Provider)», dort
-ebenfalls bearbeitbar. So kann derselbe Kunde für seine Kunden Provider sein und sich selbst weiter auf neruna.cloud
-verwalten (Cloud-Plan z. B. Business); ist er auf seinen eigenen Server umgezogen, läuft die Cloud-Lizenz aus. Die
-Pläne `control`/`provider` beim Mandanten gibt es nur noch für bestehende Lizenzen (nicht mehr wählbar, im Portal
-weder Bestellen noch Verlängern). Das Portal (Lizenz, Anleitung «Eigenen Server einrichten») zeigt die Server mit
-ihren Grenzen. Auf seinem Server vergibt der Provider seinen Kunden die normalen Pläne.
-Die Selbstregistrierung kann ein Provider in Admin → Einstellungen öffnen (standardmässig aus; geschlossen verweist
-die Seite neutral an den Betreiber, nicht an Neruna); Control hat keine.
-
-**Lizenz pro Instanz** (`App\Support\InstanceLicence`, auf neruna.cloud `App\NerunaCloud\Dist\LicenceSigner`).
-- Die Instanz fragt alle 6 Stunden mit ihrem Schlüssel (`NERUNA_LICENCE_KEY`) `POST /api/dist/v1/licence` und
-  bringt die Nutzung mit. Die Antwort ist mit Ed25519 signiert (privater Schlüssel nur in der `.env` von
-  neruna.cloud, einmalig erzeugt mit `php artisan neruna:licence-keys`; öffentlicher Schlüssel im Image unter
-  `resources/licence/neruna.pub`). Inhalt: Instanz, Hash des Instanzschlüssels (eine kopierte Lizenz gilt auf keinem
-  anderen Server), Inhaber, Modus, Plan, `max_tenants` (Control: 1), `max_members`, bei Control die ganze Lizenz
-  (Postfächer, Geräte-Addons, Addons, Laufzeit), aktiv, `expires_at` = ausgestellt + 6 Monate.
-- Der Modus (`provider`/`control`) kommt aus der Lizenz, nicht aus `NERUNA_MODE`.
-- Bis eine Lizenz eingegangen ist, sind die Grenzen 0. Durchgesetzt: keine Mandanten über `max_tenants` (Admin und
-  Selbstregistrierung), keine Benutzer über `max_members` über alle Mandanten (`Tenant::effectiveLicense()`
-  → `seatLimit`), ohne gültige Lizenz keine neuen Geräteverbindungen.
-- Die Lizenz endet, wenn sie abläuft (`expires_at` – also 6 Monate ohne erfolgreiche Abfrage – oder `valid_until`),
-  der Schlüssel abgelehnt wird oder sie inaktiv ist. Dann nichts Neues mehr. 6 Monate danach (ohne je eine Lizenz:
-  6 Monate nach dem ersten Start) sperrt der Server Portal, API und Apps (`RequireInstanceLicence`, HTTP 503); der
-  Admin bleibt erreichbar. Eine neue gültige Lizenz hebt die Sperre sofort auf.
-- Control übernimmt die Lizenz 1:1 auf seinen einen Mandanten; im Admin ist sie dort nicht änderbar.
-- Absoluter Schutz ist bei selbst gehosteter Software nicht möglich: Umgehen heisst den Code verändern. Änderungen am
-  Code müssen offengelegt und von Neruna bewilligt werden (Vertrag: Prüfrecht, Vertragsstrafe).
-- Das Admin-Dashboard der Instanz zeigt «Mandanten n / max», «Benutzer n / max» und den Lizenzstand.
-
-**Nutzungsmeldung und Verrechnung** (`App\NerunaCloud\Support\ProviderUsage`). Mit jeder Lizenzabfrage meldet die
-Instanz Mandanten, Benutzer, verwaltete Postfächer und Geräte-Addons – gesamt und «verrechenbar» (am Stichtag
-mindestens einen Monat alt) –, pro Organisation nur eine pseudonyme Referenz (HMAC), keine Namen. neruna.cloud
-behält pro Tag die neueste Meldung (`instance_usages`). Am Monatsanfang entsteht pro Provider-Instanz ein Auftrag
-der Art `usage` mit dem Stand der letzten Meldung des Vormonats: 1/12 der Jahrespreise (Admin → Lizenzen & Preise,
-inkl. Mengenrabatt nach Benutzern; Postfächer über den inbegriffenen hinaus), abzüglich des Kundenrabatts des
-Provider-Mandanten. Er geht in die Sammelrechnung des Providers (Kreditlimit, Guthaben wie bei Resellern), datiert
-auf den letzten Tag des Monats. Control wird über seine Lizenz verrechnet, nicht über die Nutzung.
-
-**Servereinstellungen** (`App\Support\EnvSettings`, Admin → Einstellungen). Mailserver, Kontaktadresse, Name,
-Sprache, Zeitzone, Lizenzschlüssel, Protokolldauer, Cron-Token – auf neruna.cloud zusätzlich Zahlungs- und
-Auslieferungswerte – kommen aus der `.env` oder, wo die `.env` sie nicht setzt, aus dem Admin (DB, geheime Werte
-mit APP_KEY verschlüsselt, nicht im Protokoll). Die `.env` gewinnt und wird nur angezeigt (geheime Werte teilweise).
-Auf neruna.cloud bleiben geheime Werte nur in der `.env`. Was vor der Datenbank nötig ist (APP_KEY, APP_URL, DB_*,
-TRUSTED_PROXIES), gibt es nur in der `.env`. Die Kontaktadresse (`NERUNA_CONTACT_EMAIL`, sonst info@neruna.org bzw.
-auf Instanzen die Absenderadresse) füllt `:contact` in allen Texten; `:ordering` verweist auf neruna.cloud auf die
-Bestellung im Portal, auf Instanzen an die Kontaktadresse (`App\Support\ContactTranslator`).
-
-**Auslieferung.**
-
-| | neruna.cloud | Provider und Control |
-|---|---|---|
-| Form | Git: `scripts/deploy.sh` (pull, composer, migrate, optimize); ZIP aus `scripts/package-shared-hosting.sh` nur für Hostings ohne Git | Docker-Image auf GHCR (`ghcr.io/nerunamail/neruna-server:<version>`) |
-| Gebaut von | Deploy auf dem Hosting | GitHub Actions bei jedem Release-Tag (Tests, dann Image) |
-| Inhalt | ganzes Repo inkl. `app/NerunaCloud` | ohne `app/NerunaCloud`, Migrationen beim Start |
-| Update | `scripts/deploy.sh` | `./neruna-update` (fragt neruna.cloud nach Version und Quelle, holt, startet neu; `rollback`) |
-
-GHCR: Container-Images sind zurzeit gratis (Speicher und Download; Änderungen kündigt GitHub einen Monat vorher an).
-Image komprimiert ca. 270–290 MB, davon gut 210 MB Grundimage; Updates laden nur geänderte Schichten (ca. 40–60 MB).
-
-**Zugang zu den Images.** Die Instanz kennt nur ihren Schlüssel (Admin → Verrechnung → Instanzen, als Hash
-gespeichert) und neruna.cloud. `./neruna-update` fragt `GET /api/dist/v1/release` und erhält Version, Quelle
-(`registry` oder später `archive`), Image und Zugangsdaten; es meldet sich nur für diesen Pull an (eigene
-Docker-Konfiguration, nichts bleibt auf dem Host) und gibt dem Image den lokalen Namen `neruna/server:current`, den
-die ausgelieferte `docker-compose.yml` verwendet. Skript und `docker-compose.yml` holt es jedes Mal neu von
-`neruna.cloud/dist/`; eigene Anpassungen des Providers gehören in `docker-compose.override.yml`. So kann die Quelle
-(GHCR, eigene Registry, Download) wechseln, ohne dass der Provider etwas ändert. Für GHCR liefert neruna.cloud die
-Zugangsdaten eines eigenen GitHub-Kontos mit Leserecht nur auf das Paket (Token classic, `read:packages`): Provider
-brauchen kein GitHub-Konto, und Zugang gibt und entzieht allein der Schlüssel der Instanz. Weil alle dasselbe Token
-erhalten, wird es nach dem Sperren einer Instanz erneuert. Wird GHCR kostenpflichtig, reicht ein bezahlter Plan
-(oder ein Wechsel der Quelle).
-
-**Reihenfolge.** 1. Code-Trennung nach `app/NerunaCloud` und Modus `provider` (ohne neue Funktion). 2. Image-Build in
-der CI, GHCR, Instanzen mit Schlüssel und `neruna-update`. 3. Instanz-Registrierung, Lizenz, Nutzungsmeldung, Verrechnung an den
-Provider. 4. (entfällt: Zugang über den Instanz-Schlüssel.) 5. Branding des Portals pro Instanz. 6. Vertrag und Dokumentation für Provider.
+Der Server (Neruna Cloud, Control auf dem eigenen Server, Betrieb beim Provider) ist proprietär und liegt in einem
+privaten Repo; seine Architektur ist dort beschrieben (`server/docs/architecture.md`). Für den Client zählt nur der
+API-Vertrag (`server/contract/openapi.yaml`) samt den Zero-Knowledge-Formaten in den Abschnitten 6–6c.
 
 ## 6. Config-Tresor (Zero-Knowledge)
 
@@ -729,8 +608,7 @@ Zertifikat: CEK (256 bit, zufällig)
 Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Signatur freigegeben
 ```
 
-- Alles Geheime entsteht im Browser (`server/public/js/neruna-certificates.js`, WebCrypto + node-forge für
-  PKCS#12) bzw. auf dem Gerät (`Neruna.Vault.CertificateEnvelopes`); der Server prüft nur Formate und Signaturen.
+- Alles Geheime entsteht im Browser (Portal, WebCrypto + node-forge für PKCS#12) bzw. auf dem Gerät (`Neruna.Vault.CertificateEnvelopes`); der Server prüft nur Formate und Signaturen.
 - Die App übernimmt nur, was der beim ersten Mal gemerkte Organisations-Signaturschlüssel signiert hat; neue Geräte
   erhalten Zertifikate erst nach Freigabe im Portal. Entfernen wirkt nur für die Zukunft (bei Austritt widerrufen).
 - Grenze: Die Portalseite selbst kommt vom Server – ein kompromittierter Server könnte veränderten Code ausliefern.
@@ -887,11 +765,6 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
 | 1 | Lizenz Client/Shared | ✔ MPL 2.0 (Beiträge mit CLA) |
 | 2 | Endbenutzer-Auth gegenüber Cloud | ✔ Geräte-Code aus dem Portal + PIN, danach Geräteschlüssel |
 | 3 | Admin-Escrow für Tresor | Für S/MIME-Zertifikate ✔ Organisationsschlüssel (6b); Config-Tresor ✔ ohne Escrow |
-| 4 | Preismodell | pro User · pro Domain · Staffeln |
 | 5 | UI-Sprachen | ✔ de/en/fr/it: deutscher Text als Schlüssel, Kataloge `Neruna.Core/Localization/*.json`, Wahl unter Design (Neustart) |
 | 6 | HTML-Darstellung von Mails | ✔ Lesen und Verfassen: native WebView (WebView2/WebKit); Avalonia.HtmlRenderer nur für PDF-Export und Vorschauen. Avalonias RichTextEditor ist kommerziell → nicht verwendet |
-| 7 | Admin-UI Server | ✔ Filament 5 |
 | 8 | Produkt-Domain | ✔ neruna.org |
-| 9 | Provider: Abrechnungsbasis | ✔ Stand am letzten Tag des Monats; Benutzer und Postfächer jünger als ein Monat erst ab dem nächsten Stichtag |
-| 10 | Provider: Verhalten ohne gültige Lizenz | ✔ sofort nichts Neues mehr (Organisationen, Kopplungen) mit Hinweis; nach 6 Monaten sperrt der Server |
-| 11 | Provider: Anpassungen | ✔ Code-Änderungen nur offengelegt und von Neruna bewilligt |
