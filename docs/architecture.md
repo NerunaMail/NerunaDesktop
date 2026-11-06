@@ -591,13 +591,18 @@ sie in seinem eigenen System. Neruna verrechnet dem Provider die gemeldete Nutzu
 **Betriebsmodi** (`NERUNA_MODE`): `cloud` (neruna.cloud), `provider` (beim Provider, mandantenfähig), `control`
 (beim Kunden, eine Organisation). Eine Codebasis, kein zweites Repo.
 
-**Code-Trennung.** Alles, was nur neruna.cloud als Anbieter braucht, liegt unter `server/app/Cloud/` und wird von
-einem eigenen ServiceProvider nur im Modus `cloud` registriert. Dazu gehören: Website und Registrierung,
+**Code-Trennung.** Alles, was nur neruna.cloud als Anbieter braucht, liegt unter `server/app/NerunaCloud/` (Namespace
+`App\NerunaCloud`; `app/Cloud` enthält dagegen gemeinsame Dienste wie Geräte-Anmeldung und Chat) und wird von
+`NerunaCloudServiceProvider` nur im Modus `cloud` registriert – samt Routen (`app/NerunaCloud/routes.php`), Views
+(`cloud::…`) und Filament-Seiten. Dazu gehören: Website und Registrierung,
 Nutzungsbedingungen, Paddle/Payrexx, Bestellungen, Rechnungen, Steuerregeln, Lizenzpreise, Rabatte,
 Reseller-Programm (Anträge, Sammelrechnung, Kreditlimit, Guthaben), Testzeit-Anfragen, Autoconfig-Verzeichnis und
 Absturzberichte. Die Trennung geht durch beide Panels: auch Abschnitte einzelner Seiten (z. B. Rabatt und
-Reseller-Konto im Mandanten, Rechnungen auf der Lizenzseite) gehören dazu. Der Code ausserhalb von `app/Cloud`
-darf nichts daraus brauchen; die Tests laufen komplett im Modus `cloud` und ohne `app/Cloud` im Modus `provider`.
+Reseller-Konto im Mandanten, Rechnungen auf der Lizenzseite) gehören dazu. Der Code ausserhalb von `app/NerunaCloud`
+darf nichts daraus brauchen; gemeinsame Seiten bieten dafür Erweiterungspunkte (`App\Support\Extensions`, z. B.
+`portal.license.data`, `admin.tenant.sections`, `maintenance`). Die Tests laufen komplett im Modus `cloud`
+(`php artisan test`) und ohne `app/NerunaCloud` im Modus `provider` (`scripts/test-provider.sh`); Tests nur für
+neruna.cloud liegen in `tests/Feature/NerunaCloud` oder rufen `$this->cloudOnly()` auf.
 
 | Bereich | Beim Provider |
 |---|---|
@@ -630,7 +635,7 @@ bei Resellern). Schnittstelle in `server/contract/openapi.yaml`, nur additiv.
 |---|---|---|
 | Form | Git: `scripts/deploy.sh` (pull, composer, migrate, optimize); ZIP aus `scripts/package-shared-hosting.sh` nur für Hostings ohne Git | Docker-Image auf GHCR (`ghcr.io/nerunamail/neruna-server:<version>`) |
 | Gebaut von | Deploy auf dem Hosting | GitHub Actions bei jedem Release-Tag (Tests, dann Image) |
-| Inhalt | ganzes Repo inkl. `app/Cloud` | ohne `app/Cloud`, Migrationen beim Start |
+| Inhalt | ganzes Repo inkl. `app/NerunaCloud` | ohne `app/NerunaCloud`, Migrationen beim Start |
 | Update | `scripts/deploy.sh` | `docker compose pull && docker compose up -d` |
 
 GHCR: Container-Images sind zurzeit gratis (Speicher und Download; Änderungen kündigt GitHub einen Monat vorher an).
@@ -644,7 +649,7 @@ Status eingeladen/aktiv/gesperrt), automatisch entzogen bei Sperre oder überfä
 für dieses Repo, in `.env`. Vor dem Bau von Hand prüfen: externer Mitarbeitender erbt den Image-Zugriff
 (einladen, `docker login ghcr.io`, pull, entfernen).
 
-**Reihenfolge.** 1. Code-Trennung nach `app/Cloud` und Modus `provider` (ohne neue Funktion). 2. Image-Build in
+**Reihenfolge.** 1. Code-Trennung nach `app/NerunaCloud` und Modus `provider` (ohne neue Funktion). 2. Image-Build in
 der CI und GHCR mit `neruna-server-dist`. 3. Instanz-Registrierung, Lizenz, Nutzungsmeldung, Verrechnung an den
 Provider. 4. GitHub-Zugang im Admin. 5. Branding des Portals pro Instanz. 6. Vertrag und Dokumentation für Provider.
 
