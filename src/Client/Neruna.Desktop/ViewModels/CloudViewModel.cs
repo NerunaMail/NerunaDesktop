@@ -558,6 +558,10 @@ internal sealed partial class CloudViewModel(
     {
         Error = null;
         IsAdding = false;
+        LinkText = null;
+        Server = DefaultServer;
+        Code = string.Empty;
+        Pin = string.Empty;
     }
 
     /// <summary>Connections changed (the chat page reloads its tabs).</summary>
@@ -596,6 +600,12 @@ internal sealed partial class CloudViewModel(
 
             // The organisations' servers also answer "which mail server?" when an account is added.
             discovery.OrganizationServers = [.. all.Select(c => c.Server)];
+
+            // Opened from a link before the connections were loaded: the form for another organisation stays open.
+            if (LinkText is not null && all.Count > 0)
+            {
+                IsAdding = true;
+            }
         }
         finally
         {
@@ -611,6 +621,25 @@ internal sealed partial class CloudViewModel(
 
     [ObservableProperty]
     public partial string Server { get; set; } = DefaultServer;
+
+    /// <summary>Opened from the link in the mail: server and code are filled in, the PIN is still asked for.</summary>
+    [ObservableProperty]
+    public partial string? LinkText { get; set; }
+
+    /// <summary>
+    /// The link from the mail ("In Neruna Desktop öffnen"): fills in server and code – nothing is sent before the person
+    /// enters the PIN and confirms. Already connected: the form for another organisation.
+    /// </summary>
+    public void OpenLink(CloudConnectLink link)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        Error = null;
+        Server = link.ServerText;
+        Code = link.Code ?? string.Empty;
+        Pin = string.Empty;
+        IsAdding = !IsNotConnected;
+        LinkText = F("Aus dem Link übernommen: Server {0}. Bitte noch die PIN eingeben, die Sie separat erhalten haben.", link.Server.Host);
+    }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
@@ -749,6 +778,7 @@ internal sealed partial class CloudViewModel(
             Code = string.Empty;
             Pin = string.Empty;
             IsAdding = false;
+            LinkText = null;
             Server = DefaultServer;
             await LoadConnectionsAsync(connection.Id);
             await LoadProfileAsync();

@@ -129,6 +129,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         AutoReplies = autoReplies;
         _reminders = reminders;
         _settings = settings;
+        _cloudController = cloudController;
         _cloudSignatures = cloudSignatures;
         _cloudTemplates = cloudTemplates;
         _cloudTags = cloudTags;
@@ -657,7 +658,39 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 CurrentPage = MailPage;
                 await MailPage.ComposeFromProgramAsync(item);
             }
+            else if (Neruna.Core.Cloud.CloudConnectLink.TryParse(item) is { } link)
+            {
+                // No account yet: the organisation's accounts come with the connection – the setup is not needed first.
+                _cloudLinkOpened = true;
+                Overlay = Overlay is CrashReportViewModel ? Overlay : null;
+                CurrentPage = SettingsPage;
+                SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+                SettingsPage.Cloud.OpenLink(link);
+            }
         }
+    }
+
+    private bool _cloudLinkOpened;
+
+    private readonly Neruna.Core.Cloud.CloudController _cloudController;
+
+    // Device setting (cloud.* stays out of the personal backup): the clipboard was looked at once.
+    private const string FirstStartKey = "cloud.firstStartChecked";
+
+    /// <summary>
+    /// The very first start – no account, no organisation: the page /connect copied the connection link before the
+    /// download, so after installing only the PIN is left. True once; later starts (and updated installations, which
+    /// have accounts) never read the clipboard.
+    /// </summary>
+    public async Task<bool> IsFirstStartAsync()
+    {
+        if (await _settings.GetAsync(FirstStartKey) is not null)
+        {
+            return false;
+        }
+
+        await _settings.SetAsync(FirstStartKey, "1");
+        return (await _accounts.GetAccountsAsync()).Count == 0 && (await _cloudController.GetConnectionsAsync()).Count == 0;
     }
 
     public async Task StartAsync()
@@ -668,7 +701,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _ = ChatPage.StartAsync();
         if (!HasAccounts)
         {
-            ShowAccountSetup();
+            // Started from the link in the connection mail: the cloud form stays in front.
+            if (!_cloudLinkOpened)
+            {
+                ShowAccountSetup();
+            }
+
             return;
         }
 

@@ -161,10 +161,28 @@ internal sealed partial class App : Application
 
             desktop.ShutdownRequested += (_, _) => Shutdown.Cancel();
             Infrastructure.DefaultMailApp.Current?.Refresh();
+            Infrastructure.LinkProtocol.Register();
 
             // A file or link the system started Neruna with opens at once, not only after the first sync of all accounts.
             var starting = viewModel.StartAsync();
             Open(desktop.Args ?? []);
+            // Installed from the page /connect: the link it copied (only on the very first start, only a connection link).
+            if (!(desktop.Args ?? []).Any(SystemOpen.IsConnectLink) && await viewModel.IsFirstStartAsync() && main.Clipboard is { } clipboard)
+            {
+                try
+                {
+                    if (await Avalonia.Input.Platform.ClipboardExtensions.TryGetTextAsync(clipboard) is { } copied
+                        && Neruna.Core.Cloud.CloudConnectLink.TryParse(copied) is not null)
+                    {
+                        Open([copied.Trim()]);
+                    }
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or TimeoutException)
+                {
+                    // No clipboard: the link can still be opened again from the page.
+                }
+            }
+
             await starting;
             _ = _services.GetRequiredService<PrivacyService>().StartPhishingListAsync();
 

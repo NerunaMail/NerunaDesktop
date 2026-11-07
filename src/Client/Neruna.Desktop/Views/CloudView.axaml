@@ -56,6 +56,9 @@
         <TextBlock Text="{l:T 'Weitere Organisation verbinden'}" FontSize="16" FontWeight="SemiBold" IsVisible="{Binding IsAdding}" />
         <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding IsAdding}"
                    Text="{l:T 'Mit dem Verbindungscode einer weiteren Organisation erhält Neruna auch deren Signaturen, Vorlagen, Zertifikate und Konten. Die Organisationen erfahren nichts voneinander.'}" />
+        <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,8" IsVisible="{Binding LinkText, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Text="{Binding LinkText}" TextWrapping="Wrap" />
+        </Border>
         <TextBlock Text="{l:T 'Server'}" FontWeight="SemiBold" />
         <TextBox Text="{Binding Server}" PlaceholderText="{l:T 'https://neruna.cloud'}" />
         <TextBlock Text="{l:T 'Verbindungscode'}" FontWeight="SemiBold" Margin="0,6,0,0" />

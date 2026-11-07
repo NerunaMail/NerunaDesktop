@@ -291,6 +291,12 @@ die App mit einer signierten JWT-Assertion (ES256, wie OAuth private_key_jwt) an
 Verbindung (Server, Geräte-ID, Organisation) steht in den Einstellungen `cloud.connection`; die Kontoeinrichtung fragt
 zuerst die Server der verbundenen Organisationen (`AccountDiscovery.OrganizationServers`). Nur HTTPS, ausser
 `localhost` zum Entwickeln. Vertrag: `server/contract/openapi.yaml` (enrollment, token, me).
+**Link zum Verbinden:** `neruna://connect?server=…&code=…` (`CloudConnectLink`) füllt Server und Code aus, die PIN
+fragt das Formular; verbunden wird erst nach der Bestätigung. Das Portal und die Mail verlinken eine https-Seite des
+Servers, die diesen Link öffnet (Code im Fragment); öffnet sich nichts, kopiert ihr Download-Knopf den Link,
+und der allererste Start (ohne Konto und Organisation, einmalig: `cloud.firstStartChecked`) übernimmt ihn aus der
+Zwischenablage. Das Schema registriert die App bei jedem Start (`LinkProtocol`;
+macOS im Info.plist).
 
 **Serverregeln:** `IServerRulesProvider` (Core) mit einem gemeinsamen Modell: Bedingungen (Absender, Empfänger,
 Betreff, Text «enthält», alle müssen zutreffen) und Aktionen (verschieben, gelesen, kennzeichnen, weiterleiten,

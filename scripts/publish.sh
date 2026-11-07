@@ -75,6 +75,11 @@ PY
       <key>CFBundleURLName</key><string>E-Mail</string>
       <key>CFBundleURLSchemes</key><array><string>mailto</string></array>
     </dict>
+    <!-- neruna://connect?… – the button in the mail with the connection code (Einstellungen → Cloud) -->
+    <dict>
+      <key>CFBundleURLName</key><string>Neruna</string>
+      <key>CFBundleURLSchemes</key><array><string>neruna</string></array>
+    </dict>
   </array>
   <key>CFBundleDocumentTypes</key>
   <array>

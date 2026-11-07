@@ -14,7 +14,11 @@ internal static class Program
         var velopack = Velopack.VelopackApp.Build();
         if (OperatingSystem.IsWindows())
         {
-            velopack = velopack.OnBeforeUninstallFastCallback(_ => Infrastructure.DefaultMailApp.Current?.Unregister());
+            velopack = velopack.OnBeforeUninstallFastCallback(_ =>
+            {
+                Infrastructure.DefaultMailApp.Current?.Unregister();
+                Infrastructure.LinkProtocol.Unregister();
+            });
         }
 
         // Another profile running: a downloaded update waits for "Jetzt neu starten" (or a start with nothing else

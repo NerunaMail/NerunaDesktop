@@ -29,5 +29,8 @@ internal static class SystemOpen
     /// <summary>A mail handed over by another program through Simple MAPI (Neruna's DLL; see MapiRequest).</summary>
     public static bool IsMapi(string item) => Neruna.Core.Mail.MapiRequest.IsRequest(item);
 
-    public static bool IsOpenable(string item) => item == Activate || IsMailto(item) || IsEml(item) || IsMapi(item);
+    /// <summary>"neruna://connect?…" – the button in the mail with the connection code.</summary>
+    public static bool IsConnectLink(string item) => Neruna.Core.Cloud.CloudConnectLink.IsConnectLink(item);
+
+    public static bool IsOpenable(string item) => item == Activate || IsMailto(item) || IsEml(item) || IsMapi(item) || IsConnectLink(item);
 }
