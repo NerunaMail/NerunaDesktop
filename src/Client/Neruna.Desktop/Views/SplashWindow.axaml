@@ -36,8 +36,9 @@
       <Grid RowDefinitions="*,Auto" Margin="36,30,32,24">
         <StackPanel VerticalAlignment="Center" Spacing="10">
           <Image Source="/Assets/logo.png" Width="270" HorizontalAlignment="Left" />
-          <TextBlock Text="{l:T 'Mail · Kalender · Kontakte'}" FontSize="15" Foreground="#D9E6F0FF" Margin="4,2,0,0" />
-          <TextBlock Text="{l:T 'Groupware by Patrik'}" FontSize="12" Foreground="#8CA9B8E0" Margin="4,0,0,0" />
+          <!-- The claim and the kind of software: English in every language (brand line, like the name) -->
+          <TextBlock Text="Your Workspace. Your Freedom." FontSize="16" FontWeight="SemiBold" Foreground="#E6F0FF" Margin="4,4,0,0" />
+          <TextBlock Text="Open Source Groupware" FontSize="12" Foreground="#8CA9B8E0" Margin="4,0,0,0" />
         </StackPanel>
 
         <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">

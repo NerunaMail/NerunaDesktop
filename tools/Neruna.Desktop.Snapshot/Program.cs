@@ -1610,7 +1610,7 @@ internal static class Snapshots
             vm.NavigateCommand.Execute(Section.Settings);
         }
 
-        vm.SettingsPage.SelectedTab = 8;
+        vm.SettingsPage.SelectedTab = SettingsViewModel.AboutTab;
         await SaveAsync(window, output, "settings-about.png");
 
         // Crash report offered after a crash: "Details anzeigen" shows exactly what is sent (cleaned).

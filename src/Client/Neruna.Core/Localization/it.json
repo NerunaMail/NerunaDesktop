@@ -1,4 +1,5 @@
 {
+ "Entwickelt von Patrik Zimmermann": "Sviluppato da Patrik Zimmermann",
  " (ganztägig)": " (tutto il giorno)",
  " ({0})": " ({0})",
  " Der Termin ist nicht (mehr) in Ihrem Kalender.": " L'appuntamento non è (più) nel tuo calendario.",
@@ -912,7 +913,6 @@
  "Google Kalender zeigt Kalender anderer Apps erst, wenn sie dort eingeschaltet sind: im Google Kalender Menü → Einstellungen → Konten verwalten → «Neruna» einschalten.": "Google Calendar mostra i calendari di altre app solo dopo averli attivati: in Google Calendar, menu → Impostazioni → Gestisci account → attiva «Neruna».",
  "Graubünden": "Grigioni",
  "Grosses Bild": "Immagine grande",
- "Groupware by Patrik": "Groupware by Patrik",
  "Gruppe (schreibgeschützt)": "Gruppo (sola lettura)",
  "Gruppe bearbeiten": "Modifica gruppo",
  "Gruppe · 1 Mitglied": "Gruppo · 1 membro",
@@ -1185,7 +1185,6 @@
  "Löschen und Absage an alle?": "Eliminare e annullare per tutti?",
  "Löschen und absagen?": "Eliminare e rifiutare?",
  "Löschen …": "Elimina …",
- "Mail · Kalender · Kontakte": "Mail · Calendario · Contatti",
  "Mail, Kalender und Kontakte Ihres Microsoft-Kontos – angemeldet wird im Browser.": "Mail, calendario e contatti del tuo account Microsoft – l'accesso avviene nel browser.",
  "Mail, Kalender und Kontakte mit Anmeldung bei Microsoft.": "Mail, calendario e contatti con accesso Microsoft.",
  "Mails aus diesem Zeitraum lädt Neruna samt Anhängen herunter, damit sie auch ohne Internet lesbar sind. Ältere werden beim Öffnen geladen.": "Neruna scarica le e-mail di questo periodo con gli allegati, così si possono leggere anche senza internet. Quelle più vecchie vengono caricate all'apertura.",

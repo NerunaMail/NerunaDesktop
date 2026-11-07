@@ -10,6 +10,7 @@
       <Image Source="/Assets/logo.png" Width="270" HorizontalAlignment="Left" />
       <TextBlock Text="{l:T 'Neruna Desktop'}" FontSize="22" FontWeight="SemiBold" />
       <TextBlock x:Name="VersionText" Classes="subtle" />
+      <TextBlock Classes="subtle" Text="{l:T 'Entwickelt von Patrik Zimmermann'}" />
 
       <!-- Updates (installed version only) -->
       <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="12,10" Margin="0,4,0,0">
@@ -61,6 +62,7 @@
 
       <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,12,0,0">
         <HyperlinkButton Content="{l:T 'neruna.org'}" NavigateUri="https://neruna.org" Padding="0" />
+        <HyperlinkButton Content="GitHub" NavigateUri="https://github.com/NerunaMail/NerunaDesktop" Padding="0" />
         <HyperlinkButton Content="{l:T 'Devblog – was neu ist'}" NavigateUri="{x:Static vm:SettingsViewModel.DevblogUri}" Padding="0" />
         <HyperlinkButton Content="{l:T 'info@neruna.org'}" NavigateUri="mailto:info@neruna.org" Padding="0" />
         <HyperlinkButton Content="Facebook" NavigateUri="https://www.facebook.com/NerunaMail" Padding="0" />
