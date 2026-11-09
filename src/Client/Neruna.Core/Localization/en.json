@@ -2644,7 +2644,6 @@
  "Terminumfrage «{0}» – bitte die passenden Termine wählen:": "Scheduling poll “{0}” – please choose the dates that suit you:",
  "Terminumfrage: {0}": "Scheduling poll: {0}",
  "Terminumfragen": "Scheduling polls",
- "Terminumfragen gibt es mit einer Verbindung zu Neruna Cloud (Einstellungen → Cloud).": "Scheduling polls are available with a connection to Neruna Cloud (Settings → Cloud).",
  "Terminvorschläge": "Proposed dates",
  "Vielleicht": "Maybe",
  "Vorschlag entfernen": "Remove proposal",
@@ -2681,5 +2680,8 @@
  "Für {0} ist kein Zertifikat bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.": "No certificate is known for {0} – this email cannot be sent encrypted like this.",
  "Unverschlüsselt senden": "Send unencrypted",
  "Abbrechen und Empfänger anpassen": "Cancel and change recipients",
- "Empfänger entfernen": "Remove recipient"
+ "Empfänger entfernen": "Remove recipient",
+ "Neruna ist noch nicht mit Neruna Cloud verbunden": "Neruna is not connected to Neruna Cloud yet",
+ "Für Terminumfragen muss Neruna zuerst mit einem Konto bei Neruna Cloud (neruna.cloud) verbunden werden – die Eingeladenen antworten auf einer Webseite von Neruna Cloud. Verbinden unter Einstellungen → Cloud.": "For scheduling polls, Neruna first has to be connected to an account at Neruna Cloud (neruna.cloud) – invitees answer on a Neruna Cloud web page. Connect under Settings → Cloud.",
+ "Für Terminumfragen muss Neruna zuerst mit einem Konto bei Neruna Cloud verbunden werden (Einstellungen → Cloud).": "For scheduling polls, Neruna first has to be connected to an account at Neruna Cloud (Settings → Cloud)."
 }

@@ -1302,6 +1302,12 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             Overlay = null;
             _ = RefreshPollBadgeAsync();
         };
+        view.CloudSetupRequested += (_, _) =>
+        {
+            Overlay = null;
+            CurrentPage = SettingsPage;
+            SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        };
         view.MailRequested += async (_, request) =>
         {
             if (!request.Poll.OpenLink)

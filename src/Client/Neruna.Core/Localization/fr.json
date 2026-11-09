@@ -2644,7 +2644,6 @@
  "Terminumfrage «{0}» – bitte die passenden Termine wählen:": "Sondage de date « {0} » – veuillez choisir les dates qui vous conviennent :",
  "Terminumfrage: {0}": "Sondage de date : {0}",
  "Terminumfragen": "Sondages de date",
- "Terminumfragen gibt es mit einer Verbindung zu Neruna Cloud (Einstellungen → Cloud).": "Les sondages de date sont disponibles avec une connexion à Neruna Cloud (Paramètres → Cloud).",
  "Terminvorschläge": "Dates proposées",
  "Vielleicht": "Peut-être",
  "Vorschlag entfernen": "Supprimer la proposition",
@@ -2681,5 +2680,8 @@
  "Für {0} ist kein Zertifikat bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.": "Aucun certificat n'est connu pour {0} – cet e-mail ne peut pas être envoyé chiffré ainsi.",
  "Unverschlüsselt senden": "Envoyer sans chiffrement",
  "Abbrechen und Empfänger anpassen": "Annuler et modifier les destinataires",
- "Empfänger entfernen": "Retirer le destinataire"
+ "Empfänger entfernen": "Retirer le destinataire",
+ "Neruna ist noch nicht mit Neruna Cloud verbunden": "Neruna n’est pas encore connecté à Neruna Cloud",
+ "Für Terminumfragen muss Neruna zuerst mit einem Konto bei Neruna Cloud (neruna.cloud) verbunden werden – die Eingeladenen antworten auf einer Webseite von Neruna Cloud. Verbinden unter Einstellungen → Cloud.": "Pour les sondages de date, Neruna doit d’abord être connecté à un compte Neruna Cloud (neruna.cloud) – les invités répondent sur une page web de Neruna Cloud. Connexion sous Paramètres → Cloud.",
+ "Für Terminumfragen muss Neruna zuerst mit einem Konto bei Neruna Cloud verbunden werden (Einstellungen → Cloud).": "Pour les sondages de date, Neruna doit d’abord être connecté à un compte Neruna Cloud (Paramètres → Cloud)."
 }

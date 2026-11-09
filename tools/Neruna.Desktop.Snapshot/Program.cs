@@ -1092,6 +1092,12 @@ internal static class Snapshots
         pollsView.Selected = pollsView.Items[0];
         vm.Overlay = pollsView;
         await SaveAsync(window, output, "polls.png");
+        // Without Neruna Cloud (the demo has none): what is needed, and "Neue Terminumfrage" switched off.
+        var noCloud = new PollsViewModel(schedulingPolls);
+        await noCloud.RefreshAsync();
+        vm.Overlay = noCloud;
+        await SaveAsync(window, output, "polls-no-cloud.png");
+        Console.WriteLine($"Polls without cloud: needs cloud={noCloud.NeedsCloud}, new enabled={noCloud.NewCommand.CanExecute(null)}");
         vm.Overlay = new PollEditorViewModel(schedulingPolls, [DemoConnection("Beispiel AG"), DemoConnection("Verein Muster")], null, "Teamsitzung Dezember",
             [new Neruna.Core.Calendar.EventAttendee("beat@example.com", "Beat Beispiel"), new Neruna.Core.Calendar.EventAttendee("carla@example.com", "Carla Zeller")]);
         await SaveAsync(window, output, "poll-editor.png");

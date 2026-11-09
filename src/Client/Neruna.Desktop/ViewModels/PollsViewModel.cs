@@ -123,7 +123,7 @@ internal sealed partial class PollsViewModel(SchedulingPolls polls) : ViewModelB
     [NotifyPropertyChangedFor(nameof(IsEmpty))]
     public partial bool IsLoaded { get; set; }
 
-    public bool IsEmpty => IsLoaded && Items.Count == 0 && Message is null;
+    public bool IsEmpty => IsLoaded && Items.Count == 0 && Message is null && !NeedsCloud;
 
     /// <summary>The password set in this session per poll (the server keeps only its hash), for the mail.</summary>
     private readonly Dictionary<string, string> _passwords = [];
@@ -228,9 +228,9 @@ internal sealed partial class PollsViewModel(SchedulingPolls polls) : ViewModelB
         try
         {
             _connections = await polls.ConnectionsAsync();
-            if (_connections.Count == 0)
+            NeedsCloud = _connections.Count == 0;
+            if (NeedsCloud)
             {
-                Message = T("Terminumfragen gibt es mit einer Verbindung zu Neruna Cloud (Einstellungen → Cloud).");
                 Items.Clear();
                 return;
             }
@@ -285,7 +285,21 @@ internal sealed partial class PollsViewModel(SchedulingPolls polls) : ViewModelB
         }
     }
 
+    /// <summary>No Neruna Cloud connected: the overlay says how to connect, and "Neue Terminumfrage" is off.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
+    [NotifyCanExecuteChangedFor(nameof(NewCommand))]
+    public partial bool NeedsCloud { get; set; }
+
+    private bool CanNew => !NeedsCloud;
+
+    /// <summary>"Mit der Cloud verbinden …": the shell opens Einstellungen → Cloud.</summary>
+    public event EventHandler? CloudSetupRequested;
+
     [RelayCommand]
+    private void OpenCloudSetup() => CloudSetupRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand(CanExecute = nameof(CanNew))]
     private void New() => OpenEditor(new PollEditorViewModel(polls, _connections, null));
 
     [RelayCommand(CanExecute = nameof(HasSelection))]

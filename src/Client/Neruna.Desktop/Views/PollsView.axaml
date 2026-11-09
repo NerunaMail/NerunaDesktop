@@ -63,6 +63,15 @@
     <StackPanel Grid.Row="1" Margin="0,8,0,0">
       <ProgressBar IsIndeterminate="True" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" />
       <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+      <!-- Without Neruna Cloud: what is needed, and the way there -->
+      <Border IsVisible="{Binding NeedsCloud}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="14,12" Margin="0,4,0,0">
+        <StackPanel Spacing="8">
+          <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{l:T 'Neruna ist noch nicht mit Neruna Cloud verbunden'}" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="{l:T 'Für Terminumfragen muss Neruna zuerst mit einem Konto bei Neruna Cloud (neruna.cloud) verbunden werden – die Eingeladenen antworten auf einer Webseite von Neruna Cloud. Verbinden unter Einstellungen → Cloud.'}" />
+          <Button Classes="accent" Content="{l:T 'Mit der Cloud verbinden …'}" Command="{Binding OpenCloudSetupCommand}" />
+        </StackPanel>
+      </Border>
       <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding IsEmpty}"
                  Text="{l:T 'Noch keine Terminumfrage. Mit «Neue Terminumfrage» schlagen Sie Termine vor; die Eingeladenen wählen auf einer Webseite, welche passen.'}" />
     </StackPanel>

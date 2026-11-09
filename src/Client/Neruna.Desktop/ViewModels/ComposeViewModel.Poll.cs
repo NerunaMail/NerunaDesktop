@@ -29,7 +29,7 @@ internal sealed partial class ComposeViewModel
             var connections = await polls.ConnectionsAsync();
             if (connections.Count == 0)
             {
-                Notice?.Invoke(this, T("Terminumfragen gibt es mit einer Verbindung zu Neruna Cloud (Einstellungen → Cloud)."));
+                Notice?.Invoke(this, T("Für Terminumfragen muss Neruna zuerst mit einem Konto bei Neruna Cloud verbunden werden (Einstellungen → Cloud)."));
                 return;
             }
 
