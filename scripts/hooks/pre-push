@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Before every push: build (warnings are errors) and all tests in UTC, as the release build on GitHub runs them.
+# Git runs this in the repository's top folder. Turned on once per checkout:  git config core.hooksPath scripts/hooks
+# In an emergency: git push --no-verify
+set -uo pipefail
+export PATH="$HOME/.dotnet:$PATH" DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}" DOTNET_CLI_TELEMETRY_OPTOUT=1
+LOG="${TMPDIR:-/tmp}/neruna-desktop-tests.log"
+
+pushes=0
+while read -r _ local_sha _ _; do
+  [[ "$local_sha" =~ ^0+$ ]] || pushes=1
+done
+[ "$pushes" = 1 ] || exit 0
+
+echo "▶ dotnet test (TZ=UTC)"
+TZ=UTC dotnet test >"$LOG" 2>&1
+status=$?
+grep -E " error |AVLN|fehlerhaft|gesamt:|fehlgeschlagen:|erfolgreich:|übersprungen:|total:|failed:|succeeded:|skipped:" "$LOG" | tail -20
+if [ "$status" != 0 ]; then
+  echo >&2
+  echo "✗ Push abgebrochen: Build oder Tests rot (ganzes Log: $LOG; im Notfall: git push --no-verify)." >&2
+  exit 1
+fi
+echo "✓ Alles grün – Push geht raus."

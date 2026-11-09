@@ -544,6 +544,52 @@ public sealed class MailController(
         return moved;
     }
 
+    /// <summary>
+    /// Undoes a move (also archiving or deleting into the trash): the messages go back from <paramref name="movedTo"/>
+    /// to <paramref name="origin"/>, across accounts too. Their ids in the target are new, so they are found there by
+    /// their Message-ID; one without it, or no longer there, stays where it is.
+    /// </summary>
+    /// <returns>How many were moved back.</returns>
+    public async Task<int> MoveBackAsync(
+        ServiceConnection movedToConnection,
+        MailFolder movedTo,
+        IReadOnlyCollection<MessageSummary> moved,
+        ServiceConnection originConnection,
+        MailFolder origin,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(movedTo);
+        ArgumentNullException.ThrowIfNull(moved);
+        ArgumentNullException.ThrowIfNull(origin);
+
+        await SyncFolderAsync(movedToConnection, await CurrentAsync(movedTo, cancellationToken), cancellationToken);
+        var found = new List<MessageSummary>();
+        var taken = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var message in moved.Where(m => !string.IsNullOrEmpty(m.MessageId)))
+        {
+            var there = (await store.FindByMessageIdAsync(message.MessageId!, cancellationToken))
+                .FirstOrDefault(h => h.ConnectionId == movedTo.ConnectionId && h.FolderRemoteId == movedTo.RemoteId && !taken.Contains(h.RemoteId));
+            if (there.RemoteId is { } remoteId)
+            {
+                taken.Add(remoteId);
+                found.Add(message with { RemoteId = remoteId });
+            }
+        }
+
+        if (found.Count == 0)
+        {
+            return 0;
+        }
+
+        if (movedTo.ConnectionId == origin.ConnectionId)
+        {
+            await MoveAsync(movedToConnection, movedTo, [.. found.Select(m => m.RemoteId)], origin, cancellationToken);
+            return found.Count;
+        }
+
+        return await MoveToAccountAsync(movedToConnection, movedTo, found, originConnection, origin, cancellationToken);
+    }
+
     /// <summary>Moves to "Gelöschte Elemente"; deletes permanently only inside the trash or without one.</summary>
     public async Task DeleteAsync(ServiceConnection connection, MailFolder folder, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)
     {

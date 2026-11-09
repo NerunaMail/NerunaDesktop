@@ -500,7 +500,7 @@ internal static class LiveScenario
         await certificates.ImportDataAsync("anna.p12", await File.ReadAllBytesAsync(Path.Combine(CertDir, "anna.p12")), "geheim");
         await certificates.ImportDataAsync("expired.p12", await File.ReadAllBytesAsync(Path.Combine(CertDir, "expired.p12")), "geheim");
         await certificates.ImportDataAsync("testlab-ca.crt", await File.ReadAllBytesAsync(Path.Combine(CertDir, "testlab-ca.crt")), null);
-        await certificates.ImportDataAsync("lea.crt", await File.ReadAllBytesAsync(Path.Combine(CertDir, "lea.crt")), null);
+        await certificates.ImportDataAsync("lea.crt", LeaCertificate().Export(System.Security.Cryptography.X509Certificates.X509ContentType.Cert), null);
 
         var vm = services.GetRequiredService<MainWindowViewModel>();
         var window = new MainWindow { DataContext = vm, Width = 1440, Height = 880 };
@@ -632,7 +632,19 @@ internal static class LiveScenario
         // Send a signed + encrypted reply to Lea through the real SMTP server and read the copy in "Sent"... via Lea's view: just send.
         var compose = vm.MailPage.Compose!;
         compose.Sign = true;
+
+        // Encryption switched on by hand stays on when a recipient without certificate joins; sending then asks.
+        compose.Encrypt = false;
         compose.Encrypt = true;
+        compose.To = to + ", unbekannt@example.org";
+        await WaitAsync(() => compose.EncryptHint.Contains("unbekannt@example.org", StringComparison.Ordinal));
+        await compose.SendCommand.ExecuteAsync(null);
+        Console.WriteLine($"Chosen encryption, unknown recipient: encrypt={compose.Encrypt}, asked={compose.IsAskingUnencrypted}, closed={vm.MailPage.Compose is null} ({compose.EncryptHint})");
+        await Snapshots.SaveAsync(window, output, "live-compose-unencrypted-question.png");
+        compose.KeepEncryptedCommand.Execute(null);
+        compose.To = to;
+        Console.WriteLine($"After 'Abbrechen und Empfänger anpassen': asked={compose.IsAskingUnencrypted}, encrypt={compose.Encrypt}");
+
         await compose.SendCommand.ExecuteAsync(null);
         Console.WriteLine("Signed+encrypted reply sent: " + (compose.Error ?? "ok"));
         vm.MailPage.Compose = null;
@@ -646,6 +658,7 @@ internal static class LiveScenario
         await CheckPushAsync(vm, window, output, mailHost, user, services.GetRequiredService<NotificationService>());
         await CheckInvitationAsync(vm, window, output, mailHost, user, services);
         await CheckSearchAsync(vm, window, output, mailHost, user);
+        await CheckUndoAsync(vm, mailHost, user);
 
         vm.NavigateCommand.Execute(Section.Calendar);
         await Snapshots.SaveAsync(window, output, "live-calendar.png");
@@ -820,6 +833,51 @@ internal static class LiveScenario
 
         await vm.MailPage.CloseSearchCommand.ExecuteAsync(null);
         Console.WriteLine($"Search closed: back in {vm.MailPage.ListTitle}, {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()} messages");
+    }
+
+    // Ctrl+Z: deleting into the trash and moving to "Projekte" are undone – checked on the IMAP server itself.
+    private static async Task CheckUndoAsync(MainWindowViewModel vm, string mailHost, string user)
+    {
+        vm.NavigateCommand.Execute(Section.Mail);
+        var inbox = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
+            .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox && f.Account.Account.EmailAddress == user);
+        var projects = inbox.Account.AllFolders().First(f => f.Folder.RemoteId == "Projekte");
+        vm.MailPage.Tree.SelectedTreeItem = inbox;
+        await WaitAsync(() => vm.MailPage.CurrentFolder == inbox && vm.MailPage.Entries.OfType<MessageItemViewModel>().Any());
+
+        async Task<string> ServerAsync()
+        {
+            using var imap = new MailKit.Net.Imap.ImapClient();
+            await imap.ConnectAsync(mailHost, 3143, SecureSocketOptions.None);
+            await imap.AuthenticateAsync(user, "geheim");
+            var counts = new List<string>();
+            foreach (var name in new[] { "INBOX", "Trash", "Projekte" })
+            {
+                var folder = await imap.GetFolderAsync(name);
+                await folder.OpenAsync(MailKit.FolderAccess.ReadOnly);
+                counts.Add($"{name}={folder.Count}");
+            }
+
+            await imap.DisconnectAsync(true);
+            return string.Join(" ", counts);
+        }
+
+        var before = await ServerAsync();
+        var message = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+        vm.MailPage.SelectedEntry = message;
+        await vm.MailPage.DeleteCommand.ExecuteAsync(null);
+        var deleted = await ServerAsync();
+        await vm.MailPage.UndoCommand.ExecuteAsync(null);
+        Console.WriteLine($"Undo delete '{message.Subject}': {before} → {deleted} → {await ServerAsync()}; back in the list: "
+            + vm.MailPage.Entries.OfType<MessageItemViewModel>().Any(m => m.Subject == message.Subject));
+
+        var two = vm.MailPage.Entries.OfType<MessageItemViewModel>().Take(2).ToList();
+        await vm.MailPage.MoveToFolderAsync(two, projects);
+        var moved = await ServerAsync();
+        await vm.MailPage.UndoCommand.ExecuteAsync(null);
+        Console.WriteLine($"Undo move of {two.Count} to Projekte: {moved} → {await ServerAsync()}");
+        await vm.MailPage.UndoCommand.ExecuteAsync(null);
+        Console.WriteLine("Second Ctrl+Z: nothing left to undo (status only)");
     }
 
     // Invitations: Marco invites Anna by mail; the bar shows it, "Annehmen" puts it into Anna's calendar (Radicale)
@@ -1082,6 +1140,37 @@ internal static class LiveScenario
 
     private static readonly string[] PickSubjects = ["Offerte Netzwerk-Erneuerung Q4", "Newsletter Oktober"];
 
+    // Lea's certificate shows "läuft bald ab": issued by the lab CA on every run, valid 20 days from today. A file
+    // from make-certs.sh would simply expire (it did on 27 October 2026 and stopped the whole live run).
+    private static System.Security.Cryptography.X509Certificates.X509Certificate2? _lea;
+
+    private static System.Security.Cryptography.X509Certificates.X509Certificate2 LeaCertificate()
+    {
+        if (_lea is not null)
+        {
+            return _lea;
+        }
+
+        using var ca = System.Security.Cryptography.X509Certificates.X509Certificate2.CreateFromPemFile(
+            Path.Combine(CertDir, "testlab-ca.crt"), Path.Combine(CertDir, "testlab-ca.key"));
+        using var key = System.Security.Cryptography.RSA.Create(2048);
+        var request = new System.Security.Cryptography.X509Certificates.CertificateRequest(
+            "CN=Lea Keller, E=lea@example.com", key, System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(new System.Security.Cryptography.X509Certificates.X509BasicConstraintsExtension(false, false, 0, true));
+        request.CertificateExtensions.Add(new System.Security.Cryptography.X509Certificates.X509KeyUsageExtension(
+            System.Security.Cryptography.X509Certificates.X509KeyUsageFlags.DigitalSignature | System.Security.Cryptography.X509Certificates.X509KeyUsageFlags.NonRepudiation
+            | System.Security.Cryptography.X509Certificates.X509KeyUsageFlags.KeyEncipherment, true));
+        request.CertificateExtensions.Add(new System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension(
+            [new System.Security.Cryptography.Oid("1.3.6.1.5.5.7.3.4")], false));
+        var san = new System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder();
+        san.AddEmailAddress("lea@example.com");
+        request.CertificateExtensions.Add(san.Build());
+        using var issued = request.Create(ca, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(20),
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+        _lea = System.Security.Cryptography.X509Certificates.RSACertificateExtensions.CopyWithPrivateKey(issued, key);
+        return _lea;
+    }
+
     private static async Task EnsureFolderAsync(string host, string name)
     {
         using var imap = new MailKit.Net.Imap.ImapClient();
@@ -1188,7 +1277,9 @@ internal static class LiveScenario
         await lea.AuthenticateAsync("lea@example.com", "geheim");
         using (var leaContext = new TemporarySecureMimeContext())
         {
-            await using (var p12 = File.OpenRead(Path.Combine(CertDir, "lea.p12")))
+            using (var p12 = new MemoryStream(new System.Security.Cryptography.X509Certificates.X509Certificate2Collection
+                   { LeaCertificate(), System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(Path.Combine(CertDir, "testlab-ca.crt")) }
+                   .Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pfx, "geheim")!))
             {
                 leaContext.Import(p12, "geheim");
             }

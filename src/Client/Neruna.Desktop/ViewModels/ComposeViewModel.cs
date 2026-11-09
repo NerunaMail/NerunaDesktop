@@ -433,6 +433,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         if (!_settingEncrypt)
         {
             _encryptChosen = true;
+            ScheduleEncryptionCheck(); // the hint names recipients without a certificate
         }
     }
 
@@ -483,8 +484,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     partial void OnCcChanged(string value) => ScheduleEncryptionCheck();
 
+    partial void OnBccChanged(string value) => ScheduleEncryptionCheck();
+
     private void ScheduleEncryptionCheck()
     {
+        IsAskingUnencrypted = false; // the question was about the recipients as they were
         if (!_initialized)
         {
             return;
@@ -503,8 +507,16 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     private async Task UpdateEncryptionAsync(int version)
     {
-        if (!_autoEncrypt || _encryptChosen || version != _recipientVersion)
+        if (version != _recipientVersion)
         {
+            return;
+        }
+
+        // Switched on by hand (or a reply to encrypted mail): recipients do not switch it off, but the hint says who
+        // has no certificate – sending then asks (see SendAsync).
+        if (!_autoEncrypt || _encryptChosen)
+        {
+            await UpdateChosenEncryptionHintAsync(version);
             return;
         }
 
@@ -539,6 +551,56 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             ? T("Automatisch verschlüsselt: Zertifikate aller Empfänger sind bekannt")
             : T("Nicht automatisch verschlüsselt – kein Zertifikat für: ") + string.Join(", ", missing);
     }
+
+    private async Task UpdateChosenEncryptionHintAsync(int version)
+    {
+        if (!Encrypt)
+        {
+            EncryptHint = T("Mit S/MIME verschlüsseln (Zertifikate aller Empfänger nötig)");
+            return;
+        }
+
+        var missing = await MissingCertificatesAsync();
+        if (version == _recipientVersion && Encrypt)
+        {
+            EncryptHint = missing.Count == 0
+                ? T("Verschlüsselt: Zertifikate aller Empfänger sind bekannt")
+                : T("Kein Zertifikat für: ") + string.Join(", ", missing) + T(" – beim Senden wird nachgefragt");
+        }
+    }
+
+    // The recipients without a known certificate (the sender is encrypted to as well, for "Gesendet").
+    private async Task<IReadOnlyList<string>> MissingCertificatesAsync()
+    {
+        var recipients = RecipientAddresses.ToList();
+        if (recipients.Count == 0)
+        {
+            return [];
+        }
+
+        return (await _secureMime.GetCapabilitiesAsync(From.Email, recipients.Append(From.Email))).RecipientsWithoutCertificate;
+    }
+
+    /// <summary>
+    /// Sending encrypted while a recipient has no certificate: the bar asks whether to send unencrypted or to change the
+    /// recipients (encryption is never dropped silently).
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsAskingUnencrypted { get; set; }
+
+    [ObservableProperty]
+    public partial string UnencryptedQuestion { get; set; } = string.Empty;
+
+    [RelayCommand]
+    private async Task SendUnencryptedAsync()
+    {
+        IsAskingUnencrypted = false;
+        Encrypt = false;
+        await SendAsync();
+    }
+
+    [RelayCommand]
+    private void KeepEncrypted() => IsAskingUnencrypted = false;
 
     private void SetEncryptAutomatically(bool value)
     {
@@ -853,6 +915,14 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             return;
         }
 
+        if (Encrypt && await MissingCertificatesAsync() is { Count: > 0 } missing)
+        {
+            UnencryptedQuestion = F("Für {0} ist kein Zertifikat bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.", string.Join(", ", missing));
+            IsAskingUnencrypted = true;
+            return;
+        }
+
+        IsAskingUnencrypted = false;
         IsSending = true;
         try
         {

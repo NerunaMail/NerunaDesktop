@@ -2670,5 +2670,16 @@
  "Antwortmöglichkeiten": "Réponses possibles",
  "Noch keine Antworten.": "Pas encore de réponse.",
  "{0} offene Terminumfragen – {1} davon abgelaufen und noch nicht festgelegt": "{0} sondages de date ouverts – dont {1} terminés et pas encore fixés",
- "{0} offene Terminumfragen": "{0} sondages de date ouverts"
+ "{0} offene Terminumfragen": "{0} sondages de date ouverts",
+ "Nichts zum Rückgängigmachen.": "Rien à annuler.",
+ "Rückgängigmachen fehlgeschlagen": "L'annulation a échoué",
+ "Rückgängig nicht möglich: Die Nachrichten sind dort nicht mehr zu finden.": "Impossible d'annuler : les messages ne s'y trouvent plus.",
+ "Rückgängig: {0} zurück nach «{1}».": "Annulé : {0} de retour dans « {1} ».",
+ "Verschlüsselt: Zertifikate aller Empfänger sind bekannt": "Chiffré : les certificats de tous les destinataires sont connus",
+ "Kein Zertifikat für: ": "Aucun certificat pour : ",
+ " – beim Senden wird nachgefragt": " – une question sera posée à l'envoi",
+ "Für {0} ist kein Zertifikat bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.": "Aucun certificat n'est connu pour {0} – cet e-mail ne peut pas être envoyé chiffré ainsi.",
+ "Unverschlüsselt senden": "Envoyer sans chiffrement",
+ "Abbrechen und Empfänger anpassen": "Annuler et modifier les destinataires",
+ "Empfänger entfernen": "Retirer le destinataire"
 }

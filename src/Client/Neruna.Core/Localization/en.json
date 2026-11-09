@@ -2670,5 +2670,16 @@
  "Antwortmöglichkeiten": "Answer options",
  "Noch keine Antworten.": "No answers yet.",
  "{0} offene Terminumfragen – {1} davon abgelaufen und noch nicht festgelegt": "{0} open scheduling polls – {1} of them over and not fixed yet",
- "{0} offene Terminumfragen": "{0} open scheduling polls"
+ "{0} offene Terminumfragen": "{0} open scheduling polls",
+ "Nichts zum Rückgängigmachen.": "Nothing to undo.",
+ "Rückgängigmachen fehlgeschlagen": "Undo failed",
+ "Rückgängig nicht möglich: Die Nachrichten sind dort nicht mehr zu finden.": "Cannot undo: the messages are no longer there.",
+ "Rückgängig: {0} zurück nach «{1}».": "Undone: {0} back in “{1}”.",
+ "Verschlüsselt: Zertifikate aller Empfänger sind bekannt": "Encrypted: certificates of all recipients are known",
+ "Kein Zertifikat für: ": "No certificate for: ",
+ " – beim Senden wird nachgefragt": " – you will be asked when sending",
+ "Für {0} ist kein Zertifikat bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.": "No certificate is known for {0} – this email cannot be sent encrypted like this.",
+ "Unverschlüsselt senden": "Send unencrypted",
+ "Abbrechen und Empfänger anpassen": "Cancel and change recipients",
+ "Empfänger entfernen": "Remove recipient"
 }

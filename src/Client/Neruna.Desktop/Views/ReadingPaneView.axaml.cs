@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -15,6 +16,8 @@ internal sealed partial class ReadingPaneView : UserControl
         // Another mail: one line again. A new width can cut the lines (or no longer): the hint follows.
         DataContextChanged += (_, _) => ShowRecipients(expanded: false);
         RecipientLines.SizeChanged += (_, _) => UpdateRecipientsHint();
+        PreviewToolbar.SizeChanged += (_, _) => ArrangePreviewToolbar();
+        PreviewButtons.SizeChanged += (_, _) => ArrangePreviewToolbar();
         ToLine.PropertyChanged += (_, e) =>
         {
             if (e.Property == TextBlock.TextProperty)
@@ -209,5 +212,33 @@ internal sealed partial class ReadingPaneView : UserControl
         var point = e.GetPosition(image);
         e.Handled = true;
         await preview.PlaceAsync(page, point.X / image.Bounds.Width, point.Y / image.Bounds.Height);
+    }
+
+    // Attachment preview: the buttons stay right of the file name while there is room (the name keeps at least ~200 px),
+    // otherwise they move onto their own line below – instead of running past the window's edge.
+    private void ArrangePreviewToolbar()
+    {
+        var available = PreviewToolbar.Bounds.Width;
+        if (available <= 0)
+        {
+            return;
+        }
+
+        var buttons = 0.0;
+        foreach (var child in PreviewButtons.Children.Where(c => c.IsVisible))
+        {
+            buttons += child.DesiredSize.Width + 4;
+        }
+
+        var wrap = PreviewBack.Bounds.Width + 200 + buttons > available;
+        if (wrap == (Grid.GetRow(PreviewButtons) == 1))
+        {
+            return;
+        }
+
+        Grid.SetRow(PreviewButtons, wrap ? 1 : 0);
+        Grid.SetColumn(PreviewButtons, wrap ? 0 : 2);
+        Grid.SetColumnSpan(PreviewButtons, wrap ? 3 : 1);
+        PreviewButtons.Margin = wrap ? new Thickness(0, 6, 0, 0) : default;
     }
 }

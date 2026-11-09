@@ -79,6 +79,11 @@ internal sealed partial class MailView : UserControl
                 current.DeleteCommand.Execute(null);
                 e.Handled = true;
             }
+            else if (e.Key == Key.Z && e.KeyModifiers == KeyModifiers.Control && !e.Handled && ViewModel is { } undoing && DeletesMessage(undoing))
+            {
+                undoing.UndoCommand.Execute(null); // the last move, archiving or deleting (in a text field Ctrl+Z stays the text's)
+                e.Handled = true;
+            }
             else if (!e.Handled && ViewModel is { } vm && Infrastructure.Shortcuts.Of(e) is { } shortcut && vm.RunQuickActionShortcut(shortcut))
             {
                 e.Handled = true; // a quick action's own key combination (Einstellungen → Schnellaktionen)

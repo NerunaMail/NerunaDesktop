@@ -91,11 +91,13 @@ internal sealed class FakeMailServer
     /// <summary>Counts deliveries, so a watcher notices one that happened while it was not waiting.</summary>
     public int Version => Volatile.Read(ref _version);
 
+    public string NextId() => (_nextId++).ToString(CultureInfo.InvariantCulture);
+
     public MessageSummary Deliver(string folder, string subject, DateTimeOffset date, MessageFlags flags = MessageFlags.None, string? messageId = null)
     {
         Interlocked.Increment(ref _version);
         Interlocked.Exchange(ref _changed, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
-        var id = (_nextId++).ToString(CultureInfo.InvariantCulture);
+        var id = NextId();
         var message = new MessageSummary(id, messageId ?? $"<{id}@example.com>", null, subject, new MailAddress("Bob", "bob@example.com"), [], date, flags, 1000, false, "preview " + subject);
         Folders[folder].Add(message);
         return message;
@@ -220,9 +222,10 @@ internal sealed class FakeMailProvider(Guid connectionId, FakeMailServer server)
 
     public Task MoveAsync(MailFolder source, IReadOnlyCollection<string> remoteIds, MailFolder target, CancellationToken cancellationToken = default)
     {
+        // Like IMAP (UIDs per folder), a moved message gets a new id in its target folder.
         var moving = server.Folders[source.RemoteId].Where(m => remoteIds.Contains(m.RemoteId)).ToList();
         server.Folders[source.RemoteId].RemoveAll(m => remoteIds.Contains(m.RemoteId));
-        server.Folders[target.RemoteId].AddRange(moving);
+        server.Folders[target.RemoteId].AddRange(moving.Select(m => m with { RemoteId = server.NextId() }));
         return Task.CompletedTask;
     }
 

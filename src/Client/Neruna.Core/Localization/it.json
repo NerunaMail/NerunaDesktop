@@ -2670,5 +2670,16 @@
  "Antwortmöglichkeiten": "Risposte possibili",
  "Noch keine Antworten.": "Ancora nessuna risposta.",
  "{0} offene Terminumfragen – {1} davon abgelaufen und noch nicht festgelegt": "{0} sondaggi sulla data aperti – di cui {1} scaduti e non ancora fissati",
- "{0} offene Terminumfragen": "{0} sondaggi sulla data aperti"
+ "{0} offene Terminumfragen": "{0} sondaggi sulla data aperti",
+ "Nichts zum Rückgängigmachen.": "Niente da annullare.",
+ "Rückgängigmachen fehlgeschlagen": "Annullamento non riuscito",
+ "Rückgängig nicht möglich: Die Nachrichten sind dort nicht mehr zu finden.": "Impossibile annullare: i messaggi non si trovano più lì.",
+ "Rückgängig: {0} zurück nach «{1}».": "Annullato: {0} di nuovo in «{1}».",
+ "Verschlüsselt: Zertifikate aller Empfänger sind bekannt": "Cifrato: i certificati di tutti i destinatari sono noti",
+ "Kein Zertifikat für: ": "Nessun certificato per: ",
+ " – beim Senden wird nachgefragt": " – verrà chiesto all'invio",
+ "Für {0} ist kein Zertifikat bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.": "Per {0} non è noto alcun certificato – così questa e-mail non può essere inviata cifrata.",
+ "Unverschlüsselt senden": "Invia senza cifratura",
+ "Abbrechen und Empfänger anpassen": "Annulla e modifica i destinatari",
+ "Empfänger entfernen": "Rimuovi destinatario"
 }

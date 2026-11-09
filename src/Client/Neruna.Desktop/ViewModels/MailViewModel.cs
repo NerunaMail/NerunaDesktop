@@ -855,7 +855,7 @@ internal sealed partial class MailViewModel(
     {
         if (!InReadOnly(ActionTargets))
         {
-            await RunOnMessagesAsync(ActionTargets, T("Löschen"), (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true);
+            await RunOnMessagesAsync(ActionTargets, T("Löschen"), (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true, movesTo: TrashOf);
         }
     }
 
@@ -864,7 +864,8 @@ internal sealed partial class MailViewModel(
     {
         if (!InReadOnly(ActionTargets))
         {
-            await RunOnMessagesAsync(ActionTargets, T("Archivieren"), (connection, folder, ids) => mail.ArchiveAsync(connection, folder, ids), removesMessages: true);
+            await RunOnMessagesAsync(ActionTargets, T("Archivieren"), (connection, folder, ids) => mail.ArchiveAsync(connection, folder, ids), removesMessages: true,
+                movesTo: f => f.Account.AllFolders().FirstOrDefault(n => n.Folder.Role == FolderRole.Archive));
         }
     }
 
@@ -1221,7 +1222,7 @@ internal sealed partial class MailViewModel(
         // Still in the list: delete like from the toolbar (the list and counters follow).
         if (_allMessages.Contains(message))
         {
-            return await RunOnMessagesAsync([message], T("Löschen"), (connection, f, ids) => mail.DeleteAsync(connection, f, ids), removesMessages: true);
+            return await RunOnMessagesAsync([message], T("Löschen"), (connection, f, ids) => mail.DeleteAsync(connection, f, ids), removesMessages: true, movesTo: TrashOf);
         }
 
         try
@@ -1353,7 +1354,7 @@ internal sealed partial class MailViewModel(
                 ? mail.MoveAsync(connection, folder, ids, target.Folder)
                 : mail.MoveToAccountAsync(connection, folder, messages.Where(m => ids.Contains(m.Summary.RemoteId) && FolderOf(m)!.Folder == folder).Select(m => m.Summary).ToList(), target.Account.Connection, target.Folder);
 
-        if (await RunOnMessagesAsync(messages, T("Verschieben"), operation, removesMessages: true))
+        if (await RunOnMessagesAsync(messages, T("Verschieben"), operation, removesMessages: true, movesTo: _ => target))
         {
             target.UnreadCount += unread;
             StatusMessage?.Invoke(this, sameAccount
@@ -1393,7 +1394,22 @@ internal sealed partial class MailViewModel(
 
     private static string LeavingKey(MailFolder folder, string remoteId) => $"{FolderKey(folder)}|{remoteId}";
 
-    private async Task<bool> RunOnMessagesAsync(IReadOnlyList<MessageItemViewModel> messages, string action, Func<ServiceConnection, MailFolder, IReadOnlyCollection<string>, Task> operation, bool removesMessages)
+    // Deleting moves into the account's trash – except inside it (then it is gone for good, nothing to undo).
+    private static MailFolderNode? TrashOf(MailFolderNode folder) => folder.Folder.Role == FolderRole.Trash
+        ? null
+        : folder.Account.AllFolders().FirstOrDefault(n => n.Folder.Role == FolderRole.Trash);
+
+    // Ctrl+Z: the last move, archiving or deleting into the trash – per source folder, where they went and what they were.
+    private sealed record UndoStep(MailFolderNode From, MailFolderNode To, IReadOnlyList<MessageSummary> Messages);
+
+    private IReadOnlyList<UndoStep>? _undo;
+
+    /// <summary>
+    /// Runs <paramref name="operation"/> per folder. <paramref name="movesTo"/> names where the messages of a folder end
+    /// up when the operation moves them; then Ctrl+Z can bring them back (any other operation forgets the last one).
+    /// </summary>
+    private async Task<bool> RunOnMessagesAsync(IReadOnlyList<MessageItemViewModel> messages, string action, Func<ServiceConnection, MailFolder, IReadOnlyCollection<string>, Task> operation, bool removesMessages,
+        Func<MailFolderNode, MailFolderNode?>? movesTo = null)
     {
         if (messages.Count == 0 || messages.Any(m => FolderOf(m) is null))
         {
@@ -1401,6 +1417,14 @@ internal sealed partial class MailViewModel(
         }
 
         var groups = messages.GroupBy(m => FolderOf(m)!).ToList();
+        var undo = movesTo is null
+            ? []
+            : groups.Select(g => movesTo(g.Key) is { } to && to != g.Key ? new UndoStep(g.Key, to, [.. g.Select(m => m.Summary)]) : null).OfType<UndoStep>().ToList();
+        if (removesMessages)
+        {
+            _undo = null;
+        }
+
         var leaving = removesMessages ? groups.SelectMany(g => g.Select(m => LeavingKey(g.Key.Folder, m.Summary.RemoteId))).ToList() : [];
         if (removesMessages)
         {
@@ -1434,6 +1458,7 @@ internal sealed partial class MailViewModel(
                 await operation(group.Key.Account.Connection, group.Key.Folder, group.Select(m => m.Summary.RemoteId).ToList());
             }
 
+            _undo = undo.Count > 0 ? undo : null;
             return true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -1457,6 +1482,47 @@ internal sealed partial class MailViewModel(
             _leaving.ExceptWith(leaving);
             _serverOperations.Release();
         }
+    }
+
+    /// <summary>Ctrl+Z in the mail list: moves the messages of the last move, archiving or deleting back.</summary>
+    [RelayCommand]
+    private async Task UndoAsync()
+    {
+        if (_undo is not { } undo)
+        {
+            StatusMessage?.Invoke(this, T("Nichts zum Rückgängigmachen."));
+            return;
+        }
+
+        _undo = null;
+        var back = 0;
+        await _serverOperations.WaitAsync();
+        try
+        {
+            foreach (var step in undo)
+            {
+                back += await mail.MoveBackAsync(step.To.Account.Connection, step.To.Folder, step.Messages, step.From.Account.Connection, step.From.Folder);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(T("Rückgängigmachen fehlgeschlagen"), ex);
+        }
+        finally
+        {
+            _serverOperations.Release();
+        }
+
+        await Tree.UpdateCountsAsync();
+        if (!IsSearchMode && CurrentFolder is { } folder)
+        {
+            await LoadFolderAsync(folder, SelectedMessage?.Summary.RemoteId);
+        }
+
+        var what = back == 1 ? T("Nachricht") : F("{0} Nachrichten", back);
+        StatusMessage?.Invoke(this, back == 0
+            ? T("Rückgängig nicht möglich: Die Nachrichten sind dort nicht mehr zu finden.")
+            : F("Rückgängig: {0} zurück nach «{1}».", what, undo[0].From.Name));
     }
 
     private async Task OpenFolderAsync(MailFolderNode folder, string? messageToSelect = null)

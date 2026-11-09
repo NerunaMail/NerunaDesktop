@@ -194,6 +194,17 @@
         </WrapPanel>
       </StackPanel>
     </Border>
+    <!-- Encrypted, but a recipient has no certificate: send unencrypted, or go back and change the recipients -->
+    <Border IsVisible="{Binding IsAskingUnencrypted}" Background="{DynamicResource WarnBackgroundBrush}" BorderBrush="{DynamicResource DividerBrush}"
+            BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,6">
+      <StackPanel Spacing="6">
+        <TextBlock TextWrapping="Wrap" FontWeight="SemiBold" Text="{Binding UnencryptedQuestion}" />
+        <WrapPanel ItemSpacing="8" LineSpacing="6">
+          <Button Content="{l:T 'Unverschlüsselt senden'}" Command="{Binding SendUnencryptedCommand}" />
+          <Button Classes="accent" Content="{l:T 'Abbrechen und Empfänger anpassen'}" Command="{Binding KeepEncryptedCommand}" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
     <!-- The password for the PDF(s): suggested, shown so it can be passed on (by phone, SMS – not in this mail) -->
     <Border IsVisible="{Binding IsAskingPdfPassword}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,8" Margin="0,0,0,6">
       <StackPanel Spacing="6">

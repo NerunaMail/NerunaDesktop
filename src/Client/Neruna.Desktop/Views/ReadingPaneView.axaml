@@ -376,13 +376,14 @@
       <!-- Attachment preview in place of the message text -->
       <Grid Grid.Row="7" RowDefinitions="Auto,Auto,*" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}">
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,1" Padding="16,6">
-          <Grid ColumnDefinitions="Auto,*,Auto" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
-            <Button Classes="command" Content="{l:T '← Zur Nachricht'}" Command="{Binding CloseCommand}" />
+          <!-- The buttons go onto a second line when the pane is too narrow for them beside the file name (code-behind) -->
+          <Grid x:Name="PreviewToolbar" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
+            <Button x:Name="PreviewBack" Classes="command" Content="{l:T '← Zur Nachricht'}" Command="{Binding CloseCommand}" />
             <DockPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
               <TextBlock DockPanel.Dock="Right" Text="{Binding PageInfo}" Classes="subtle" FontSize="12" VerticalAlignment="Center" Margin="10,0,0,0" />
               <TextBlock Text="{Binding Attachment.FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Attachment.FileName}" />
             </DockPanel>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+            <WrapPanel x:Name="PreviewButtons" Grid.Column="2" Orientation="Horizontal" ItemSpacing="4" LineSpacing="4">
               <!-- PDF: a stamp ("Genehmigt", name, date) into the file -->
               <Button Classes="command" IsVisible="{Binding CanStamp}" IsEnabled="{Binding !IsStamping}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -407,7 +408,7 @@
               <Button Classes="command" Content="{l:T 'Weiterleiten mit PDF'}" Command="{Binding ForwardWithCommand}" IsVisible="{Binding IsStamped}" />
               <Button Classes="command" Content="{l:T 'Öffnen'}" Command="{Binding Attachment.OpenCommand}" IsVisible="{Binding !IsStamped}" />
               <Button Classes="command" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" />
-            </StackPanel>
+            </WrapPanel>
           </Grid>
         </Border>
         <!-- Placing a stamp: what to do, then keep it or not -->

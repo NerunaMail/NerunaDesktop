@@ -2,6 +2,7 @@ using Avalonia.VisualTree;
 using Avalonia.LogicalTree;
 using System.Globalization;
 using Avalonia;
+using Avalonia.Input;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Media;
@@ -303,6 +304,13 @@ internal static class Snapshots
         stampPreview.ApplyStampCommand.Execute(null);
         await Task.Delay(200);
         await SaveAsync(window, output, "mail-pdf-stamped.png");
+        // A narrow window: the preview's buttons move onto a line of their own instead of running past the edge.
+        var wideWidth = window.Width;
+        window.Width = 1000;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-pdf-narrow.png");
+        window.Width = wideWidth;
+        await Task.Delay(300);
         Console.WriteLine($"Stamped: {stampPreview.IsStamped}, stamping: {stampPreview.IsStamping}");
 
         // Own text: clicked first, then typed – shown where it begins.
@@ -388,6 +396,15 @@ internal static class Snapshots
         await vm.SettingsPage.QuickActions.EditCommand.ExecuteAsync(vm.SettingsPage.QuickActions.Actions[0]);
         await Task.Delay(300);
         await SaveAsync(window, output, "settings-quick-action-edit.png");
+        // The shortcut field: pressed, not typed – and Backspace clears it again (the TextBox used to swallow it).
+        if (window.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(t => t.Name == "ShortcutBox") is { } shortcutBox)
+        {
+            shortcutBox.Focus();
+            window.KeyPress(Avalonia.Input.Key.M, Avalonia.Input.RawInputModifiers.Control, Avalonia.Input.PhysicalKey.M, null);
+            var pressed = vm.SettingsPage.QuickActions.Editing!.Shortcut;
+            window.KeyPress(Avalonia.Input.Key.Back, Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.Backspace, null);
+            Console.WriteLine($"Shortcut field: pressed '{pressed}', after Backspace '{vm.SettingsPage.QuickActions.Editing!.Shortcut}'");
+        }
         // The move step's folder list: accounts as headings, folders indented below.
         var editorScroll = window.GetVisualDescendants().OfType<ScrollViewer>().First(v => v.DataContext is QuickActionsViewModel);
         editorScroll.Offset = new Vector(0, 10000);
@@ -657,6 +674,21 @@ internal static class Snapshots
         await Task.Delay(200);
         Console.WriteLine($"Suggestions open: {toBox.IsSuggesting}");
         await SaveAsync(window, output, "compose-autocomplete.png");
+        Console.WriteLine($"Typed with a comma: boxes [{string.Join(" | ", toBox.ChipLabels)}], still typed '{toBox.TypedText}'");
+        await toBox.TypeAsync(string.Empty);
+
+        // Recipients as boxes: a pasted list, an address alone (name from the address book), Backspace marks then removes.
+        vm.MailPage.Compose.To = "Jes Caspersen <JCaspersen@itcag.com>, Naireta Chatterjee <nchatterjee@itcag.com>, csekhar@itcag.com, "
+            + "'Ender Informatics GmbH' <info@ender-informatics.ch>, marco@bernasconi.example";
+        await Task.Delay(400);
+        Dispatcher.UIThread.RunJobs();
+        Console.WriteLine($"Recipient boxes: [{string.Join(" | ", toBox.ChipLabels)}]");
+        await SaveAsync(window, output, "compose-recipient-boxes.png");
+        toBox.FocusText();
+        toBox.Press(Key.Back);
+        await SaveAsync(window, output, "compose-recipient-marked.png");
+        toBox.Press(Key.Back);
+        Console.WriteLine($"After Backspace twice: To = {vm.MailPage.Compose.To}");
         await toBox.TypeAsync(string.Empty);
 
         var picking = RecipientPicker.ShowAsync(window, "An", vm.MailPage.Compose!.Recipients!);
