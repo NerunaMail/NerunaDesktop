@@ -342,11 +342,24 @@ internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvide
                 (1, 13, 30, 60, "Offerte Netzwerk prüfen", null, null, "Kunde,Projekt"),
                 (3, 14, 0, 90, "Quartalsplanung", "Sitzungszimmer Pilatus", null, "Besprechung,Projekt"),
                 (4, 12, 0, 60, "Mittagessen mit Lea", "Restaurant Lindenhof", null, null),
+                // More of an ordinary week, so the week looks like one (screenshots, --demo).
+                (0, 10, 30, 60, "Kundentermin Müller Treuhand", "Luzern", null, "Kunde,Reise"),
+                (0, 14, 0, 120, "Konzept Webshop", null, null, "Projekt"),
+                (1, 8, 0, 60, "Zahnarzt", null, null, "Privat"),
+                (1, 10, 0, 90, "Offerten vergleichen", null, null, "Projekt"),
+                (2, 15, 0, 30, "Rückruf Nadia Rossi", null, null, "Anruf"),
+                (3, 9, 30, 60, "Einzelgespräch Thomas", "Büro Thomas", null, "Besprechung"),
+                (4, 9, 30, 120, "Budget 2027", null, null, "Projekt"),
+                (5, 10, 0, 150, "Velotour Vierwaldstättersee", "Treffpunkt Bahnhof", null, "Privat"),
             ]
             :
             [
                 (2, 10, 0, 120, "Kundenworkshop Bernasconi AG", "Zürich", null, "Kunde,Reise,Besprechung"),
                 (4, 16, 0, 60, "Apéro Team", "Dachterrasse", null, null),
+                (1, 16, 0, 60, "Teammeeting", "Sitzungszimmer Rigi", "FREQ=WEEKLY;BYDAY=TU", "Besprechung"),
+                (2, 13, 30, 60, "Einführung neue Mitarbeitende", "Schulungsraum", null, null),
+                (3, 11, 0, 60, "Projektabnahme Keller GmbH", "Online", null, "Kunde"),
+                (4, 14, 0, 60, "Wochenrückblick", "Teams-Raum", null, "Besprechung"),
             ];
 
         var items = events.Select((e, i) =>
