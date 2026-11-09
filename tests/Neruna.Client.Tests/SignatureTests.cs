@@ -17,6 +17,19 @@ public class SignatureTests
     }
 
     [Fact]
+    public void A_scheduling_poll_mail_has_its_link_above_the_signature()
+    {
+        var poll = new Neruna.Contracts.Cloud.CloudPoll("p", "Sitzung", null, null, "Europe/Zurich", "all", false, true, new Uri("https://neruna.cloud/poll/abc"),
+            null, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, [], []);
+        var (html, _) = Neruna.Core.Cloud.SchedulingPolls.InvitationText(poll, null);
+
+        var draft = SignatureBlock.Apply(ComposeDraft.Empty with { LeadHtml = html }, Formal);
+
+        Assert.True(draft.HtmlBody!.IndexOf("neruna.cloud/poll/abc", StringComparison.Ordinal) < draft.HtmlBody.IndexOf("Anna Muster", StringComparison.Ordinal));
+        Assert.True(draft.Body.IndexOf("neruna.cloud/poll/abc", StringComparison.Ordinal) < draft.Body.IndexOf("Anna Muster", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Reply_signature_sits_above_the_quote()
     {
         var original = new MimeMessage { Subject = "Offerte" };

@@ -823,8 +823,9 @@ internal sealed partial class MailViewModel(
         ArgumentNullException.ThrowIfNull(poll);
         var to = string.Join(", ", poll.Participants.Where(p => p.Invited && !string.IsNullOrWhiteSpace(p.Email))
             .Select(p => string.IsNullOrWhiteSpace(p.Name) ? p.Email! : new MimeKit.MailboxAddress(p.Name, p.Email!).ToString()));
-        var (html, text) = Neruna.Core.Cloud.SchedulingPolls.InvitationText(poll, password);
-        return StartComposeAsync(ComposeDraft.Empty with { To = to, Subject = F("Terminumfrage: {0}", poll.Title), Body = text, HtmlBody = html }, ComposeKind.New);
+        // Above the signature (as a quick action's text), not below it like a quoted mail.
+        var (html, _) = Neruna.Core.Cloud.SchedulingPolls.InvitationText(poll, password);
+        return StartComposeAsync(ComposeDraft.Empty with { To = to, Subject = F("Terminumfrage: {0}", poll.Title), LeadHtml = html }, ComposeKind.New);
     }
 
     private bool CanRespond() => ReadingPane?.Message is not null && CurrentAccount is not null;
