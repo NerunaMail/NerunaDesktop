@@ -15,6 +15,16 @@ public sealed class SchedulingPolls(CloudController cloud)
     /// <summary>The answers a participant can give, in this order on the page.</summary>
     public static readonly IReadOnlyList<string> Answers = ["yes", "ifneeded", "maybe", "no"];
 
+    /// <summary>What a new poll offers unless the planner chooses otherwise.</summary>
+    public static readonly IReadOnlyList<string> DefaultChoices = ["yes", "maybe", "no"];
+
+    /// <summary>The answers a poll offers, in the order of <see cref="Answers"/> (an older server: all four).</summary>
+    public static IReadOnlyList<string> Choices(CloudPoll poll)
+    {
+        ArgumentNullException.ThrowIfNull(poll);
+        return poll.Choices is { } chosen ? Answers.Where(a => a == "yes" || chosen.Contains(a)).ToList() : Answers;
+    }
+
     /// <summary>The organisations a poll can be made with; empty without Neruna Cloud.</summary>
     public Task<IReadOnlyList<CloudConnection>> ConnectionsAsync(CancellationToken cancellationToken = default) => cloud.GetConnectionsAsync(cancellationToken);
 
@@ -140,6 +150,6 @@ public sealed class SchedulingPolls(CloudController cloud)
         ArgumentNullException.ThrowIfNull(poll);
         return new PollRequest(poll.Title, poll.Location, poll.Description, poll.TimeZone, poll.Visibility, null, poll.OpenLink, poll.Deadline,
             poll.Options.Select(o => new PollOptionRequest(o.Id, o.Start, o.End, o.AllDay)).ToList(),
-            poll.Participants.Where(p => p.Invited).Select(p => new PollInviteeRequest(p.Id, p.Name, p.Email)).ToList());
+            poll.Participants.Where(p => p.Invited).Select(p => new PollInviteeRequest(p.Id, p.Name, p.Email)).ToList(), poll.Choices);
     }
 }

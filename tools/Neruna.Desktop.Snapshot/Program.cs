@@ -1834,8 +1834,10 @@ internal static class Snapshots
             new Uri("https://neruna.cloud/poll/Ab3dEf6hIj9kLm2nOp5qRs8t"), new DateTimeOffset(2026, 11, 30, 18, 0, 0, TimeSpan.FromHours(1)),
             new DateTimeOffset(2027, 1, 9, 0, 0, 0, TimeSpan.Zero), DateTimeOffset.Now,
             [Option("o0", 8, 9), Option("o1", 8, 14), Option("o2", 9, 9), new("o3", new DateTimeOffset(2026, 12, 10, 0, 0, 0, TimeSpan.Zero), null, true)],
-            [Person("Beat Beispiel", true, "yes", "no", "yes", "maybe"), Person("Carla Zeller", true, "ifneeded", "yes", "yes", "no"),
-             Person("Dora Dorn", true), Person("Emil Egger", false, "yes", "-", "ifneeded", "yes")]);
+            [Person("Beat Beispiel", true, "yes", "no", "yes", "maybe"),
+             Person("Carla Zeller", true, "ifneeded", "yes", "yes", "no") with { Comment = "Am Dienstag erst ab 9:30 – vorher habe ich einen Kundentermin." },
+             Person("Dora Dorn", true), Person("Emil Egger", false, "yes", "-", "ifneeded", "yes")],
+            ["yes", "ifneeded", "maybe", "no"]);
     }
 
     private static async Task SaveSplashAsync(string output)

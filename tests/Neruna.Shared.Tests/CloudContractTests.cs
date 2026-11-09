@@ -93,6 +93,7 @@ public class CloudContractTests
 
         var poll = Assert.Single(response.Polls);
         Assert.Equal(("Teamsitzung Dezember", "Europe/Zurich", "all"), (poll.Title, poll.TimeZone, poll.Visibility));
+        Assert.Equal(["yes", "maybe", "no"], poll.Choices);
         Assert.Equal(2, poll.Options.Count);
         Assert.True(poll.Options[1].AllDay);
         Assert.Null(poll.Options[1].End);

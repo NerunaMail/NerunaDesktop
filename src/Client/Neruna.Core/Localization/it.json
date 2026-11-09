@@ -2663,7 +2663,10 @@
  "{0} Ja · {1} wenn nötig · {2} vielleicht · {3} nein": "{0} sì · {1} se necessario · {2} forse · {3} no",
  "{0} Vorschläge · {1} Antworten": "{0} proposte · {1} risposte",
  "über den Link": "tramite il link",
- "✓ ja · (✓) wenn nötig · ? vielleicht · ✗ nein · – keine Angabe": "✓ sì · (✓) se necessario · ? forse · ✗ no · – nessuna risposta",
  "Die Umfrage läuft in Neruna Cloud dieser Organisation.": "Il sondaggio si svolge nel Neruna Cloud di questa organizzazione.",
- "Organisation": "Organizzazione"
+ "Organisation": "Organizzazione",
+ "Bemerkungen": "Osservazioni",
+ "keine Angabe": "nessuna risposta",
+ "Antwortmöglichkeiten": "Risposte possibili",
+ "Noch keine Antworten.": "Ancora nessuna risposta."
 }

@@ -2663,7 +2663,10 @@
  "{0} Ja · {1} wenn nötig · {2} vielleicht · {3} nein": "{0} yes · {1} if needed · {2} maybe · {3} no",
  "{0} Vorschläge · {1} Antworten": "{0} proposals · {1} answers",
  "über den Link": "via the link",
- "✓ ja · (✓) wenn nötig · ? vielleicht · ✗ nein · – keine Angabe": "✓ yes · (✓) if needed · ? maybe · ✗ no · – no answer",
  "Die Umfrage läuft in Neruna Cloud dieser Organisation.": "The poll runs in this organisation’s Neruna Cloud.",
- "Organisation": "Organisation"
+ "Organisation": "Organisation",
+ "Bemerkungen": "Comments",
+ "keine Angabe": "no answer",
+ "Antwortmöglichkeiten": "Answer options",
+ "Noch keine Antworten.": "No answers yet."
 }

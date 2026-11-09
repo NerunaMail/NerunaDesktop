@@ -243,6 +243,7 @@ public sealed record PollsResponse(IReadOnlyList<CloudPoll> Polls);
 /// <param name="TimeZone">IANA zone the dates are shown in on the page.</param>
 /// <param name="Visibility">all (names and answers), anonymous (only counts) or own (only one's own answer).</param>
 /// <param name="Url">The common link; null when only the invitees' personal links work (<see cref="OpenLink"/> false).</param>
+/// <param name="Choices">The answers the page offers (yes, ifneeded, maybe, no – "yes" always); null from an older server: all four.</param>
 public sealed record CloudPoll(
     string Id,
     string Title,
@@ -257,7 +258,8 @@ public sealed record CloudPoll(
     DateTimeOffset ExpiresAt,
     DateTimeOffset CreatedAt,
     IReadOnlyList<CloudPollOption> Options,
-    IReadOnlyList<CloudPollParticipant> Participants);
+    IReadOnlyList<CloudPollParticipant> Participants,
+    IReadOnlyList<string>? Choices = null);
 
 /// <summary>A proposed date; a whole day (<see cref="AllDay"/>) starts at 00:00 UTC of that day.</summary>
 public sealed record CloudPollOption(string Id, DateTimeOffset Start, DateTimeOffset? End, bool AllDay);
@@ -279,6 +281,7 @@ public sealed record CloudPollParticipant(
 /// with an id are kept with their answers.
 /// </summary>
 /// <param name="Password">Null: unchanged (not sent); empty: removed; text: set.</param>
+/// <param name="Choices">The answers offered ("yes" is always added); null: a new poll gets yes, maybe, no, a changed one keeps its own.</param>
 public sealed record PollRequest(
     string Title,
     string? Location,
@@ -289,7 +292,8 @@ public sealed record PollRequest(
     bool OpenLink,
     DateTimeOffset? Deadline,
     IReadOnlyList<PollOptionRequest> Options,
-    IReadOnlyList<PollInviteeRequest> Invitees);
+    IReadOnlyList<PollInviteeRequest> Invitees,
+    IReadOnlyList<string>? Choices = null);
 
 public sealed record PollOptionRequest(string? Id, DateTimeOffset Start, DateTimeOffset? End, bool AllDay);
 

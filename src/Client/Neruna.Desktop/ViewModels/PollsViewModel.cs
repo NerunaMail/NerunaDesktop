@@ -16,9 +16,37 @@ internal sealed record PollAnswerCell(string Symbol, string Answer, string Tip)
     public bool IsNo => Answer == "no";
 }
 
-/// <summary>A proposed date with how many gave which answer; the best ones are marked.</summary>
-internal sealed record PollOptionResult(CloudPollOption Option, int Number, string When, int Yes, int IfNeeded, int Maybe, int No, bool IsBest)
+/// <summary>
+/// A proposed date as a column of the table: its head (month, day, weekday, time), how many said yes (and if needed /
+/// maybe, when offered or given), and whether it suits best.
+/// </summary>
+internal sealed record PollOptionResult(CloudPollOption Option, string When, int Yes, int IfNeeded, int Maybe, int No, bool IsBest)
 {
+    private DateTime From => Option.AllDay ? Option.Start.UtcDateTime : Option.Start.LocalDateTime;
+
+    private DateTime? To => Option.End is not { } end ? null : Option.AllDay ? end.UtcDateTime : end.LocalDateTime;
+
+    // A whole day ends at the next midnight: several days only when it ends later than that.
+    private bool SeveralDays => To is { } to && (Option.AllDay ? to.Date > From.Date.AddDays(1) : to.Date > From.Date);
+
+    public string Month => From.ToString("MMM", System.Globalization.CultureInfo.CurrentCulture).ToUpperInvariant();
+
+    public string Day => Option.AllDay && SeveralDays && To is { } to
+        ? From.Day + ".–" + (to.TimeOfDay == TimeSpan.Zero ? to.AddDays(-1) : to).Day + "."
+        : From.Day.ToString(System.Globalization.CultureInfo.CurrentCulture);
+
+    public string Weekday => From.ToString("ddd", System.Globalization.CultureInfo.CurrentCulture);
+
+    public string Time => Option.AllDay ? T("ganztägig")
+        : From.ToString("HH:mm", System.Globalization.CultureInfo.CurrentCulture)
+          + (To is { } to ? "–" + to.ToString(SeveralDays ? "ddd HH:mm" : "HH:mm", System.Globalization.CultureInfo.CurrentCulture) : string.Empty);
+
+    public string Total => "✓ " + Yes;
+
+    public string More => string.Join(" · ", new[] { (IfNeeded, "(✓)"), (Maybe, "?") }.Where(x => x.Item1 > 0).Select(x => x.Item2 + " " + x.Item1));
+
+    public bool HasMore => IfNeeded + Maybe > 0;
+
     public string Counts => F("{0} Ja · {1} wenn nötig · {2} vielleicht · {3} nein", Yes, IfNeeded, Maybe, No);
 }
 
@@ -70,7 +98,7 @@ internal sealed partial class PollsViewModel(SchedulingPolls polls) : ViewModelB
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelection), nameof(Results), nameof(Participants), nameof(LinkText), nameof(HasLink), nameof(Details), nameof(HasParticipants),
-        nameof(OptionNumbers))]
+        nameof(Comments), nameof(HasComments), nameof(Legend))]
     [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(DeleteCommand), nameof(CopyLinkCommand), nameof(WriteMailCommand))]
     public partial PollListItem? Selected { get; set; }
 
@@ -144,15 +172,13 @@ internal sealed partial class PollsViewModel(SchedulingPolls polls) : ViewModelB
             }
 
             var best = SchedulingPolls.Best(poll).Select(o => o.Id).ToHashSet();
-            return poll.Options.Select((o, i) =>
+            return poll.Options.Select(o =>
             {
                 var counts = SchedulingPolls.Count(poll, o);
-                return new PollOptionResult(o, i + 1, SchedulingPolls.When(o), counts["yes"], counts["ifneeded"], counts["maybe"], counts["no"], best.Contains(o.Id));
+                return new PollOptionResult(o, SchedulingPolls.When(o), counts["yes"], counts["ifneeded"], counts["maybe"], counts["no"], best.Contains(o.Id));
             }).ToList();
         }
     }
-
-    public IReadOnlyList<string> OptionNumbers => Selected?.Poll.Options.Select((_, i) => (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)).ToList() ?? [];
 
     public IReadOnlyList<PollParticipantResult> Participants
     {
@@ -173,7 +199,16 @@ internal sealed partial class PollsViewModel(SchedulingPolls polls) : ViewModelB
         }
     }
 
+    /// <summary>"✓ Ja · ? Vielleicht · ✗ Nein · – keine Angabe": the answers this poll offers.</summary>
+    public string Legend => Selected?.Poll is not { } poll ? string.Empty
+        : string.Join(" · ", SchedulingPolls.Choices(poll).Select(a => Symbol(a) + " " + SchedulingPolls.AnswerText(a))) + " · – " + T("keine Angabe");
+
     public bool HasParticipants => Selected?.Poll.Participants.Count > 0;
+
+    /// <summary>What participants wrote in "Bemerkung" on the page (only the planner sees it).</summary>
+    public IReadOnlyList<PollParticipantResult> Comments => Participants.Where(p => p.HasComment).ToList();
+
+    public bool HasComments => Selected?.Poll.Participants.Any(p => !string.IsNullOrWhiteSpace(p.Comment)) == true;
 
     private static string Symbol(string answer) => answer switch
     {

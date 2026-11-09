@@ -71,6 +71,14 @@
     <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" IsVisible="{Binding CanChooseOpenLink}"
                Text="{l:T 'Jede eingeladene Person erhält einen eigenen Link. Beim Festlegen erhalten alle mit Adresse die Einladung zum Termin.'}" />
 
+    <TextBlock Classes="label" Text="{l:T 'Antwortmöglichkeiten'}" />
+    <WrapPanel>
+      <CheckBox Content="{l:T 'Ja'}" IsChecked="True" IsEnabled="False" Margin="0,0,16,0" />
+      <CheckBox Content="{l:T 'Wenn nötig'}" IsChecked="{Binding OffersIfNeeded}" Margin="0,0,16,0" />
+      <CheckBox Content="{l:T 'Vielleicht'}" IsChecked="{Binding OffersMaybe}" Margin="0,0,16,0" />
+      <CheckBox Content="{l:T 'Nein'}" IsChecked="{Binding OffersNo}" />
+    </WrapPanel>
+
     <TextBlock Classes="label" Text="{l:T 'Antworten der anderen'}" />
     <ComboBox ItemsSource="{Binding VisibilityChoices}" SelectedIndex="{Binding VisibilityIndex}" HorizontalAlignment="Stretch" />
 

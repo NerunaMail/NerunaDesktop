@@ -6,11 +6,33 @@
              x:DataType="vm:PollsViewModel">
 
   <UserControl.Styles>
+    <Style Selector="Border.head">
+      <Setter Property="Width" Value="108" />
+      <Setter Property="Padding" Value="4,8" />
+      <Setter Property="Background" Value="{DynamicResource InfoBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+      <Setter Property="BorderThickness" Value="1,0,0,1" />
+    </Style>
+    <Style Selector="Border.head.best">
+      <Setter Property="Background" Value="#2216A34A" />
+      <Setter Property="BorderBrush" Value="#16A34A" />
+      <Setter Property="BorderThickness" Value="1,3,0,1" />
+    </Style>
+    <Style Selector="Border.cell">
+      <Setter Property="Width" Value="108" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+      <Setter Property="BorderThickness" Value="1,0,0,0" />
+    </Style>
+    <Style Selector="Border.cell.yes"><Setter Property="Background" Value="#2616A34A" /></Style>
+    <Style Selector="Border.cell.ifneeded"><Setter Property="Background" Value="#2665A30D" /></Style>
+    <Style Selector="Border.cell.maybe"><Setter Property="Background" Value="#26D97706" /></Style>
+    <Style Selector="Border.cell.no"><Setter Property="Background" Value="#26DC2626" /></Style>
     <Style Selector="TextBlock.cell">
-      <Setter Property="Width" Value="44" />
-      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
       <Setter Property="VerticalAlignment" Value="Center" />
-      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="Bold" />
     </Style>
     <Style Selector="TextBlock.yes"><Setter Property="Foreground" Value="#16A34A" /></Style>
     <Style Selector="TextBlock.ifneeded"><Setter Property="Foreground" Value="#65A30D" /></Style>
@@ -93,54 +115,52 @@
           </Button>
         </StackPanel>
 
-        <!-- The proposed dates with the counts; "Festlegen" opens the event -->
-        <TextBlock Classes="label" Text="{l:T 'Terminvorschläge'}" />
-        <ItemsControl ItemsSource="{Binding Results}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:PollOptionResult">
-              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,6">
-                <Grid ColumnDefinitions="28,*,Auto">
-                  <TextBlock Classes="subtle" Text="{Binding Number}" VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="1">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBlock Text="{Binding When}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                      <Border Background="#16A34A" CornerRadius="8" Padding="6,0" IsVisible="{Binding IsBest}" VerticalAlignment="Center">
-                        <TextBlock Text="{l:T 'passt am besten'}" Foreground="White" FontSize="11" />
-                      </Border>
-                    </StackPanel>
-                    <TextBlock Classes="subtle" FontSize="12" Text="{Binding Counts}" />
-                  </StackPanel>
-                  <Button Grid.Column="2" Content="{l:T 'Festlegen'}" VerticalAlignment="Center"
-                          Command="{Binding $parent[UserControl].((vm:PollsViewModel)DataContext).FixCommand}" CommandParameter="{Binding}"
-                          ToolTip.Tip="{l:T 'Termin mit allen Eingeladenen erstellen; die Umfrage wird danach gelöscht'}" />
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-
-        <!-- Who answered what: one column per proposed date (numbers as above) -->
-        <TextBlock Classes="label" Text="{l:T 'Antworten'}" IsVisible="{Binding HasParticipants}" />
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasParticipants}">
+        <!-- The table: a column per proposed date (its head with the totals and "Festlegen"), a row per person -->
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,14,0,0">
           <StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+            <StackPanel Orientation="Horizontal">
               <Border Width="200" />
-              <ItemsControl ItemsSource="{Binding OptionNumbers}">
+              <ItemsControl ItemsSource="{Binding Results}">
                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="x:String">
-                    <TextBlock Classes="cell subtle" Text="{Binding}" />
+                  <DataTemplate x:DataType="vm:PollOptionResult">
+                    <Border Classes="head" Classes.best="{Binding IsBest}" ToolTip.Tip="{Binding When}">
+                      <DockPanel>
+                      <Button DockPanel.Dock="Bottom" Content="{l:T 'Festlegen'}" HorizontalAlignment="Center" Margin="0,6,0,0" FontSize="12" Padding="8,3"
+                              Command="{Binding $parent[UserControl].((vm:PollsViewModel)DataContext).FixCommand}" CommandParameter="{Binding}"
+                              ToolTip.Tip="{l:T 'Termin mit allen Eingeladenen erstellen; die Umfrage wird danach gelöscht'}" />
+                      <StackPanel HorizontalAlignment="Center" Spacing="1">
+                        <TextBlock Classes="subtle" FontSize="11" Text="{Binding Month}" HorizontalAlignment="Center" />
+                        <TextBlock FontSize="20" FontWeight="Bold" Text="{Binding Day}" HorizontalAlignment="Center" />
+                        <TextBlock Classes="subtle" FontSize="12" Text="{Binding Weekday}" HorizontalAlignment="Center" />
+                        <TextBlock FontSize="11" FontWeight="SemiBold" Text="{Binding Time}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                        <TextBlock Classes="yes" FontSize="15" FontWeight="Bold" Text="{Binding Total}" HorizontalAlignment="Center" Margin="0,6,0,0"
+                                   ToolTip.Tip="{Binding Counts}" />
+                        <TextBlock Classes="subtle" FontSize="11" Text="{Binding More}" HorizontalAlignment="Center" IsVisible="{Binding HasMore}" />
+                        <Border Background="#16A34A" CornerRadius="8" Padding="6,0" Margin="0,4,0,0" IsVisible="{Binding IsBest}" HorizontalAlignment="Center">
+                          <TextBlock Text="{l:T 'passt am besten'}" Foreground="White" FontSize="10" />
+                        </Border>
+                      </StackPanel>
+                      </DockPanel>
+                    </Border>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
             </StackPanel>
+            <TextBlock Classes="subtle" FontSize="12" Margin="0,10,0,0" IsVisible="{Binding !HasParticipants}"
+                       Text="{l:T 'Noch keine Antworten.'}" />
             <ItemsControl ItemsSource="{Binding Participants}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:PollParticipantResult">
-                  <StackPanel Orientation="Horizontal" Margin="0,2">
-                    <Grid Width="200" ColumnDefinitions="*,Auto">
+                  <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1">
+                  <StackPanel Orientation="Horizontal">
+                    <Grid Width="200" ColumnDefinitions="*,Auto" Margin="0,3">
                       <StackPanel>
-                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Participant.Comment}" />
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" MaxWidth="150" />
+                          <PathIcon Data="{StaticResource IconChat}" Width="12" Height="12" Foreground="{DynamicResource AccentTextBrush}"
+                                    IsVisible="{Binding HasComment}" ToolTip.Tip="{Binding Participant.Comment}" Background="Transparent" />
+                        </StackPanel>
                         <TextBlock Classes="subtle" FontSize="11" Text="{Binding State}" />
                       </StackPanel>
                       <Button Grid.Column="1" Classes="command" IsVisible="{Binding HasPersonalLink}" VerticalAlignment="Center"
@@ -153,19 +173,38 @@
                       <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PollAnswerCell">
-                          <TextBlock Classes="cell" Classes.yes="{Binding IsYes}" Classes.ifneeded="{Binding IsIfNeeded}"
-                                     Classes.maybe="{Binding IsMaybe}" Classes.no="{Binding IsNo}" Text="{Binding Symbol}" ToolTip.Tip="{Binding Tip}" />
+                          <Border Classes="cell" Classes.yes="{Binding IsYes}" Classes.ifneeded="{Binding IsIfNeeded}"
+                                  Classes.maybe="{Binding IsMaybe}" Classes.no="{Binding IsNo}" ToolTip.Tip="{Binding Tip}">
+                            <TextBlock Classes="cell" Classes.yes="{Binding IsYes}" Classes.ifneeded="{Binding IsIfNeeded}"
+                                       Classes.maybe="{Binding IsMaybe}" Classes.no="{Binding IsNo}" Text="{Binding Symbol}" />
+                          </Border>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
+                  </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </StackPanel>
         </ScrollViewer>
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
-                   Text="{l:T '✓ ja · (✓) wenn nötig · ? vielleicht · ✗ nein · – keine Angabe'}" />
+                   Text="{Binding Legend}" IsVisible="{Binding HasParticipants}" />
+
+        <!-- What people wrote in "Bemerkung" on the page: only here, the others on the page don't see it -->
+        <TextBlock Classes="label" Text="{l:T 'Bemerkungen'}" IsVisible="{Binding HasComments}" />
+        <ItemsControl ItemsSource="{Binding Comments}" IsVisible="{Binding HasComments}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PollParticipantResult">
+              <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                <StackPanel>
+                  <TextBlock FontWeight="SemiBold" FontSize="12" Text="{Binding Name}" />
+                  <SelectableTextBlock TextWrapping="Wrap" Text="{Binding Participant.Comment}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </StackPanel>
     </Grid>
   </Grid>

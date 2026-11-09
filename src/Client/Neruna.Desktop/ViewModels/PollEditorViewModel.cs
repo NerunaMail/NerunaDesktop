@@ -94,6 +94,10 @@ internal sealed partial class PollEditorViewModel : ViewModelBase
             VisibilityIndex = Math.Max(0, Visibilities.IndexOf(existing.Visibility));
             HasPassword = existing.HasPassword;
             OpenLink = existing.OpenLink;
+            var choices = SchedulingPolls.Choices(existing);
+            OffersIfNeeded = choices.Contains("ifneeded");
+            OffersMaybe = choices.Contains("maybe");
+            OffersNo = choices.Contains("no");
             Deadline = existing.Deadline?.LocalDateTime.Date;
             foreach (var option in existing.Options)
             {
@@ -163,6 +167,16 @@ internal sealed partial class PollEditorViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial int VisibilityIndex { get; set; }
+
+    /// <summary>Answers offered besides "Ja" (always): by default "Nein" and "Vielleicht".</summary>
+    [ObservableProperty]
+    public partial bool OffersNo { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool OffersMaybe { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool OffersIfNeeded { get; set; }
 
     /// <summary>The poll asks for a password on the common link (personal links need none).</summary>
     [ObservableProperty]
@@ -276,7 +290,7 @@ internal sealed partial class PollEditorViewModel : ViewModelBase
         var password = !HasPassword ? (HadPassword ? string.Empty : null) : string.IsNullOrEmpty(Password) ? null : Password;
         var request = new PollRequest(Title.Trim(), NullIfEmpty(Location), NullIfEmpty(Description), SchedulingPolls.LocalTimeZoneId(),
             Visibilities[Math.Clamp(VisibilityIndex, 0, Visibilities.Count - 1)], password, IsForMail || OpenLink,
-            Deadline is { } deadline ? new DateTimeOffset(deadline.Date.AddDays(1).AddSeconds(-1)) : null, options, invitees);
+            Deadline is { } deadline ? new DateTimeOffset(deadline.Date.AddDays(1).AddSeconds(-1)) : null, options, invitees, ChosenAnswers());
 
         IsBusy = true;
         try
@@ -294,6 +308,15 @@ internal sealed partial class PollEditorViewModel : ViewModelBase
             IsBusy = false;
         }
     }
+
+    private List<string> ChosenAnswers() =>
+        SchedulingPolls.Answers.Where(a => a switch
+        {
+            "ifneeded" => OffersIfNeeded,
+            "maybe" => OffersMaybe,
+            "no" => OffersNo,
+            _ => true,
+        }).ToList();
 
     private static string? NullIfEmpty(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 

@@ -2663,7 +2663,10 @@
  "{0} Ja · {1} wenn nötig · {2} vielleicht · {3} nein": "{0} oui · {1} si nécessaire · {2} peut-être · {3} non",
  "{0} Vorschläge · {1} Antworten": "{0} propositions · {1} réponses",
  "über den Link": "via le lien",
- "✓ ja · (✓) wenn nötig · ? vielleicht · ✗ nein · – keine Angabe": "✓ oui · (✓) si nécessaire · ? peut-être · ✗ non · – sans réponse",
  "Die Umfrage läuft in Neruna Cloud dieser Organisation.": "Le sondage se déroule dans le Neruna Cloud de cette organisation.",
- "Organisation": "Organisation"
+ "Organisation": "Organisation",
+ "Bemerkungen": "Remarques",
+ "keine Angabe": "sans réponse",
+ "Antwortmöglichkeiten": "Réponses possibles",
+ "Noch keine Antworten.": "Pas encore de réponse."
 }
