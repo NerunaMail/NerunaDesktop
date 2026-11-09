@@ -23,6 +23,9 @@ internal interface IWindowService
 
     /// <summary>"In welchen Ordner verschieben?" above the active window; null when cancelled.</summary>
     Task<MailFolderNode?> ShowFolderPickerAsync(FolderPickerViewModel picker);
+
+    /// <summary>A scheduling poll in a window of its own (from a mail being written); true if it was saved.</summary>
+    Task<bool> ShowPollEditorAsync(PollEditorViewModel editor);
 }
 
 internal sealed class WindowService(UiLayout layout) : IWindowService
@@ -93,6 +96,45 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
         }
 
         return changed;
+    }
+
+    public async Task<bool> ShowPollEditorAsync(PollEditorViewModel editor)
+    {
+        ArgumentNullException.ThrowIfNull(editor);
+        var saved = false;
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+        var owner = lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow;
+        var window = new Window
+        {
+            Title = Neruna.Core.Localization.Texts.T("Terminumfrage"),
+            Icon = owner?.Icon,
+            Width = 800,
+            Height = 800,
+            MinWidth = 640,
+            MinHeight = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new ScrollViewer { Content = new PollEditorView { DataContext = editor, Margin = new Avalonia.Thickness(24, 18) } },
+        };
+        window.Bind(Window.BackgroundProperty, window.GetResourceObservable("PaneBackgroundBrush"));
+        editor.Finished += (_, ok) =>
+        {
+            saved = ok;
+            window.Close();
+        };
+
+        if (owner is not null)
+        {
+            await window.ShowDialog(owner);
+        }
+        else
+        {
+            var closed = new TaskCompletionSource();
+            window.Closed += (_, _) => closed.TrySetResult();
+            window.Show();
+            await closed.Task;
+        }
+
+        return saved;
     }
 
     public async Task<MailFolderNode?> ShowFolderPickerAsync(FolderPickerViewModel picker)

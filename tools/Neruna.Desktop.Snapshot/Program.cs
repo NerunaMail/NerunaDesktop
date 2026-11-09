@@ -1052,6 +1052,17 @@ internal static class Snapshots
         vm.Overlay = special;
         await SaveAsync(window, output, "special-calendar-holidays.png");
         await special.AddCommand.ExecuteAsync(null);
+
+        // Scheduling polls (Neruna Cloud): the answers of a poll, and planning one. Filled in by hand – no server here.
+        var schedulingPolls = services.GetRequiredService<Neruna.Core.Cloud.SchedulingPolls>();
+        var pollsView = new PollsViewModel(schedulingPolls);
+        pollsView.Items.Add(new PollListItem(DemoPoll(), DemoConnection("Beispiel AG")));
+        pollsView.Selected = pollsView.Items[0];
+        vm.Overlay = pollsView;
+        await SaveAsync(window, output, "polls.png");
+        vm.Overlay = new PollEditorViewModel(schedulingPolls, [DemoConnection("Beispiel AG"), DemoConnection("Verein Muster")], null, "Teamsitzung Dezember",
+            [new Neruna.Core.Calendar.EventAttendee("beat@example.com", "Beat Beispiel"), new Neruna.Core.Calendar.EventAttendee("carla@example.com", "Carla Zeller")]);
+        await SaveAsync(window, output, "poll-editor.png");
         vm.Overlay = null;
         await calendarController.SyncAllAsync();
         await vm.CalendarPage.ReloadAsync();
@@ -1807,6 +1818,24 @@ internal static class Snapshots
         await settings.SetAsync(SettingKeys.MarkAsRead, null);
         MailViewModel.ReadDelay = TimeSpan.FromSeconds(10);
         Console.WriteLine(string.Join(Environment.NewLine, results));
+    }
+
+    private static Neruna.Core.Cloud.CloudConnection DemoConnection(string organization) =>
+        new(new Uri("https://neruna.cloud/"), "demo", organization, "Anna Muster", DateTimeOffset.Now, organization);
+
+    private static Neruna.Contracts.Cloud.CloudPoll DemoPoll()
+    {
+        Neruna.Contracts.Cloud.CloudPollOption Option(string id, int day, int hour) =>
+            new(id, new DateTimeOffset(2026, 12, day, hour, 0, 0, TimeSpan.FromHours(1)), new DateTimeOffset(2026, 12, day, hour + 2, 0, 0, TimeSpan.FromHours(1)), false);
+        Neruna.Contracts.Cloud.CloudPollParticipant Person(string name, bool invited, params string[] answers) =>
+            new(name, name, invited ? name.Split(' ')[0].ToLowerInvariant() + "@example.com" : null, invited, invited ? new Uri("https://neruna.cloud/poll/x") : null, null,
+                answers.Length == 0 ? null : DateTimeOffset.Now, answers.Select((a, i) => (Key: "o" + i, a)).Where(x => x.a != "-").ToDictionary(x => x.Key, x => x.a));
+        return new("p1", "Teamsitzung Dezember", "Sitzungszimmer 2", "Jahresplanung 2027", "Europe/Zurich", "all", false, true,
+            new Uri("https://neruna.cloud/poll/Ab3dEf6hIj9kLm2nOp5qRs8t"), new DateTimeOffset(2026, 11, 30, 18, 0, 0, TimeSpan.FromHours(1)),
+            new DateTimeOffset(2027, 1, 9, 0, 0, 0, TimeSpan.Zero), DateTimeOffset.Now,
+            [Option("o0", 8, 9), Option("o1", 8, 14), Option("o2", 9, 9), new("o3", new DateTimeOffset(2026, 12, 10, 0, 0, 0, TimeSpan.Zero), null, true)],
+            [Person("Beat Beispiel", true, "yes", "no", "yes", "maybe"), Person("Carla Zeller", true, "ifneeded", "yes", "yes", "no"),
+             Person("Dora Dorn", true), Person("Emil Egger", false, "yes", "-", "ifneeded", "yes")]);
     }
 
     private static async Task SaveSplashAsync(string output)

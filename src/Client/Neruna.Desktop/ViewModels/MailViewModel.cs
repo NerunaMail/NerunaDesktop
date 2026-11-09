@@ -45,6 +45,7 @@ internal sealed partial class MailViewModel(
     MailTagService tagService,
     CalendarCategoryService categories,
     Neruna.Core.Notes.NoteController notes,
+    Neruna.Core.Cloud.SchedulingPolls polls,
     ILogger<MailViewModel> logger) : ViewModelBase, IDisposable, IMailSearchHost, IAttachmentActions
 {
     /// <summary>"Notiz": a new note about the open message (the shell opens the notes page).</summary>
@@ -816,6 +817,16 @@ internal sealed partial class MailViewModel(
     /// <summary>Starts a new mail to the given address, e.g. from a mailto: link in a message.</summary>
     public Task ComposeToAsync(string address) => StartComposeAsync(ComposeDraft.Empty with { To = address }, ComposeKind.New);
 
+    /// <summary>A new mail to a poll's invitees with its link (Kalender → Terminumfragen → Mail an die Eingeladenen).</summary>
+    public Task ComposePollAsync(Neruna.Contracts.Cloud.CloudPoll poll, string? password)
+    {
+        ArgumentNullException.ThrowIfNull(poll);
+        var to = string.Join(", ", poll.Participants.Where(p => p.Invited && !string.IsNullOrWhiteSpace(p.Email))
+            .Select(p => string.IsNullOrWhiteSpace(p.Name) ? p.Email! : new MimeKit.MailboxAddress(p.Name, p.Email!).ToString()));
+        var (html, text) = Neruna.Core.Cloud.SchedulingPolls.InvitationText(poll, password);
+        return StartComposeAsync(ComposeDraft.Empty with { To = to, Subject = F("Terminumfrage: {0}", poll.Title), Body = text, HtmlBody = html }, ComposeKind.New);
+    }
+
     private bool CanRespond() => ReadingPane?.Message is not null && CurrentAccount is not null;
 
     private IReadOnlyList<MessageItemViewModel> _selectedMessages = [];
@@ -1046,6 +1057,7 @@ internal sealed partial class MailViewModel(
             Preferences = preferences,
             TextTemplates = textTemplates,
             Calendars = new ComposeCalendar(calendar, invitations, windows, meetings, categories),
+            Polls = polls,
             PdfSecurity = pdfSecurity,
         };
         compose.Ai = new ComposeAiViewModel(ai, compose);

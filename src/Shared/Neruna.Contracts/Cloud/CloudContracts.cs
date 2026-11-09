@@ -232,3 +232,65 @@ public sealed record PairingLimits(int MobileDevicesAllowed, int MobileDevicesLe
 public sealed record PairedEnvelopesRequest(IReadOnlyList<PairedEnvelope> Certificates, IReadOnlyList<PairedEnvelope> Accounts);
 
 public sealed record PairedEnvelope(string Id, string Envelope);
+
+/// <summary>Response of <c>GET /api/v1/polls</c>: the connected person's scheduling polls (older servers: 404).</summary>
+public sealed record PollsResponse(IReadOnlyList<CloudPoll> Polls);
+
+/// <summary>
+/// A scheduling poll (Terminumfrage), answered on the web page <see cref="Url"/>. The server keeps it only while it
+/// runs: the app deletes it when the date is fixed; an unfixed one is deleted at <see cref="ExpiresAt"/>.
+/// </summary>
+/// <param name="TimeZone">IANA zone the dates are shown in on the page.</param>
+/// <param name="Visibility">all (names and answers), anonymous (only counts) or own (only one's own answer).</param>
+/// <param name="Url">The common link; null when only the invitees' personal links work (<see cref="OpenLink"/> false).</param>
+public sealed record CloudPoll(
+    string Id,
+    string Title,
+    string? Location,
+    string? Description,
+    string TimeZone,
+    string Visibility,
+    bool HasPassword,
+    bool OpenLink,
+    Uri? Url,
+    DateTimeOffset? Deadline,
+    DateTimeOffset ExpiresAt,
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<CloudPollOption> Options,
+    IReadOnlyList<CloudPollParticipant> Participants);
+
+/// <summary>A proposed date; a whole day (<see cref="AllDay"/>) starts at 00:00 UTC of that day.</summary>
+public sealed record CloudPollOption(string Id, DateTimeOffset Start, DateTimeOffset? End, bool AllDay);
+
+/// <param name="Invited">Invited by the planner; <see cref="Url"/> is then their personal link.</param>
+/// <param name="Answers">Option id → yes, ifneeded, maybe or no; options without an answer are missing.</param>
+public sealed record CloudPollParticipant(
+    string Id,
+    string? Name,
+    string? Email,
+    bool Invited,
+    Uri? Url,
+    string? Comment,
+    DateTimeOffset? AnsweredAt,
+    IReadOnlyDictionary<string, string> Answers);
+
+/// <summary>
+/// Body of <c>POST /api/v1/polls</c> and <c>PUT /api/v1/polls/{id}</c> (always the whole poll). Options and invitees
+/// with an id are kept with their answers.
+/// </summary>
+/// <param name="Password">Null: unchanged (not sent); empty: removed; text: set.</param>
+public sealed record PollRequest(
+    string Title,
+    string? Location,
+    string? Description,
+    string TimeZone,
+    string Visibility,
+    string? Password,
+    bool OpenLink,
+    DateTimeOffset? Deadline,
+    IReadOnlyList<PollOptionRequest> Options,
+    IReadOnlyList<PollInviteeRequest> Invitees);
+
+public sealed record PollOptionRequest(string? Id, DateTimeOffset Start, DateTimeOffset? End, bool AllDay);
+
+public sealed record PollInviteeRequest(string? Id, string? Name, string? Email);

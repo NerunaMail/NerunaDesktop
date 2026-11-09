@@ -31,6 +31,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     /// <summary>"Spezieller Kalender": birthdays or holidays.</summary>
     public event EventHandler? SpecialRequested;
 
+    /// <summary>"Terminumfragen": the shell shows the polls (Neruna Cloud).</summary>
+    public event EventHandler? PollsRequested;
+
     /// <summary>The shell shows the editor as an overlay and reloads the week when it reports a change.</summary>
     public event EventHandler<EventEditorViewModel>? EditorRequested;
 
@@ -505,6 +508,46 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     [RelayCommand]
     private void AddSpecial() => SpecialRequested?.Invoke(this, EventArgs.Empty);
 
+    [RelayCommand]
+    private void OpenPolls() => PollsRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>
+    /// A poll's date fixed: the event editor with the poll's title, place and text, the chosen time and everyone with
+    /// an address as attendees. The editor is returned so the shell can delete the poll once the event is saved.
+    /// </summary>
+    public async Task<EventEditorViewModel> OpenPollResultAsync(Neruna.Contracts.Cloud.CloudPoll poll, Neruna.Contracts.Cloud.CloudPollOption option)
+    {
+        ArgumentNullException.ThrowIfNull(poll);
+        ArgumentNullException.ThrowIfNull(option);
+        DateTime start, end;
+        if (option.AllDay)
+        {
+            start = option.Start.UtcDateTime.Date;
+            end = (option.End?.UtcDateTime.Date ?? start).AddDays(1);
+        }
+        else
+        {
+            start = option.Start.LocalDateTime;
+            end = option.End?.LocalDateTime ?? start.AddHours(1);
+        }
+
+        var attendees = poll.Participants
+            .Where(p => !string.IsNullOrWhiteSpace(p.Email) && !(p.Answers.Count > 0 && p.Answers.Values.All(a => a == "no") && !p.Invited))
+            .GroupBy(p => p.Email!, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new EventAttendee(g.First().Email!, g.First().Name))
+            .ToList();
+        var draft = EventDraft.New(start, await settings.GetDefaultReminderAsync()) with
+        {
+            Summary = poll.Title,
+            Location = poll.Location,
+            Description = poll.Description,
+            End = end,
+            IsAllDay = option.AllDay,
+            Attendees = attendees,
+        };
+        return await ShowEditorAsync(draft, null);
+    }
+
     /// <param name="day">Day column that was used, or null for "next full hour today".</param>
     [RelayCommand]
     private void NewEvent(DateTime? day)
@@ -755,7 +798,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         await ReloadAsync();
     }
 
-    private async Task ShowEditorAsync(EventDraft draft, (CalendarInfo Calendar, string RemoteId)? existing, CalendarInfo? target = null)
+    private async Task<EventEditorViewModel> ShowEditorAsync(EventDraft draft, (CalendarInfo Calendar, string RemoteId)? existing, CalendarInfo? target = null)
     {
         var writable = Calendars.Select(c => c.Info).Where(c => !c.IsReadOnly).ToList();
 
@@ -783,6 +826,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         }
 
         EditorRequested?.Invoke(this, editor);
+        return editor;
     }
 
     /// <param name="dataChanged">Calendars, their visibility or events changed: busy days are recomputed.</param>

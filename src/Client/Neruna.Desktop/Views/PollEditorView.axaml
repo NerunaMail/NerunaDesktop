@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:core="using:Neruna.Core.Cloud"
+             x:Class="Neruna.Desktop.Views.PollEditorView"
+             x:DataType="vm:PollEditorViewModel">
+
+  <StackPanel>
+    <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+               Text="{l:T 'Die Eingeladenen wählen auf einer Webseite, welche Termine passen. Vorschläge und Antworten liegen nur, solange die Umfrage läuft, in Neruna Cloud – beim Festlegen des Termins werden sie dort gelöscht.'}" />
+
+    <StackPanel IsVisible="{Binding CanChooseConnection}">
+      <TextBlock Classes="label" Text="{l:T 'Organisation'}" />
+      <ComboBox ItemsSource="{Binding Connections}" SelectedItem="{Binding Connection}" HorizontalAlignment="Stretch">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="core:CloudConnection">
+            <TextBlock Text="{Binding OrganizationName}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                 Text="{l:T 'Die Umfrage läuft in Neruna Cloud dieser Organisation.'}" />
+    </StackPanel>
+
+    <TextBlock Classes="label" Text="{l:T 'Titel'}" />
+    <TextBox Text="{Binding Title}" PlaceholderText="{l:T 'Worum geht es?'}" />
+
+    <TextBlock Classes="label" Text="{l:T 'Ort'}" />
+    <TextBox Text="{Binding Location}" />
+
+    <TextBlock Classes="label" Text="{l:T 'Beschreibung'}" />
+    <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" MaxHeight="140" />
+
+    <TextBlock Classes="label" Text="{l:T 'Terminvorschläge'}" />
+    <ItemsControl ItemsSource="{Binding Options}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:PollOptionRow">
+          <Grid ColumnDefinitions="*,8,Auto,4,Auto,4,Auto,12,Auto,4,Auto,4,Auto" Margin="0,0,0,6">
+            <CalendarDatePicker SelectedDate="{Binding Day}" HorizontalAlignment="Stretch" MinWidth="150" />
+            <TimePicker Grid.Column="2" SelectedTime="{Binding Start}" ClockIdentifier="24HourClock" MinuteIncrement="5" IsVisible="{Binding HasTime}"
+                        MinWidth="0" Width="112" ToolTip.Tip="{l:T 'Beginn'}" />
+            <TextBlock Grid.Column="4" Text="–" VerticalAlignment="Center" IsVisible="{Binding HasTime}" />
+            <TimePicker Grid.Column="6" SelectedTime="{Binding End}" ClockIdentifier="24HourClock" MinuteIncrement="5" IsVisible="{Binding HasTime}"
+                        MinWidth="0" Width="112" ToolTip.Tip="{l:T 'Ende'}" />
+            <CheckBox Grid.Column="8" Content="{l:T 'Ganztägig'}" IsChecked="{Binding IsAllDay}" VerticalAlignment="Center" />
+            <Button Grid.Column="10" Classes="command" ToolTip.Tip="{l:T 'Weitere Zeit am selben Tag'}" IsVisible="{Binding HasTime}"
+                    Command="{Binding $parent[UserControl].((vm:PollEditorViewModel)DataContext).AddTimeCommand}" CommandParameter="{Binding}">
+              <PathIcon Data="{StaticResource IconClock}" Width="14" Height="14" />
+            </Button>
+            <Button Grid.Column="12" Classes="command" ToolTip.Tip="{l:T 'Vorschlag entfernen'}"
+                    Command="{Binding $parent[UserControl].((vm:PollEditorViewModel)DataContext).RemoveOptionCommand}" CommandParameter="{Binding}">
+              <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" />
+            </Button>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <Button Command="{Binding AddOptionCommand}" HorizontalAlignment="Left">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+        <TextBlock Text="{l:T 'Termin vorschlagen'}" />
+      </StackPanel>
+    </Button>
+
+    <TextBlock Classes="label" Text="{l:T 'Eingeladene'}" />
+    <TextBox Text="{Binding InviteesText}" AcceptsReturn="False" TextWrapping="Wrap" PlaceholderText="{l:T 'Name &lt;adresse@beispiel.ch&gt;, …'}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" IsVisible="{Binding IsForMail}"
+               Text="{l:T 'Aus den Empfängern der Mail. Beim Festlegen erhalten sie die Einladung zum Termin.'}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" IsVisible="{Binding CanChooseOpenLink}"
+               Text="{l:T 'Jede eingeladene Person erhält einen eigenen Link. Beim Festlegen erhalten alle mit Adresse die Einladung zum Termin.'}" />
+
+    <TextBlock Classes="label" Text="{l:T 'Antworten der anderen'}" />
+    <ComboBox ItemsSource="{Binding VisibilityChoices}" SelectedIndex="{Binding VisibilityIndex}" HorizontalAlignment="Stretch" />
+
+    <CheckBox Content="{l:T 'Alle mit dem Link können antworten'}" IsChecked="{Binding OpenLink}" IsVisible="{Binding CanChooseOpenLink}" Margin="0,10,0,0" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,0,0,0" IsVisible="{Binding CanChooseOpenLink}"
+               Text="{l:T 'Ausgeschaltet können nur die Eingeladenen mit ihrem eigenen Link antworten.'}" />
+
+    <CheckBox Content="{l:T 'Mit Passwort schützen'}" IsChecked="{Binding HasPassword}" Margin="0,8,0,0" />
+    <TextBox Text="{Binding Password}" IsVisible="{Binding HasPassword}" Margin="28,4,0,0"
+             PlaceholderText="{l:T 'Passwort (leer lassen: bisheriges behalten)'}" />
+
+    <Grid ColumnDefinitions="Auto,8,*,8,Auto" Margin="0,10,0,0">
+      <TextBlock Text="{l:T 'Antworten bis'}" VerticalAlignment="Center" />
+      <CalendarDatePicker Grid.Column="2" SelectedDate="{Binding Deadline}" IsVisible="{Binding HasDeadline}" HorizontalAlignment="Left" MinWidth="180" />
+      <Button Grid.Column="2" Content="{l:T 'Frist setzen'}" Command="{Binding SetDeadlineCommand}" IsVisible="{Binding !HasDeadline}" HorizontalAlignment="Left" />
+      <Button Grid.Column="4" Content="{l:T 'Keine Frist'}" Command="{Binding ClearDeadlineCommand}" IsVisible="{Binding HasDeadline}" />
+    </Grid>
+
+    <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,20,0,0">
+      <ProgressBar IsIndeterminate="True" Width="80" MinWidth="0" Height="4" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+      <Button Grid.Column="2" Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Classes="accent" Content="{l:T 'Speichern'}" Command="{Binding SaveCommand}" />
+    </Grid>
+  </StackPanel>
+</UserControl>

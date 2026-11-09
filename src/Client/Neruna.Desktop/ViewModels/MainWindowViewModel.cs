@@ -241,6 +241,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarPage.PrintRequested += (_, _) => ShowCalendarPrint();
         MailPage.QuickActionSuggested += (_, suggestion) => SuggestQuickAction(suggestion);
         CalendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
+        CalendarPage.PollsRequested += async (_, _) => await ShowPollsAsync();
         CalendarPage.RemoveRequested += async (_, info) => await RemoveCalendarAccountAsync(info);
         CalendarPage.EditorRequested += (_, editor) => ShowEditor(editor, CalendarChangedAsync);
         CalendarPage.StatusMessage += (_, message) => StatusText = message;
@@ -574,6 +575,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarSelectionViewModel { HasSeveralSources: true } => 1040, // accounts beside the calendars, long names
         CalendarSelectionViewModel or AddressBookSelectionViewModel => 760,
         CalendarPrintViewModel => 1080, // options beside a page preview
+        PollsViewModel => 1000, // the polls beside the answers of the chosen one
+        PollEditorViewModel => 780, // date, two times and the buttons in one line per proposal
         AccountTransferDialogViewModel => 900, // the QR code (up to ~520 px) with PIN and instructions beside it
         SyncStatusViewModel or BackupChangesViewModel => 820, // account, service and state in one line, errors below
         _ => 640,
@@ -1270,6 +1273,51 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         Overlay = subscription;
+    }
+
+    /// <summary>Kalender → Terminumfragen: the polls with their answers; fixing a date opens the event.</summary>
+    private async Task ShowPollsAsync()
+    {
+        var polls = new Neruna.Core.Cloud.SchedulingPolls(_cloudController);
+        var view = new PollsViewModel(polls);
+        view.Closed += (_, _) => Overlay = null;
+        view.MailRequested += async (_, request) =>
+        {
+            if (!request.Poll.OpenLink)
+            {
+                view.Message = T("Diese Umfrage hat nur persönliche Links – bitte jeder Person ihren eigenen Link senden (Symbol neben dem Namen).");
+                return;
+            }
+
+            Overlay = null;
+            CurrentPage = MailPage;
+            await MailPage.ComposePollAsync(request.Poll, request.Password);
+        };
+        view.FixRequested += async (_, request) =>
+        {
+            Overlay = null;
+            var editor = await CalendarPage.OpenPollResultAsync(request.Poll, request.Option);
+            editor.Finished += async (_, saved) =>
+            {
+                if (!saved || editor.Saved is null)
+                {
+                    return;
+                }
+
+                // The result is the event now: the poll and its answers go from Neruna Cloud.
+                try
+                {
+                    await polls.DeleteAsync(request.Connection, request.Poll.Id);
+                    StatusText = F("Termin festgelegt; die Umfrage «{0}» wurde in Neruna Cloud gelöscht.", request.Poll.Title);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    StatusText = T("Der Termin ist gespeichert, aber die Umfrage konnte nicht gelöscht werden: ") + ex.Message;
+                }
+            };
+        };
+        Overlay = view;
+        await view.RefreshAsync();
     }
 
     private async Task ShowSpecialCalendarAsync()

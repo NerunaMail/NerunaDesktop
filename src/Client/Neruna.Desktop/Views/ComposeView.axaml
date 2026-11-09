@@ -48,6 +48,9 @@
         <!-- Termin: an event for this mail, the recipients as attendees (ComposeViewModel.Appointment) -->
         <ctl:ToolButton Icon="{StaticResource IconCalendar}" Label="{l:T 'Termin'}" Hint="{l:T 'Termin zu dieser E-Mail erstellen – die Empfänger werden eingeladen'}"
                         Command="{Binding MakeAppointmentCommand}" IsVisible="{Binding CanMakeAppointment}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+        <!-- Terminumfrage: a poll with the recipients as invitees, its link into the text (ComposeViewModel.Poll) -->
+        <ctl:ToolButton Icon="{StaticResource IconPoll}" Label="{l:T 'Terminumfrage'}" Hint="{l:T 'Terminumfrage erstellen und den Link einfügen – die Empfänger wählen, welche Termine passen'}"
+                        Command="{Binding MakePollCommand}" IsVisible="{Binding CanMakePoll}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
         <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
         <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="{l:T 'Textvorlage'}" Hint="{l:T 'Textvorlage an der Cursorposition einfügen – oder «kürzel::» bzw. «kürzel» + Tab tippen'}"
                         IsEnabled="{Binding HasTemplates}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">

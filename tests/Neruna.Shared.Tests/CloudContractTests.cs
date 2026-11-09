@@ -41,7 +41,7 @@ public class CloudContractTests
         Assert.Equal(("Anna", "Muster", "Projektleiterin", "+41 79 123 45 67"), (me.Member.FirstName, me.Member.LastName, me.Member.Position, me.Member.PhoneMobile));
         Assert.False(me.Member.HasPhoto);
         Assert.Equal(("Example AG", "Zürich", "https://example.com"), (me.Organization.Name, me.Organization.City, me.Organization.Website));
-        Assert.Equal(["signatures", "templates", "chat", "certificates"], me.Addons);
+        Assert.Equal(["signatures", "templates", "chat", "certificates", "polls"], me.Addons);
         Assert.Equal("Anna – Notebook", me.Device.Name);
     }
 
@@ -84,6 +84,24 @@ public class CloudContractTests
 
         var tag = Assert.Single(response.Tags);
         Assert.Equal(("Offerte", "offerte", "#e8590c"), (tag.Name, tag.Keyword, tag.Color));
+    }
+
+    [Fact]
+    public void Client_reads_the_polls()
+    {
+        var response = JsonSerializer.Deserialize<PollsResponse>(ContractFixtures.Read("polls-example.json"), NerunaJson.Options)!;
+
+        var poll = Assert.Single(response.Polls);
+        Assert.Equal(("Teamsitzung Dezember", "Europe/Zurich", "all"), (poll.Title, poll.TimeZone, poll.Visibility));
+        Assert.Equal(2, poll.Options.Count);
+        Assert.True(poll.Options[1].AllDay);
+        Assert.Null(poll.Options[1].End);
+        Assert.Equal(new DateTimeOffset(2026, 12, 8, 8, 0, 0, TimeSpan.Zero), poll.Options[0].Start);
+        Assert.True(poll.Participants[0].Invited);
+        Assert.NotNull(poll.Participants[0].Url);
+        Assert.Null(poll.Participants[1].Url);
+        Assert.Equal("yes", poll.Participants[0].Answers[poll.Options[0].Id]);
+        Assert.Equal("no", poll.Participants[1].Answers[poll.Options[1].Id]);
     }
 
     [Fact]

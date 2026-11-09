@@ -45,7 +45,7 @@ public static class SettingKeys
     /// <summary>Payload fingerprint per account of an organisation as last set up (JSON; per connection).</summary>
     public const string CloudAccountsState = "cloud.accounts";
 
-    /// <summary>Id of the connection whose chat is shown (none: the first).</summary>
+    /// <summary>Was: the organisation whose chat was shown (before each one had its own tab); only removed now.</summary>
     public const string CloudChatConnection = "cloud.chatConnection";
 
     /// <summary>Id of the connection that keeps the personal backups (none: the first).</summary>

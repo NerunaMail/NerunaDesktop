@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.PollsView"
+             x:DataType="vm:PollsViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.cell">
+      <Setter Property="Width" Value="44" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.yes"><Setter Property="Foreground" Value="#16A34A" /></Style>
+    <Style Selector="TextBlock.ifneeded"><Setter Property="Foreground" Value="#65A30D" /></Style>
+    <Style Selector="TextBlock.maybe"><Setter Property="Foreground" Value="#D97706" /></Style>
+    <Style Selector="TextBlock.no"><Setter Property="Foreground" Value="#DC2626" /></Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*">
+    <Grid ColumnDefinitions="*,Auto">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <PathIcon Data="{StaticResource IconPoll}" Width="18" Height="18" VerticalAlignment="Center" />
+        <TextBlock Text="{l:T 'Terminumfragen'}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding !HasEditor}">
+        <Button Classes="accent" Command="{Binding NewCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+            <TextBlock Text="{l:T 'Neue Terminumfrage'}" />
+          </StackPanel>
+        </Button>
+        <Button Command="{Binding RefreshCommand}" ToolTip.Tip="{l:T 'Antworten neu laden'}">
+          <PathIcon Data="{StaticResource IconSync}" Width="14" Height="14" />
+        </Button>
+        <Button Content="{l:T 'Schliessen'}" Command="{Binding CloseCommand}" />
+      </StackPanel>
+    </Grid>
+
+    <StackPanel Grid.Row="1" Margin="0,8,0,0">
+      <ProgressBar IsIndeterminate="True" Height="4" MinWidth="0" IsVisible="{Binding IsBusy}" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+      <TextBlock Classes="subtle" TextWrapping="Wrap" IsVisible="{Binding IsEmpty}"
+                 Text="{l:T 'Noch keine Terminumfrage. Mit «Neue Terminumfrage» schlagen Sie Termine vor; die Eingeladenen wählen auf einer Webseite, welche passen.'}" />
+    </StackPanel>
+
+    <!-- The editor in place of the list -->
+    <ContentControl Grid.Row="2" Content="{Binding Editor}" IsVisible="{Binding HasEditor}" Margin="0,8,0,0" />
+
+    <Grid Grid.Row="2" ColumnDefinitions="240,16,*" Margin="0,12,0,0" IsVisible="{Binding !HasEditor}" MinHeight="360">
+      <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" VerticalAlignment="Top" MaxHeight="560">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:PollListItem">
+            <StackPanel Margin="0,2">
+              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Classes="subtle" FontSize="12" Text="{Binding Info}" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <StackPanel Grid.Column="2" IsVisible="{Binding HasSelection}">
+        <TextBlock Text="{Binding Selected.Title}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0" Text="{Binding Details}" />
+
+        <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,8" Margin="0,10,0,0" IsVisible="{Binding HasLink}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <PathIcon Data="{StaticResource IconLink}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+            <SelectableTextBlock Grid.Column="1" Text="{Binding LinkText}" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="12" />
+            <Button Grid.Column="2" Content="{l:T 'Link kopieren'}" Command="{Binding CopyLinkCommand}" Margin="8,0,0,0" />
+          </Grid>
+        </Border>
+
+        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+          <Button Command="{Binding WriteMailCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconMail}" Width="14" Height="14" />
+              <TextBlock Text="{l:T 'Mail an die Eingeladenen'}" />
+            </StackPanel>
+          </Button>
+          <Button Command="{Binding EditCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" />
+              <TextBlock Text="{l:T 'Bearbeiten'}" />
+            </StackPanel>
+          </Button>
+          <Button Command="{Binding DeleteCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" />
+              <TextBlock Text="{l:T 'Löschen'}" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <!-- The proposed dates with the counts; "Festlegen" opens the event -->
+        <TextBlock Classes="label" Text="{l:T 'Terminvorschläge'}" />
+        <ItemsControl ItemsSource="{Binding Results}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PollOptionResult">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,0,1" Padding="0,6">
+                <Grid ColumnDefinitions="28,*,Auto">
+                  <TextBlock Classes="subtle" Text="{Binding Number}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding When}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <Border Background="#16A34A" CornerRadius="8" Padding="6,0" IsVisible="{Binding IsBest}" VerticalAlignment="Center">
+                        <TextBlock Text="{l:T 'passt am besten'}" Foreground="White" FontSize="11" />
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Classes="subtle" FontSize="12" Text="{Binding Counts}" />
+                  </StackPanel>
+                  <Button Grid.Column="2" Content="{l:T 'Festlegen'}" VerticalAlignment="Center"
+                          Command="{Binding $parent[UserControl].((vm:PollsViewModel)DataContext).FixCommand}" CommandParameter="{Binding}"
+                          ToolTip.Tip="{l:T 'Termin mit allen Eingeladenen erstellen; die Umfrage wird danach gelöscht'}" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Who answered what: one column per proposed date (numbers as above) -->
+        <TextBlock Classes="label" Text="{l:T 'Antworten'}" IsVisible="{Binding HasParticipants}" />
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasParticipants}">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+              <Border Width="200" />
+              <ItemsControl ItemsSource="{Binding OptionNumbers}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Classes="cell subtle" Text="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            <ItemsControl ItemsSource="{Binding Participants}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PollParticipantResult">
+                  <StackPanel Orientation="Horizontal" Margin="0,2">
+                    <Grid Width="200" ColumnDefinitions="*,Auto">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Participant.Comment}" />
+                        <TextBlock Classes="subtle" FontSize="11" Text="{Binding State}" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="command" IsVisible="{Binding HasPersonalLink}" VerticalAlignment="Center"
+                              ToolTip.Tip="{l:T 'Persönlichen Link kopieren'}"
+                              Command="{Binding $parent[UserControl].((vm:PollsViewModel)DataContext).CopyPersonalLinkCommand}" CommandParameter="{Binding}">
+                        <PathIcon Data="{StaticResource IconLink}" Width="12" Height="12" />
+                      </Button>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Cells}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PollAnswerCell">
+                          <TextBlock Classes="cell" Classes.yes="{Binding IsYes}" Classes.ifneeded="{Binding IsIfNeeded}"
+                                     Classes.maybe="{Binding IsMaybe}" Classes.no="{Binding IsNo}" Text="{Binding Symbol}" ToolTip.Tip="{Binding Tip}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
+                   Text="{l:T '✓ ja · (✓) wenn nötig · ? vielleicht · ✗ nein · – keine Angabe'}" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>

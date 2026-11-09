@@ -121,15 +121,9 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task<CloudConnection?> GetConnectionAsync(string id, CancellationToken cancellationToken = default) =>
         (await GetConnectionsAsync(cancellationToken)).FirstOrDefault(c => c.Id == id);
 
-    /// <summary>The organisation whose chat is shown (Einstellungen → Cloud); without a choice the first one.</summary>
-    public Task<CloudConnection?> GetChatConnectionAsync(CancellationToken cancellationToken = default) =>
-        ChosenAsync(SettingKeys.CloudChatConnection, cancellationToken);
-
     /// <summary>The organisation that keeps the personal backups (Einstellungen → Cloud); without a choice the first one.</summary>
     public Task<CloudConnection?> GetBackupConnectionAsync(CancellationToken cancellationToken = default) =>
         ChosenAsync(SettingKeys.CloudBackupConnection, cancellationToken);
-
-    public Task SetChatConnectionAsync(string id, CancellationToken cancellationToken = default) => ChooseAsync(SettingKeys.CloudChatConnection, id, cancellationToken);
 
     public Task SetBackupConnectionAsync(string id, CancellationToken cancellationToken = default) => ChooseAsync(SettingKeys.CloudBackupConnection, id, cancellationToken);
 
@@ -261,6 +255,29 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         }
     }
 
+    /// <summary>The person's scheduling polls; null when the server has none yet (older version: 404).</summary>
+    public async Task<PollsResponse?> GetPollsAsync(CloudConnection connection, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAuthorizedAsync(connection, HttpMethod.Get, "api/v1/polls", cancellationToken);
+        return response.StatusCode == HttpStatusCode.NotFound ? null : await ReadAsync<PollsResponse>(response, cancellationToken);
+    }
+
+    /// <summary>Creates a poll (<paramref name="id"/> null) or replaces one; returns it as stored, with its links.</summary>
+    public async Task<CloudPoll> SavePollAsync(CloudConnection connection, string? id, PollRequest poll, CancellationToken cancellationToken = default) =>
+        id is null
+            ? await AuthorizedAsync<CloudPoll>(connection, HttpMethod.Post, "api/v1/polls", poll, cancellationToken)
+            : await AuthorizedAsync<CloudPoll>(connection, HttpMethod.Put, $"api/v1/polls/{Uri.EscapeDataString(id)}", poll, cancellationToken);
+
+    /// <summary>Deletes a poll with every answer (when the date is fixed); already gone counts as done.</summary>
+    public async Task DeletePollAsync(CloudConnection connection, string id, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAuthorizedAsync(connection, HttpMethod.Delete, $"api/v1/polls/{Uri.EscapeDataString(id)}", cancellationToken);
+        if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound)
+        {
+            await ReadAsync<CloudError>(response, cancellationToken);
+        }
+    }
+
     /// <summary>Sets the online status others see in the chat.</summary>
     public async Task SetPresenceAsync(CloudConnection connection, string presence, CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<PresenceRequest>(connection, HttpMethod.Put, "api/v1/presence", new PresenceRequest(presence), cancellationToken);
@@ -340,7 +357,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     {
         ArgumentNullException.ThrowIfNull(report);
         const string path = "api/v1/crash-reports";
-        var connection = await GetChatConnectionAsync(cancellationToken);
+        var connection = await GetConnectionAsync(cancellationToken);
         HttpResponseMessage? response = null;
         try
         {

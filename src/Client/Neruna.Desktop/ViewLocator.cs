@@ -17,6 +17,8 @@ internal sealed class ViewLocator : IDataTemplate
         NotesViewModel => new NotesView(),
         TaskEditorViewModel => new TaskEditorView(),
         ChatViewModel => new ChatView(),
+        PollsViewModel => new PollsView(),
+        PollEditorViewModel => new PollEditorView(),
         AccountSetupViewModel => new AccountSetupView(),
         IcsSubscriptionViewModel => new IcsSubscriptionView(),
         PstAccountViewModel => new PstAccountView(),

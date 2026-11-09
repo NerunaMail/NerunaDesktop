@@ -23,6 +23,13 @@
               <TextBlock Text="{l:T 'Neuer Termin'}" />
             </StackPanel>
           </Button>
+          <Button Classes="command" Command="{Binding OpenPollsCommand}" Margin="0,0,8,0"
+                  ToolTip.Tip="{l:T 'Termine vorschlagen und die Eingeladenen auf einer Webseite wählen lassen (Neruna Cloud)'}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconPoll}" Width="14" Height="14" />
+              <TextBlock Text="{l:T 'Terminumfragen'}" />
+            </StackPanel>
+          </Button>
           <Button Classes="command" Command="{Binding TodayCommand}" Content="{l:T 'Heute'}" />
           <Button Classes="command" Command="{Binding PreviousWeekCommand}" ToolTip.Tip="{Binding PreviousTip}">
             <PathIcon Data="{StaticResource IconChevronLeft}" Width="14" Height="14" Margin="0" />

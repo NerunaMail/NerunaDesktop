@@ -117,6 +117,12 @@ public sealed class ChatController(
             await settings.SetAsync(SettingKeys.ChatConnection, null, cancellationToken);
         }
 
+        // Chosen when only one organisation's chat was shown; each has its own tab now.
+        if (await settings.GetAsync(SettingKeys.CloudChatConnection, cancellationToken) is not null)
+        {
+            await settings.SetAsync(SettingKeys.CloudChatConnection, null, cancellationToken);
+        }
+
         await store.ClearOthersAsync(_services.Where(s => s.Kind == ChatKind.NerunaCloud).Select(s => s.Key).ToList(), cancellationToken);
         Changed?.Invoke(this, EventArgs.Empty);
     }

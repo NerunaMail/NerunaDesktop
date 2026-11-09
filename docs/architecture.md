@@ -17,6 +17,10 @@ Stand: 2026-11-06 · lebendes Dokument, wird mit dem Code nachgeführt.
    Bewusste Ausnahme: der **Chat** (Räume, private Nachrichten, Online-Status) liegt auf Cloud/Control –
    unverschlüsselt, nicht für vertrauliche Daten, nur so lange wie die Organisation festlegt (1 Tag bis 3 Monate,
    Standard 14 Tage; Server und Client löschen ältere Nachrichten). Abgleich per HTTP-Polling, kein Socket-Server.
+   Zweite Ausnahme: die **Terminumfrage** – Vorschläge und Antworten liegen nur, solange die Umfrage läuft, auf
+   Cloud/Control (die Antwortseite braucht eine öffentliche Adresse). Beim Festlegen löscht der Client sie dort; das
+   Ergebnis bleibt lokal. Nie festgelegte Umfragen löscht der Server 30 Tage nach dem letzten Vorschlag. Ohne Cloud
+   gibt es keine Terminumfrage, und nichts liegt in der Cloud.
 2. **Der Client ist ohne Cloud vollwertig.** Die Cloud ist Mehrwert für Organisationen, nie Voraussetzung.
 3. **Zero-Knowledge für Geheimnisse.** Passwörter und Tokens verlassen den Client nur clientseitig verschlüsselt.
 4. **Offene Standards vor eigenen Protokollen** (Thunderbird-Autoconfig, RFC 6186/6764, iCalendar, vCard).
@@ -338,9 +342,11 @@ Konten mit `CloudId` = `<id>:<Portal-ID>`. Die Abgleiche (`CloudSignatureSync`, 
 `CloudCertificateSync`, `CloudAccountSync`, Handy-Zustellung) laufen je Verbindung; eine nicht erreichbare hält die
 anderen nicht auf. `RemoveDisconnectedAsync` entfernt, was keiner verbundenen Organisation mehr gehört; Zertifikate
 merken sich je Verbindung, welche sie geliefert hat (`cloud.certificates`). Dieselbe Adresse von zwei Organisationen:
-das zuerst eingerichtete Konto bleibt. Chat und Sicherungen nutzen je eine gewählte Organisation (Einstellungen → Cloud,
-`cloud.chatConnection`, `cloud.backupConnection`; ohne Wahl die erste); beim Wechsel wird der lokale Chat geleert
-(`chat.connection`) und der Tresor-Schlüssel vergessen. Erneut mit derselben Organisation verbunden (gleicher Server und
+das zuerst eingerichtete Konto bleibt. Der Chat zeigt
+jede Organisation in einem eigenen Tab. Sicherungen nutzen eine gewählte Organisation (Einstellungen → Cloud,
+`cloud.backupConnection`; ohne Wahl die erste); beim Wechsel wird der Tresor-Schlüssel vergessen. Terminumfragen
+laufen mit der Organisation, die beim Planen gewählt wird (bei nur einer ohne Frage); die Übersicht zeigt die Umfragen
+aller Organisationen. Erneut mit derselben Organisation verbunden (gleicher Server und
 Name), übernimmt die neue Verbindung den Platz der alten.
 
 ### Kalendernamen und -farben

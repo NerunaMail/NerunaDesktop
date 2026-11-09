@@ -51,11 +51,11 @@ public class CloudConnectionsTests
         Assert.NotEqual(example.EncryptionKeyId, partner.EncryptionKeyId);
         Assert.Equal(["Example AG", "Partner GmbH"], (await cloud.GetConnectionsAsync(ct)).Select(c => c.OrganizationName));
 
-        // Chat and backups: the first, until another is chosen.
-        Assert.Equal(example.Id, (await cloud.GetChatConnectionAsync(ct))!.Id);
-        await cloud.SetChatConnectionAsync(partner.Id, ct);
-        Assert.Equal(partner.Id, (await cloud.GetChatConnectionAsync(ct))!.Id);
+        // Backups: the first, until another is chosen.
         Assert.Equal(example.Id, (await cloud.GetBackupConnectionAsync(ct))!.Id);
+        await cloud.SetBackupConnectionAsync(partner.Id, ct);
+        Assert.Equal(partner.Id, (await cloud.GetBackupConnectionAsync(ct))!.Id);
+        await cloud.SetBackupConnectionAsync(example.Id, ct);
 
         // Each organisation's signatures, apart even with the same id.
         var signatures = new SignatureService(env.Get<ISignatureStore>(), settings);

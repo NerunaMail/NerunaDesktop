@@ -168,6 +168,7 @@ internal static class AppServices
         services.AddSingleton<AccountSetupService>();
         services.AddSingleton<AccountDiscovery>();
         services.AddSingleton<Neruna.Core.Cloud.CloudController>();
+        services.AddSingleton<Neruna.Core.Cloud.SchedulingPolls>();
         services.AddSingleton<Neruna.Core.Cloud.CloudSignatureSync>();
         services.AddSingleton<Neruna.Core.Cloud.CloudTextTemplateSync>();
         services.AddSingleton<Neruna.Core.Cloud.CloudMailTagSync>();
