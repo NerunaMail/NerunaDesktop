@@ -17,7 +17,7 @@ namespace Neruna.Providers.Graph;
 /// what it sees from CalDAV. The version of an event is Graph's change key. The server delivers invitations itself.
 /// Not (yet) mapped: changed single occurrences of a series.
 /// </summary>
-internal sealed class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy, ICalendarOnlineMeetings
+internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy, ICalendarOnlineMeetings
 {
     /// <summary>
     /// Free/busy of people in the organisation (getSchedule) – also without their calendar being shared; subject and

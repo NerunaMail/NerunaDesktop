@@ -92,6 +92,8 @@
       <StreamGeometry x:Key="IconReply">M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z</StreamGeometry>
       <StreamGeometry x:Key="IconReplyAll">M7 8V5l-7 7 7 7v-3l-4-4 4-4zm6 1V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z</StreamGeometry>
       <StreamGeometry x:Key="IconForward">M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z</StreamGeometry>
+      <StreamGeometry x:Key="IconUndo">M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z</StreamGeometry>
+      <StreamGeometry x:Key="IconRedo">M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z</StreamGeometry>
       <StreamGeometry x:Key="IconDelete">M9 3h6l1 1h4v2H4V4h4l1-1zM5 7h14l-1 14H6L5 7zm4 2v10h2V9H9zm4 0v10h2V9h-2z</StreamGeometry>
       <StreamGeometry x:Key="IconArchive">M3 4h18v4H3V4zm1 5h16v11H4V9zm5 2v2h6v-2H9z</StreamGeometry>
       <StreamGeometry x:Key="IconEdit">M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7L20.7 7z</StreamGeometry>
@@ -251,6 +253,13 @@
     <Style Selector="Border.pane">
       <Setter Property="Background" Value="{DynamicResource PaneBackgroundBrush}" />
       <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <!-- Toolbars: a group of small tools, set off from the one before by a fine line -->
+    <Style Selector="Border.toolGroup">
+      <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+      <Setter Property="BorderThickness" Value="1,0,0,0" />
+      <Setter Property="Padding" Value="3,0,0,0" />
+      <Setter Property="Margin" Value="3,2,0,2" />
     </Style>
   </Application.Styles>
 </Application>

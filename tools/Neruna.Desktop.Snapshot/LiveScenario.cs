@@ -469,6 +469,8 @@ internal static class LiveScenario
         await SeedDavAsync(davUrl, user);
         await EnsureFolderAsync(mailHost, "Projekte");
         await EnsureFolderAsync(mailHost, "Trash");
+        await EnsureFolderAsync(mailHost, "Sent"); // sent mail is kept there ("Als Entwurf öffnen")
+        await SeedSentAsync(mailHost);
         await SeedMailAsync(mailHost);
         await SeedRichMailAsync(mailHost);
 
@@ -659,6 +661,8 @@ internal static class LiveScenario
         await CheckInvitationAsync(vm, window, output, mailHost, user, services);
         await CheckSearchAsync(vm, window, output, mailHost, user);
         await CheckUndoAsync(vm, mailHost, user);
+        await CheckCopyAsync(vm, window, output, mailHost, user);
+        await CheckOpenAsDraftAsync(vm, window, output, user);
 
         vm.NavigateCommand.Execute(Section.Calendar);
         await Snapshots.SaveAsync(window, output, "live-calendar.png");
@@ -880,6 +884,89 @@ internal static class LiveScenario
         Console.WriteLine("Second Ctrl+Z: nothing left to undo (status only)");
     }
 
+    // "Als Entwurf öffnen" on a sent mail: a new draft with the same recipients, subject and text.
+    private static async Task CheckOpenAsDraftAsync(MainWindowViewModel vm, MainWindow window, string output, string user)
+    {
+        var sent = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
+            .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Sent && f.Account.Account.EmailAddress == user);
+        vm.MailPage.Tree.SelectedTreeItem = sent;
+        // The list of "Gesendet" (not the one before): its mails go to others.
+        await WaitAsync(() => vm.MailPage.CurrentFolder == sent && vm.MailPage.Entries.OfType<MessageItemViewModel>().Any(m => m.Sender.StartsWith("An:", StringComparison.Ordinal)));
+        var message = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+        vm.MailPage.SelectedEntry = message;
+        await WaitAsync(() => vm.MailPage.OpenAsDraftCommand.CanExecute(null));
+        await Snapshots.SaveAsync(window, output, "live-sent-open-as-draft.png");
+        await vm.MailPage.OpenAsDraftCommand.ExecuteAsync(null);
+        await WaitAsync(() => vm.MailPage.Compose is not null);
+        var compose = vm.MailPage.Compose;
+        Console.WriteLine($"Opened as draft: to={compose?.To}, subject={compose?.Subject} (sent: {message.Subject}), button shown={vm.MailPage.IsSentFolder}, open={compose is not null}, status={vm.StatusText}");
+        await Snapshots.SaveAsync(window, output, "live-open-as-draft.png");
+        if (compose is not null)
+        {
+            await compose.DiscardCommand.ExecuteAsync(null);
+            if (!compose.IsFinished)
+            {
+                await compose.DiscardCommand.ExecuteAsync(null); // "wirklich verwerfen?"
+            }
+        }
+    }
+
+    // "Kopieren nach …": into a folder of the same account and into the other account (Lea); the originals stay. Then
+    // the folder dialog with both accounts, opened again as it was left.
+    private static async Task CheckCopyAsync(MainWindowViewModel vm, MainWindow window, string output, string mailHost, string user)
+    {
+        var inbox = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
+            .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox && f.Account.Account.EmailAddress == user);
+        var projects = inbox.Account.AllFolders().First(f => f.Folder.RemoteId == "Projekte");
+        var leaInbox = vm.MailPage.Accounts.SelectMany(a => a.AllFolders())
+            .First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox && f.Account.Account.EmailAddress == "lea@example.com");
+        vm.MailPage.Tree.SelectedTreeItem = inbox;
+        await WaitAsync(() => vm.MailPage.CurrentFolder == inbox && vm.MailPage.Entries.OfType<MessageItemViewModel>().Any());
+
+        async Task<int> CountAsync(string login, string name)
+        {
+            using var imap = new MailKit.Net.Imap.ImapClient();
+            await imap.ConnectAsync(mailHost, 3143, SecureSocketOptions.None);
+            await imap.AuthenticateAsync(login, "geheim");
+            var folder = await imap.GetFolderAsync(name);
+            await folder.OpenAsync(MailKit.FolderAccess.ReadOnly);
+            var count = folder.Count;
+            await imap.DisconnectAsync(true);
+            return count;
+        }
+
+        var message = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+        var (inboxBefore, projectsBefore, leaBefore) = (await CountAsync(user, "INBOX"), await CountAsync(user, "Projekte"), await CountAsync("lea@example.com", "INBOX"));
+        await vm.MailPage.CopyToFolderAsync([message], projects);
+        await vm.MailPage.CopyToFolderAsync([message], leaInbox);
+        Console.WriteLine($"Copy '{message.Subject}': INBOX {inboxBefore}→{await CountAsync(user, "INBOX")}, Projekte {projectsBefore}→{await CountAsync(user, "Projekte")}, "
+            + $"Lea's INBOX {leaBefore}→{await CountAsync("lea@example.com", "INBOX")}; still in the list: {vm.MailPage.Entries.OfType<MessageItemViewModel>().Contains(message)}");
+
+        // Searching all folders finds the original and the copy: each hit says its folder, in the table too.
+        vm.MailPage.Search.IsAdvancedSearchOpen = true;
+        vm.MailPage.Search.SearchSubject = message.Subject;
+        vm.MailPage.Search.SearchScopeChoice = vm.MailPage.Search.SearchScopes.First(s => s.IsAccount && s.Account == inbox.Account);
+        await vm.MailPage.Search.RunSearchCommand.ExecuteAsync(null);
+        await vm.MailPage.Search.SearchServerCommand.ExecuteAsync(null); // just copied: not in the index on this device yet
+        await WaitAsync(() => vm.MailPage.Entries.OfType<MessageItemViewModel>().Count() >= 2);
+        vm.MailPage.ListLayout.IsTable = true;
+        await Task.Delay(300);
+        await Snapshots.SaveAsync(window, output, "live-search-folders-table.png");
+        vm.MailPage.ListLayout.IsTable = false;
+        Console.WriteLine($"Search over all folders: {string.Join(" | ", vm.MailPage.Entries.OfType<MessageItemViewModel>().Select(m => m.Subject + " in " + m.FolderText))}");
+        await vm.MailPage.CloseSearchCommand.ExecuteAsync(null);
+
+        var picker = new FolderPickerViewModel(vm.MailPage.Accounts, inbox, "In welchen Ordner kopieren?");
+        picker.Roots[^1].IsExpanded = false;
+        var again = new FolderPickerViewModel(vm.MailPage.Accounts, inbox, "In welchen Ordner kopieren?", picker.ExpandedKeys);
+        var pickerWindow = new Window { Width = 440, Height = 560, Content = new FolderPickerView { DataContext = again, Margin = new Thickness(20, 16) } };
+        pickerWindow.Bind(Window.BackgroundProperty, pickerWindow.GetResourceObservable("PaneBackgroundBrush"));
+        pickerWindow.Show();
+        await Snapshots.SaveAsync(pickerWindow, output, "live-folder-picker.png");
+        Console.WriteLine($"Folder dialog: {again.Roots.Count} accounts, reopened as left: {string.Join(", ", again.Roots.Select(r => r.Name + (r.IsExpanded ? " open" : " closed")))}");
+        pickerWindow.Close();
+    }
+
     // Invitations: Marco invites Anna by mail; the bar shows it, "Annehmen" puts it into Anna's calendar (Radicale)
     // and sends Marco the answer. Then the event editor with reminder and attendees, and the reminder window.
     private static async Task CheckInvitationAsync(MainWindowViewModel vm, MainWindow window, string output, string mailHost, string user, IServiceProvider services)
@@ -1099,6 +1186,11 @@ internal static class LiveScenario
         await WaitAsync(() => vm.MailPage.EditDraftCommand.CanExecute(null));
         await vm.MailPage.EditDraftCommand.ExecuteAsync(null);
         await WaitAsync(() => vm.MailPage.Compose is not null);
+        if (vm.MailPage.Compose is null)
+        {
+            Console.WriteLine($"Reopening the draft failed: status={vm.StatusText}, selected={vm.MailPage.SelectedMessage?.Subject}, canEdit={vm.MailPage.EditDraftCommand.CanExecute(null)}");
+        }
+
         var reopened = vm.MailPage.Compose!;
         Console.WriteLine($"Reopened draft: to={reopened.To}, subject={reopened.Subject}, folder name={drafts.Name}");
         await Snapshots.SaveAsync(window, output, "live-draft.png");
@@ -1169,6 +1261,22 @@ internal static class LiveScenario
             System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
         _lea = System.Security.Cryptography.X509Certificates.RSACertificateExtensions.CopyWithPrivateKey(issued, key);
         return _lea;
+    }
+
+    // A mail Anna sent to Lea earlier, with an attachment.
+    private static async Task SeedSentAsync(string host)
+    {
+        using var imap = new MailKit.Net.Imap.ImapClient();
+        await imap.ConnectAsync(host, 3143, SecureSocketOptions.None);
+        await imap.AuthenticateAsync("anna@example.com", "geheim");
+        var sent = await imap.GetFolderAsync("Sent");
+        var body = new BodyBuilder { TextBody = "Hallo Lea\n\nAnbei das Protokoll.\n\nGruss Anna" };
+        body.Attachments.Add("Protokoll.txt", System.Text.Encoding.UTF8.GetBytes("Traktanden …"));
+        var message = new MimeMessage { Subject = "Protokoll Sitzung", Body = body.ToMessageBody(), Date = DateTimeOffset.Now.AddHours(-2) };
+        message.From.Add(new MailboxAddress("Anna Muster", "anna@example.com"));
+        message.To.Add(new MailboxAddress("Lea Keller", "lea@example.com"));
+        await sent.AppendAsync(new MailKit.AppendRequest(message, MailKit.MessageFlags.Seen));
+        await imap.DisconnectAsync(true);
     }
 
     private static async Task EnsureFolderAsync(string host, string name)

@@ -15,6 +15,11 @@
      into the sent mail. */
   #editor div, #editor p { margin: 0; }
   #editor > div, #editor > p { margin: 0 0 var(--paragraph-spacing, 0.5em) 0; }
+  /* Lists start where the text starts: the bullet (or number) at the left edge, its text just after; only nested lists
+     (Tab) are indented. cleanHtml puts the same into the sent mail, whose program would otherwise indent them. */
+  #editor ul, #editor ol { margin: 0; padding-left: 1.3em; }
+  #editor ol { padding-left: 1.8em; }
+  #editor > ul, #editor > ol { margin: 0 0 var(--paragraph-spacing, 0.5em) 0; }
   #editor blockquote { margin: 0 0 0 4px; padding-left: 10px; border-left: 2px solid #c8c8c8; }
   #editor img { max-width: 100%; }
   /* A fine frame around pictures while writing, so white or transparent ones can be seen (not sent: CSS of the editor). */
@@ -235,6 +240,13 @@
         el.style.margin = "0 0 " + paragraphSpacing + " 0";
       }
     });
+    Array.prototype.slice.call(clone.querySelectorAll("ul, ol")).forEach(function (list) {
+      if (list.classList.contains("neruna-checklist") || list.style.paddingLeft || list.style.marginLeft) return;
+      list.style.marginTop = "0";
+      list.style.marginLeft = "0";
+      list.style.marginBottom = list.parentNode === clone ? paragraphSpacing : "0";
+      list.style.paddingLeft = list.tagName === "OL" ? "1.8em" : "1.3em";
+    });
     return clone.innerHTML;
   }
 
@@ -297,7 +309,28 @@
     }
   });
 
+  // Files copied in the file manager (Ctrl+C, then Ctrl+V here): the app looks at its clipboard and attaches them.
+  // Only when there is no file behind them (a screenshot) a picture goes into the text. Text from Word or a spreadsheet
+  // (HTML, often with a picture of it besides) is pasted as before.
+  var pastedFiles = null;
   editor.addEventListener("paste", function (e) {
+    var data = e.clipboardData;
+    if (!data || (typeof window.invokeCSharpAction !== "function" && typeof window.__nerunaTestSink !== "function")) return;
+    var types = Array.prototype.slice.call(data.types || []);
+    var uris = (data.getData("text/uri-list") || "").split(/\r?\n/).filter(function (u) { return /^file:/i.test(u); });
+    var files = Array.prototype.filter.call(data.items || [], function (i) { return i.kind === "file"; })
+      .map(function (i) { return i.getAsFile(); }).filter(function (f) { return !!f; });
+    var hasText = types.indexOf("text/html") >= 0 || types.indexOf("text/plain") >= 0;
+    // Nothing in the page's view of the clipboard (some systems hide copied files from it): ask the app as well.
+    if (uris.length === 0 && (hasText || (files.length === 0 && types.length > 0))) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    pastedFiles = files;
+    post({ type: "filepaste", uris: uris, count: files.length });
+  });
+
+  editor.addEventListener("paste", function (e) {
+    if (e.defaultPrevented) return;
     var items = (e.clipboardData && e.clipboardData.items) || [];
     for (var i = 0; i < items.length; i++) {
       if (items[i].kind === "file" && /^image\//.test(items[i].type)) {
@@ -800,6 +833,21 @@
         reader.readAsDataURL(file);
       });
       return String(files.length);
+    },
+    /** Pasted files the app found no paths for: a picture (screenshot) into the text, anything else attached. */
+    usePastedFiles: function (maxBytes) {
+      var files = pastedFiles || [];
+      pastedFiles = null;
+      if (files.length > 0 && files.every(function (f) { return /^image\//.test(f.type); })) {
+        files.forEach(function (file) {
+          var reader = new FileReader();
+          reader.onload = function () { post({ type: "image", data: reader.result }); };
+          reader.readAsDataURL(file);
+        });
+        return String(files.length);
+      }
+      droppedFiles = files;
+      return window.neruna.readDroppedFiles(maxBytes);
     },
     /** Inserts html at the last caret position (start of the text if there never was one); nothing is replaced. */
     insertHtml: function (html) {

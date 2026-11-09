@@ -1,4 +1,5 @@
 using Neruna.Core.Calendar;
+using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Providers.Google;
 
@@ -7,8 +8,14 @@ namespace Neruna.Providers.Google;
 /// connection, so the account has one calendar entry. Calendars and tasks each only where the sign-in includes them.
 /// </summary>
 internal sealed class GoogleCalendarProvider(Guid connectionId, ICalendarProvider dav, GoogleTasks tasks, Func<string, CancellationToken, Task<bool>> grants)
-    : ICalendarProvider, ICalendarScheduling
+    : ICalendarProvider, ICalendarScheduling, ICalendarColors
 {
+    /// <summary>Google keeps the colour per user (calendar list): changing it never changes it for others.</summary>
+    public Task SetCalendarColorAsync(CalendarInfo calendar, string color, CancellationToken cancellationToken = default) =>
+        !GoogleTasks.IsTaskList(calendar) && dav is ICalendarColors colors
+            ? colors.SetCalendarColorAsync(calendar, color, cancellationToken)
+            : throw new NotSupportedException(T("Aufgabenlisten haben bei Google keine Farbe."));
+
     public CalendarProviderCapabilities Capabilities => dav.Capabilities;
 
     public async Task TestConnectionAsync(CancellationToken cancellationToken = default)

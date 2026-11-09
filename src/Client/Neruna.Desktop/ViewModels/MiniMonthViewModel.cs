@@ -31,7 +31,8 @@ internal sealed partial class MiniMonth : ObservableObject
     /// <summary>Always six weeks, so two months stacked stay aligned and the size never jumps.</summary>
     public IReadOnlyList<MiniWeek> Weeks { get; }
 
-    public void Show(DateTime month, bool isFirst, DateTime selectedWeekStart, IReadOnlySet<DateTime> daysWithEvents)
+    /// <param name="chosen">Days picked by hand: marked each (no week highlighted); null shows the selected week.</param>
+    public void Show(DateTime month, bool isFirst, DateTime selectedWeekStart, IReadOnlySet<DateTime> daysWithEvents, IReadOnlySet<DateTime>? chosen = null)
     {
         var first = new DateTime(month.Year, month.Month, 1);
         Title = first.ToString("MMMM yyyy", Culture);
@@ -41,7 +42,7 @@ internal sealed partial class MiniMonth : ObservableObject
         for (var w = 0; w < 6; w++)
         {
             var weekStart = start.AddDays(7 * w);
-            Weeks[w].Show(weekStart, weekStart == selectedWeekStart, first.Month, daysWithEvents);
+            Weeks[w].Show(weekStart, chosen is null && weekStart == selectedWeekStart, first.Month, daysWithEvents, chosen);
         }
     }
 }
@@ -58,7 +59,7 @@ internal sealed partial class MiniWeek : ObservableObject
 
     public DateTime Start => Days[0].Date;
 
-    public void Show(DateTime weekStart, bool isSelected, int month, IReadOnlySet<DateTime> daysWithEvents)
+    public void Show(DateTime weekStart, bool isSelected, int month, IReadOnlySet<DateTime> daysWithEvents, IReadOnlySet<DateTime>? chosen = null)
     {
         NumberText = ISOWeek.GetWeekOfYear(weekStart).ToString(CultureInfo.InvariantCulture);
         IsSelected = isSelected;
@@ -66,6 +67,7 @@ internal sealed partial class MiniWeek : ObservableObject
         {
             var date = weekStart.AddDays(d);
             Days[d].Show(date, date.Month == month, date == DateTime.Today, daysWithEvents.Contains(date));
+            Days[d].IsChosen = chosen?.Contains(date) == true;
         }
     }
 }
@@ -89,6 +91,10 @@ internal sealed partial class MiniDay : ObservableObject
 
     [ObservableProperty]
     public partial bool HasEvents { get; set; }
+
+    /// <summary>One of the days picked by hand (drag, Ctrl+click), shown on the right.</summary>
+    [ObservableProperty]
+    public partial bool IsChosen { get; set; }
 
     public bool IsOtherMonth => !IsCurrentMonth;
 

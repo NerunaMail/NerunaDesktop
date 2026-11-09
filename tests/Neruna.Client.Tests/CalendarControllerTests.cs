@@ -87,6 +87,49 @@ public class CalendarControllerTests
     }
 
     [Fact]
+    public async Task A_local_ics_file_is_subscribed_and_read_again_when_it_changes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var file = Path.Combine(Path.GetTempPath(), $"neruna-{Guid.NewGuid():N}", "Ferien Team.ics");
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        try
+        {
+            await File.WriteAllTextAsync(file, Feed.Replace("X-WR-CALNAME:Team\n", string.Empty, StringComparison.Ordinal), ct);
+            var url = IcsProviderFactory.NormalizeUrl(file);
+            Assert.True(url.IsFile);
+            await env.AddAccountAsync(ServiceKind.Calendar, ProviderIds.Ics, new Dictionary<string, string> { [IcsCalendarProvider.UrlSetting] = url.AbsoluteUri });
+
+            Assert.Equal(1, (await env.Calendar.SyncAllAsync(ct)).SucceededConnections);
+            var calendar = Assert.Single(await env.Calendar.GetCalendarsAsync(ct));
+            Assert.Equal("Ferien Team", calendar.Name); // no name in the file: its file name
+            var from = new DateTimeOffset(2026, 10, 5, 0, 0, 0, TimeSpan.FromHours(2));
+            Assert.Contains("Betriebsausflug", (await env.Calendar.GetOccurrencesAsync([calendar], from, from.AddDays(14), ct)).Select(o => o.Summary));
+
+            // Changed on disk: the next sync shows it.
+            await File.WriteAllTextAsync(file, Feed.Replace("Betriebsausflug", "Teamausflug", StringComparison.Ordinal), ct);
+            await env.Calendar.SyncAllAsync(ct);
+            var after = await env.Calendar.GetOccurrencesAsync([Assert.Single(await env.Calendar.GetCalendarsAsync(ct))], from, from.AddDays(14), ct);
+            Assert.Contains("Teamausflug", after.Select(o => o.Summary));
+            Assert.DoesNotContain("Betriebsausflug", after.Select(o => o.Summary));
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(file)!, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("webcal://calendar.example.com/team.ics", "https://calendar.example.com/team.ics")]
+    [InlineData("file:///home/anna/ferien.ics", "file:///home/anna/ferien.ics")]
+    public void Addresses_and_files_are_accepted_others_not(string input, string expected)
+    {
+        Assert.Equal(expected, IcsProviderFactory.NormalizeUrl(input).AbsoluteUri);
+        Assert.Throws<ArgumentException>(() => IcsProviderFactory.NormalizeUrl("ftp://example.com/x.ics"));
+        Assert.Throws<UriFormatException>(() => IcsProviderFactory.NormalizeUrl("ferien.ics")); // a relative path says nothing
+    }
+
+    [Fact]
     public async Task Unchanged_feed_is_not_rewritten_and_changed_feed_replaces_events()
     {
         await using var env = await TestEnvironment.CreateAsync();

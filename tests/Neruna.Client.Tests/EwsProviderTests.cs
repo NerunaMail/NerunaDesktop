@@ -610,6 +610,42 @@ public class EwsProviderTests
     private static XElement Item(string xml) =>
         XElement.Parse(xml.Replace("<t:CalendarItem>", $"<t:CalendarItem xmlns:t=\"{T.NamespaceName}\">", StringComparison.Ordinal));
 
+    [Fact]
+    public async Task The_category_list_of_the_mailbox_is_read_and_only_colours_change()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (connection, factory, server, _) = Connect(ServiceKind.Calendar);
+        const string List = """<?xml version="1.0"?><categories default="Rot" lastSavedSession="2" xmlns="CategoryList.xsd"><category name="Kunde" color="7" keyboardShortcut="0" usageCount="3" guid="{A}" renameOnFirstUse="0"/><category name="Ohne" color="-1" keyboardShortcut="0" guid="{B}"/></categories>""";
+        server.On("GetUserConfiguration", _ => Ok("GetUserConfiguration",
+            $"<m:UserConfiguration><t:UserConfigurationName Name=\"CategoryList\"><t:DistinguishedFolderId Id=\"calendar\"/></t:UserConfigurationName><t:XmlData>{Convert.ToBase64String(Encoding.UTF8.GetBytes("\uFEFF" + List))}</t:XmlData></m:UserConfiguration>"));
+        server.On("UpdateUserConfiguration", _ => Ok("UpdateUserConfiguration", string.Empty));
+        await using var provider = new EwsCalendarProviderFactory(factory).Create(connection);
+        var categories = Assert.IsAssignableFrom<ICalendarCategoryColors>(provider);
+
+        Assert.Equal([new CalendarCategory("Kunde", "#0078D4"), new CalendarCategory("Ohne", "#A0A0A0")], await categories.GetCategoriesAsync(ct));
+        var asked = server.Operations("GetUserConfiguration").Single();
+        Assert.Equal("CategoryList", asked.Element(M + "UserConfigurationName")!.Attribute("Name")!.Value);
+        Assert.Equal("XmlData", asked.Element(M + "UserConfigurationProperties")!.Value);
+
+        // Recoloured and one added; usage, guid and the list's own attributes stay.
+        await categories.SetCategoryColorAsync("Kunde", "#13A10E", ct);
+        var written = XDocument.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(server.Operations("UpdateUserConfiguration").Last().Descendants(T + "XmlData").Single().Value))).Root!;
+        XNamespace ns = "CategoryList.xsd";
+        var kunde = written.Elements(ns + "category").Single(c => (string?)c.Attribute("name") == "Kunde");
+        Assert.Equal(("4", "3", "{A}"), ((string)kunde.Attribute("color")!, (string)kunde.Attribute("usageCount")!, (string)kunde.Attribute("guid")!));
+        Assert.Equal("Rot", (string?)written.Attribute("default"));
+        Assert.Equal("calendar", server.Operations("UpdateUserConfiguration").Last().Descendants(T + "DistinguishedFolderId").Single().Attribute("Id")!.Value);
+
+        await categories.SetCategoryColorAsync("Projekt", "#5C2E91", ct);
+        written = XDocument.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(server.Operations("UpdateUserConfiguration").Last().Descendants(T + "XmlData").Single().Value))).Root!;
+        Assert.Equal("23", (string?)written.Elements(ns + "category").Single(c => (string?)c.Attribute("name") == "Projekt").Attribute("color"));
+
+        // A mailbox without a list yet (never opened in Outlook): none to read, a clear message to write.
+        server.On("GetUserConfiguration", _ => Many("GetUserConfiguration", [Error("GetUserConfiguration", "ErrorItemNotFound")]));
+        Assert.Empty(await categories.GetCategoriesAsync(ct));
+        await Assert.ThrowsAsync<NotSupportedException>(() => categories.SetCategoryColorAsync("Kunde", "#13A10E", ct));
+    }
+
     private static string EventIcs(string summary) => $"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:U1\r\nSUMMARY:{summary}\r\nDTSTART:20261014T080000Z\r\nDTEND:20261014T090000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
 
     private static string Message(string operation, string inner) =>

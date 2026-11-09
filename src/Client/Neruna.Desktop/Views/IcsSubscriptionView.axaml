@@ -10,8 +10,13 @@
     <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,8"
                Text="{l:T 'Feiertage, Schulferien, Spielpläne oder veröffentlichte Kalender als ICS- oder webcal-Link. Abonnierte Kalender sind schreibgeschützt.'}" />
 
-    <TextBlock Classes="label" Text="{l:T 'Adresse'}" />
-    <TextBox Text="{Binding Url}" PlaceholderText="{l:T 'webcal://… oder https://….ics'}" />
+    <TextBlock Classes="label" Text="{l:T 'Adresse oder Datei'}" />
+    <Grid ColumnDefinitions="*,8,Auto">
+      <TextBox Text="{Binding Url}" PlaceholderText="{l:T 'webcal://…, https://….ics oder eine Datei'}" />
+      <Button Grid.Column="2" Content="{l:T 'Datei wählen …'}" Command="{Binding PickFileCommand}" />
+    </Grid>
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+               Text="{l:T 'Eine Datei auf diesem Computer oder einem Netzlaufwerk wird bei jedem Synchronisieren neu gelesen – Änderungen daran erscheinen von selbst.'}" />
 
     <TextBlock Classes="label" Text="{l:T 'Name (optional)'}" />
     <TextBox Text="{Binding Name}" PlaceholderText="{l:T 'z. B. Feiertage Zürich'}" />

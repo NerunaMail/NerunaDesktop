@@ -306,7 +306,7 @@ internal static class Snapshots
         await SaveAsync(window, output, "mail-pdf-stamped.png");
         // A narrow window: the preview's buttons move onto a line of their own instead of running past the edge.
         var wideWidth = window.Width;
-        window.Width = 1000;
+        window.Width = 1340;
         await Task.Delay(300);
         await SaveAsync(window, output, "mail-pdf-narrow.png");
         window.Width = wideWidth;
@@ -420,14 +420,35 @@ internal static class Snapshots
         moveStep.AskFolder = true;
         await Task.Delay(200);
         await SaveAsync(window, output, "settings-quick-action-ask.png");
-        var folderPicker = new FolderPickerViewModel(vm.MailPage.Accounts, vm.MailPage.Accounts[0], null);
+        // "Verschieben nach …" / "Kopieren nach …" (and a quick action asking): all accounts as a tree.
+        var pickerInbox = vm.MailPage.Accounts[0].Folders.First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox);
+        var folderPicker = new FolderPickerViewModel(vm.MailPage.Accounts, pickerInbox, "In welchen Ordner verschieben?");
         var pickerWindow = new Window { Width = 440, Height = 560, Content = new FolderPickerView { DataContext = folderPicker, Margin = new Thickness(20, 16) } };
         pickerWindow.Bind(Window.BackgroundProperty, pickerWindow.GetResourceObservable("PaneBackgroundBrush"));
         pickerWindow.Show();
         await SaveAsync(pickerWindow, output, "quick-action-folder-picker.png");
+        Console.WriteLine($"Picker first time: open [{string.Join(", ", folderPicker.ExpandedKeys.Select(k => k[..Math.Min(k.Length, 12)]))}], current enabled: "
+            + $"{folderPicker.Roots[0].Children.First(n => n.Folder == pickerInbox).IsEnabled}");
+        // Closing an account and opening a folder: the next picker opens the same way.
+        foreach (var root in folderPicker.Roots.Skip(1))
+        {
+            root.IsExpanded = false;
+        }
+
+        if (folderPicker.Roots[0].Children.FirstOrDefault(n => n.Children.Count > 0) is { } parent)
+        {
+            parent.IsExpanded = true;
+        }
+
+        var kept = folderPicker.ExpandedKeys;
+        var again = new FolderPickerViewModel(vm.MailPage.Accounts, pickerInbox, "In welchen Ordner kopieren?", kept);
+        Console.WriteLine($"Picker reopened: same open nodes = {kept.SequenceEqual(again.ExpandedKeys)} ({kept.Count} open)");
         folderPicker.Filter = "ar";
         await SaveAsync(pickerWindow, output, "quick-action-folder-picker-search.png");
-        Console.WriteLine($"Picker focus on search: {pickerWindow.FocusManager?.GetFocusedElement() is TextBox}, matches: {string.Join(" | ", folderPicker.Folders.Select(f => f.Name))}");
+        Console.WriteLine($"Picker focus on search: {pickerWindow.FocusManager?.GetFocusedElement() is TextBox}, matches: {string.Join(" | ", folderPicker.Matches.Select(f => f.Name + " (" + f.Account + ")"))}");
+        pickerWindow.Content = new FolderPickerView { DataContext = again, Margin = new Thickness(20, 16) };
+        await Task.Delay(200);
+        await SaveAsync(pickerWindow, output, "folder-picker-reopened.png");
         pickerWindow.Close();
 
         // Einstellungen → Profile with two profiles (the demo itself has none).
@@ -488,6 +509,14 @@ internal static class Snapshots
             autoReply.TemplateName = "Ferien";
             await autoReply.SaveTemplateCommand.ExecuteAsync(null);
             await SaveAsync(window, output, "auto-reply.png");
+            // "Mit Uhrzeit": from noon on the first day, back at 8 on the last; the placeholders show the times.
+            autoReply.WithTime = true;
+            await Task.Delay(200);
+            await SaveAsync(window, output, "auto-reply-time.png");
+            var from = DateTime.Today.AddHours(12);
+            var returning = DateTime.Today.AddDays(11).AddHours(8);
+            Console.WriteLine($"Out of office with times: {Neruna.Core.Mail.AutoReplyText.Render("vom {{start}} bis {{end}}", new DateTimeOffset(from), new DateTimeOffset(returning))}");
+            autoReply.WithTime = false;
             await autoReply.SaveCommand.ExecuteAsync(null);
             Console.WriteLine($"Out of office sent: {autoReply.Saved?.Message.Split('\n')[2]} | templates: {string.Join(", ", vm.AutoReplies.Templates.Select(t => t.Name))}, in use: {vm.AutoReplies.Accounts.FirstOrDefault()?.SelectedTemplate?.Name}");
             Console.WriteLine($"Out of office on: header '{vm.AutoReplies.HeaderText}', list: {string.Join(" | ", vm.AutoReplies.Accounts.Select(e => e.Title + " " + e.Status))}");
@@ -628,6 +657,16 @@ internal static class Snapshots
         vm.MailPage.Compose.Subject = "Offerte Netzwerk-Erneuerung Q4";
         await Task.Delay(300);
         await SaveAsync(window, output, "compose.png");
+        // Narrow window: the small tools wrap among themselves, the big buttons stay where they are.
+        var composeWidth = window.Width;
+        window.Width = 1340;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "compose-narrow.png");
+        window.Width = 1240;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "compose-narrower.png");
+        window.Width = composeWidth;
+        await Task.Delay(300);
         vm.MailPage.Preferences.ToolbarLabels = false;
         await SaveAsync(window, output, "compose-icons-only.png");
         vm.MailPage.Preferences.ToolbarLabels = true;
@@ -873,6 +912,7 @@ internal static class Snapshots
             await Task.Delay(100);
         }
 
+        await CheckCalendarWindowAsync(vm, window, services, output);
         vm.CalendarPage.NavigatorMonthCount = 2;
         await SaveAsync(window, output, "calendar-2-months.png");
         vm.CalendarPage.NavigatorMonthCount = 1;
@@ -892,6 +932,12 @@ internal static class Snapshots
         }
 
         var moved = calendarSelection.Sources.First(g => g.Calendars.Count(c => c.IsSelected) > 1);
+        // The demo servers keep no colours: shown as for a CalDAV account, to see the switch.
+        moved.CanStoreCalendarColors = true;
+        moved.StoresColorsOnServer = true;
+        calendarSelection.SelectedSource = null;
+        calendarSelection.SelectedSource = moved;
+        await SaveAsync(window, output, "calendar-selection-colors.png");
         // The last calendar to the top: in "Meine Kalender" it comes first.
         var last = moved.Calendars.Last();
         while (last.CanMoveUp)
@@ -1136,6 +1182,59 @@ internal static class Snapshots
         await vm.CalendarPage.ReloadAsync();
         await Task.Delay(400);
         await SaveAsync(window, output, "calendar-tasks.png");
+
+        // "Internet-Kalender abonnieren": a web address or a file on this computer.
+        vm.CalendarPage.SubscribeCommand.Execute(null);
+        await Task.Delay(300);
+        if (vm.Overlay is IcsSubscriptionViewModel subscription)
+        {
+            subscription.Url = OperatingSystem.IsWindows() ? @"C:\Users\Anna\Kalender\Ferien Team.ics" : "/home/anna/Kalender/Ferien Team.ics";
+            subscription.Name = "Ferien Team";
+            await Task.Delay(200);
+            await SaveAsync(window, output, "calendar-subscribe-file.png");
+            subscription.CancelCommand.Execute(null);
+        }
+
+        // The navigator: drag over three days of next week, then Ctrl+click a day after – only those days on the right
+        // (real mouse input on the day buttons). Then as list and planning; a click on a day brings the week back.
+        Point? DayButton(DateTime date) =>
+            Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(window).OfType<Button>()
+                .FirstOrDefault(b => b.DataContext is MiniDay d && d.Date == date && b.IsEffectivelyVisible) is { } dayButton
+                ? dayButton.TranslatePoint(new Point(dayButton.Bounds.Width / 2, dayButton.Bounds.Height / 2), window)
+                : null;
+        var nextMonday = DateTime.Today.AddDays(7 - (((int)DateTime.Today.DayOfWeek + 6) % 7));
+        if (DayButton(nextMonday.AddDays(1)) is { } dragFrom && DayButton(nextMonday.AddDays(3)) is { } dragTo && DayButton(nextMonday.AddDays(8)) is { } extra)
+        {
+            window.MouseDown(dragFrom, Avalonia.Input.MouseButton.Left);
+            window.MouseMove(new Point((dragFrom.X + dragTo.X) / 2, dragFrom.Y), Avalonia.Input.RawInputModifiers.LeftMouseButton);
+            window.MouseMove(dragTo, Avalonia.Input.RawInputModifiers.LeftMouseButton);
+            window.MouseUp(dragTo, Avalonia.Input.MouseButton.Left);
+            await Task.Delay(400);
+            Console.WriteLine($"Navigator drag: {vm.CalendarPage.RangeTitle} ({vm.CalendarPage.DayCount} days)");
+            window.MouseDown(extra, Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.Control);
+            window.MouseUp(extra, Avalonia.Input.MouseButton.Left, Avalonia.Input.RawInputModifiers.Control);
+            await Task.Delay(400);
+            Console.WriteLine($"Navigator Ctrl+click: {vm.CalendarPage.RangeTitle} ({vm.CalendarPage.DayCount} days), week buttons off: {!vm.CalendarPage.IsFullWeek && !vm.CalendarPage.IsWorkWeek}");
+            await SaveAsync(window, output, "calendar-chosen-days.png");
+            vm.CalendarPage.IsTimeGrid = false;
+            await Task.Delay(300);
+            await SaveAsync(window, output, "calendar-chosen-days-list.png");
+            vm.CalendarPage.IsPlanning = true;
+            await vm.CalendarPage.ReloadAsync();
+            await Task.Delay(300);
+            await SaveAsync(window, output, "calendar-chosen-days-planning.png");
+            vm.CalendarPage.IsPlanning = false;
+            vm.CalendarPage.IsTimeGrid = true;
+            window.MouseDown(dragFrom, Avalonia.Input.MouseButton.Left);
+            window.MouseUp(dragFrom, Avalonia.Input.MouseButton.Left);
+            await Task.Delay(400);
+            Console.WriteLine($"Navigator plain click: {vm.CalendarPage.RangeTitle}, chosen days: {vm.CalendarPage.HasChosenDays}, 7 Tage: {vm.CalendarPage.IsFullWeek}");
+            await vm.CalendarPage.TodayCommand.ExecuteAsync(null);
+        }
+        else
+        {
+            Console.WriteLine("Navigator: day buttons not found");
+        }
 
         // The colour/name menu (a popup in the app), on its own: the same control in the calendar and under "Aufgaben".
         var menuItem = vm.CalendarPage.Calendars.FirstOrDefault(c => c.CanRemove) ?? vm.CalendarPage.Calendars.First(c => c.Info.RemoteId == "personal");
@@ -1988,6 +2087,38 @@ internal static class Snapshots
         window.MouseUp(point, Avalonia.Input.MouseButton.Left);
         await Task.Delay(50);
         Dispatcher.UIThread.RunJobs();
+    }
+
+    // The calendar in its own window: the main window goes back to the mails, the calendar button only brings that
+    // window forward, a dialog opened there shows there; closed, the calendar is back in the main window.
+    private static async Task CheckCalendarWindowAsync(MainWindowViewModel vm, MainWindow window, IServiceProvider services, string output)
+    {
+        CalendarWindow.Attach(vm, services.GetRequiredService<UiLayout>(), window);
+        vm.CalendarPage.ToggleWindowCommand.Execute(null);
+        await Task.Delay(200);
+        Dispatcher.UIThread.RunJobs();
+        var calendarWindow = CalendarWindow.Current ?? throw new InvalidOperationException("No calendar window.");
+        calendarWindow.Width = 1200;
+        calendarWindow.Height = 820;
+        vm.CurrentPage = vm.CalendarPage;
+        await Task.Delay(100);
+        Dispatcher.UIThread.RunJobs();
+        Console.WriteLine($"Calendar window: detached={vm.IsCalendarDetached}, main shows {vm.CurrentPage.GetType().Name}, title '{calendarWindow.Title}', button '{vm.CalendarPage.WindowToggleText}'");
+        await SaveAsync(calendarWindow, output, "calendar-window.png");
+        await SaveAsync(window, output, "calendar-window-main.png");
+
+        calendarWindow.Activate();
+        vm.IsCalendarWindowActive = () => true; // headless: no window is ever active
+        vm.CalendarPage.ManageCommand.Execute(null);
+        await Task.Delay(300);
+        Console.WriteLine($"Dialog from the calendar window: in it={vm.HasCalendarOverlay}, over the main window={vm.HasOverlay}");
+        await SaveAsync(calendarWindow, output, "calendar-window-dialog.png");
+        vm.Overlay = null;
+
+        calendarWindow.Close();
+        await Task.Delay(100);
+        Dispatcher.UIThread.RunJobs();
+        Console.WriteLine($"Closed: detached={vm.IsCalendarDetached}, main shows {vm.CurrentPage.GetType().Name}, remembered={await services.GetRequiredService<ISettingsStore>().GetAsync("calendar.detached")}");
     }
 
     public static async Task SaveAsync(Window window, string output, string name)

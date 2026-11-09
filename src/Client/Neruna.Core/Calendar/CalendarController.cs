@@ -443,6 +443,97 @@ public sealed class CalendarController(
         return $"{list.ConnectionId:N}|{list.RemoteId}";
     }
 
+    // ---- Colours on the server (per account, "Kalender verwalten") -------------------------------------------------
+
+    /// <summary>What the connection's server keeps of colours: per calendar, and/or a category list.</summary>
+    public async Task<(bool Calendars, bool Categories)> ServerColorSupportAsync(ServiceConnection connection)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        await using var provider = providers.CreateCalendar(connection);
+        return (provider is ICalendarColors, provider is ICalendarCategoryColors);
+    }
+
+    public async Task<bool> StoresColorsOnServerAsync(Guid accountId, CancellationToken cancellationToken = default) =>
+        await settings.GetBoolAsync(SettingKeys.CalendarServerColors(accountId), cancellationToken: cancellationToken);
+
+    public Task SetStoresColorsOnServerAsync(Guid accountId, bool value, CancellationToken cancellationToken = default) =>
+        settings.SetBoolAsync(SettingKeys.CalendarServerColors(accountId), value, cancellationToken);
+
+    /// <summary>
+    /// A colour chosen for a calendar: also on its server, if its account stores colours there and the server can.
+    /// </summary>
+    /// <returns>Whether it went to the server.</returns>
+    public async Task<bool> SetColorOnServerAsync(CalendarInfo calendar, string color, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        var account = (await accounts.GetAccountsAsync(cancellationToken)).FirstOrDefault(a => a.Connections.Any(c => c.Id == calendar.ConnectionId));
+        if (account is null || !await StoresColorsOnServerAsync(account.Id, cancellationToken))
+        {
+            return false;
+        }
+
+        await using var provider = providers.CreateCalendar(account.Connections.First(c => c.Id == calendar.ConnectionId));
+        if (provider is not ICalendarColors colors)
+        {
+            return false;
+        }
+
+        await colors.SetCalendarColorAsync(calendar, color, cancellationToken);
+        return true;
+    }
+
+    /// <summary>Changed category colours: into the category list of every account that stores colours on its server.</summary>
+    /// <returns>The accounts it failed for, with the reason.</returns>
+    public async Task<IReadOnlyList<string>> SetCategoryColorsOnServerAsync(IReadOnlyList<CalendarCategory> changed, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(changed);
+        var failed = new List<string>();
+        if (changed.Count == 0)
+        {
+            return failed;
+        }
+
+        foreach (var account in await accounts.GetAccountsAsync(cancellationToken))
+        {
+            if (!await StoresColorsOnServerAsync(account.Id, cancellationToken))
+            {
+                continue;
+            }
+
+            foreach (var connection in account.ConnectionsOf(ServiceKind.Calendar))
+            {
+                await using var provider = providers.CreateCalendar(connection);
+                if (provider is not ICalendarCategoryColors categories)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    foreach (var category in changed)
+                    {
+                        await categories.SetCategoryColorAsync(category.Name, category.Color, cancellationToken);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Category colours could not be stored for connection {Connection}", connection.Id);
+                    failed.Add($"{account.Title}: {ex.Message}");
+                }
+            }
+        }
+
+        return failed;
+    }
+
+    /// <summary>The category list of a connection's server (for taking over its colours when the option is switched on).</summary>
+    public async Task<IReadOnlyList<CalendarCategory>> GetServerCategoriesAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        await using var provider = providers.CreateCalendar(connection);
+        return provider is ICalendarCategoryColors categories ? await categories.GetCategoriesAsync(cancellationToken) : [];
+    }
+
     private async Task<ServiceConnection> ConnectionAsync(Guid connectionId, CancellationToken cancellationToken) =>
         (await accounts.GetAccountsAsync(cancellationToken)).SelectMany(a => a.Connections).FirstOrDefault(c => c.Id == connectionId)
         ?? throw new InvalidOperationException($"Connection {connectionId} no longer exists.");

@@ -19,6 +19,96 @@ internal sealed partial class CalendarView : UserControl
     private readonly DispatcherTimer _nowTimer = new() { Interval = TimeSpan.FromMinutes(1) };
     private bool _scrolledToMorning;
 
+    // A pick in the navigator: the day pressed, the days there were before (Ctrl adds to them), the day under the pointer.
+    private sealed class DayPick
+    {
+        public required DateTime Anchor { get; init; }
+
+        public required IReadOnlyCollection<DateTime> Before { get; init; }
+
+        public required bool Adding { get; init; }
+
+        public DateTime Current { get; set; }
+
+        public bool Moved { get; set; }
+
+        public HashSet<DateTime> Days()
+        {
+            var (from, to) = Anchor <= Current ? (Anchor, Current) : (Current, Anchor);
+            var range = Enumerable.Range(0, (int)(to - from).TotalDays + 1).Select(i => from.AddDays(i));
+            return Adding ? [.. Before, .. range] : [.. range];
+        }
+    }
+
+    private DayPick? _dayPick;
+
+    private static MiniDay? DayAt(IInputElement root, Point point) =>
+        (root.InputHitTest(point) as Visual)?.GetSelfAndVisualAncestors().OfType<Control>().Select(c => c.DataContext).OfType<MiniDay>().FirstOrDefault();
+
+    private void OnNavigatorPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control navigator || DataContext is not CalendarViewModel vm || !e.GetCurrentPoint(navigator).Properties.IsLeftButtonPressed
+            || DayAt(navigator, e.GetPosition(navigator)) is not { } day)
+        {
+            return;
+        }
+
+        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta);
+        _dayPick = new DayPick { Anchor = day.Date, Current = day.Date, Adding = ctrl, Before = [.. vm.ShownDates] };
+        if (ctrl)
+        {
+            // Ctrl: the button must not show the week; the navigator follows the pointer itself.
+            e.Handled = true;
+            e.Pointer.Capture(navigator);
+        }
+    }
+
+    private void OnNavigatorMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dayPick is not { } pick || sender is not Control navigator || DataContext is not CalendarViewModel vm
+            || DayAt(navigator, e.GetPosition(navigator)) is not { } day || day.Date == pick.Current)
+        {
+            return;
+        }
+
+        pick.Current = day.Date;
+        pick.Moved = true;
+        vm.PreviewChosenDays(pick.Days());
+    }
+
+    private void OnNavigatorReleased(object? sender, PointerReleasedEventArgs e) => EndDayPick(commit: true);
+
+    private void EndDayPick(bool commit)
+    {
+        if (_dayPick is not { } pick || DataContext is not CalendarViewModel vm)
+        {
+            return;
+        }
+
+        _dayPick = null;
+        if (!commit)
+        {
+            vm.PreviewChosenDays(null);
+        }
+        else if (pick.Adding && !pick.Moved)
+        {
+            // Ctrl+click: the day in or out (the last one stays).
+            var days = new HashSet<DateTime>(pick.Before);
+            if (!days.Remove(pick.Anchor))
+            {
+                days.Add(pick.Anchor);
+            }
+
+            _ = vm.ShowChosenDaysAsync(days.Count > 0 ? days : pick.Before);
+        }
+        else if (pick.Moved)
+        {
+            _ = vm.ShowChosenDaysAsync(pick.Days());
+        }
+
+        // A plain click (no move, no Ctrl): the day's button shows its week as before.
+    }
+
     public CalendarView()
     {
         InitializeComponent();
@@ -39,6 +129,13 @@ internal sealed partial class CalendarView : UserControl
                 e.Handled = true;
             }
         };
+
+        // The navigator: drag over days (also into the second month) or Ctrl+click to show just those days.
+        var navigator = this.FindControl<ItemsControl>("Navigator")!;
+        navigator.AddHandler(PointerPressedEvent, OnNavigatorPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        navigator.AddHandler(PointerMovedEvent, OnNavigatorMoved, RoutingStrategies.Bubble, handledEventsToo: true);
+        navigator.AddHandler(PointerReleasedEvent, OnNavigatorReleased, RoutingStrategies.Bubble, handledEventsToo: true);
+        navigator.AddHandler(PointerCaptureLostEvent, (_, _) => EndDayPick(commit: false));
 
         // Drag in the time grid: tunnelling, so a press on an event is seen before its button takes the pointer.
         // The button keeps working for a plain click; once the pointer has moved a few pixels, the grid takes it over.

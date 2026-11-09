@@ -12,7 +12,7 @@ namespace Neruna.Providers.Ews;
 /// is its change key. Exchange sends invitations, updates, cancellations and answers itself: saving an invitation with
 /// a new own answer accepts or declines it on the server, deleting someone else's meeting declines it.
 /// </summary>
-internal sealed class EwsCalendarProvider(ServiceConnection connection, EwsConnectionFactory connections) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy
+internal sealed partial class EwsCalendarProvider(ServiceConnection connection, EwsConnectionFactory connections) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy
 {
     /// <summary>
     /// Free/busy of people in the organisation (GetUserAvailability) – also without their calendar being shared;

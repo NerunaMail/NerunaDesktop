@@ -62,6 +62,17 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
     [ObservableProperty]
     public partial DateTime? LastDay { get; set; } = DateTime.Today.AddDays(7);
 
+    /// <summary>"Mit Uhrzeit": from a time on the first day until a time on the last (e.g. from noon, back at 8).</summary>
+    [ObservableProperty]
+    public partial bool WithTime { get; set; }
+
+    [ObservableProperty]
+    public partial TimeSpan? FirstTime { get; set; } = new TimeSpan(12, 0, 0);
+
+    /// <summary>With <see cref="WithTime"/>: back at this time on <see cref="LastDay"/>.</summary>
+    [ObservableProperty]
+    public partial TimeSpan? LastTime { get; set; } = new TimeSpan(8, 0, 0);
+
     [ObservableProperty]
     public partial string Subject { get; set; } = string.Empty;
 
@@ -196,8 +207,15 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
             await LoadTemplatesAsync(null);
             if (reply.IsScheduled && !reply.IsRecurring)
             {
-                FirstDay = reply.Start!.Value.LocalDateTime.Date;
-                LastDay = reply.End!.Value.LocalDateTime.Date.AddDays(-1);
+                var (first, last) = (reply.Start!.Value.LocalDateTime, reply.End!.Value.LocalDateTime);
+                WithTime = first.TimeOfDay != TimeSpan.Zero || last.TimeOfDay != TimeSpan.Zero;
+                FirstDay = first.Date;
+                // Whole days: the end is the first day back. With a time: the day and time of return.
+                LastDay = WithTime ? last.Date : last.Date.AddDays(-1);
+                if (WithTime)
+                {
+                    (FirstTime, LastTime) = (first.TimeOfDay, last.TimeOfDay);
+                }
             }
         }
         catch (AutoReplyUnavailableException ex)
@@ -241,9 +259,17 @@ internal sealed partial class AutoReplyViewModel(MailController mail, Neruna.Cor
                 return;
             }
 
-            // The end is exclusive: the first day back.
-            start = new DateTimeOffset(first.Date, TimeZoneInfo.Local.GetUtcOffset(first.Date));
-            end = new DateTimeOffset(last.Date.AddDays(1), TimeZoneInfo.Local.GetUtcOffset(last.Date.AddDays(1)));
+            // The end is exclusive: the first day back – or, with a time, the moment of return.
+            var from = WithTime ? first.Date + (FirstTime ?? TimeSpan.Zero) : first.Date;
+            var until = WithTime ? last.Date + (LastTime ?? TimeSpan.Zero) : last.Date.AddDays(1);
+            if (until <= from)
+            {
+                Error = T("Bitte einen gültigen Zeitraum wählen (die Rückkehr nach dem Beginn).");
+                return;
+            }
+
+            start = new DateTimeOffset(from, TimeZoneInfo.Local.GetUtcOffset(from));
+            end = new DateTimeOffset(until, TimeZoneInfo.Local.GetUtcOffset(until));
         }
 
         AutoReply reply;

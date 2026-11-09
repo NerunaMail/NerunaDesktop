@@ -23,6 +23,9 @@ internal sealed class ToolButton : Button
 
     public static readonly StyledProperty<string?> HintProperty = AvaloniaProperty.Register<ToolButton, string?>(nameof(Hint));
 
+    /// <summary>A small tool: a 16 px icon, the text only in the tooltip (or beside the icon with <see cref="ShowLabel"/>).</summary>
+    public static readonly StyledProperty<bool> CompactProperty = AvaloniaProperty.Register<ToolButton, bool>(nameof(Compact));
+
     public ToolButton()
     {
         Classes.Add("command");
@@ -64,6 +67,12 @@ internal sealed class ToolButton : Button
         set => SetValue(HintProperty, value);
     }
 
+    public bool Compact
+    {
+        get => GetValue(CompactProperty);
+        set => SetValue(CompactProperty, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -71,9 +80,9 @@ internal sealed class ToolButton : Button
         {
             ToolContent.UpdateTip(this, Label, Shortcut, Hint);
         }
-        else if (change.Property == ShowLabelProperty)
+        else if (change.Property == ShowLabelProperty || change.Property == CompactProperty)
         {
-            ToolContent.UpdateSize(this, ShowLabel);
+            ToolContent.UpdateSize(this, ShowLabel, Compact);
         }
     }
 }
@@ -88,6 +97,8 @@ internal sealed class ToolToggleButton : ToggleButton
     public static readonly StyledProperty<bool> ShowLabelProperty = ToolButton.ShowLabelProperty.AddOwner<ToolToggleButton>();
 
     public static readonly StyledProperty<string?> HintProperty = ToolButton.HintProperty.AddOwner<ToolToggleButton>();
+
+    public static readonly StyledProperty<bool> CompactProperty = ToolButton.CompactProperty.AddOwner<ToolToggleButton>();
 
     public ToolToggleButton()
     {
@@ -122,6 +133,12 @@ internal sealed class ToolToggleButton : ToggleButton
         set => SetValue(HintProperty, value);
     }
 
+    public bool Compact
+    {
+        get => GetValue(CompactProperty);
+        set => SetValue(CompactProperty, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -129,9 +146,9 @@ internal sealed class ToolToggleButton : ToggleButton
         {
             ToolContent.UpdateTip(this, Label, null, Hint);
         }
-        else if (change.Property == ShowLabelProperty)
+        else if (change.Property == ShowLabelProperty || change.Property == CompactProperty)
         {
-            ToolContent.UpdateSize(this, ShowLabel);
+            ToolContent.UpdateSize(this, ShowLabel, Compact);
         }
     }
 }
@@ -149,10 +166,22 @@ internal static class ToolContent
         button.Content = new StackPanel { Children = { icon, label } };
     }
 
-    public static void UpdateSize(TemplatedControl button, bool showLabel)
+    public static void UpdateSize(TemplatedControl button, bool showLabel, bool compact = false)
     {
-        button.MinWidth = showLabel ? 64 : 0;
-        button.Padding = showLabel ? new Thickness(6, 4) : new Thickness(8, 6);
+        // Small tools: icon and (if shown) text side by side, about half the height of a big button.
+        if (((ContentControl)button).Content is StackPanel { Children: [PathIcon icon, TextBlock label] } panel)
+        {
+            panel.Orientation = compact ? Orientation.Horizontal : Orientation.Vertical;
+            icon.Width = icon.Height = compact ? 16 : 18;
+            icon.VerticalAlignment = VerticalAlignment.Center;
+            label.FontSize = compact ? 12 : 11;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            label.Margin = compact ? new Thickness(5, 0, 0, 0) : new Thickness(0, 3, 0, 0);
+        }
+
+        button.MinWidth = compact || !showLabel ? 0 : 64;
+        button.MinHeight = 0;
+        button.Padding = compact ? new Thickness(6, 4) : showLabel ? new Thickness(6, 4) : new Thickness(8, 6);
     }
 
     public static void UpdateTip(Control button, string? label, string? shortcut, string? hint) =>

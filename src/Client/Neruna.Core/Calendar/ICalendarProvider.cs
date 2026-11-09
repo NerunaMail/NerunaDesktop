@@ -73,3 +73,20 @@ public sealed record CalendarSyncResult(
     bool IsFullResync,
     IReadOnlyList<CalendarObject> AddedOrChanged,
     IReadOnlyList<string> RemovedRemoteIds);
+
+/// <summary>Optional: the server keeps a colour per calendar, and Neruna may set it ("Farben auf dem Server speichern").</summary>
+public interface ICalendarColors
+{
+    /// <param name="color">#rrggbb; a server with fixed colours takes the nearest of them.</param>
+    Task SetCalendarColorAsync(CalendarInfo calendar, string color, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Optional: the account keeps its own list of categories with colours (Microsoft 365, Exchange).</summary>
+public interface ICalendarCategoryColors
+{
+    /// <returns>The account's categories, each with the colour of its fixed colour (#rrggbb).</returns>
+    Task<IReadOnlyList<CalendarCategory>> GetCategoriesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Sets the colour of a category (the nearest the server offers); a name it does not know yet is added.</summary>
+    Task SetCategoryColorAsync(string name, string color, CancellationToken cancellationToken = default);
+}

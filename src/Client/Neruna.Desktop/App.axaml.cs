@@ -106,6 +106,7 @@ internal sealed partial class App : Application
             }
 
             layout.TrackWindow(main, "window.main", withPosition: true);
+            Views.CalendarWindow.Attach(viewModel, layout, main);
             desktop.MainWindow = main;
 
             // Mail and draft windows are not owned by the main window (so they do not stay in front of it); closing

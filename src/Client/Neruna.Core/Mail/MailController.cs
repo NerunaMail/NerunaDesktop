@@ -491,13 +491,37 @@ public sealed class MailController(
     /// </summary>
     /// <returns>How many messages were moved (all, unless an exception is thrown).</returns>
     /// <exception cref="NotSupportedException">The target account cannot store messages (e.g. read-only demo account).</exception>
-    public async Task<int> MoveToAccountAsync(
+    public Task<int> MoveToAccountAsync(
         ServiceConnection sourceConnection,
         MailFolder source,
         IReadOnlyCollection<MessageSummary> messages,
         ServiceConnection targetConnection,
         MailFolder target,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        TransferAsync(sourceConnection, source, messages, targetConnection, target, copy: false, cancellationToken);
+
+    /// <summary>
+    /// "Kopieren nach …": each message is stored in <paramref name="target"/> (in this or another account) with its
+    /// flags and date; the original stays where it is.
+    /// </summary>
+    /// <returns>How many were copied.</returns>
+    public Task<int> CopyAsync(
+        ServiceConnection sourceConnection,
+        MailFolder source,
+        IReadOnlyCollection<MessageSummary> messages,
+        ServiceConnection targetConnection,
+        MailFolder target,
+        CancellationToken cancellationToken = default) =>
+        TransferAsync(sourceConnection, source, messages, targetConnection, target, copy: true, cancellationToken);
+
+    private async Task<int> TransferAsync(
+        ServiceConnection sourceConnection,
+        MailFolder source,
+        IReadOnlyCollection<MessageSummary> messages,
+        ServiceConnection targetConnection,
+        MailFolder target,
+        bool copy,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(sourceConnection);
         ArgumentNullException.ThrowIfNull(source);
@@ -514,7 +538,7 @@ public sealed class MailController(
         await using var sourceProvider = providers.CreateMail(sourceConnection);
 
         // From a read-only source (an Outlook data file) it is a copy: the original stays.
-        var keepOriginal = !sourceProvider.Capabilities.HasFlag(MailProviderCapabilities.Delete);
+        var keepOriginal = copy || !sourceProvider.Capabilities.HasFlag(MailProviderCapabilities.Delete);
         var moved = 0;
         try
         {

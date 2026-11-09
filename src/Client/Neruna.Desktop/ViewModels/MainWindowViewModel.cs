@@ -238,6 +238,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     {
         CalendarPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
         CalendarPage.ManageRequested += (_, _) => ShowCalendarSelection();
+        CalendarPage.WindowToggleRequested += async (_, _) => await ToggleCalendarWindowAsync();
         CalendarPage.PrintRequested += (_, _) => ShowCalendarPrint();
         MailPage.QuickActionSuggested += (_, suggestion) => SuggestQuickAction(suggestion);
         CalendarPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
@@ -563,10 +564,11 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     /// <summary>Modal content shown above the shell, or null.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasOverlay), nameof(OverlayWidth))]
+    [NotifyPropertyChangedFor(nameof(HasOverlay), nameof(HasCalendarOverlay), nameof(OverlayWidth))]
     public partial ViewModelBase? Overlay { get; set; }
 
-    public bool HasOverlay => Overlay is not null;
+    /// <summary>A dialog over the main window (one opened in the calendar window is shown there instead).</summary>
+    public bool HasOverlay => Overlay is not null && !OverlayInCalendarWindow;
 
     /// <summary>Some dialogs show two things side by side and need more room (group editor, the transfer's QR code and PIN).</summary>
     public double OverlayWidth => Overlay switch
@@ -728,6 +730,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         }
 
         _servicesStarted = true;
+        await RestoreCalendarWindowAsync();
         _timer.Start();
         SettingsPage.Updates.Start();
 
@@ -1263,7 +1266,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private void ShowIcsSubscription()
     {
-        var subscription = new IcsSubscriptionViewModel(_setup);
+        var subscription = new IcsSubscriptionViewModel(_setup, _files);
         subscription.Finished += async (_, created) =>
         {
             Overlay = null;
@@ -1398,7 +1401,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     private void ShowCalendarSelection()
     {
-        var selection = new CalendarSelectionViewModel(_calendar, _settings);
+        var selection = new CalendarSelectionViewModel(_calendar, _settings, CalendarPage.Categories);
         selection.Finished += async (_, changed) =>
         {
             Overlay = null;
@@ -1525,6 +1528,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     partial void OnCurrentPageChanged(ViewModelBase value)
     {
+        FollowCalendarWindow(value);
         if (value == NotesPage)
         {
             _ = NotesPage.ActivateAsync();
@@ -1541,6 +1545,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
 
     partial void OnOverlayChanged(ViewModelBase? value)
     {
+        // Opened while the calendar window is active: shown there, over the calendar it belongs to.
+        OverlayInCalendarWindow = value is not null && IsCalendarDetached && (IsCalendarWindowActive?.Invoke() ?? false);
         UpdateChatActive();
         if (value is null && _crashOfferWaiting)
         {

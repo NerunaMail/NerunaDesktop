@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="using:Neruna.Desktop"
+        xmlns:vm="using:Neruna.Desktop.ViewModels"
+        x:Class="Neruna.Desktop.Views.CalendarWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Neruna"
+        Icon="/Assets/app.ico"
+        Width="1200" Height="820" MinWidth="720" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource ShellBackgroundBrush}">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="F5" Command="{Binding SyncCommand}" />
+  </Window.KeyBindings>
+
+  <!-- The calendar page of the main window, shown here; dialogs opened here appear here too -->
+  <Grid>
+    <ContentControl Content="{Binding CalendarPage}" Margin="6,6,6,6" />
+
+    <Border IsVisible="{Binding HasCalendarOverlay}" Background="#80000000">
+      <Border Classes="pane" Width="{Binding OverlayWidth}" MaxWidth="{Binding $parent[Window].Bounds.Width}" Margin="0,24" HorizontalAlignment="Center" VerticalAlignment="Center"
+              BoxShadow="0 8 32 0 #40000000">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <ContentControl Content="{Binding Overlay}" Margin="28" />
+        </ScrollViewer>
+      </Border>
+    </Border>
+  </Grid>
+</Window>

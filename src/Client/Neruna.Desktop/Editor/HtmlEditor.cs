@@ -73,6 +73,9 @@ internal interface IHtmlEditor
 
     Task RunAsync(string script);
 
+    /// <summary>"Rückgängig" / "Wiederherstellen" in the text (the page's own undo history, or the plain-text box's).</summary>
+    Task UndoAsync(bool redo);
+
     /// <summary>Inserts at the caret without replacing anything: <paramref name="html"/> when formatting is available,
     /// otherwise <paramref name="text"/> in the plain-text box.</summary>
     Task InsertAsync(string html, string text);
@@ -218,6 +221,25 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         if (_nativeFiles is null && OperatingSystem.IsWindows() && handle is Avalonia.Platform.IWindowsWebView2PlatformHandle webView2)
         {
             _nativeFiles = WebView2Files.Attach(webView2.CoreWebView2, (message, paths) => Dispatcher.UIThread.Post(() => OnFileDrop(message, paths)));
+        }
+    }
+
+    // Ctrl+V with files copied in the file manager: attached like dropped ones. The paths come from the page (file://
+    // URIs) or from the system clipboard; without any (a screenshot) the page uses the content itself.
+    private async Task OnFilePasteAsync(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            paths = await ClipboardFiles.PathsAsync(TopLevel.GetTopLevel(this)?.Clipboard);
+        }
+
+        if (paths.Count > 0)
+        {
+            FilesDropped?.Invoke(this, new EditorFileDrop(paths, Link: false, Ask: false, default));
+        }
+        else
+        {
+            await ScriptAsync($"neruna.usePastedFiles({MaxDroppedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)})");
         }
     }
 
@@ -482,6 +504,25 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                && Unwrap(await ScriptAsync($"neruna.replaceText({FormattingViewModel.Js(html)}, {(selectionOnly ? "true" : "false")})")) == "ok";
     }
 
+    public async Task UndoAsync(bool redo)
+    {
+        if (_fallback is { } box)
+        {
+            if (redo)
+            {
+                box.Redo();
+            }
+            else
+            {
+                box.Undo();
+            }
+
+            return;
+        }
+
+        await RunAsync($"neruna.exec({FormattingViewModel.Js(redo ? "redo" : "undo")})");
+    }
+
     public async Task RunAsync(string script)
     {
         if (IsRich && _web is not null)
@@ -678,6 +719,11 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 OnFileDrop(message.GetRawText(), message.TryGetProperty("uris", out var uris) && uris.ValueKind == JsonValueKind.Array
                     ? [.. uris.EnumerateArray().Select(u => Neruna.Core.Mail.FileLinks.ToPath(u.GetString())).OfType<string>()]
                     : []);
+                break;
+            case "filepaste":
+                OnFilePasteAsync(message.TryGetProperty("uris", out var pastedUris) && pastedUris.ValueKind == JsonValueKind.Array
+                    ? [.. pastedUris.EnumerateArray().Select(u => Neruna.Core.Mail.FileLinks.ToPath(u.GetString())).OfType<string>()]
+                    : []).Forget();
                 break;
             case "filedata" when message.TryGetProperty("name", out var fileName) && fileName.GetString() is { } name:
                 FileDataDropped?.Invoke(this, new EditorFileData(name, DataOf(message), Bool(message, "tooLarge")));

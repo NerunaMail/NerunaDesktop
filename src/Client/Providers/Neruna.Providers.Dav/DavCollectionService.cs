@@ -99,6 +99,38 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
     public Uri? DefaultCalendar { get; private set; }
 
     /// <summary>The single collection at <paramref name="url"/>, or null if it is not one of our type.</summary>
+    /// <summary>
+    /// The calendar's colour on the server (Apple's calendar-color, which Nextcloud, SOGo, Radicale, iCloud and Google
+    /// keep); written with full opacity as most of them store it ("#RRGGBBFF").
+    /// </summary>
+    /// <exception cref="NotSupportedException">The server refuses the property.</exception>
+    public async Task SetColorAsync(Uri collection, string color, CancellationToken cancellationToken)
+    {
+        var body = new XDocument(new XElement(DavNames.Dav + "propertyupdate",
+            new XAttribute(XNamespace.Xmlns + "d", DavNames.Dav.NamespaceName),
+            new XAttribute(XNamespace.Xmlns + "a", DavNames.Apple.NamespaceName),
+            new XElement(DavNames.Dav + "set", new XElement(DavNames.Dav + "prop", new XElement(CalendarColor, color.ToUpperInvariant() + "FF")))));
+        var response = await client.SendAsync(new HttpMethod("PROPPATCH"), collection, body.ToString(SaveOptions.DisableFormatting),
+            "application/xml; charset=utf-8", null, null, cancellationToken);
+        if (response.Status is not (HttpStatusCode.OK or HttpStatusCode.MultiStatus or HttpStatusCode.NoContent))
+        {
+            throw new NotSupportedException(F("Der Server hat die Farbe abgelehnt ({0}).", (int)response.Status));
+        }
+
+        // 207: each property has its own status – the colour must have "200".
+        if (response.Status == HttpStatusCode.MultiStatus && !string.IsNullOrWhiteSpace(response.Body))
+        {
+            var refused = XDocument.Parse(response.Body).Descendants(DavNames.Dav + "propstat")
+                .Where(p => p.Descendants(CalendarColor).Any())
+                .Select(p => p.Element(DavNames.Dav + "status")?.Value ?? string.Empty)
+                .FirstOrDefault(s => !s.Contains(" 200 ", StringComparison.Ordinal));
+            if (refused is not null)
+            {
+                throw new NotSupportedException(F("Der Server hat die Farbe abgelehnt ({0}).", refused.Trim()));
+            }
+        }
+    }
+
     public async Task<DavCollection?> GetCollectionAsync(Uri url, CancellationToken cancellationToken)
     {
         try

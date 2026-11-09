@@ -26,6 +26,8 @@ internal sealed partial class ComposeView : UserControl
         // (the WebView) the editor reports them; anywhere else in the window (fields, attachments, plain-text box) here.
         editor.FilesDropped += (_, drop) => _ = HandleDropAsync(drop.Paths, drop.Link, drop.Ask, editor, drop.Position);
         editor.FileDataDropped += (_, file) => (DataContext as ComposeViewModel)?.AttachData(file.Name, file.Data, file.TooLarge);
+        // Ctrl+V with files copied in the file manager: attached, wherever the cursor is (the text itself: the editor).
+        AddHandler(KeyDownEvent, OnPasteKey, RoutingStrategies.Tunnel);
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragOverEvent, OnDragOver, handledEventsToo: true);
         AddHandler(DragDrop.DropEvent, OnDrop, handledEventsToo: true);
@@ -68,6 +70,30 @@ internal sealed partial class ComposeView : UserControl
     }
 
     private bool _secondaryDrag;
+
+    private void OnPasteKey(object? sender, KeyEventArgs e)
+    {
+        var paste = (e.Key == Key.V && e.KeyModifiers == KeyModifiers.Control) || (e.Key == Key.Insert && e.KeyModifiers == KeyModifiers.Shift);
+        if (!paste || e.Source is not TextBox box || DataContext is not ComposeViewModel vm)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _ = PasteAsync();
+
+        async Task PasteAsync()
+        {
+            if (await Neruna.Desktop.Editor.ClipboardFiles.PathsAsync(TopLevel.GetTopLevel(this)?.Clipboard) is { Count: > 0 } paths)
+            {
+                await vm.AttachFilesAsync(paths);
+            }
+            else
+            {
+                box.Paste();
+            }
+        }
+    }
 
     private void OnDragOver(object? sender, DragEventArgs e)
     {

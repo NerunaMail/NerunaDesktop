@@ -116,8 +116,14 @@ internal abstract class DavProviderBase(
             : null;
 }
 
-internal sealed class CalDavCalendarProvider : DavProviderBase, ICalendarProvider, ICalendarUrlLookup, ICalendarScheduling
+internal sealed class CalDavCalendarProvider : DavProviderBase, ICalendarProvider, ICalendarUrlLookup, ICalendarScheduling, ICalendarColors
 {
+    public async Task SetCalendarColorAsync(CalendarInfo calendar, string color, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        await (await ServiceAsync(cancellationToken)).SetColorAsync(new Uri(calendar.RemoteId), color, cancellationToken);
+    }
+
     public string? DiscoveryDetails { get; private set; }
 
     public async Task<CalendarInfo?> GetCalendarAsync(Uri url, CancellationToken cancellationToken = default)

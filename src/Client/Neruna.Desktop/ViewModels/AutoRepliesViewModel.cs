@@ -312,6 +312,12 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
     [ObservableProperty]
     public partial DateTime? LastDay { get; set; } = DateTime.Today.AddDays(7);
 
+    /// <summary>The period has times (set in "Weitere Optionen …"): kept when the days are changed here.</summary>
+    [ObservableProperty]
+    public partial bool HasTimes { get; set; }
+
+    private (TimeSpan From, TimeSpan Back) _times;
+
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
 
@@ -372,6 +378,7 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
         { IsRecurring: true } when Reply.IsActive(DateTimeOffset.Now) => F("Serie: {0} – heute aktiv", AutoReplySeries.Describe(Reply.Weekdays!)),
         { IsRecurring: true } => F("Serie: {0}", AutoReplySeries.Describe(Reply.Weekdays!)),
         { End: { } end } when end <= DateTimeOffset.Now => T("abgelaufen"),
+        { End: { } end } when end.LocalDateTime.TimeOfDay != TimeSpan.Zero => F("aktiv, zurück am {0:g}", end.LocalDateTime),
         { End: { } end } => F("aktiv, bis und mit {0:d}", end.LocalDateTime.Date.AddDays(-1)),
         _ => T("aktiv"),
     };
@@ -392,8 +399,15 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
             IsScheduled = reply.IsScheduled && CanSchedule && !reply.IsRecurring;
             if (reply.IsScheduled && !reply.IsRecurring)
             {
-                FirstDay = reply.Start!.Value.LocalDateTime.Date;
-                LastDay = reply.End!.Value.LocalDateTime.Date.AddDays(-1);
+                var (first, last) = (reply.Start!.Value.LocalDateTime, reply.End!.Value.LocalDateTime);
+                HasTimes = first.TimeOfDay != TimeSpan.Zero || last.TimeOfDay != TimeSpan.Zero;
+                _times = (first.TimeOfDay, last.TimeOfDay);
+                FirstDay = first.Date;
+                LastDay = HasTimes ? last.Date : last.Date.AddDays(-1);
+            }
+            else
+            {
+                HasTimes = false;
             }
 
             Error = null;
@@ -468,8 +482,17 @@ internal sealed partial class AutoReplyAccountViewModel(AutoRepliesViewModel own
                 return;
             }
 
-            start = new DateTimeOffset(first.Date, TimeZoneInfo.Local.GetUtcOffset(first.Date));
-            end = new DateTimeOffset(last.Date.AddDays(1), TimeZoneInfo.Local.GetUtcOffset(last.Date.AddDays(1)));
+            // With times: from that time on the first day, back at that time on the last.
+            var from = HasTimes ? first.Date + _times.From : first.Date;
+            var until = HasTimes ? last.Date + _times.Back : last.Date.AddDays(1);
+            if (until <= from)
+            {
+                Error = T("Bitte einen gültigen Zeitraum wählen (die Rückkehr nach dem Beginn).");
+                return;
+            }
+
+            start = new DateTimeOffset(from, TimeZoneInfo.Local.GetUtcOffset(from));
+            end = new DateTimeOffset(until, TimeZoneInfo.Local.GetUtcOffset(until));
         }
 
         // {{start}}/{{end}} without a period (e.g. from a series back to "Ferien"): nothing is sent, the choice stays so

@@ -76,7 +76,8 @@
                               <CheckBox Content="{l:T 'Nur in diesem Zeitraum'}" IsChecked="{Binding IsScheduled}" FontSize="12" />
                               <Grid ColumnDefinitions="*,8,Auto,8,*" IsEnabled="{Binding IsScheduled}">
                                 <CalendarDatePicker SelectedDate="{Binding FirstDay}" HorizontalAlignment="Stretch" />
-                                <TextBlock Grid.Column="2" Text="{l:T 'bis und mit'}" FontSize="12" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{l:T 'bis und mit'}" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding !HasTimes}" />
+                                <TextBlock Grid.Column="2" Text="{l:T 'zurück am'}" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasTimes}" />
                                 <CalendarDatePicker Grid.Column="4" SelectedDate="{Binding LastDay}" HorizontalAlignment="Stretch" />
                               </Grid>
                             </StackPanel>

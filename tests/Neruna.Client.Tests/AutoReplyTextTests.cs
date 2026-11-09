@@ -23,6 +23,13 @@ public class AutoReplyTextTests
     }
 
     [Fact]
+    public void With_times_the_placeholders_show_them_and_the_end_is_the_moment_of_return()
+    {
+        var text = AutoReplyText.Render("Abwesend vom {{start}} bis {{end}}.", Monday.AddHours(12), Monday.AddDays(4).AddHours(8), German);
+        Assert.Equal("Abwesend vom Montag, 12. Oktober 2026, 12:00 bis Freitag, 16. Oktober 2026, 08:00.", text);
+    }
+
+    [Fact]
     public void Switched_on_with_placeholders_needs_a_period()
     {
         Assert.Throws<ArgumentException>(() => AutoReplyText.ForServer("bis {{end}}", enabled: true, null, null));

@@ -78,8 +78,9 @@ internal sealed partial class CalendarViewModel
             return;
         }
 
-        var from = new DateTimeOffset(WeekStart);
-        var to = from.AddDays(DayCount);
+        var dates = ShownDates;
+        var from = new DateTimeOffset(dates[0]);
+        var to = new DateTimeOffset(dates[^1].AddDays(1));
         IReadOnlyList<Availability>? answers;
         try
         {
@@ -148,13 +149,11 @@ internal sealed partial class CalendarViewModel
         var from = Math.Clamp(VisibleFrom, 0, 23);
         var to = Math.Clamp(VisibleTo, from + 1, 24);
         var span = to - from;
-        var days = DayCount;
         var step = span > 12 ? 3 : span > 6 ? 2 : 1;
 
         PlanningDays.Clear();
-        for (var i = 0; i < days; i++)
+        foreach (var day in ShownDates)
         {
-            var day = WeekStart.AddDays(i);
             var hours = new List<string>();
             for (var h = from; h < to; h += step)
             {
@@ -199,31 +198,26 @@ internal sealed partial class CalendarViewModel
         var from = Math.Clamp(VisibleFrom, 0, 23);
         var to = Math.Clamp(VisibleTo, from + 1, 24);
         var span = to - from;
-        var days = DayCount;
-        double At(DateTime local)
+        // The days need not follow each other (days chosen in the navigator): each its own place on the axis.
+        var dates = ShownDates;
+        var index = dates.Select((d, i) => (d, i)).ToDictionary(x => x.d, x => x.i);
+        var days = dates.Count;
+        double At(int column, DateTime local)
         {
-            var index = (local.Date - WeekStart).TotalDays;
-            if (index < 0)
-            {
-                return 0;
-            }
-
-            if (index >= days)
-            {
-                return 1;
-            }
-
             var hour = Math.Clamp(local.TimeOfDay.TotalHours, from, to);
-            return (index + (hour - from) / span) / days;
+            return (column + (hour - from) / span) / days;
         }
 
         for (var day = start.Date; day < end || day == start.Date; day = day.AddDays(1))
         {
-            var a = At(allDay ? day.AddHours(from) : (day == start.Date ? start : day.AddHours(from)));
-            var b = At(allDay ? day.AddHours(to) : (end.Date == day ? end : day.AddHours(to)));
-            if (b > a)
+            if (index.TryGetValue(day, out var column))
             {
-                yield return (a, b);
+                var a = At(column, allDay ? day.AddHours(from) : (day == start.Date ? start : day.AddHours(from)));
+                var b = allDay || end.Date != day ? (column + 1.0) / days : At(column, end);
+                if (b > a)
+                {
+                    yield return (a, b);
+                }
             }
 
             if (day >= end.Date)

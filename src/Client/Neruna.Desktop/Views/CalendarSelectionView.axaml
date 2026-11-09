@@ -125,6 +125,14 @@
           <ComboBox Grid.Column="1" ItemsSource="{Binding InvitationChoices}" SelectedItem="{Binding InvitationCalendar}" HorizontalAlignment="Stretch" />
         </Grid>
 
+        <!-- Off: colours only on this device (shared mailboxes – each colleague keeps their own) -->
+        <StackPanel Spacing="2" IsVisible="{Binding CanStoreColors}">
+          <CheckBox IsChecked="{Binding StoresColorsOnServer}" Content="{l:T 'Farben auf dem Server speichern'}" />
+          <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap" Margin="28,0,0,0" Text="{Binding ColorsHint}" />
+          <TextBlock Classes="subtle" FontSize="11" TextWrapping="Wrap" Margin="28,0,0,0"
+                     Text="{l:T 'Aus: Farben gelten nur auf diesem Gerät – bei gemeinsam genutzten Konten wählt jede Person ihre eigenen.'}" />
+        </StackPanel>
+
         <!-- Rarely needed: where the server was asked, and a calendar it does not list -->
         <Expander Header="{l:T 'Kalender fehlt?'}" IsVisible="{Binding CanAddByUrl}" HorizontalAlignment="Stretch">
           <StackPanel Spacing="4">

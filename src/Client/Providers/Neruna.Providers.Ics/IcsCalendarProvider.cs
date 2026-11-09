@@ -27,7 +27,7 @@ public sealed class IcsCalendarProvider(Guid connectionId, Uri feedUrl, string? 
     public async Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default)
     {
         var content = await LoadAsync(cancellationToken);
-        var name = displayName ?? IcsFeed.CalendarName(content) ?? feedUrl.Host;
+        var name = displayName ?? IcsFeed.CalendarName(content) ?? IcsProviderFactory.FallbackName(feedUrl);
         return [new CalendarInfo(connectionId, feedUrl.AbsoluteUri, name, Color: null, IsReadOnly: true)];
     }
 
@@ -71,6 +71,24 @@ public sealed class IcsCalendarProvider(Guid connectionId, Uri feedUrl, string? 
             return _content;
         }
 
+        if (feedUrl.IsFile)
+        {
+            // A file on this computer (or a network drive): read again at every sync, so changes to it show up.
+            var path = feedUrl.LocalPath;
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException(F("Die Datei «{0}» wurde nicht gefunden.", path), path);
+            }
+
+            var text = await File.ReadAllTextAsync(path, cancellationToken);
+            if (!text.TrimStart('\uFEFF', ' ', '\r', '\n', '\t').StartsWith("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(T("Die Datei ist kein iCalendar-Kalender (.ics)."));
+            }
+
+            return _content = text;
+        }
+
         using var request = new HttpRequestMessage(HttpMethod.Get, feedUrl);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/calendar"));
         using var response = await http.SendAsync(request, cancellationToken);
@@ -108,20 +126,48 @@ public sealed class IcsProviderFactory(HttpClient http) : IProviderFactory<ICale
     }
 
     public string Summary(IReadOnlyDictionary<string, string> settings) =>
-        settings?.GetValueOrDefault(IcsCalendarProvider.UrlSetting) ?? string.Empty;
+        settings?.GetValueOrDefault(IcsCalendarProvider.UrlSetting) is { } url
+            ? Uri.TryCreate(url, UriKind.Absolute, out var uri) ? Display(uri) : url
+            : string.Empty;
 
-    /// <summary>Accepts webcal:// links as published by most calendar sites.</summary>
+    /// <summary>Accepts webcal:// links as published by most calendar sites, and local .ics files (a path or file://).</summary>
     public static Uri NormalizeUrl(string url)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(url);
+        url = url.Trim().Trim('"');
         if (url.StartsWith("webcal://", StringComparison.OrdinalIgnoreCase))
         {
             url = "https://" + url["webcal://".Length..];
         }
 
+        // "C:\Kalender\ferien.ics", "/home/anna/ferien.ics", "\\server\share\ferien.ics", "~/ferien.ics"
+        if (url.StartsWith("~/", StringComparison.Ordinal))
+        {
+            url = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), url[2..]);
+        }
+
+        if (!url.Contains("://", StringComparison.Ordinal) && Path.IsPathFullyQualified(url))
+        {
+            return new Uri(Path.GetFullPath(url));
+        }
+
         var uri = new Uri(url, UriKind.Absolute);
-        return uri.Scheme is "https" or "http"
+        return uri.Scheme is "https" or "http" || uri.IsFile
             ? uri
-            : throw new ArgumentException("Only http(s) and webcal URLs are supported.", nameof(url));
+            : throw new ArgumentException("Only http(s), webcal and file addresses are supported.", nameof(url));
+    }
+
+    /// <summary>The name when the feed has none: the host of a web address, the file name of a local file.</summary>
+    public static string FallbackName(Uri url)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        return url.IsFile ? Path.GetFileNameWithoutExtension(url.LocalPath) : url.Host;
+    }
+
+    /// <summary>For the settings and lists: the path of a local file, else the address.</summary>
+    public static string Display(Uri url)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        return url.IsFile ? url.LocalPath : url.AbsoluteUri;
     }
 }

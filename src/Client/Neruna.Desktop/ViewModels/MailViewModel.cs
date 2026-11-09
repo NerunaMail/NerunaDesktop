@@ -225,13 +225,13 @@ internal sealed partial class MailViewModel(
     public ObservableCollection<MessageListEntry> Entries { get; } = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedMessage), nameof(HasSelection), nameof(ShowMessageActions))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand), nameof(ForwardAsAttachmentCommand), nameof(SaveAsEmlCommand), nameof(PrintCommand), nameof(NewNoteCommand))]
+    [NotifyPropertyChangedFor(nameof(SelectedMessage), nameof(HasSelection), nameof(ShowMessageActions), nameof(IsDraftsFolder), nameof(IsSentFolder))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand), nameof(OpenAsDraftCommand), nameof(ForwardAsAttachmentCommand), nameof(SaveAsEmlCommand), nameof(PrintCommand), nameof(NewNoteCommand), nameof(MoveToChosenFolderCommand), nameof(CopyToChosenFolderCommand))]
     public partial MessageListEntry? SelectedEntry { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsDraftsFolder), nameof(FromColumnTitle))]
-    [NotifyCanExecuteChangedFor(nameof(EditDraftCommand))]
+    [NotifyPropertyChangedFor(nameof(IsDraftsFolder), nameof(IsSentFolder), nameof(FromColumnTitle))]
+    [NotifyCanExecuteChangedFor(nameof(EditDraftCommand), nameof(OpenAsDraftCommand))]
     public partial MailFolderNode? CurrentFolder { get; set; }
 
     /// <summary>Head of the table column: in "Gesendet" and "Entwürfe" the list shows the recipients.</summary>
@@ -239,6 +239,9 @@ internal sealed partial class MailViewModel(
 
     /// <summary>In "Entwürfe" a message opens for editing ("Bearbeiten", double-click).</summary>
     public bool IsDraftsFolder => (SelectedMessage?.Folder ?? CurrentFolder)?.Folder.Role == FolderRole.Drafts;
+
+    /// <summary>In "Gesendet" a message can be opened again as a new draft ("Als Entwurf öffnen").</summary>
+    public bool IsSentFolder => (SelectedMessage?.Folder ?? CurrentFolder)?.Folder.Role == FolderRole.Sent;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RightPane))]
@@ -1268,6 +1271,36 @@ internal sealed partial class MailViewModel(
 
     private bool CanEditDraft() => IsDraftsFolder && HasSelection;
 
+    /// <summary>
+    /// "Als Entwurf öffnen" on a sent mail: the same recipients, subject, text and attachments in a new draft – to send it
+    /// once more, to someone else or with something added. The sent mail stays as it is.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanOpenAsDraft))]
+    private async Task OpenAsDraftAsync()
+    {
+        if (SelectedMessage is not { } message || FolderOf(message) is not { } folder)
+        {
+            return;
+        }
+
+        try
+        {
+            var opened = await secureMime.OpenAsync(await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId));
+            // A new draft: no draft id (nothing to replace) and a new Message-ID when it is sent.
+            var draft = MessageComposer.FromDraft(opened.Readable, string.Empty) with { DraftRemoteId = null, MessageId = null };
+            var inWindow = await settings.GetBoolAsync(SettingKeys.ComposeInWindow);
+            var compose = CreateCompose(folder.Account.Account, folder.Account.Connection, draft, ComposeKind.New, opened.Security.WasEncrypted, inWindow);
+            await compose.InitializeAsync();
+            await ShowComposeAsync(compose);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Report(T("Nachricht konnte nicht als Entwurf geöffnet werden"), ex);
+        }
+    }
+
+    private bool CanOpenAsDraft() => IsSentFolder && HasSelection;
+
     // The open "Entwürfe" list follows saves, and a folder just created for the first draft appears in the tree –
     // but not while a draft is open inline (reloading would close it).
     private async Task RefreshDraftsAsync(Guid connectionId, bool folderMayBeNew)
@@ -1299,6 +1332,63 @@ internal sealed partial class MailViewModel(
     /// window asks; Einstellungen → Schnellaktionen can turn it off).
     /// </summary>
     public event EventHandler<QuickActionSuggestion>? QuickActionSuggested;
+
+    /// <summary>
+    /// The folder dialog over all accounts, opened and closed as last time (kept in the settings).
+    /// </summary>
+    /// <returns>The folder chosen, or null when cancelled.</returns>
+    internal async Task<MailFolderNode?> ChooseFolderAsync(string title, MailFolderNode? current)
+    {
+        var expanded = await settings.GetListAsync(SettingKeys.FolderPickerExpanded);
+        var picker = new FolderPickerViewModel(Accounts, current, title, expanded);
+        var chosen = await windows.ShowFolderPickerAsync(picker);
+        await settings.SetListAsync(SettingKeys.FolderPickerExpanded, picker.ExpandedKeys);
+        return chosen;
+    }
+
+    /// <summary>Right click → "Verschieben nach …": the selected messages into a folder of any account.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task MoveToChosenFolderAsync()
+    {
+        var messages = ActionTargets.ToList();
+        if (messages.Count > 0 && await ChooseFolderAsync(T("In welchen Ordner verschieben?"), FolderOf(messages[0])) is { } target)
+        {
+            await MoveToFolderAsync(messages, target);
+        }
+    }
+
+    /// <summary>Right click → "Kopieren nach …": a copy of the selected messages in a folder of any account.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private async Task CopyToChosenFolderAsync()
+    {
+        var messages = ActionTargets.ToList();
+        if (messages.Count > 0 && await ChooseFolderAsync(T("In welchen Ordner kopieren?"), FolderOf(messages[0])) is { } target)
+        {
+            await CopyToFolderAsync(messages, target);
+        }
+    }
+
+    /// <summary>A copy in <paramref name="target"/>, in this or another account; the messages stay where they are.</summary>
+    public async Task CopyToFolderAsync(IReadOnlyList<MessageItemViewModel> messages, MailFolderNode target)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        ArgumentNullException.ThrowIfNull(target);
+        messages = messages.Where(m => FolderOf(m) is { } from && from != target).ToList();
+        if (target.Account.IsReadOnly || messages.Count == 0)
+        {
+            return;
+        }
+
+        var unread = messages.Count(m => m.IsUnread);
+        var what = messages.Count == 1 ? T("Nachricht") : F("{0} Nachrichten", messages.Count);
+        if (await RunOnMessagesAsync(messages, T("Kopieren"), (connection, folder, ids) => mail.CopyAsync(connection, folder,
+                messages.Where(m => ids.Contains(m.Summary.RemoteId) && FolderOf(m)!.Folder == folder).Select(m => m.Summary).ToList(), target.Account.Connection, target.Folder),
+            removesMessages: false))
+        {
+            target.UnreadCount += unread;
+            StatusMessage?.Invoke(this, F("{0} nach «{1}» ({2}) kopiert.", what, target.Name, target.Account.Title));
+        }
+    }
 
     /// <param name="byQuickAction">Moved by a quick action: not counted for suggesting one.</param>
     public async Task MoveToFolderAsync(IReadOnlyList<MessageItemViewModel> messages, MailFolderNode target, bool byQuickAction = false)

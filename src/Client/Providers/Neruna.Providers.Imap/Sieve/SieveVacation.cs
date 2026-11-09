@@ -94,10 +94,8 @@ internal static class SieveVacation
             }
             else if (reply.IsScheduled)
             {
-                // Days in the user's time zone; the end is exclusive (the first day back).
-                var zone = Zone(reply.Start!.Value.Offset);
-                block.Append(CultureInfo.InvariantCulture,
-                        $"if allof (currentdate :zone \"{zone}\" :value \"ge\" \"date\" \"{DateText(reply.Start)}\", currentdate :zone \"{zone}\" :value \"lt\" \"date\" \"{DateText(reply.End)}\") {{\r\n")
+                // In the user's time zone; the end is exclusive (the first day back, or the time of return).
+                block.Append(CultureInfo.InvariantCulture, $"if allof ({Bound(reply.Start!.Value, from: true)}, {Bound(reply.End!.Value, from: false)}) {{\r\n")
                     .Append("  ").Append(vacation).Append("\r\n}\r\n");
             }
             else
@@ -213,12 +211,30 @@ internal static class SieveVacation
     private static string Zone(TimeSpan offset) =>
         (offset < TimeSpan.Zero ? "-" : "+") + offset.Duration().ToString("hhmm", CultureInfo.InvariantCulture);
 
-    private static string? DateText(DateTimeOffset? value) => value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    /// <summary>"2026-11-09", or "2026-11-09T14:30" with a time of day.</summary>
+    private static string? DateText(DateTimeOffset? value) =>
+        value?.ToString(value.Value.TimeOfDay == TimeSpan.Zero ? "yyyy-MM-dd" : "yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
 
     private static DateTimeOffset? DateOf(string? text) =>
-        DateTime.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+        DateTime.TryParseExact(text, ["yyyy-MM-dd", "yyyy-MM-dd'T'HH:mm"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
             ? new DateTimeOffset(date, TimeZoneInfo.Local.GetUtcOffset(date))
             : null;
+
+    // One end of the period. A whole day compares the date; with a time of day: a later (earlier) day, or the same day
+    // from (before) that time. Sieve compares "date" (yyyy-mm-dd) and "time" (hh:mm:ss) as text, which fits their fixed form.
+    private static string Bound(DateTimeOffset value, bool from)
+    {
+        var zone = Zone(value.Offset);
+        var date = value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        if (value.TimeOfDay == TimeSpan.Zero)
+        {
+            return $"currentdate :zone \"{zone}\" :value \"{(from ? "ge" : "lt")}\" \"date\" \"{date}\"";
+        }
+
+        var time = value.ToString("HH:mm:00", CultureInfo.InvariantCulture);
+        return $"anyof (currentdate :zone \"{zone}\" :value \"{(from ? "gt" : "lt")}\" \"date\" \"{date}\", "
+            + $"allof (currentdate :zone \"{zone}\" :is \"date\" \"{date}\", currentdate :zone \"{zone}\" :value \"{(from ? "ge" : "lt")}\" \"time\" \"{time}\"))";
+    }
 
     internal static IEnumerable<string> Lines(string? script)
     {

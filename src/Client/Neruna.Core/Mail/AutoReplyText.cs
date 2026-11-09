@@ -16,7 +16,10 @@ public static partial class AutoReplyText
 
     public static bool HasPlaceholders(string template) => Placeholder().IsMatch(template ?? string.Empty);
 
-    /// <summary>The text with the dates in: {{start}} the first day, {{end}} the last day away (the end is exclusive).</summary>
+    /// <summary>
+    /// The text with the dates in: {{start}} the first day, {{end}} the last day away (the end is exclusive) – each with
+    /// its time when one was set ("Montag, 9. November 2026, 14:00"; then {{end}} is the time of return that day).
+    /// </summary>
     /// <remarks>Without a period the placeholders stay as they are.</remarks>
     public static string Render(string template, DateTimeOffset? start, DateTimeOffset? end, CultureInfo? culture = null)
     {
@@ -28,8 +31,19 @@ public static partial class AutoReplyText
 
         culture ??= Culture;
         return Placeholder().Replace(template, m => m.Groups[1].Value.Equals("start", StringComparison.OrdinalIgnoreCase)
-            ? start.Value.LocalDateTime.Date.ToString("D", culture)
-            : end.Value.LocalDateTime.Date.AddDays(-1).ToString("D", culture));
+            ? Moment(start.Value.LocalDateTime, culture, lastDay: false)
+            : Moment(end.Value.LocalDateTime, culture, lastDay: true));
+    }
+
+    // A whole day: the date (the end is the day after the last one). With a time: the date and the time.
+    private static string Moment(DateTime local, CultureInfo culture, bool lastDay)
+    {
+        if (local.TimeOfDay == TimeSpan.Zero)
+        {
+            return (lastDay ? local.Date.AddDays(-1) : local.Date).ToString("D", culture);
+        }
+
+        return local.ToString("D", culture) + ", " + local.ToString("t", culture);
     }
 
     /// <summary>The template to edit: Neruna's own if the server still has what it made of it, else the server's text.</summary>

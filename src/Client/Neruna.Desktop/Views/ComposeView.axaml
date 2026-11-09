@@ -31,84 +31,107 @@
 
     <!-- Actions -->
     <Grid Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-      <WrapPanel Orientation="Horizontal" ItemSpacing="4" LineSpacing="6">
-        <!-- Icons with the text below, as in the reading pane (or icons only: Einstellungen → Design) -->
-        <Button Classes="accent" Command="{Binding SendCommand}" HotKey="Ctrl+Enter" ToolTip.Tip="{l:T 'Senden (Ctrl+Enter)'}" VerticalAlignment="Stretch"
-                Padding="{Binding Preferences.ToolbarLabels, FallbackValue=True, Converter={x:Static views:ComposeView.SendPadding}}" MinWidth="64">
-          <StackPanel>
-            <PathIcon Data="{StaticResource IconSend}" Width="18" Height="18" HorizontalAlignment="Center" />
-            <TextBlock Text="{l:T 'Senden'}" FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,0" IsVisible="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+      <!-- Big: Senden and Anhängen with their text. Beside them the small tools in groups; a narrow window wraps only
+           these (they never go below the big ones). -->
+      <ctl:SplitToolbar>
+        <WrapPanel Orientation="Horizontal" LineSpacing="2" ItemSpacing="4" VerticalAlignment="Top">
+            <Button Classes="accent" Command="{Binding SendCommand}" HotKey="Ctrl+Enter" ToolTip.Tip="{l:T 'Senden (Ctrl+Enter)'}" VerticalAlignment="Stretch"
+                    Padding="{Binding Preferences.ToolbarLabels, FallbackValue=True, Converter={x:Static views:ComposeView.SendPadding}}" MinWidth="64">
+              <StackPanel>
+                <PathIcon Data="{StaticResource IconSend}" Width="18" Height="18" HorizontalAlignment="Center" />
+                <TextBlock Text="{l:T 'Senden'}" FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,0" IsVisible="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+              </StackPanel>
+            </Button>
+            <ctl:ToolButton Icon="{StaticResource IconAttach}" Label="{l:T 'Anhängen'}" Hint="{l:T 'Datei anhängen'}" Command="{Binding AddAttachmentCommand}"
+                            ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
+        </WrapPanel>
+        <WrapPanel Orientation="Horizontal" ItemSpacing="0" LineSpacing="2" VerticalAlignment="Center" Margin="6,0,0,0">
+          <WrapPanel Orientation="Horizontal" ItemSpacing="1" LineSpacing="2">
+              <ctl:ToolButton Icon="{StaticResource IconUndo}" Label="{l:T 'Rückgängig'}" Shortcut="Ctrl+Z" Command="{Binding UndoCommand}" Compact="True" ShowLabel="False" />
+              <ctl:ToolButton Icon="{StaticResource IconRedo}" Label="{l:T 'Wiederherstellen'}" Hint="{l:T 'Wiederherstellen: rückgängig Gemachtes wieder ausführen (Ctrl+Y)'}" Command="{Binding RedoCommand}" Compact="True" ShowLabel="False" />
+          </WrapPanel>
+          <Border Classes="toolGroup">
+            <WrapPanel Orientation="Horizontal" ItemSpacing="1" LineSpacing="2">
+                <ctl:ToolToggleButton Icon="{StaticResource IconCertificate}" Label="{l:T 'Signieren'}" Hint="{Binding SignHint}" IsChecked="{Binding Sign}" IsVisible="{Binding CanSign}" Compact="True" ShowLabel="False" />
+                <ctl:ToolToggleButton Icon="{StaticResource IconLock}" Label="{l:T 'Verschlüsseln'}" Hint="{Binding EncryptHint}" IsChecked="{Binding Encrypt}" IsVisible="{Binding ShowEncrypt}"
+                                      Compact="True" ShowLabel="False" />
+            </WrapPanel>
+          </Border>
+          <Border Classes="toolGroup">
+            <WrapPanel Orientation="Horizontal" ItemSpacing="1" LineSpacing="2">
+                <!-- Termin: an event for this mail, the recipients as attendees (ComposeViewModel.Appointment) -->
+                <ctl:ToolButton Icon="{StaticResource IconCalendar}" Label="{l:T 'Termin'}" Hint="{l:T 'Termin zu dieser E-Mail erstellen – die Empfänger werden eingeladen'}"
+                                Command="{Binding MakeAppointmentCommand}" IsVisible="{Binding CanMakeAppointment}" Compact="True" ShowLabel="False" />
+                <!-- Terminumfrage: a poll with the recipients as invitees, its link into the text (ComposeViewModel.Poll) -->
+                <ctl:ToolButton Icon="{StaticResource IconPoll}" Label="{l:T 'Terminumfrage'}" Hint="{l:T 'Terminumfrage erstellen und den Link einfügen – die Empfänger wählen, welche Termine passen'}"
+                                Command="{Binding MakePollCommand}" IsVisible="{Binding CanMakePoll}" Compact="True" ShowLabel="False" />
+                <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
+                <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="{l:T 'Textvorlage'}" Hint="{l:T 'Textvorlage an der Cursorposition einfügen – oder «kürzel::» bzw. «kürzel» + Tab tippen'}"
+                                IsEnabled="{Binding HasTemplates}" Compact="True" ShowLabel="False">
+                  <ctl:ToolButton.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding TemplateMenu}">
+                      <MenuFlyout.ItemContainerTheme>
+                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:TextTemplateMenuItem">
+                          <Setter Property="Header" Value="{Binding Title}" />
+                          <Setter Property="Command" Value="{Binding Command}" />
+                          <Setter Property="CommandParameter" Value="{Binding Template}" />
+                        </ControlTheme>
+                      </MenuFlyout.ItemContainerTheme>
+                    </MenuFlyout>
+                  </ctl:ToolButton.Flyout>
+                </ctl:ToolButton>
+                <!-- Signatur: swap or remove the signature in the text -->
+                <ctl:ToolButton Icon="{StaticResource IconSignature}" Label="{l:T 'Signatur'}" Hint="{l:T 'Signatur einfügen oder wechseln'}" IsVisible="{Binding Formatting.IsRichText}"
+                                Compact="True" ShowLabel="False">
+                  <ctl:ToolButton.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding SignatureMenu}">
+                      <MenuFlyout.ItemContainerTheme>
+                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SignatureMenuItem">
+                          <Setter Property="Header" Value="{Binding Title}" />
+                          <Setter Property="Command" Value="{Binding Command}" />
+                          <Setter Property="CommandParameter" Value="{Binding Signature}" />
+                        </ControlTheme>
+                      </MenuFlyout.ItemContainerTheme>
+                    </MenuFlyout>
+                  </ctl:ToolButton.Flyout>
+                </ctl:ToolButton>
+                <!-- KI: the bar above the text ("Schreiben", "Verbessern" …), only with a connected AI -->
+                <ctl:ToolToggleButton Icon="{StaticResource IconAi}" Label="{l:T 'KI'}" Hint="{l:T 'Mit KI schreiben oder überarbeiten'}"
+                                      IsChecked="{Binding Ai.IsOpen, FallbackValue=False}" IsVisible="{Binding Ai.Available, FallbackValue=False}"
+                                      Compact="True" ShowLabel="False" />
+            </WrapPanel>
+          </Border>
+          <Border Classes="toolGroup">
+            <WrapPanel Orientation="Horizontal" ItemSpacing="1" LineSpacing="2">
+                <!-- Optionen: delivery and read receipt for this mail -->
+                <ctl:ToolButton Icon="{StaticResource IconSettings}" Label="{l:T 'Optionen'}" Hint="{l:T 'Übermittlungs- und Lesebestätigung'}"
+                                Compact="True" ShowLabel="False">
+                  <ctl:ToolButton.Flyout>
+                    <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                      <MenuItem Header="{l:T 'Übermittlungsbestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestDeliveryReceipt, Mode=OneWay}" Command="{Binding ToggleDeliveryReceiptCommand}"
+                                ToolTip.Tip="{l:T 'Der Mailserver meldet, wenn die Nachricht zugestellt wurde – sofern er das unterstützt.'}" />
+                      <MenuItem Header="{l:T 'Lesebestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestReadReceipt, Mode=OneWay}" Command="{Binding ToggleReadReceiptCommand}"
+                                ToolTip.Tip="{l:T 'Das Mailprogramm des Empfängers fragt, ob es das Lesen bestätigen soll – der Empfänger entscheidet.'}" />
+                    </MenuFlyout>
+                  </ctl:ToolButton.Flyout>
+                </ctl:ToolButton>
+                <ctl:ToolButton Icon="{StaticResource IconEdit}" Label="{l:T 'Speichern'}" Hint="{l:T 'Als Entwurf speichern (Ctrl+S) – geschieht auch automatisch'}"
+                                Command="{Binding SaveDraftCommand}" HotKey="Ctrl+S" Compact="True" ShowLabel="False" />
+                <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{Binding DiscardLabel}" Hint="{l:T 'Nachricht verwerfen (auch den gespeicherten Entwurf)'}"
+                                Command="{Binding DiscardCommand}" Compact="True" ShowLabel="{Binding ConfirmDiscard}"
+                                Classes.confirm="{Binding ConfirmDiscard}" />
+            </WrapPanel>
+          </Border>
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,0,0,0" VerticalAlignment="Center">
+            <ProgressBar IsIndeterminate="True" Width="60" MinWidth="0" Height="4" IsVisible="{Binding IsSending}" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding DraftStatus}" Classes="subtle" FontSize="12" VerticalAlignment="Center"
+                       IsVisible="{Binding DraftStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </StackPanel>
-        </Button>
-        <ctl:ToolButton Icon="{StaticResource IconAttach}" Label="{l:T 'Anhängen'}" Hint="{l:T 'Datei anhängen'}" Command="{Binding AddAttachmentCommand}"
-                        ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <ctl:ToolToggleButton Icon="{StaticResource IconCertificate}" Label="{l:T 'Signieren'}" Hint="{Binding SignHint}" IsChecked="{Binding Sign}" IsVisible="{Binding CanSign}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <ctl:ToolToggleButton Icon="{StaticResource IconLock}" Label="{l:T 'Verschlüsseln'}" Hint="{Binding EncryptHint}" IsChecked="{Binding Encrypt}" IsVisible="{Binding ShowEncrypt}"
-                              ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <!-- Termin: an event for this mail, the recipients as attendees (ComposeViewModel.Appointment) -->
-        <ctl:ToolButton Icon="{StaticResource IconCalendar}" Label="{l:T 'Termin'}" Hint="{l:T 'Termin zu dieser E-Mail erstellen – die Empfänger werden eingeladen'}"
-                        Command="{Binding MakeAppointmentCommand}" IsVisible="{Binding CanMakeAppointment}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <!-- Terminumfrage: a poll with the recipients as invitees, its link into the text (ComposeViewModel.Poll) -->
-        <ctl:ToolButton Icon="{StaticResource IconPoll}" Label="{l:T 'Terminumfrage'}" Hint="{l:T 'Terminumfrage erstellen und den Link einfügen – die Empfänger wählen, welche Termine passen'}"
-                        Command="{Binding MakePollCommand}" IsVisible="{Binding CanMakePoll}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
-        <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="{l:T 'Textvorlage'}" Hint="{l:T 'Textvorlage an der Cursorposition einfügen – oder «kürzel::» bzw. «kürzel» + Tab tippen'}"
-                        IsEnabled="{Binding HasTemplates}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
-          <ctl:ToolButton.Flyout>
-            <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding TemplateMenu}">
-              <MenuFlyout.ItemContainerTheme>
-                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:TextTemplateMenuItem">
-                  <Setter Property="Header" Value="{Binding Title}" />
-                  <Setter Property="Command" Value="{Binding Command}" />
-                  <Setter Property="CommandParameter" Value="{Binding Template}" />
-                </ControlTheme>
-              </MenuFlyout.ItemContainerTheme>
-            </MenuFlyout>
-          </ctl:ToolButton.Flyout>
-        </ctl:ToolButton>
-        <!-- Signatur: swap or remove the signature in the text -->
-        <ctl:ToolButton Icon="{StaticResource IconSignature}" Label="{l:T 'Signatur'}" Hint="{l:T 'Signatur einfügen oder wechseln'}" IsVisible="{Binding Formatting.IsRichText}"
-                        ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
-          <ctl:ToolButton.Flyout>
-            <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding SignatureMenu}">
-              <MenuFlyout.ItemContainerTheme>
-                <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SignatureMenuItem">
-                  <Setter Property="Header" Value="{Binding Title}" />
-                  <Setter Property="Command" Value="{Binding Command}" />
-                  <Setter Property="CommandParameter" Value="{Binding Signature}" />
-                </ControlTheme>
-              </MenuFlyout.ItemContainerTheme>
-            </MenuFlyout>
-          </ctl:ToolButton.Flyout>
-        </ctl:ToolButton>
-        <!-- KI: the bar above the text ("Schreiben", "Verbessern" …), only with a connected AI -->
-        <ctl:ToolToggleButton Icon="{StaticResource IconAi}" Label="{l:T 'KI'}" Hint="{l:T 'Mit KI schreiben oder überarbeiten'}"
-                              IsChecked="{Binding Ai.IsOpen, FallbackValue=False}" IsVisible="{Binding Ai.Available, FallbackValue=False}"
-                              ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <!-- Optionen: delivery and read receipt for this mail -->
-        <ctl:ToolButton Icon="{StaticResource IconSettings}" Label="{l:T 'Optionen'}" Hint="{l:T 'Übermittlungs- und Lesebestätigung'}"
-                        ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}">
-          <ctl:ToolButton.Flyout>
-            <MenuFlyout Placement="BottomEdgeAlignedLeft">
-              <MenuItem Header="{l:T 'Übermittlungsbestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestDeliveryReceipt, Mode=OneWay}" Command="{Binding ToggleDeliveryReceiptCommand}"
-                        ToolTip.Tip="{l:T 'Der Mailserver meldet, wenn die Nachricht zugestellt wurde – sofern er das unterstützt.'}" />
-              <MenuItem Header="{l:T 'Lesebestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestReadReceipt, Mode=OneWay}" Command="{Binding ToggleReadReceiptCommand}"
-                        ToolTip.Tip="{l:T 'Das Mailprogramm des Empfängers fragt, ob es das Lesen bestätigen soll – der Empfänger entscheidet.'}" />
-            </MenuFlyout>
-          </ctl:ToolButton.Flyout>
-        </ctl:ToolButton>
-        <ctl:ToolButton Icon="{StaticResource IconEdit}" Label="{l:T 'Speichern'}" Hint="{l:T 'Als Entwurf speichern (Ctrl+S) – geschieht auch automatisch'}"
-                        Command="{Binding SaveDraftCommand}" HotKey="Ctrl+S" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{Binding DiscardLabel}" Hint="{l:T 'Nachricht verwerfen (auch den gespeicherten Entwurf)'}"
-                        Command="{Binding DiscardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}"
-                        Classes.confirm="{Binding ConfirmDiscard}" />
-        <ProgressBar IsIndeterminate="True" Width="60" MinWidth="0" Height="4" IsVisible="{Binding IsSending}" VerticalAlignment="Center" />
-        <TextBlock Text="{Binding DraftStatus}" Classes="subtle" FontSize="12" VerticalAlignment="Center"
-                   IsVisible="{Binding DraftStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
-      </WrapPanel>
+        </WrapPanel>
+      </ctl:SplitToolbar>
       <!-- Pop-out, icon-only ("In neuem Fenster öffnen") -->
       <ctl:ToolButton Grid.Column="1" Icon="{StaticResource IconPopOut}" Label="{l:T 'Loslösen'}" Hint="{l:T 'Loslösen – in eigenem Fenster weiterschreiben'}"
-                      Command="{Binding PopOutCommand}" IsVisible="{Binding CanPopOut}" Margin="8,0,0,0" VerticalAlignment="Top" ShowLabel="False" />
+                      Command="{Binding PopOutCommand}" IsVisible="{Binding CanPopOut}" Margin="8,0,0,0" VerticalAlignment="Top" Compact="True" ShowLabel="False" />
     </Grid>
 
     <TextBlock Grid.Row="1" Classes="subtle" Text="{l:T 'Von'}" VerticalAlignment="Center" />

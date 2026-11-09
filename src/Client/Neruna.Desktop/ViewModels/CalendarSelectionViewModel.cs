@@ -14,7 +14,7 @@ namespace Neruna.Desktop.ViewModels;
 /// and per account the one its invitations go into – both chosen from the calendars shown, so the lists are current.
 /// The arrows set the order of the calendars within their account in "Meine Kalender".
 /// </summary>
-internal sealed partial class CalendarSelectionViewModel(CalendarController calendar, ISettingsStore settings) : ViewModelBase
+internal sealed partial class CalendarSelectionViewModel(CalendarController calendar, ISettingsStore settings, CalendarCategoryService? categories = null) : ViewModelBase
 {
     public event EventHandler<bool>? Finished;
 
@@ -109,6 +109,8 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
             {
                 var group = new CalendarSourceGroup(source, await settings.GetAsync(InvitationService.DefaultCalendarKey(source.Account.Id)));
                 group.ChoicesChanged += (_, _) => UpdateChoices();
+                (group.CanStoreCalendarColors, group.CanStoreCategoryColors) = await calendar.ServerColorSupportAsync(source.Connection);
+                group.StoresColorsOnServer = group.StoredColorsOnServer = await calendar.StoresColorsOnServerAsync(source.Account.Id);
                 Sources.Add(group);
                 try
                 {
@@ -169,6 +171,14 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
             foreach (var group in Sources)
             {
                 await settings.SetAsync(InvitationService.DefaultCalendarKey(group.Source.Account.Id), group.InvitationKey);
+                if (group.CanStoreColors && group.StoresColorsOnServer != group.StoredColorsOnServer)
+                {
+                    await calendar.SetStoresColorsOnServerAsync(group.Source.Account.Id, group.StoresColorsOnServer);
+                    if (group.StoresColorsOnServer && group.CanStoreCategoryColors)
+                    {
+                        await TakeOverCategoriesAsync(group);
+                    }
+                }
             }
 
             Finished?.Invoke(this, true);
@@ -232,6 +242,42 @@ internal sealed partial class CalendarSelectionViewModel(CalendarController cale
     /// <summary>A calendar was added by address: the calendar view reloads even when the dialog is cancelled.</summary>
     public bool Changed { get; private set; }
 
+    /// <summary>
+    /// Just switched on for an account with a category list (Microsoft 365, Exchange): its colours become the ones shown
+    /// – categories Neruna does not know yet are added. Not reachable now: the local list stays.
+    /// </summary>
+    private async Task TakeOverCategoriesAsync(CalendarSourceGroup group)
+    {
+        try
+        {
+            var server = await calendar.GetServerCategoriesAsync(group.Source.Connection);
+            if (server.Count == 0 || categories is null)
+            {
+                return;
+            }
+
+            var local = (await categories.GetAllAsync()).ToList();
+            foreach (var category in server)
+            {
+                var at = local.FindIndex(c => c.Matches(category.Name));
+                if (at >= 0)
+                {
+                    local[at] = local[at] with { Color = category.Color };
+                }
+                else
+                {
+                    local.Add(category);
+                }
+            }
+
+            await categories.SaveAsync(local);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            group.Error = T("Kategorien des Servers nicht übernommen: ") + ex.Message;
+        }
+    }
+
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, Changed);
 
@@ -267,6 +313,32 @@ internal sealed partial class CalendarSourceGroup : ObservableObject
     }
 
     public CalendarSource Source { get; }
+
+    // ---- Colours: only on this device, or also on the server ----
+
+    public bool CanStoreCalendarColors { get; set; }
+
+    public bool CanStoreCategoryColors { get; set; }
+
+    /// <summary>Whether the account's server keeps colours Neruna could set (CalDAV, Google, Microsoft 365, Exchange).</summary>
+    public bool CanStoreColors => CanStoreCalendarColors || CanStoreCategoryColors;
+
+    /// <summary>Off (default): colours apply on this device only – on a shared mailbox, each colleague keeps their own.</summary>
+    [ObservableProperty]
+    public partial bool StoresColorsOnServer { get; set; }
+
+    /// <summary>As saved, to see whether it was switched.</summary>
+    public bool StoredColorsOnServer { get; set; }
+
+    /// <summary>What goes to this server, in one line.</summary>
+    public string ColorsHint => (CanStoreCalendarColors, CanStoreCategoryColors) switch
+    {
+        (true, true) => T("Kalenderfarben und Kategoriefarben werden im Postfach gespeichert und gelten für alle, die es nutzen. Der Server kennt nur wenige feste Farben, er nimmt die nächstliegende."),
+        (false, true) => T("Kategoriefarben werden im Postfach gespeichert und gelten für alle, die es nutzen. Der Server kennt nur feste Farben, er nimmt die nächstliegende."),
+        (true, false) when Source.Connection.ProviderId == ProviderIds.Google => T("Kalenderfarben werden bei Google gespeichert; Google hält sie pro Person, andere sehen ihre eigenen."),
+        (true, false) => T("Kalenderfarben werden auf dem Server gespeichert und gelten für alle, die den Kalender nutzen. Kategoriefarben bleiben auf diesem Gerät."),
+        _ => string.Empty,
+    };
 
     /// <summary>Moves a calendar past the next one shown (with a search, the hidden ones are skipped).</summary>
     public void Move(CalendarChoiceItem item, int delta)

@@ -15,8 +15,9 @@
 
     <!-- Command bar -->
     <Border Classes="pane" Padding="8,6" Margin="0,0,0,6">
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <StackPanel Orientation="Horizontal" Spacing="4">
+      <!-- Navigation on the left; the tools on the right wrap into a second row when the window is narrow -->
+      <ctl:SplitToolbar SmallMinWidth="240">
+        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
           <Button Classes="accent" Command="{Binding NewEventCommand}" Padding="12,6" Margin="0,0,8,0">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
@@ -46,7 +47,7 @@
           </Button>
           <TextBlock Text="{Binding RangeTitle}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,0,0" />
         </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+        <WrapPanel HorizontalAlignment="Right" ItemSpacing="4" LineSpacing="4">
           <!-- Planung: the week as a time line per calendar -->
           <ToggleButton IsChecked="{Binding IsPlanning}" Padding="10,5" Margin="0,0,8,0" VerticalAlignment="Center"
                         ToolTip.Tip="{l:T 'Planungsansicht: jeder Kalender als Zeitstrahl – rot beschäftigt, grün frei'}">
@@ -61,6 +62,12 @@
             <ToggleButton Content="{l:T 'Mo–Fr'}" IsChecked="{Binding IsWorkWeek}" Padding="10,5" CornerRadius="0" ToolTip.Tip="{l:T 'Nur Arbeitstage anzeigen'}" />
             <ToggleButton Content="{l:T '1 Tag'}" IsChecked="{Binding IsSingleDay}" Padding="10,5" CornerRadius="0,4,4,0" ToolTip.Tip="{l:T 'Nur einen Tag anzeigen'}" />
           </StackPanel>
+          <Button Classes="command" Command="{Binding ToggleWindowCommand}" ToolTip.Tip="{Binding WindowToggleTip}">
+            <StackPanel Orientation="Horizontal">
+              <PathIcon Data="{StaticResource IconPopOut}" />
+              <TextBlock Text="{Binding WindowToggleText}" />
+            </StackPanel>
+          </Button>
           <Button Classes="command" Command="{Binding ManageCommand}" ToolTip.Tip="{l:T 'Server erneut nach Kalendern fragen (auch im Webmail abonnierte) und auswählen'}">
             <StackPanel Orientation="Horizontal">
               <PathIcon Data="{StaticResource IconSync}" />
@@ -85,8 +92,8 @@
               <TextBlock Text="{l:T 'Internet-Kalender abonnieren'}" />
             </StackPanel>
           </Button>
-        </StackPanel>
-      </Grid>
+        </WrapPanel>
+      </ctl:SplitToolbar>
     </Border>
 
     <Grid x:Name="Columns" Grid.Row="1" ColumnDefinitions="264,6,*">
@@ -110,7 +117,8 @@
               <KeyBinding Gesture="Escape" Command="{Binding CloseSearchCommand}" />
             </TextBox.KeyBindings>
           </TextBox>
-          <ItemsControl DockPanel.Dock="Top" Margin="0,0,0,6" ItemsSource="{Binding MiniMonths}">
+          <!-- A click shows the week; dragging over days or Ctrl+click picks any days (CalendarView.axaml.cs) -->
+          <ItemsControl x:Name="Navigator" DockPanel.Dock="Top" Margin="0,0,0,6" ItemsSource="{Binding MiniMonths}">
             <ItemsControl.Styles>
               <Style Selector="Button.day">
                 <Setter Property="Width" Value="26" />
@@ -138,6 +146,12 @@
               </Style>
               <Style Selector="Button.day.busy">
                 <Setter Property="FontWeight" Value="Bold" />
+              </Style>
+              <Style Selector="Button.day.chosen">
+                <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
+              </Style>
+              <Style Selector="Button.day.chosen.today">
+                <Setter Property="Background" Value="{DynamicResource HeaderBackgroundBrush}" />
               </Style>
               <Style Selector="Button.week">
                 <Setter Property="Width" Value="22" />
@@ -207,7 +221,7 @@
                             <ItemsControl.ItemTemplate>
                               <DataTemplate x:DataType="vm:MiniDay">
                                 <Button Classes="day" Classes.other="{Binding IsOtherMonth}" Classes.today="{Binding IsToday}" Classes.busy="{Binding HasEvents}"
-                                        Content="{Binding Text}" ToolTip.Tip="{Binding Tooltip}"
+                                        Classes.chosen="{Binding IsChosen}" Content="{Binding Text}" ToolTip.Tip="{Binding Tooltip}"
                                         Command="{Binding $parent[UserControl].((vm:CalendarViewModel)DataContext).SelectDayCommand}"
                                         CommandParameter="{Binding Date}" />
                               </DataTemplate>

@@ -146,7 +146,7 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
         var owner = lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow;
         var window = new Window
         {
-            Title = Neruna.Core.Localization.Texts.T("Verschieben"),
+            Title = picker.Title,
             Icon = owner?.Icon,
             Width = 440,
             Height = 560,

@@ -8,7 +8,7 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>Subscribe to an internet calendar (ICS/webcal) – a second calendar provider next to CalDAV.</summary>
-internal sealed partial class IcsSubscriptionViewModel(AccountSetupService setup) : ViewModelBase
+internal sealed partial class IcsSubscriptionViewModel(AccountSetupService setup, Infrastructure.IFileService files) : ViewModelBase
 {
     public event EventHandler<bool>? Finished;
 
@@ -37,7 +37,7 @@ internal sealed partial class IcsSubscriptionViewModel(AccountSetupService setup
         }
         catch (Exception ex) when (ex is UriFormatException or ArgumentException)
         {
-            Error = T("Bitte eine gültige https- oder webcal-Adresse eingeben.");
+            Error = T("Bitte eine gültige https- oder webcal-Adresse oder eine .ics-Datei angeben.");
             return;
         }
 
@@ -47,7 +47,7 @@ internal sealed partial class IcsSubscriptionViewModel(AccountSetupService setup
             settings[IcsCalendarProvider.NameSetting] = Name.Trim();
         }
 
-        var title = string.IsNullOrWhiteSpace(Name) ? url.Host : Name.Trim();
+        var title = string.IsNullOrWhiteSpace(Name) ? IcsProviderFactory.FallbackName(url) : Name.Trim();
         var account = new Account(Guid.NewGuid(), title, null, [new ServiceConnection(Guid.NewGuid(), ServiceKind.Calendar, ProviderIds.Ics, settings)]);
 
         IsBusy = true;
@@ -67,6 +67,20 @@ internal sealed partial class IcsSubscriptionViewModel(AccountSetupService setup
     }
 
     private bool CanSubscribe() => !IsBusy && Url.Trim().Length > 0;
+
+    /// <summary>"Datei wählen …": a calendar file on this computer or a network drive instead of a web address.</summary>
+    [RelayCommand]
+    private async Task PickFileAsync()
+    {
+        if (await files.PickFileAsync(T("Kalenderdatei wählen"), T("iCalendar-Dateien"), ["*.ics", "*.ical", "*.ifb"]) is { } path)
+        {
+            Url = path;
+            if (string.IsNullOrWhiteSpace(Name))
+            {
+                Name = Path.GetFileNameWithoutExtension(path);
+            }
+        }
+    }
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, false);

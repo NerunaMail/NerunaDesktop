@@ -243,7 +243,8 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
     public Task<Stream?> OpenMessageContentAsync(Guid connectionId, string folderRemoteId, string remoteId, CancellationToken cancellationToken = default)
     {
         var path = files.PathFor(connectionId, folderRemoteId, remoteId);
-        Stream? stream = File.Exists(path) ? File.OpenRead(path) : null;
+        // Shared for deleting too: a second download of the same message may replace the file while this one reads it.
+        Stream? stream = File.Exists(path) ? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete) : null;
         return Task.FromResult(stream);
     }
 
@@ -253,14 +254,27 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         var path = files.PathFor(connectionId, folderRemoteId, remoteId);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        // Write to a temp file first so a crash never leaves a truncated message in the cache.
-        var temp = path + ".tmp";
-        await using (var file = File.Create(temp))
+        // Write to a temp file first so a crash never leaves a truncated message in the cache. Each its own: the same
+        // message may be fetched twice at once (reading pane and "Bearbeiten"), and both must succeed.
+        var temp = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
         {
-            await mime.CopyToAsync(file, cancellationToken);
+            await using (var file = File.Create(temp))
+            {
+                await mime.CopyToAsync(file, cancellationToken);
+            }
+
+            File.Move(temp, path, overwrite: true);
+        }
+        catch (IOException) when (File.Exists(path))
+        {
+            // The other download stored it first (and it is being read): the same message, nothing lost.
+        }
+        finally
+        {
+            File.Delete(temp);
         }
 
-        File.Move(temp, path, overwrite: true);
         await MarkContentAvailableAsync(connectionId, folderRemoteId, remoteId, cancellationToken);
     }
 

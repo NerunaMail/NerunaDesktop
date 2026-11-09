@@ -53,6 +53,20 @@ public class SieveVacationTests
     }
 
     [Fact]
+    public void A_period_with_times_starts_and_ends_at_those_times()
+    {
+        // From Monday noon until (not including) Friday 08:00.
+        var reply = new AutoReply(true, "Ferien", Monday.AddHours(12), Monday.AddDays(4).AddHours(8));
+        var script = SieveVacation.Write(null, reply, ["anna@example.com"], withDates: true);
+        Assert.Contains("anyof (currentdate :zone \"+0200\" :value \"gt\" \"date\" \"2026-10-12\", allof (currentdate :zone \"+0200\" :is \"date\" \"2026-10-12\", "
+            + "currentdate :zone \"+0200\" :value \"ge\" \"time\" \"12:00:00\"))", script, StringComparison.Ordinal);
+        Assert.Contains("anyof (currentdate :zone \"+0200\" :value \"lt\" \"date\" \"2026-10-16\", allof (currentdate :zone \"+0200\" :is \"date\" \"2026-10-16\", "
+            + "currentdate :zone \"+0200\" :value \"lt\" \"time\" \"08:00:00\"))", script, StringComparison.Ordinal);
+        var read = SieveVacation.Read(script);
+        Assert.Equal((new DateTime(2026, 10, 12, 12, 0, 0), new DateTime(2026, 10, 16, 8, 0, 0)), (read.Start!.Value.DateTime, read.End!.Value.DateTime));
+    }
+
+    [Fact]
     public void A_period_needs_the_date_extension()
     {
         Assert.Throws<ArgumentException>(() => SieveVacation.Write(null, new AutoReply(true, "x", Monday, Monday.AddDays(1)), [], withDates: false));
@@ -100,6 +114,12 @@ public class SieveVacationTests
             Assert.Equal("webmail", Assert.Single(scripts, s => s.Active).Name);
             Assert.Contains("fileinto \"Rechnungen\"", await sieve.GetScriptAsync("webmail", ct), StringComparison.Ordinal);
         }
+
+        // With times: the server accepts the comparisons by "time" as well, and they come back.
+        var timed = reply with { Start = Monday.AddHours(12), End = Monday.AddDays(4).AddHours(8) };
+        await provider.SetAutoReplyAsync(timed, [user], ct);
+        var (storedTimed, _) = await provider.GetAutoReplyAsync(ct);
+        Assert.Equal((TimeSpan.FromHours(12), TimeSpan.FromHours(8)), (storedTimed.Start!.Value.TimeOfDay, storedTimed.End!.Value.TimeOfDay));
 
         await provider.SetAutoReplyAsync(reply with { IsEnabled = false }, [user], ct);
         var (off, _) = await provider.GetAutoReplyAsync(ct);

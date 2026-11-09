@@ -235,7 +235,7 @@ internal sealed partial class MailViewModel
 
                     case QuickActionStepKind.MoveToFolder when step.AskFolder:
                         // Asked each time: account (the mail's own preselected) and folder; cancelling stops the action.
-                        if (await windows.ShowFolderPickerAsync(new FolderPickerViewModel(Accounts, folder.Account, FolderOf(item) ?? folder)) is not { } chosen)
+                        if (await ChooseFolderAsync(T("In welchen Ordner verschieben?"), FolderOf(item) ?? folder) is not { } chosen)
                         {
                             Cancelled();
                             return;

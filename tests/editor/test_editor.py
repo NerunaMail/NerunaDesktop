@@ -83,7 +83,21 @@ def test_lists_and_state(page):
     page.keyboard.type("Punkt")
     page.evaluate("neruna.exec('insertUnorderedList')")
     assert last_state(page)["bulletList"]
-    assert "<ul>" in page.evaluate("neruna.getHtml()")
+    assert "<ul" in page.evaluate("neruna.getHtml()")
+
+
+def test_a_list_is_flush_with_the_text_before_it_and_in_the_sent_mail(page):
+    page.keyboard.type("Vorher")
+    page.keyboard.press("Enter")
+    page.keyboard.type("Punkt")
+    page.evaluate("neruna.exec('insertUnorderedList')")
+    # The bullet starts where the text above starts (not 40px in, as browsers and mail programs do by themselves).
+    left = page.evaluate("""() => { const e = document.getElementById('editor'); const ul = e.querySelector('ul');
+                            return [e.firstElementChild.getBoundingClientRect().left, ul.getBoundingClientRect().left,
+                                    parseFloat(getComputedStyle(ul).paddingLeft)]; }""")
+    assert left[0] == left[1] and left[2] < 25
+    html = page.evaluate("neruna.getHtml()")
+    assert "padding-left: 1.3em" in html and "margin-left: 0" in html
 
 
 def test_ctrl_enter_requests_send(page):
@@ -425,6 +439,53 @@ def test_undo_takes_the_link_back(page):
 def paste_text(page, text):
     page.evaluate("""t => { const d = new DataTransfer(); d.setData('text/plain', t);
                     document.getElementById('editor').dispatchEvent(new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true })); }""", text)
+
+
+def paste_files(page, files, uris=None, text=None):
+    """files: [(name, mime type, content)] as the page sees a clipboard with files."""
+    page.evaluate("""([files, uris, text]) => { const d = new DataTransfer();
+                    files.forEach(([n, t, c]) => d.items.add(new File([c], n, { type: t })));
+                    if (uris) d.setData('text/uri-list', uris);
+                    if (text) d.setData('text/plain', text);
+                    const e = new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true });
+                    document.getElementById('editor').dispatchEvent(e); window.__pasteHandled = e.defaultPrevented; }""",
+                  [files, uris, text])
+
+
+def messages(page, kind):
+    page.wait_for_timeout(150)
+    return page.evaluate(f"window.__nerunaMessages.filter(m => m.type === '{kind}')")
+
+
+def test_a_pasted_file_goes_to_the_app_and_its_content_comes_as_an_attachment(page):
+    page.keyboard.type("Anbei: ")
+    paste_files(page, [["offerte.pdf", "application/pdf", "%PDF-1.4"]])
+    assert page.evaluate("window.__pasteHandled")
+    paste = messages(page, "filepaste")[-1]
+    assert paste["count"] == 1 and paste["uris"] == []
+    # No path from the system clipboard: the app asks the page for the content.
+    assert page.evaluate("neruna.usePastedFiles(1000000)") == "1"
+    data = messages(page, "filedata")
+    assert data and data[-1]["name"] == "offerte.pdf" and data[-1]["data"].startswith("data:application/pdf")
+    assert "offerte" not in page.evaluate("neruna.getHtml()")
+
+
+def test_copied_files_with_paths_are_handed_over_as_uris(page):
+    paste_files(page, [], uris="file:///home/anna/Offerte.pdf\r\nfile:///home/anna/Plan.png", text="/home/anna/Offerte.pdf")
+    assert messages(page, "filepaste")[-1]["uris"] == ["file:///home/anna/Offerte.pdf", "file:///home/anna/Plan.png"]
+    assert "Offerte" not in page.evaluate("neruna.getHtml()")
+
+
+def test_a_screenshot_without_a_file_goes_into_the_text(page):
+    paste_files(page, [["image.png", "image/png", "png"]])
+    assert messages(page, "filepaste")  # the app first looks for a file behind it
+    page.evaluate("neruna.usePastedFiles(1000000)")
+    assert messages(page, "image")[-1]["data"].startswith("data:image/png")
+
+
+def test_plain_text_is_pasted_as_text_not_as_a_file(page):
+    paste_text(page, "Guten Tag")
+    assert not messages(page, "filepaste")  # (a synthetic paste inserts nothing itself; the browser does that)
 
 
 def test_pasted_addresses_become_links(page):

@@ -323,6 +323,42 @@ public class GraphProviderTests
         Assert.Contains("PATCH /v1.0/me/mailboxSettings", http.Requests);
     }
 
+    [Fact]
+    public async Task Calendar_and_category_colours_are_written_as_the_nearest_of_Outlooks()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (graph, http) = await SignedInAsync("Calendars.ReadWrite MailboxSettings.ReadWrite");
+        var provider = new GraphCalendarProvider(Guid.NewGuid(), graph);
+        var calendar = new CalendarInfo(Guid.NewGuid(), "CAL1", "Kalender", null, false);
+
+        await provider.SetCalendarColorAsync(calendar, "#0A8F12", ct);
+        Assert.Equal("PATCH /v1.0/me/calendars/CAL1", http.Requests[^1]);
+        Assert.Contains("\"color\":\"lightGreen\"", http.Bodies[^1], StringComparison.Ordinal);
+
+        http.Routes["GET /v1.0/me/outlook/masterCategories"] = """
+            {"value":[{"id":"C1","displayName":"Kunde","color":"preset7"},{"id":"C2","displayName":"Privat","color":"none"}]}
+            """;
+        var categories = await provider.GetCategoriesAsync(ct);
+        Assert.Equal([new CalendarCategory("Kunde", "#0078D4"), new CalendarCategory("Privat", "#A0A0A0")], categories);
+
+        // Known: only its colour (and nothing when it is the same); unknown: added.
+        await provider.SetCategoryColorAsync("kunde", "#D13438", ct);
+        Assert.Equal("PATCH /v1.0/me/outlook/masterCategories/C1", http.Requests[^1]);
+        Assert.Contains("\"color\":\"preset0\"", http.Bodies[^1], StringComparison.Ordinal);
+        var before = http.Requests.Count;
+        await provider.SetCategoryColorAsync("Kunde", "#0078D4", ct);
+        Assert.Equal(before + 1, http.Requests.Count);
+        http.Routes["POST /v1.0/me/outlook/masterCategories"] = """{"id":"C3"}""";
+        await provider.SetCategoryColorAsync("Projekt", "#5C2E91", ct);
+        Assert.Equal("POST /v1.0/me/outlook/masterCategories", http.Requests[^1]);
+        Assert.Contains("\"displayName\":\"Projekt\"", http.Bodies[^1], StringComparison.Ordinal);
+        Assert.Contains("\"color\":\"preset23\"", http.Bodies[^1], StringComparison.Ordinal);
+
+        // Signed in before the permission: a clear message instead of a 403.
+        var (old, _) = await SignedInAsync("Calendars.ReadWrite");
+        await Assert.ThrowsAsync<NotSupportedException>(() => new GraphCalendarProvider(Guid.NewGuid(), old).GetCategoriesAsync(ct));
+    }
+
     private static async Task<(GraphClient Graph, FakeGraph Http)> SignedInAsync(string? scope = null)
     {
         var env = await TestEnvironment.CreateAsync();

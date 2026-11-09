@@ -148,6 +148,14 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>The editor once attached (the AI reads and replaces text through it).</summary>
     internal IHtmlEditor? Editor => _editor;
 
+    /// <summary>"Rückgängig" in the text (also Ctrl+Z in the editor itself).</summary>
+    [RelayCommand]
+    private Task UndoAsync() => _editor?.UndoAsync(redo: false) ?? Task.CompletedTask;
+
+    /// <summary>"Wiederherstellen" (also Ctrl+Y in the editor itself).</summary>
+    [RelayCommand]
+    private Task RedoAsync() => _editor?.UndoAsync(redo: true) ?? Task.CompletedTask;
+
     /// <summary>The address books, for completing An/Cc and the contact picker (none in tests).</summary>
     public RecipientDirectory? Recipients { get; init; }
 

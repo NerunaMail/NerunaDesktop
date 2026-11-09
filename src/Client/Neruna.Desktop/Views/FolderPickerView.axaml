@@ -5,34 +5,50 @@
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              x:Class="Neruna.Desktop.Views.FolderPickerView"
              x:DataType="vm:FolderPickerViewModel">
-  <!-- Account, search (focused: type and Enter), folders (a click moves) -->
+  <!-- Search (focused: type and Enter), the folders of all accounts as a tree (a click picks) -->
   <DockPanel>
-    <TextBlock DockPanel.Dock="Top" Text="{l:T 'In welchen Ordner verschieben?'}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
-    <ComboBox DockPanel.Dock="Top" ItemsSource="{Binding Accounts}" SelectedItem="{Binding SelectedAccount}" HorizontalAlignment="Stretch"
-              IsVisible="{Binding HasSeveralAccounts}" Margin="0,0,0,8">
-      <ComboBox.ItemTemplate>
-        <DataTemplate x:DataType="vm:MailAccountNode">
-          <TextBlock Text="{Binding Title}" />
-        </DataTemplate>
-      </ComboBox.ItemTemplate>
-    </ComboBox>
+    <TextBlock DockPanel.Dock="Top" Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12" />
     <TextBox ctl:SearchBox.Clearable="True" x:Name="SearchBox" DockPanel.Dock="Top" Text="{Binding Filter}" PlaceholderText="{l:T 'Ordner suchen …'}" Margin="0,0,0,8" KeyDown="OnSearchKeyDown" />
     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
       <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" />
     </StackPanel>
     <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="4">
       <Panel>
+        <!-- All accounts: opened and closed as last time -->
+        <TreeView x:Name="Tree" ItemsSource="{Binding Roots}" IsVisible="{Binding !IsSearching}" KeyDown="OnTreeKeyDown">
+          <TreeView.Styles>
+            <Style Selector="TreeViewItem" x:DataType="vm:FolderPickNode">
+              <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+              <Setter Property="IsEnabled" Value="{Binding IsEnabled}" />
+            </Style>
+          </TreeView.Styles>
+          <TreeView.ItemTemplate>
+            <TreeDataTemplate DataType="vm:FolderPickNode" ItemsSource="{Binding Children}">
+              <Grid ColumnDefinitions="Auto,*" Background="Transparent" Tapped="OnNodeTapped">
+                <PathIcon Data="{Binding Role, Converter={x:Static l:Converters.FolderIcon}}" Width="14" Height="14" Margin="0,0,8,0"
+                          Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" IsVisible="{Binding !IsAccount}" />
+                <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                           FontWeight="{Binding IsAccount, Converter={x:Static l:Converters.BoldIf}}" />
+              </Grid>
+            </TreeDataTemplate>
+          </TreeView.ItemTemplate>
+        </TreeView>
+
+        <!-- Searching: the matching folders of all accounts, flat with their path -->
         <TextBlock Classes="subtle" Text="{l:T 'Kein Ordner passt zur Suche.'}" IsVisible="{Binding HasNoMatch}" Margin="6" />
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding Folders}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding IsSearching}">
+          <ItemsControl ItemsSource="{Binding Matches}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:FolderPickItem">
                 <Button Classes="folderPick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="8,5"
                         Command="{Binding $parent[UserControl].((vm:FolderPickerViewModel)DataContext).PickCommand}" CommandParameter="{Binding}">
-                  <StackPanel Orientation="Horizontal" Margin="{Binding Indent}">
-                    <PathIcon Data="{Binding Role, Converter={x:Static l:Converters.FolderIcon}}" Width="14" Height="14" Margin="0,0,8,0" />
-                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                  </StackPanel>
+                  <Grid ColumnDefinitions="Auto,*">
+                    <PathIcon Data="{Binding Role, Converter={x:Static l:Converters.FolderIcon}}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Top" />
+                    <StackPanel Grid.Column="1">
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Account}" Classes="subtle" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </Grid>
                 </Button>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

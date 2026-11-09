@@ -91,6 +91,31 @@ public sealed class DavIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task CalDav_colours_go_to_the_server_only_when_the_account_stores_them_there()
+    {
+        Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");
+        var ct = TestContext.Current.CancellationToken;
+        await MakeCollectionAsync($"{_user}/arbeit/", "calendar", "Arbeit", ct);
+        await using var env = await CreateEnvironmentAsync(ServiceKind.Calendar, ProviderIds.CalDav);
+        Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
+        var calendar = Assert.Single(await env.Calendar.GetCalendarsAsync(ct));
+        var account = Assert.Single(await env.Get<IAccountStore>().GetAccountsAsync(ct));
+        Assert.Equal((true, false), await env.Calendar.ServerColorSupportAsync(account.Connections.Single()));
+
+        // Default: only on this device – the server keeps its colour.
+        Assert.False(await env.Calendar.StoresColorsOnServerAsync(account.Id, ct));
+        Assert.False(await env.Calendar.SetColorOnServerAsync(calendar, "#13A10E", ct));
+        await env.Calendar.SyncAllAsync(ct);
+        Assert.Equal("#C239B3", Assert.Single(await env.Calendar.GetCalendarsAsync(ct)).Color);
+
+        // Switched on: PROPPATCH calendar-color, read back on the next sync.
+        await env.Calendar.SetStoresColorsOnServerAsync(account.Id, true, ct);
+        Assert.True(await env.Calendar.SetColorOnServerAsync(calendar, "#13a10e", ct));
+        await env.Calendar.SyncAllAsync(ct);
+        Assert.Equal("#13A10E", Assert.Single(await env.Calendar.GetCalendarsAsync(ct)).Color);
+    }
+
+    [Fact]
     public async Task CalDav_task_lists_are_found_and_tasks_written_completed_and_deleted()
     {
         Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");

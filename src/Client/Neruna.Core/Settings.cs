@@ -99,6 +99,9 @@ public static class SettingKeys
     /// <summary>Folder tree nodes the user collapsed (JSON list of keys); everything else is expanded.</summary>
     public const string CollapsedFolders = "mail.collapsedFolders";
 
+    /// <summary>"Verschieben nach …" / "Kopieren nach …": the accounts and folders open in the dialog last time (JSON list of keys).</summary>
+    public const string FolderPickerExpanded = "mail.folderPickerExpanded";
+
     /// <summary>The folder open last ("connectionId|remoteId"): opened again at the next start (this device only).</summary>
     public const string LastMailFolder = "mail.lastFolder";
 
@@ -148,6 +151,12 @@ public static class SettingKeys
 
     /// <summary>The categories offered for events (JSON list of name and colour); not set: the defaults.</summary>
     public const string CalendarCategories = "calendar.categories";
+
+    /// <summary>
+    /// Per account ("Kalender verwalten"): colours chosen in Neruna are also stored on the server (true), or only on this
+    /// device (default) – for shared calendars where each colleague picks colours of their own.
+    /// </summary>
+    public static string CalendarServerColors(Guid accountId) => $"calendar.serverColors.{accountId:N}";
 
     /// <summary>Reminder for new events and accepted invitations, minutes before the start; "none" for none. Default: 15.</summary>
     public const string CalendarDefaultReminder = "calendar.defaultReminder";

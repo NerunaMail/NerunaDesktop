@@ -6,8 +6,9 @@ namespace Neruna.Desktop.ViewModels;
 /// <summary>
 /// Einstellungen → Kalender → Kategorien: name and colour of the categories for events, kept apart from the tags of
 /// mails. The server stores only the name, so renaming one leaves the events that have the old name without colour.
+/// Accounts that store colours on their server (Microsoft 365, Exchange) also get the changed colours in their list.
 /// </summary>
-internal sealed class CalendarCategoriesViewModel(CalendarCategoryService categories) : ColorListViewModel
+internal sealed class CalendarCategoriesViewModel(CalendarCategoryService categories, CalendarController calendar) : ColorListViewModel
 {
     public override string NewPlaceholder => T("Neue Kategorie");
 
@@ -29,7 +30,23 @@ internal sealed class CalendarCategoriesViewModel(CalendarCategoryService catego
     public override async Task SaveAsync()
     {
         Error = null;
-        await categories.SaveAsync([.. Rows.Where(r => !string.IsNullOrWhiteSpace(r.Name)).Select(r => new CalendarCategory(r.Name.Trim(), r.Color))
-            .DistinctBy(c => c.Name, StringComparer.OrdinalIgnoreCase)]);
+        var before = await categories.GetAllAsync();
+        List<CalendarCategory> now = [.. Rows.Where(r => !string.IsNullOrWhiteSpace(r.Name)).Select(r => new CalendarCategory(r.Name.Trim(), r.Color))
+            .DistinctBy(c => c.Name, StringComparer.OrdinalIgnoreCase)];
+        await categories.SaveAsync(now);
+
+        // Only new or recoloured ones: the server's other categories stay as they are.
+        var changed = now.Where(c => !before.Any(b => b.Matches(c.Name) && string.Equals(b.Color, c.Color, StringComparison.OrdinalIgnoreCase))).ToList();
+        try
+        {
+            if (await calendar.SetCategoryColorsOnServerAsync(changed) is { Count: > 0 } failed)
+            {
+                Error = T("Auf dem Server nicht gespeichert: ") + string.Join("; ", failed);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Error = T("Auf dem Server nicht gespeichert: ") + ex.Message;
+        }
     }
 }
