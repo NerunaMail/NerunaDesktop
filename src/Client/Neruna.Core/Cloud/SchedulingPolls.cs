@@ -38,6 +38,43 @@ public sealed class SchedulingPolls(CloudController cloud)
     public Task DeleteAsync(CloudConnection connection, string id, CancellationToken cancellationToken = default) =>
         cloud.DeletePollAsync(connection, id, cancellationToken);
 
+    /// <summary>
+    /// Over but not fixed yet: answers are closed (the deadline passed) or every proposed date is past – the planner
+    /// should fix the date (or delete the poll).
+    /// </summary>
+    public static bool IsOverdue(CloudPoll poll, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(poll);
+        return poll.Deadline < now
+               || (poll.Options.Count > 0 && poll.Options.All(o => (o.End ?? (o.AllDay ? o.Start.AddDays(1) : o.Start)) < now));
+    }
+
+    /// <summary>
+    /// How many polls run (with every organisation) and how many of them are over (<see cref="IsOverdue"/>); an
+    /// organisation that cannot be reached counts nothing.
+    /// </summary>
+    public async Task<(int Open, int Overdue)> SummaryAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        var (open, overdue) = (0, 0);
+        foreach (var connection in await ConnectionsAsync(cancellationToken))
+        {
+            try
+            {
+                foreach (var poll in await ListAsync(connection, cancellationToken) ?? [])
+                {
+                    open++;
+                    overdue += IsOverdue(poll, now) ? 1 : 0;
+                }
+            }
+            catch (Exception ex) when (ex is HttpRequestException or CloudException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                // Not reachable now: the next sync counts again.
+            }
+        }
+
+        return (open, overdue);
+    }
+
     /// <summary>The IANA name of this computer's time zone (Windows names are converted); UTC when unknown.</summary>
     public static string LocalTimeZoneId()
     {

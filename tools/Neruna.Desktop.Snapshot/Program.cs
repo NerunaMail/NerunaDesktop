@@ -1064,6 +1064,8 @@ internal static class Snapshots
             [new Neruna.Core.Calendar.EventAttendee("beat@example.com", "Beat Beispiel"), new Neruna.Core.Calendar.EventAttendee("carla@example.com", "Carla Zeller")]);
         await SaveAsync(window, output, "poll-editor.png");
         vm.Overlay = null;
+        vm.CalendarPage.OpenPollCount = 2;
+        vm.CalendarPage.OverduePollCount = 1;
         await calendarController.SyncAllAsync();
         await vm.CalendarPage.ReloadAsync();
         vm.CalendarPage.IsTimeGrid = true;

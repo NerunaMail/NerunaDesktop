@@ -23,11 +23,18 @@
               <TextBlock Text="{l:T 'Neuer Termin'}" />
             </StackPanel>
           </Button>
-          <Button Classes="command" Command="{Binding OpenPollsCommand}" Margin="0,0,8,0"
-                  ToolTip.Tip="{l:T 'Termine vorschlagen und die Eingeladenen auf einer Webseite wählen lassen (Neruna Cloud)'}">
+          <Button Classes="command" Command="{Binding OpenPollsCommand}" Margin="0,0,8,0" ToolTip.Tip="{Binding PollsTip}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource IconPoll}" Width="14" Height="14" />
               <TextBlock Text="{l:T 'Terminumfragen'}" />
+              <!-- How many run; a red "!" when one is over and still waits to be fixed -->
+              <Border Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="9" Padding="6,0" MinWidth="18" VerticalAlignment="Center"
+                      IsVisible="{Binding HasOpenPolls}">
+                <TextBlock Text="{Binding OpenPollCount}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" />
+              </Border>
+              <Border Background="#DC2626" CornerRadius="9" Width="18" Height="18" VerticalAlignment="Center" IsVisible="{Binding HasOverduePolls}">
+                <TextBlock Text="!" Foreground="White" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
             </StackPanel>
           </Button>
           <Button Classes="command" Command="{Binding TodayCommand}" Content="{l:T 'Heute'}" />

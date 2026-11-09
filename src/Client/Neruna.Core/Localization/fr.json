@@ -2668,5 +2668,7 @@
  "Bemerkungen": "Remarques",
  "keine Angabe": "sans réponse",
  "Antwortmöglichkeiten": "Réponses possibles",
- "Noch keine Antworten.": "Pas encore de réponse."
+ "Noch keine Antworten.": "Pas encore de réponse.",
+ "{0} offene Terminumfragen – {1} davon abgelaufen und noch nicht festgelegt": "{0} sondages de date ouverts – dont {1} terminés et pas encore fixés",
+ "{0} offene Terminumfragen": "{0} sondages de date ouverts"
 }

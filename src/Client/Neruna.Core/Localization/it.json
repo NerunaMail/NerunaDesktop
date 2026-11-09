@@ -2668,5 +2668,7 @@
  "Bemerkungen": "Osservazioni",
  "keine Angabe": "nessuna risposta",
  "Antwortmöglichkeiten": "Risposte possibili",
- "Noch keine Antworten.": "Ancora nessuna risposta."
+ "Noch keine Antworten.": "Ancora nessuna risposta.",
+ "{0} offene Terminumfragen – {1} davon abgelaufen und noch nicht festgelegt": "{0} sondaggi sulla data aperti – di cui {1} scaduti e non ancora fissati",
+ "{0} offene Terminumfragen": "{0} sondaggi sulla data aperti"
 }

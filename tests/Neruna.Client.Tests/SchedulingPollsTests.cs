@@ -61,4 +61,15 @@ public sealed class SchedulingPollsTests
         Assert.Equal("anna@example.com", Assert.Single(request.Invitees).Email);
         Assert.False(string.IsNullOrEmpty(SchedulingPolls.LocalTimeZoneId()));
     }
+
+    [Fact]
+    public void A_poll_is_over_after_its_deadline_or_its_last_date()
+    {
+        var poll = Poll();
+        Assert.False(SchedulingPolls.IsOverdue(poll, new DateTimeOffset(2026, 12, 9, 12, 0, 0, TimeSpan.Zero))); // Wednesday runs all day
+        Assert.True(SchedulingPolls.IsOverdue(poll, new DateTimeOffset(2026, 12, 10, 0, 1, 0, TimeSpan.Zero)));
+        var withDeadline = poll with { Deadline = new DateTimeOffset(2026, 11, 30, 17, 0, 0, TimeSpan.Zero) };
+        Assert.False(SchedulingPolls.IsOverdue(withDeadline, new DateTimeOffset(2026, 11, 30, 16, 0, 0, TimeSpan.Zero)));
+        Assert.True(SchedulingPolls.IsOverdue(withDeadline, new DateTimeOffset(2026, 12, 1, 8, 0, 0, TimeSpan.Zero)));
+    }
 }

@@ -511,6 +511,26 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     [RelayCommand]
     private void OpenPolls() => PollsRequested?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>Running polls (the number on "Terminumfragen"); set by the shell after a sync.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOpenPolls), nameof(PollsTip))]
+    public partial int OpenPollCount { get; set; }
+
+    /// <summary>Polls that are over but not fixed yet (the "!" on "Terminumfragen").</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasOverduePolls), nameof(PollsTip))]
+    public partial int OverduePollCount { get; set; }
+
+    public bool HasOpenPolls => OpenPollCount > 0;
+
+    public bool HasOverduePolls => OverduePollCount > 0;
+
+    public string PollsTip => OverduePollCount > 0
+        ? F("{0} offene Terminumfragen – {1} davon abgelaufen und noch nicht festgelegt", OpenPollCount, OverduePollCount)
+        : OpenPollCount > 0
+            ? F("{0} offene Terminumfragen", OpenPollCount)
+            : T("Termine vorschlagen und die Eingeladenen auf einer Webseite wählen lassen (Neruna Cloud)");
+
     /// <summary>
     /// A poll's date fixed: the event editor with the poll's title, place and text, the chosen time and everyone with
     /// an address as attendees. The editor is returned so the shell can delete the poll once the event is saved.

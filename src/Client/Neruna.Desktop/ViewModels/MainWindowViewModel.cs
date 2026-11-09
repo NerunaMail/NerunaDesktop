@@ -963,6 +963,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 await RefreshPagesAsync();
             }
 
+            _ = RefreshPollBadgeAsync();
+
             if (DateTime.UtcNow - _autoRepliesCheckedAt > TimeSpan.FromHours(1))
             {
                 _ = RefreshAutoRepliesAsync();
@@ -1275,12 +1277,31 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         Overlay = subscription;
     }
 
+    /// <summary>The number of running polls on "Terminumfragen" (and "!" for those over but not fixed).</summary>
+    private async Task RefreshPollBadgeAsync()
+    {
+        try
+        {
+            var (open, overdue) = await new Neruna.Core.Cloud.SchedulingPolls(_cloudController).SummaryAsync(DateTimeOffset.Now);
+            CalendarPage.OpenPollCount = open;
+            CalendarPage.OverduePollCount = overdue;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogInformation(ex, "Counting the scheduling polls failed");
+        }
+    }
+
     /// <summary>Kalender → Terminumfragen: the polls with their answers; fixing a date opens the event.</summary>
     private async Task ShowPollsAsync()
     {
         var polls = new Neruna.Core.Cloud.SchedulingPolls(_cloudController);
         var view = new PollsViewModel(polls);
-        view.Closed += (_, _) => Overlay = null;
+        view.Closed += (_, _) =>
+        {
+            Overlay = null;
+            _ = RefreshPollBadgeAsync();
+        };
         view.MailRequested += async (_, request) =>
         {
             if (!request.Poll.OpenLink)
@@ -1309,6 +1330,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 {
                     await polls.DeleteAsync(request.Connection, request.Poll.Id);
                     StatusText = F("Termin festgelegt; die Umfrage «{0}» wurde in Neruna Cloud gelöscht.", request.Poll.Title);
+                    _ = RefreshPollBadgeAsync();
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
