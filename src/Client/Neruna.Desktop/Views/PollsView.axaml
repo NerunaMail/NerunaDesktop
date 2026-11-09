@@ -117,7 +117,8 @@
 
         <!-- The table: a column per proposed date (its head with the totals and "Festlegen"), a row per person -->
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,14,0,0">
-          <StackPanel>
+          <!-- Room below the last row: the horizontal scroll bar widens on hover and would cover it -->
+          <StackPanel Margin="0,0,0,16">
             <StackPanel Orientation="Horizontal">
               <Border Width="200" />
               <ItemsControl ItemsSource="{Binding Results}">
