@@ -32,6 +32,43 @@
       </StackPanel>
 
       <StackPanel Spacing="8">
+        <TextBlock Text="{l:T 'Anhang-Erinnerung'}" FontSize="16" FontWeight="SemiBold" />
+        <CheckBox IsChecked="{Binding AttachmentReminder}" Content="{l:T 'An fehlende Anhänge erinnern'}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
+                   Text="{l:T 'Steht eines dieser Wörter in Ihrem Text (ohne Zitat und Signatur) und ist nichts angehängt, erscheint unter dem Text ein Hinweis, und beim Senden fragt Neruna nach. Ein Wort zählt am Wortanfang («Beilage» auch in «Beilagen»), eine Dateiendung wie «.pdf» nach einem Dateinamen.'}" />
+        <ItemsControl ItemsSource="{Binding AttachmentKeywords}" IsEnabled="{Binding AttachmentReminder}" Margin="28,0,0,0">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="8,2,2,2" Margin="0,0,6,6">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                  <Button Classes="command" Padding="4" ToolTip.Tip="{l:T 'Entfernen'}"
+                          Command="{Binding $parent[UserControl].((vm:MailOptionsViewModel)DataContext).RemoveAttachmentKeywordCommand}" CommandParameter="{Binding}">
+                    <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
+                  </Button>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="28,0,0,0" IsEnabled="{Binding AttachmentReminder}">
+          <TextBox Text="{Binding NewAttachmentKeyword}" Width="240" PlaceholderText="{l:T 'Wort oder Endung, z. B. Offerte'}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding AddAttachmentKeywordCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button Content="{l:T 'Hinzufügen'}" Command="{Binding AddAttachmentKeywordCommand}" />
+          <Button Content="{l:T 'Standardwörter'}" Command="{Binding ResetAttachmentKeywordsCommand}"
+                  ToolTip.Tip="{l:T 'Die mitgelieferten Wörter wiederherstellen (eigene gehen verloren)'}" />
+        </StackPanel>
+      </StackPanel>
+
+      <StackPanel Spacing="8">
         <TextBlock Text="{l:T 'Verfassen'}" FontSize="16" FontWeight="SemiBold" />
         <TextBlock Classes="subtle" Text="{l:T 'Neue E-Mails, Antworten und Weiterleitungen öffnen'}" />
         <StackPanel Orientation="Horizontal" Spacing="16">

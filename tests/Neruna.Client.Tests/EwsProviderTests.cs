@@ -443,6 +443,11 @@ public class EwsProviderTests
         var exception = calendar.Events.Single(e => e.RecurrenceIdentifier is not null);
         Assert.Equal((master.Uid, "Teamsitzung (verschoben)", 14), (exception.Uid, exception.Summary, exception.DtStart!.Hour));
         Assert.Equal((2026, 10, 7, 9), (exception.RecurrenceIdentifier!.StartTime.Year, exception.RecurrenceIdentifier.StartTime.Month, exception.RecurrenceIdentifier.StartTime.Day, exception.RecurrenceIdentifier.StartTime.Hour));
+        Assert.Equal("OCC1", EventDraft.OccurrenceIdOf(ics, new DateTimeOffset(2026, 10, 7, 7, 0, 0, TimeSpan.Zero)));
+
+        // Exchange counts the occurrences from 1, the deleted one of 12 October too.
+        Assert.Equal(4, EwsCalendarConverter.InstanceIndexOf(ics, new DateTimeOffset(2026, 10, 14, 7, 0, 0, TimeSpan.Zero)));
+        Assert.Null(EwsCalendarConverter.InstanceIndexOf(ics, new DateTimeOffset(2026, 10, 14, 8, 0, 0, TimeSpan.Zero)));
 
         // All-day: the date in the item's zone, not in UTC.
         var holiday = EwsCalendarConverter.ToICalendar(Item("""
@@ -452,6 +457,47 @@ public class EwsProviderTests
         Assert.Contains("DTSTART;VALUE=DATE:20261012", holiday, StringComparison.Ordinal);
         Assert.Contains("DTEND;VALUE=DATE:20261014", holiday, StringComparison.Ordinal);
         Assert.Contains("TRANSP:TRANSPARENT", holiday, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task One_occurrence_is_changed_and_deleted_as_an_item_of_its_own()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (connection, factory, server, _) = Connect(ServiceKind.Calendar);
+        var calendarInfo = new CalendarInfo(connection.Id, "CAL", "Kalender", null, false);
+        const string Master = """
+            <t:CalendarItem><t:ItemId Id="S1" ChangeKey="k1"/><t:Subject>Planung</t:Subject><t:UID>U1</t:UID>
+              <t:Start>2026-10-05T07:00:00Z</t:Start><t:End>2026-10-05T08:00:00Z</t:End><t:IsAllDayEvent>false</t:IsAllDayEvent>
+              <t:IsMeeting>false</t:IsMeeting><t:MyResponseType>Organizer</t:MyResponseType>
+              <t:Recurrence><t:DailyRecurrence><t:Interval>1</t:Interval></t:DailyRecurrence><t:NoEndRecurrence><t:StartDate>2026-10-05+02:00</t:StartDate></t:NoEndRecurrence></t:Recurrence>
+              <t:StartTimeZone Id="W. Europe Standard Time"/></t:CalendarItem>
+            """;
+        const string Occurrence = """
+            <t:CalendarItem><t:ItemId Id="O3" ChangeKey="o1"/><t:Subject>Planung</t:Subject><t:UID>U1</t:UID>
+              <t:Start>2026-10-07T07:00:00Z</t:Start><t:End>2026-10-07T08:00:00Z</t:End><t:IsAllDayEvent>false</t:IsAllDayEvent>
+              <t:IsMeeting>false</t:IsMeeting><t:MyResponseType>Organizer</t:MyResponseType><t:StartTimeZone Id="W. Europe Standard Time"/></t:CalendarItem>
+            """;
+        server.On("GetItem", op => Ok("GetItem", "<m:Items>" + (op.Descendants(T + "OccurrenceItemId").Any() || op.Descendants(T + "ItemId").Any(i => i.Attribute("Id")!.Value == "O3") ? Occurrence : Master) + "</m:Items>"));
+        server.On("UpdateItem", _ => Ok("UpdateItem", "<m:Items/>"));
+        server.On("DeleteItem", _ => Ok("DeleteItem", ""));
+        await using var calendar = new EwsCalendarProviderFactory(factory).Create(connection);
+        var occurrences = Assert.IsAssignableFrom<ICalendarOccurrences>(calendar);
+        var series = new CalendarObject("S1", "k1", EwsCalendarConverter.ToICalendar(Item(Master), [], null));
+        var third = new DateTimeOffset(2026, 10, 7, 7, 0, 0, TimeSpan.Zero);
+
+        var draft = EventDraft.FromOccurrence(series.ICalendarData, third) with { Summary = "Planung (Ausnahme)" };
+        var alone = EventDraft.OccurrenceAlone(draft.ToOccurrenceICalendar(series.ICalendarData, third), third)!;
+        await occurrences.SaveOccurrenceAsync(calendarInfo, series, third, null, alone, ct);
+
+        var occurrenceId = server.Operations("GetItem").Select(o => o.Descendants(T + "OccurrenceItemId").SingleOrDefault()).OfType<XElement>().First();
+        Assert.Equal(("S1", "3"), (occurrenceId.Attribute("RecurringMasterId")!.Value, occurrenceId.Attribute("InstanceIndex")!.Value));
+        var update = server.Operations("UpdateItem").Single();
+        Assert.Equal("O3", update.Descendants(T + "ItemId").Single().Attribute("Id")!.Value);
+        Assert.Equal(["item:Subject"], update.Descendants(T + "SetItemField").Select(f => f.Element(T + "FieldURI")!.Attribute("FieldURI")!.Value));
+
+        await occurrences.DeleteOccurrenceAsync(calendarInfo, series, third, "O3", ct);
+        var delete = server.Operations("DeleteItem").Single();
+        Assert.Equal(("O3", "SendToNone"), (delete.Descendants(T + "ItemId").Single().Attribute("Id")!.Value, delete.Attribute("SendMeetingCancellations")!.Value));
     }
 
     [Fact]

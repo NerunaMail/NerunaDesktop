@@ -122,6 +122,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         {
             MarkChanged();
             _ = CheckPdfProtectionAsync();
+            ScheduleReminderCheck();
         };
         PropertyChanged += (_, e) =>
         {
@@ -663,7 +664,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
                 }
             };
             editor.SaveRequested += (_, _) => _ = SaveDraftCommand.ExecuteAsync(null);
-            editor.ContentChanged += (_, _) => MarkChanged();
+            editor.ContentChanged += (_, _) =>
+            {
+                MarkChanged();
+                ScheduleReminderCheck();
+            };
         }
 
         var font = await _settings.GetAsync(SettingKeys.ComposeFont) is { Length: > 0 } configured ? configured : FontCatalog.DefaultFont;
@@ -688,6 +693,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         editor.SetAutoLists(await _settings.GetBoolAsync(SettingKeys.ComposeAutoLists, fallback: true));
         editor.SetParagraphSpacing(await _settings.GetParagraphSpacingAsync());
         _editorDraft = draft;
+        ScheduleReminderCheck(); // a draft opened again may already announce an attachment
         await LoadTemplatesAsync(editor);
     }
 
@@ -882,6 +888,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     {
         _finished = true;
         _autosave.Stop();
+        _reminderTimer?.Stop();
     }
 
     // Once sent or discarded, the saved copy in "Entwürfe" is not needed any more.
@@ -920,6 +927,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             || (Bcc.Trim().Length > 0 && !InternetAddressList.TryParse(Bcc, out _)))
         {
             Error = T("Bitte gültige Empfängeradressen eingeben (mehrere mit Komma trennen).");
+            return;
+        }
+
+        if (!await MaySendWithoutAttachmentAsync())
+        {
             return;
         }
 

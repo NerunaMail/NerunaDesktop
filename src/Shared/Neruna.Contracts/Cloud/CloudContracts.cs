@@ -75,6 +75,13 @@ public sealed record MailTagsResponse(bool Available, IReadOnlyList<CloudMailTag
 /// <param name="Color">#rrggbb</param>
 public sealed record CloudMailTag(string Id, string Name, string Keyword, string Color, DateTimeOffset UpdatedAt);
 
+/// <summary>Response of <c>GET /api/v1/calendar-categories</c>: the organisation's categories of events (older servers: 404).</summary>
+public sealed record CalendarCategoriesResponse(bool Available, IReadOnlyList<CloudCalendarCategory> Categories);
+
+/// <param name="Name">What events store (iCalendar CATEGORIES); matched case-insensitive.</param>
+/// <param name="Color">#rrggbb</param>
+public sealed record CloudCalendarCategory(string Id, string Name, string Color, DateTimeOffset UpdatedAt);
+
 /// <summary>
 /// Response of <c>GET /api/v1/chat?after=…</c>: rooms the person sees, everyone of the organisation with their online
 /// status, the messages newer than <c>after</c> (at most 500; <see cref="More"/> → ask again) and the read markers.

@@ -152,6 +152,9 @@ public static class SettingKeys
     /// <summary>The categories offered for events (JSON list of name and colour); not set: the defaults.</summary>
     public const string CalendarCategories = "calendar.categories";
 
+    /// <summary>The organisations' categories of events (Neruna Cloud), per connection: JSON {source: [category]}.</summary>
+    public const string CalendarCategoriesCloud = "calendar.categories.cloud";
+
     /// <summary>
     /// Per account ("Kalender verwalten"): colours chosen in Neruna are also stored on the server (true), or only on this
     /// device (default) – for shared calendars where each colleague picks colours of their own.

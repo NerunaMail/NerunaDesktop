@@ -41,6 +41,7 @@ internal sealed partial class MailViewModel(
     Neruna.Core.Workspaces.WorkspaceService workspaces,
     Neruna.Core.Meetings.MeetingController meetings,
     PdfProtectionService pdfSecurity,
+    AttachmentReminderService attachmentReminder,
     AddressCollector addressCollector,
     MailTagService tagService,
     CalendarCategoryService categories,
@@ -1064,6 +1065,7 @@ internal sealed partial class MailViewModel(
             Calendars = new ComposeCalendar(calendar, invitations, windows, meetings, categories),
             Polls = polls,
             PdfSecurity = pdfSecurity,
+            AttachmentReminder = attachmentReminder,
         };
         compose.Ai = new ComposeAiViewModel(ai, compose);
         compose.Sent += (_, message) => _ = CollectAddressesAsync(message);

@@ -226,6 +226,7 @@ internal static class AppServices
         services.AddSingleton<CalendarCategoriesViewModel>();
         services.AddSingleton<Neruna.Core.Mail.QuickActionService>();
         services.AddSingleton<Neruna.Core.Mail.PdfProtectionService>();
+        services.AddSingleton<Neruna.Core.Mail.AttachmentReminderService>();
         services.AddSingleton<PdfOptionsViewModel>();
         services.AddSingleton<QuickActionsViewModel>();
         services.AddSingleton<MeetingsOptionsViewModel>();

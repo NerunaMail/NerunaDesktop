@@ -301,6 +301,7 @@ internal sealed partial class MailViewModel
                 {
                     Attachments = [.. attachments.Where(changed.ContainsKey).Select(PartOf)],
                 },
+            QuickActionStepKind.Forward when step?.AsAttachment == true => ForwardWholeDraft(message, [.. attachments.Where(changed.ContainsKey).Select(PartOf)]),
             QuickActionStepKind.Forward => ForwardDraft(message, attachments, PartOf),
             _ => ComposeDraft.Empty with
             {
@@ -350,6 +351,13 @@ internal sealed partial class MailViewModel
     }
 
     // All attachments of the mail go along, the changed ones in their new version.
+    // Forwarded as attachment: the mail unchanged as .eml; what a step changed (a stamped PDF) beside it.
+    private static ComposeDraft ForwardWholeDraft(MimeMessage message, IReadOnlyList<MimeEntity> changed)
+    {
+        var draft = MessageComposer.ForwardAsAttachments([message]);
+        return draft with { Attachments = [.. draft.Attachments, .. changed] };
+    }
+
     private static ComposeDraft ForwardDraft(MimeMessage message, IReadOnlyList<AttachmentViewModel> attachments, Func<AttachmentViewModel, MimeEntity> partOf)
     {
         var draft = MessageComposer.Forward(message);

@@ -191,6 +191,51 @@ public class GraphProviderTests
     }
 
     [Fact]
+    public async Task A_series_brings_its_changed_and_cancelled_occurrences_which_are_changed_one_by_one()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (graph, http) = await SignedInAsync();
+        var provider = new GraphCalendarProvider(Guid.NewGuid(), graph);
+        var calendar = new CalendarInfo(Guid.NewGuid(), "CAL", "Kalender", null, false);
+        http.Routes["GET /v1.0/me/calendars/CAL/events"] = """{"value":[{"id":"S1","changeKey":"CK1"}]}""";
+        // The fake ignores the query: the series and its occurrences come in one answer.
+        http.Routes["GET /v1.0/me/events/S1"] = """
+            {"id":"S1","changeKey":"CK1","iCalUId":"U1","subject":"Planung","type":"seriesMaster","isAllDay":false,
+             "start":{"dateTime":"2026-10-05T09:00:00.0000000","timeZone":"W. Europe Standard Time"},"end":{"dateTime":"2026-10-05T10:00:00.0000000","timeZone":"W. Europe Standard Time"},
+             "recurrence":{"pattern":{"type":"daily","interval":1},"range":{"type":"noEnd","startDate":"2026-10-05"}},
+             "cancelledOccurrences":["OID.S1.2026-10-06"],
+             "exceptionOccurrences":[{"id":"X7","subject":"Planung (verschoben)","type":"exception","isAllDay":false,"originalStart":"2026-10-07T07:00:00Z",
+               "start":{"dateTime":"2026-10-07T13:00:00.0000000","timeZone":"W. Europe Standard Time"},"end":{"dateTime":"2026-10-07T14:00:00.0000000","timeZone":"W. Europe Standard Time"}}]}
+            """;
+
+        var series = Assert.Single((await provider.SyncCalendarAsync(calendar, new Dictionary<string, string?>(), ct)).AddedOrChanged);
+        Assert.Contains(http.Requested, r => r.Contains("$expand=exceptionOccurrences", StringComparison.Ordinal));
+        var info = new CalendarInfo(Guid.NewGuid(), "CAL", "Kalender", null, false);
+        var shown = CalendarController.Expand(info, series, new DateTimeOffset(2026, 10, 5, 0, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, 9, 0, 0, 0, TimeSpan.Zero)).ToList();
+        Assert.Equal(["Planung", "Planung (verschoben)", "Planung"], shown.Select(o => o.Summary));
+        Assert.Equal(new DateTimeOffset(2026, 10, 7, 11, 0, 0, TimeSpan.Zero), shown[1].Start);
+        var moved = new DateTimeOffset(2026, 10, 7, 7, 0, 0, TimeSpan.Zero);
+        Assert.Equal(moved, shown[1].RecurrenceId);
+        Assert.Equal("X7", EventDraft.OccurrenceIdOf(series.ICalendarData, moved));
+
+        // An occurrence not changed yet: found among the instances by its original start, then patched.
+        var eighth = new DateTimeOffset(2026, 10, 8, 7, 0, 0, TimeSpan.Zero);
+        http.Routes["GET /v1.0/me/events/S1/instances"] = """
+            {"value":[{"id":"I7","originalStart":"2026-10-07T07:00:00Z"},{"id":"I8","originalStart":"2026-10-08T07:00:00Z"}]}
+            """;
+        var draft = EventDraft.FromOccurrence(series.ICalendarData, eighth) with { Summary = "Planung (Ausnahme)" };
+        var alone = EventDraft.OccurrenceAlone(draft.ToOccurrenceICalendar(series.ICalendarData, eighth), eighth)!;
+        await provider.SaveOccurrenceAsync(calendar, series, eighth, null, alone, ct);
+        Assert.Contains("PATCH /v1.0/me/events/I8", http.Requests);
+        Assert.DoesNotContain("recurrence", http.Bodies.Last(), StringComparison.Ordinal);
+        Assert.Contains("Planung (Ausnahme)", http.Bodies.Last(), StringComparison.Ordinal);
+
+        http.Routes["DELETE /v1.0/me/events/X7"] = "{}";
+        await provider.DeleteOccurrenceAsync(calendar, series, moved, "X7", ct);
+        Assert.Contains("DELETE /v1.0/me/events/X7", http.Requests);
+    }
+
+    [Fact]
     public void Contacts_become_vcards_and_back()
     {
         var contact = JsonDocument.Parse("""

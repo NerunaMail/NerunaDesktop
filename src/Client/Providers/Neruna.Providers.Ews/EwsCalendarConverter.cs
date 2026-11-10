@@ -56,6 +56,10 @@ internal static class EwsCalendarConverter
         {
             var changed = EventOf(occurrence, ZoneOf(occurrence) is var z && z != "UTC" ? z : zone, mailbox, calendar);
             changed.Uid = master.Uid;
+            if (occurrence.Id() is { } occurrenceId)
+            {
+                changed.Properties.Set(EventDraft.OccurrenceIdProperty, occurrenceId);
+            }
             if (occurrence.Date("OriginalStart") is { } original)
             {
                 changed.RecurrenceIdentifier = new RecurrenceIdentifier(When(original, zone, allDay), null);
@@ -282,6 +286,41 @@ internal static class EwsCalendarConverter
     }
 
     // ── writing ──
+
+    /// <summary>
+    /// The place of the occurrence at <paramref name="originalStart"/> in its series as Exchange counts it (from 1,
+    /// deleted occurrences included); null when the rule does not have it.
+    /// </summary>
+    internal static int? InstanceIndexOf(string iCalendarData, DateTimeOffset originalStart)
+    {
+        var master = ICalendar.Load(iCalendarData)?.Events.FirstOrDefault(e => e.RecurrenceIdentifier is null);
+        if (master?.RecurrenceRule is null || master.DtStart is null)
+        {
+            return null;
+        }
+
+        var pattern = new CalendarEvent { DtStart = master.DtStart, DtEnd = master.DtEnd, RecurrenceRule = master.RecurrenceRule };
+        var index = 0;
+        foreach (var occurrence in pattern.GetOccurrences(master.DtStart))
+        {
+            index++;
+            var start = occurrence.Period.StartTime;
+            var same = start.HasTime
+                ? CalendarController.ToDateTimeOffset(start) == originalStart
+                : DateOnly.FromDateTime(start.Value) == DateOnly.FromDateTime(originalStart.Date);
+            if (same)
+            {
+                return index;
+            }
+
+            if (CalendarController.ToDateTimeOffset(start) > originalStart.AddDays(1) || index > 10_000)
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>What Neruna writes of an event, field by field (field URI → element), in schema order.</summary>
     public static List<(string Field, XElement? Value)> FieldsOf(string iCalendarData, out IReadOnlyList<(string Email, string? Name, bool Optional)> attendees)

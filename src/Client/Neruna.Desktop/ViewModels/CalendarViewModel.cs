@@ -633,6 +633,23 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     [RelayCommand]
     private void Subscribe() => SubscribeRequested?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>"Termine importieren": the shell shows the import dialog.</summary>
+    public event EventHandler<(IReadOnlyList<CalendarInfo> Writable, CalendarInfo? Preferred)>? ImportRequested;
+
+    /// <summary>The events of an .ics file into a writable calendar: the one shown alone or clicked, else the default calendar.</summary>
+    [RelayCommand]
+    private async Task ImportAsync()
+    {
+        var writable = Calendars.Select(c => c.Info).Where(c => !c.IsReadOnly && c.HasEvents).ToList();
+        var preferred = Calendars.FirstOrDefault(c => c.IsSelected && !c.Info.IsReadOnly)?.Info;
+        if (preferred is null && await settings.GetAsync(SettingKeys.CalendarDefaultCalendar) is { Length: > 0 } key)
+        {
+            preferred = writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == key);
+        }
+
+        ImportRequested?.Invoke(this, (writable, preferred));
+    }
+
     [RelayCommand]
     private void Manage() => ManageRequested?.Invoke(this, EventArgs.Empty);
 
@@ -727,7 +744,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
     /// <summary>
     /// An event dragged in the time grid (moved, or its start or end): saved right away. Only the organizer changes the
-    /// time; attendees get the update as from the editor, after asking. Of a series, the whole series moves (after asking).
+    /// time; attendees get the update as from the editor, after asking. Of a series, this occurrence or the whole series
+    /// moves (asked).
     /// </summary>
     /// <returns>False when nothing was changed (not allowed, cancelled, failed).</returns>
     internal async Task<bool> ChangeEventTimeAsync(CalendarEventItem item, DateTime start, DateTime end)
@@ -763,28 +781,38 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
         var title = string.IsNullOrWhiteSpace(item.Title) ? T("Termin") : item.Title;
         var others = (draft.Attendees ?? []).Count(a => !string.Equals(a.Email, draft.Organizer, StringComparison.OrdinalIgnoreCase));
-        var questions = new List<string>();
-        if (occurrence.IsRecurring)
+        var notice = others > 0 ? F("Die {0} Teilnehmer erhalten die neue Zeit.", others) : null;
+        bool? onlyThis = false;
+        if (occurrence.RecurrenceId is not null)
         {
-            questions.Add(T("Wiederkehrender Termin – es wird die ganze Serie geändert."));
+            onlyThis = await AskSeriesAsync(F("«{0}» ändern", title), notice);
+            if (onlyThis is null)
+            {
+                return false;
+            }
         }
-
-        if (others > 0)
-        {
-            questions.Add(F("Die {0} Teilnehmer erhalten die neue Zeit.", others));
-        }
-
-        if (questions.Count > 0 && !await Views.ChoiceDialog.ShowInFrontAsync(F("«{0}» ändern", title), string.Join("\n\n", questions),
-                (T("Ändern"), true, true), (T("Abbrechen"), false, false)))
+        else if (notice is not null && !await Views.ChoiceDialog.ShowInFrontAsync(F("«{0}» ändern", title), notice,
+                     (T("Ändern"), true, true), (T("Abbrechen"), false, false)))
         {
             return false;
         }
 
-        // A series keeps its rhythm: its first event moves by as much as this one did.
-        var changed = draft with { Start = draft.Start + (start - oldStart), End = draft.End + (end - oldEnd) };
         try
         {
-            var saved = await calendar.SaveEventAsync(occurrence.Calendar, changed, (occurrence.Calendar, occurrence.ObjectRemoteId));
+            CalendarObject saved;
+            if (onlyThis == true)
+            {
+                var single = EventDraft.FromOccurrence(stored.ICalendarData, occurrence.RecurrenceId!.Value);
+                saved = await calendar.SaveOccurrenceAsync(occurrence.Calendar, occurrence.ObjectRemoteId, occurrence.RecurrenceId.Value,
+                    single with { Start = single.Start + (start - oldStart), End = single.End + (end - oldEnd) });
+            }
+            else
+            {
+                // A series keeps its rhythm: its first event moves by as much as this one did.
+                var changed = draft with { Start = draft.Start + (start - oldStart), End = draft.End + (end - oldEnd) };
+                saved = await calendar.SaveEventAsync(occurrence.Calendar, changed, (occurrence.Calendar, occurrence.ObjectRemoteId));
+            }
+
             var message = F("«{0}» geändert: {1}", title, $"{start:ddd d.M. HH:mm}–{end:HH:mm}");
             if (others > 0)
             {
@@ -840,8 +868,33 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             return;
         }
 
+        // Of a series: this occurrence alone, or the whole series (a read-only one is only shown, as a series).
+        if (occurrence.RecurrenceId is { } at && !occurrence.Calendar.IsReadOnly)
+        {
+            var onlyThis = await AskSeriesAsync(F("«{0}» bearbeiten", string.IsNullOrWhiteSpace(occurrence.Summary) ? T("Termin") : occurrence.Summary), null);
+            if (onlyThis is null)
+            {
+                return;
+            }
+
+            if (onlyThis == true)
+            {
+                await ShowEditorAsync(EventDraft.FromOccurrence(stored.ICalendarData, at), (occurrence.Calendar, occurrence.ObjectRemoteId), occurrence: at);
+                return;
+            }
+        }
+
         await ShowEditorAsync(EventDraft.FromICalendar(stored.ICalendarData), (occurrence.Calendar, occurrence.ObjectRemoteId));
     }
+
+    /// <summary>
+    /// A series: "Nur diesen Termin" (true), "Ganze Serie" (false) or cancelled (null).
+    /// </summary>
+    /// <param name="notice">Said as well (attendees are told …); null: nothing.</param>
+    private static async Task<bool?> AskSeriesAsync(string title, string? notice) =>
+        await Views.ChoiceDialog.ShowInFrontAsync<bool?>(title,
+            T("Das ist ein Termin einer Serie. Nur diesen Termin oder die ganze Serie?") + (notice is null ? string.Empty : "\n\n" + notice),
+            (T("Nur diesen Termin"), true, true), (T("Ganze Serie"), false, false), (T("Abbrechen"), null, false));
 
     /// <summary>"Notiz zum Termin": the shell opens the notes page with a note linked to the event.</summary>
     public event EventHandler<CalendarEventItem>? NoteRequested;
@@ -906,7 +959,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         await ShowEditorAsync(copy, null, item.Occurrence.Calendar.IsReadOnly ? null : item.Occurrence.Calendar);
     }
 
-    /// <summary>Deletes the event (a series as a whole) after asking; attendees or the organizer are told as in the editor.</summary>
+    /// <summary>Deletes the event (of a series: this occurrence or the whole series) after asking; attendees or the organizer are told as in the editor.</summary>
     [RelayCommand]
     private async Task DeleteEventAsync(CalendarEventItem item)
     {
@@ -923,12 +976,18 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var question = !isOrganizer ? T("Löschen und absagen?")
             : (draft.Attendees ?? []).Any(a => !string.Equals(a.Email, draft.Organizer, StringComparison.OrdinalIgnoreCase)) ? T("Löschen und Absage an alle?")
             : T("Wirklich löschen?");
-        if (occurrence.IsRecurring)
+        var title = F("«{0}» löschen", string.IsNullOrWhiteSpace(item.Title) ? T("Termin") : item.Title);
+        bool? onlyThis = false;
+        if (occurrence.RecurrenceId is not null)
         {
-            question = T("Wiederkehrender Termin – es wird die ganze Serie gelöscht.") + "\n\n" + question;
+            onlyThis = await AskSeriesAsync(title, null);
+            if (onlyThis is null)
+            {
+                return;
+            }
         }
 
-        if (!await Views.ChoiceDialog.ShowInFrontAsync(F("«{0}» löschen", string.IsNullOrWhiteSpace(item.Title) ? T("Termin") : item.Title), question,
+        if (onlyThis == false && !await Views.ChoiceDialog.ShowInFrontAsync(title, (occurrence.RecurrenceId is null ? string.Empty : T("Die ganze Serie wird gelöscht.") + "\n\n") + question,
                 (T("Löschen"), true, false), (T("Abbrechen"), false, true)))
         {
             return;
@@ -936,7 +995,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
         try
         {
-            var message = await EventEditorViewModel.DeleteStoredAsync(calendar, invitations, occurrence.Calendar, occurrence.ObjectRemoteId, isOrganizer, draft.Organizer);
+            var message = onlyThis == true
+                ? await EventEditorViewModel.DeleteOccurrenceAsync(calendar, invitations, occurrence.Calendar, occurrence.ObjectRemoteId, occurrence.RecurrenceId!.Value, isOrganizer)
+                : await EventEditorViewModel.DeleteStoredAsync(calendar, invitations, occurrence.Calendar, occurrence.ObjectRemoteId, isOrganizer, draft.Organizer);
             StatusMessage?.Invoke(this, message ?? F("«{0}» gelöscht.", item.Title));
         }
         catch (EventDeletionException ex)
@@ -955,7 +1016,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         await ReloadAsync();
     }
 
-    private async Task<EventEditorViewModel> ShowEditorAsync(EventDraft draft, (CalendarInfo Calendar, string RemoteId)? existing, CalendarInfo? target = null)
+    private async Task<EventEditorViewModel> ShowEditorAsync(EventDraft draft, (CalendarInfo Calendar, string RemoteId)? existing, CalendarInfo? target = null,
+        DateTimeOffset? occurrence = null)
     {
         var writable = Calendars.Select(c => c.Info).Where(c => !c.IsReadOnly).ToList();
 
@@ -966,6 +1028,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             Recipients = recipients,
             Meetings = meetings,
             KnownCategories = await categories.GetAllAsync(),
+            Occurrence = occurrence,
         };
         if (target is not null && writable.FirstOrDefault(c => CalendarController.CalendarKey(c) == CalendarController.CalendarKey(target)) is { } same)
         {

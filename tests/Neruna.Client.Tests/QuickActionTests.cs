@@ -71,7 +71,7 @@ public class QuickActionTests
         var action = new QuickAction(Guid.NewGuid(), "Offerte genehmigen", "#107C10",
             new QuickActionCondition { Attachment = QuickActionAttachmentKind.Pdf, SubjectContains = "Offerte" },
             [new QuickActionStep(QuickActionStepKind.StampPdf) { StampId = stamp.Id }, new QuickActionStep(QuickActionStepKind.SaveAttachment) { Folder = "/tmp/offerten", FileName = "{Dateiname}_genehmigt" },
-             new QuickActionStep(QuickActionStepKind.Forward) { FromAccountId = Guid.NewGuid(), From = "anna@firma.ch" },
+             new QuickActionStep(QuickActionStepKind.Forward) { FromAccountId = Guid.NewGuid(), From = "anna@firma.ch", AsAttachment = true },
              new QuickActionStep(QuickActionStepKind.MoveToFolder) { AskFolder = true }]) { Shortcut = "Ctrl+M" };
         await service.SaveActionsAsync([action], Ct);
         await service.SaveStampsAsync([stamp with { Text = "Freigegeben" }], Ct);
@@ -87,6 +87,8 @@ public class QuickActionTests
         await settings.SetAsync("mail.quickActions", """[{"Id":"6f1c2a10-0000-4000-8000-000000000001","Label":"Ablegen","Color":"#107C10","When":{},"Steps":[{"Kind":"MoveToFolder","FolderRemoteId":"INBOX/Projekte","FolderName":"Projekte"}]}]""", Ct);
         var old = Assert.Single(Assert.Single(await again.GetActionsAsync(Ct)).Steps);
         Assert.Equal(("INBOX/Projekte", false), (old.FolderRemoteId, old.AskFolder));
+        Assert.True(loaded.Steps[2].AsAttachment);
+        Assert.False(old.AsAttachment); // saved before "Als Anhang weiterleiten": inline, as before
     }
 
     [Fact]

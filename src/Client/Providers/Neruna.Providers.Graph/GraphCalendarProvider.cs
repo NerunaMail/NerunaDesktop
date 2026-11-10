@@ -17,7 +17,7 @@ namespace Neruna.Providers.Graph;
 /// what it sees from CalDAV. The version of an event is Graph's change key. The server delivers invitations itself.
 /// Not (yet) mapped: changed single occurrences of a series.
 /// </summary>
-internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy, ICalendarOnlineMeetings
+internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy, ICalendarOnlineMeetings, ICalendarOccurrences
 {
     /// <summary>
     /// Free/busy of people in the organisation (getSchedule) – also without their calendar being shared; subject and
@@ -65,7 +65,7 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
         return new Availability(email, slots);
     }
 
-    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs,isOnlineMeeting,onlineMeetingProvider,onlineMeeting,categories";
+    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs,isOnlineMeeting,onlineMeetingProvider,onlineMeeting,categories,type";
 
     /// <summary>
     /// Teams, where the organisation has it for this calendar (work or school accounts): Exchange then creates the
@@ -117,7 +117,7 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
                 continue;
             }
 
-            changed.Add(ToObject(await GetEventAsync(id, cancellationToken)));
+            changed.Add(await ObjectAsync(id, cancellationToken));
         }
 
         var present = listed.Select(e => e.Str("id")).ToHashSet(StringComparer.Ordinal);
@@ -151,7 +151,7 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
             saved = await graph.SendJsonAsync(HttpMethod.Patch, $"me/events/{item.RemoteId}", body, cancellationToken);
         }
 
-        return ToObject(await GetEventAsync(saved.Str("id")!, cancellationToken));
+        return await ObjectAsync(saved.Str("id")!, cancellationToken);
     }
 
     public async Task DeleteAsync(CalendarInfo calendar, CalendarObject item, CancellationToken cancellationToken = default)
@@ -173,14 +173,128 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private Task<JsonElement> GetEventAsync(string id, CancellationToken cancellationToken) =>
-        graph.GetAsync($"me/events/{id}?$select={EventFields}", cancellationToken, ("Prefer", "outlook.body-content-type=\"text\""));
+        graph.GetAsync($"me/events/{id}?$select={EventFields}", cancellationToken, TextBody);
 
-    private static CalendarObject ToObject(JsonElement e) => new(e.Str("id")!, e.Str("changeKey"), ToICalendar(e));
+    private static readonly (string, string) TextBody = ("Prefer", "outlook.body-content-type=\"text\"");
+
+    /// <summary>An event as Neruna stores it; a series with its changed and cancelled occurrences.</summary>
+    private async Task<CalendarObject> ObjectAsync(string id, CancellationToken cancellationToken)
+    {
+        var e = await GetEventAsync(id, cancellationToken);
+        JsonElement? occurrences = null;
+        if (e.Str("type") == "seriesMaster")
+        {
+            try
+            {
+                occurrences = await graph.GetAsync($"me/events/{id}?$select=cancelledOccurrences&$expand=exceptionOccurrences($select={EventFields},originalStart)",
+                    cancellationToken, TextBody);
+            }
+            catch (GraphException)
+            {
+                // A server without these fields: the series alone, as before.
+            }
+        }
+
+        return new CalendarObject(e.Str("id")!, e.Str("changeKey"), ToICalendar(e, occurrences));
+    }
+
+    // ---- One occurrence of a series: an instance of its own in Graph ----
+
+    public async Task<CalendarObject> SaveOccurrenceAsync(CalendarInfo calendar, CalendarObject series, DateTimeOffset originalStart, string? occurrenceId,
+        string occurrenceData, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(series);
+        var id = occurrenceId ?? await InstanceIdAsync(series.RemoteId, originalStart, cancellationToken) ?? throw new RemoteConflictException();
+        var body = ToGraph(occurrenceData);
+        body.Remove("recurrence"); // an occurrence has none of its own
+        await graph.SendJsonAsync(HttpMethod.Patch, $"me/events/{id}", body, cancellationToken);
+        return await ObjectAsync(series.RemoteId, cancellationToken);
+    }
+
+    public async Task<CalendarObject> DeleteOccurrenceAsync(CalendarInfo calendar, CalendarObject series, DateTimeOffset originalStart, string? occurrenceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(series);
+        if ((occurrenceId ?? await InstanceIdAsync(series.RemoteId, originalStart, cancellationToken)) is { } id)
+        {
+            await graph.SendJsonAsync(HttpMethod.Delete, $"me/events/{id}", null, cancellationToken);
+        }
+
+        return await ObjectAsync(series.RemoteId, cancellationToken);
+    }
+
+    // The instance that the series has at this time (not moved yet, else it would have an id in the stored series).
+    private async Task<string?> InstanceIdAsync(string seriesId, DateTimeOffset originalStart, CancellationToken cancellationToken)
+    {
+        static string Utc(DateTimeOffset value) => value.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        var instances = await graph.GetAsync(
+            $"me/events/{seriesId}/instances?startDateTime={Utc(originalStart.AddDays(-1))}&endDateTime={Utc(originalStart.AddDays(2))}&$select=id,originalStart,start,isAllDay&$top=50",
+            cancellationToken);
+        foreach (var instance in instances.Arr("value"))
+        {
+            if (instance.Str("originalStart") is { } original && DateTimeOffset.TryParse(original, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at)
+                && (at == originalStart || (instance.Bool("isAllDay") && DateOf(instance.Obj("start")).Value.Date == originalStart.Date)))
+            {
+                return instance.Str("id");
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>A Graph event as iCalendar (what Neruna stores and shows).</summary>
-    internal static string ToICalendar(JsonElement e)
+    /// <param name="occurrences">For a series: its cancelledOccurrences and expanded exceptionOccurrences.</param>
+    internal static string ToICalendar(JsonElement e, JsonElement? occurrences = null)
     {
         var calendar = new ICalendar { ProductId = "-//Neruna//Neruna Desktop//DE" };
+        var evt = EventOf(e, calendar);
+        calendar.Events.Add(evt);
+        if (evt.RecurrenceRule is not null && occurrences is { } more && evt.DtStart is { } first)
+        {
+            var (_, zone) = DateOf(e.Obj("start"));
+            CalDateTime InSeries(DateTimeOffset at)
+            {
+                var local = TimeZoneInfo.TryFindSystemTimeZoneById(zone, out var tz) ? TimeZoneInfo.ConvertTime(at, tz).DateTime : at.UtcDateTime;
+                return first.HasTime ? new CalDateTime(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), zone) : new CalDateTime(DateOnly.FromDateTime(local));
+            }
+
+            // "OID.<series id>.<date>": the date of a cancelled occurrence, at the series' time of day.
+            foreach (var cancelled in more.Arr("cancelledOccurrences").Select(c => c.GetString()).OfType<string>())
+            {
+                if (DateOnly.TryParseExact(cancelled[(cancelled.LastIndexOf('.') + 1)..], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+                {
+                    evt.ExceptionDates.Add(first.HasTime
+                        ? new CalDateTime(DateTime.SpecifyKind(day.ToDateTime(TimeOnly.FromDateTime(first.Value)), DateTimeKind.Unspecified), first.TzId)
+                        : new CalDateTime(day));
+                }
+            }
+
+            foreach (var exception in more.Arr("exceptionOccurrences"))
+            {
+                if (exception.Str("originalStart") is not { } original
+                    || !DateTimeOffset.TryParse(original, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at))
+                {
+                    continue;
+                }
+
+                var changed = EventOf(exception, calendar);
+                changed.Uid = evt.Uid;
+                changed.RecurrenceRule = null;
+                changed.RecurrenceIdentifier = new RecurrenceIdentifier(InSeries(at), null);
+                if (exception.Str("id") is { } id)
+                {
+                    changed.Properties.Set(EventDraft.OccurrenceIdProperty, id);
+                }
+
+                calendar.Events.Add(changed);
+            }
+        }
+
+        return new CalendarSerializer().SerializeToString(calendar) ?? throw new InvalidOperationException("Serializing the event failed.");
+    }
+
+    private static CalendarEvent EventOf(JsonElement e, ICalendar calendar)
+    {
         var evt = new CalendarEvent
         {
             Uid = e.Str("iCalUId") ?? e.Str("id"),
@@ -205,7 +319,11 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
         }
         else
         {
-            calendar.AddTimeZone(startZone);
+            if (calendar.TimeZones.All(tz => tz.TzId != startZone))
+            {
+                calendar.AddTimeZone(startZone);
+            }
+
             evt.DtStart = new CalDateTime(start, startZone);
             evt.DtEnd = new CalDateTime(end, startZone);
         }
@@ -256,8 +374,7 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
             evt.Alarms.Add(new Alarm { Action = "DISPLAY", Description = evt.Summary, Trigger = new Trigger(Duration.FromMinutes(-e.Int("reminderMinutesBeforeStart"))) });
         }
 
-        calendar.Events.Add(evt);
-        return new CalendarSerializer().SerializeToString(calendar) ?? throw new InvalidOperationException("Serializing the event failed.");
+        return evt;
     }
 
     /// <summary>iCalendar (as Neruna edits it) as a Graph event.</summary>

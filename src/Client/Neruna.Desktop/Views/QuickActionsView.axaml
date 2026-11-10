@@ -220,6 +220,8 @@
                     <TextBlock Grid.Row="2" Grid.Column="1" Classes="subtle" FontSize="12" TextWrapping="Wrap"
                                Text="{l:T 'Platzhalter: {Datum}, {Absender}, {Betreff}, {Dateiname} – z. B. «{Datum}_{Absender}_{Dateiname}». Die Endung kommt automatisch dazu. Der Speichern-Dialog öffnet sich mit Ordner und Name; «Speichern» genügt.'}" />
                   </Grid>
+                  <CheckBox IsChecked="{Binding AsAttachment}" IsVisible="{Binding ShowsAsAttachment}" Margin="140,0,0,0"
+                            Content="{l:T 'Als Anhang weiterleiten'}" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
                     <TextBlock Grid.Row="3" Classes="label" Text="{l:T 'Absender'}" IsVisible="{Binding ShowsTemplate}" />
                     <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Senders}" SelectedItem="{Binding Sender}" MinWidth="220" IsVisible="{Binding ShowsTemplate}" />

@@ -119,6 +119,9 @@ public sealed record QuickActionStep(QuickActionStepKind Kind)
 
     /// <summary>Move: asks each time (account and folder, the mail's own account preselected) instead of a fixed folder.</summary>
     public bool AskFolder { get; init; }
+
+    /// <summary>Forward: the whole mail as attachment (.eml, unchanged) instead of inline; stamped PDFs are added in their new version.</summary>
+    public bool AsAttachment { get; init; }
 }
 
 /// <summary>

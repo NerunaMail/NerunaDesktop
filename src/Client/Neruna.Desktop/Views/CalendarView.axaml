@@ -92,6 +92,12 @@
               <TextBlock Text="{l:T 'Internet-Kalender abonnieren'}" />
             </StackPanel>
           </Button>
+          <Button Classes="command" Command="{Binding ImportCommand}" ToolTip.Tip="{l:T 'Termine aus einer .ics-Datei in einen eigenen Kalender kopieren, z. B. einen Fahrplan'}">
+            <StackPanel Orientation="Horizontal">
+              <PathIcon Data="{StaticResource IconImport}" />
+              <TextBlock Text="{l:T 'Termine importieren'}" />
+            </StackPanel>
+          </Button>
         </WrapPanel>
       </ctl:SplitToolbar>
     </Border>

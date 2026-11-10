@@ -102,7 +102,17 @@ IMailStore      ICalendarStore      IContactStore            ← SQLite (Neruna.
   danach aktualisiert der Controller den lokalen Speicher. Ein geänderter Server-Stand führt zu
   `RemoteConflictException` statt zu stillem Überschreiben.
 - **Bearbeiten erhält Fremddaten:** `EventDraft` und `ContactDraft` ändern nur ihre Felder; Teilnehmer, Alarme,
-  Serien-Ausnahmen, Fotos, Adressen und Hersteller-Properties bleiben erhalten. Serien werden als Ganzes bearbeitet.
+  Serien-Ausnahmen, Fotos, Adressen und Hersteller-Properties bleiben erhalten. Bei Serien fragt die UI «Nur diesen
+  Termin» oder «Ganze Serie»: ein einzelnes Vorkommen wird zur Ausnahme mit RECURRENCE-ID
+  (`EventDraft.ToOccurrenceICalendar`), einzeln gelöscht zu einem EXDATE (`CalendarController.SaveOccurrenceAsync`/
+  `DeleteOccurrenceAsync`; `CalendarOccurrence.RecurrenceId` ist der ursprüngliche Beginn). Server, die Vorkommen als
+  eigene Objekte führen (Graph, EWS), implementieren `ICalendarOccurrences` und ändern bzw. löschen dort das Vorkommen;
+  ihre Ausnahmen tragen die Server-ID in `X-NERUNA-OCCURRENCE-ID`.
+- **Import (.ics):** `CalendarImport.Read` teilt eine Datei in ein Objekt pro UID (Serie samt Ausnahmen, nötige
+  Zeitzonen) ohne ORGANIZER/ATTENDEE/METHOD – eine Kopie für sich, keine Einladung. `CalendarController.ImportAsync`
+  speichert sie in einen beschreibbaren Kalender; dieselbe UID dort wird aktualisiert (erneuter Import verdoppelt
+  nicht), eine UID aus einem anderen Kalender des Kontos bekommt eine neue. Anders als ein ICS-Abo kein eigener
+  Kalender.
 - Bei der Kontoeinrichtung fragt `AccountSetupService` jeden registrierten Provider, welchen Teil der gefundenen
   Konfiguration er übernehmen kann (`SettingsFromDiscovery`). Sobald ein CalDAV-Provider registriert ist,
   bekommen neue Konten automatisch auch Kalender.
@@ -180,6 +190,11 @@ Internet (keine DNS-Sperrlisten, keine Favicon- oder Whois-Abfragen).
 - Inline im Lesebereich oder als eigenes Fenster (Einstellung «E-Mail → Verfassen»); «Loslösen» übergibt den Entwurf
   als HTML an ein neues Fenster.
 - Tests: `tests/editor` (Playwright, Chromium + WebKit) für die JS-API; die WebView selbst ist headless nicht prüfbar.
+- Anhang-Erinnerung (`AttachmentReminderService`, Einstellungen → Schreiben): Wörter in `compose.attachmentKeywords`
+  (JSON-Liste, ohne Wert die Standardliste DE/EN/FR/IT plus Endungen), abschaltbar mit `compose.attachmentReminder`.
+  Geprüft wird nur der eigene Text (`neruna.texts().own`, im Nur-Text-Modus ohne «> »-Zeilen, Signatur und
+  Originalnachricht), ein Wort am Wortanfang, eine Endung («.pdf») nach einem Namen. Ohne Anhang: Balken unter dem Text
+  («Anhang hinzufügen», × = für diese Mail nicht mehr) und beim Senden die Frage Ja/Nein.
 
 ### PDF: Vorschau, Stempel, Kennwort
 
@@ -677,8 +692,10 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   Forks registrieren eigene Apps.
 - Graph: Mail per Delta-Abfrage (erstes Mal 90 Tage, Älteres beim Nachladen), Nachrichten als MIME, Senden legt
   Microsoft selbst in «Gesendet» ab; Kalender und Kontakte werden in iCalendar bzw. vCard umgewandelt, Exchange
-  verschickt Einladungen selbst. Kein Push für Desktop-Apps (Abfrage jede Minute). Noch nicht: einzeln geänderte
-  Termine einer Serie, Kontaktbilder.
+  verschickt Einladungen selbst. Kein Push für Desktop-Apps (Abfrage jede Minute). Serien bringen ihre Ausnahmen mit
+  (`exceptionOccurrences` per `$expand`, `cancelledOccurrences` als EXDATE; ein Server ohne diese Felder liefert nur
+  die Serie); ein einzelnes Vorkommen wird über `instances` gefunden und direkt geändert/gelöscht. Noch nicht:
+  Kontaktbilder.
 - Google (`Neruna.Providers.Google`): OAuth über die bestehenden Provider – Gmail per IMAP/SMTP mit XOAUTH2
   (`ImapMailProvider.AccessToken`; Gmail legt Gesendetes selbst ab, kein Sieve), Kalender per CalDAV und Kontakte per
   CardDAV mit Bearer-Token (`DavOAuthProviders`), Google Tasks per REST als VTODO neben den Kalendern (wie To Do bei
@@ -749,7 +766,9 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   Geschrieben wird nur, was sich geändert hat (Serien behalten ihre Ausnahmen, Teilnehmer erfahren nur echte
   Änderungen), mit Change-Key-Prüfung. Exchange verschickt Einladungen, Updates und Absagen selbst; eine neue eigene
   Antwort auf eine fremde Besprechung wird `AcceptItem`/`TentativelyAcceptItem`/`DeclineItem`, Löschen einer fremden
-  Besprechung sagt ab. Der Geburtstagskalender von Exchange wird ausgelassen.
+  Besprechung sagt ab. Ein einzelnes Vorkommen wird über seine ItemId (geänderte) bzw. `OccurrenceItemId` mit
+  `InstanceIndex` (Zählung ab 1 inkl. gelöschter) geändert oder gelöscht. Der Geburtstagskalender von Exchange wird
+  ausgelassen.
 - Kontakte: Kontaktordner (`IPF.Contact`) als vCard 3.0 mit Adressen (nur lesend), drei E-Mail-Adressen,
   Telefonnummern in Exchanges festen Feldern; geschrieben werden nur geänderte Felder. Noch nicht: Verteilerlisten,
   Kontaktbilder.

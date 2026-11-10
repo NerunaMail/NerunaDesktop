@@ -27,7 +27,7 @@
     </Style>
   </UserControl.Styles>
 
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
 
     <!-- Actions -->
     <Grid Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
@@ -292,6 +292,25 @@
     <TextBlock Grid.Row="8" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Margin="0,0,0,6" TextWrapping="Wrap" IsVisible="{Binding Formatting.IsPlainTextFallback}"
                Text="{l:T 'Formatierung nicht verfügbar (keine WebView-Laufzeit gefunden) – die Nachricht wird als reiner Text gesendet.'}" />
 
-    <TextBlock Grid.Row="10" Grid.ColumnSpan="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
+    <!-- Anhang-Erinnerung: the text announces an attachment, but nothing is attached (Einstellungen → Schreiben) -->
+    <Border Grid.Row="10" Grid.ColumnSpan="2" IsVisible="{Binding HasMissingAttachment}" Background="{DynamicResource WarnBackgroundBrush}"
+            CornerRadius="4" Padding="10,6" Margin="0,8,0,0">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Classes="command" Padding="6" VerticalAlignment="Center" Command="{Binding DismissAttachmentReminderCommand}"
+                ToolTip.Tip="{l:T 'Für diese E-Mail nicht mehr erinnern'}">
+          <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" />
+        </Button>
+        <Button DockPanel.Dock="Right" Classes="accent" Margin="8,0,4,0" VerticalAlignment="Center" Command="{Binding AddAttachmentCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconAttach}" Width="13" Height="13" />
+            <TextBlock Text="{l:T 'Anhang hinzufügen'}" />
+          </StackPanel>
+        </Button>
+        <PathIcon Data="{StaticResource IconAttach}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding MissingAttachmentHint}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </DockPanel>
+    </Border>
+
+    <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
   </Grid>
 </UserControl>

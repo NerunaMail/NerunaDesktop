@@ -12,6 +12,8 @@
     <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="SemiBold" />
     <TextBlock Classes="subtle" FontSize="12" Margin="0,4,0,0" IsVisible="{Binding IsSeries}"
                Text="{l:T 'Wiederkehrender Termin – Änderungen gelten für die ganze Serie.'}" />
+    <TextBlock Classes="subtle" FontSize="12" Margin="0,4,0,0" IsVisible="{Binding IsOccurrence}"
+               Text="{l:T 'Termin einer Serie – Änderungen gelten nur für diesen Termin.'}" />
     <TextBlock Classes="error" Margin="0,8,0,0" IsVisible="{Binding NoCalendar}"
                Text="{l:T 'Kein beschreibbarer Kalender vorhanden. Bitte ein Konto mit CalDAV hinzufügen.'}" />
 
@@ -77,7 +79,7 @@
       <StackPanel>
         <TextBlock Classes="label" Text="{l:T 'Wiederholung'}" />
         <ComboBox ItemsSource="{x:Static vm:EventEditorViewModel.RecurrenceOptions}" SelectedItem="{Binding Recurrence}"
-                  HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}">
+                  HorizontalAlignment="Stretch" IsEnabled="{Binding CanChangeSeries}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="vm:RecurrenceOption">
               <TextBlock Text="{Binding Label}" />
@@ -87,7 +89,7 @@
       </StackPanel>
       <StackPanel Grid.Column="2">
         <TextBlock Classes="label" Text="{l:T 'Kalender'}" />
-        <ComboBox ItemsSource="{Binding Calendars}" SelectedItem="{Binding SelectedCalendar}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}">
+        <ComboBox ItemsSource="{Binding Calendars}" SelectedItem="{Binding SelectedCalendar}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanChangeSeries}">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="cal:CalendarInfo">
               <TextBlock Text="{Binding Name}" />

@@ -237,6 +237,13 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         return response.StatusCode == HttpStatusCode.NotFound ? null : await ReadAsync<MailTagsResponse>(response, cancellationToken);
     }
 
+    /// <summary>The organisation's categories of events; null when the server has none yet (older version: 404).</summary>
+    public async Task<CalendarCategoriesResponse?> GetCalendarCategoriesAsync(CloudConnection connection, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAuthorizedAsync(connection, HttpMethod.Get, "api/v1/calendar-categories", cancellationToken);
+        return response.StatusCode == HttpStatusCode.NotFound ? null : await ReadAsync<CalendarCategoriesResponse>(response, cancellationToken);
+    }
+
     /// <summary>Chat: everything newer than message <paramref name="after"/>; also keeps this person online.</summary>
     public async Task<ChatResponse> GetChatAsync(CloudConnection connection, long after, CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<ChatResponse>(connection, $"api/v1/chat?after={after}", cancellationToken);

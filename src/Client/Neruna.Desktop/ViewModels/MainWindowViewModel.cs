@@ -237,6 +237,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     private void WireCalendarAndTasks()
     {
         CalendarPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
+        CalendarPage.ImportRequested += (_, target) => ShowIcsImport(target.Writable, target.Preferred);
         CalendarPage.ManageRequested += (_, _) => ShowCalendarSelection();
         CalendarPage.WindowToggleRequested += async (_, _) => await ToggleCalendarWindowAsync();
         CalendarPage.PrintRequested += (_, _) => ShowCalendarPrint();
@@ -1278,6 +1279,21 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         Overlay = subscription;
+    }
+
+    private void ShowIcsImport(IReadOnlyList<CalendarInfo> writable, CalendarInfo? preferred)
+    {
+        var import = new IcsImportViewModel(_calendar, _files, writable, preferred);
+        import.Finished += async (_, imported) =>
+        {
+            Overlay = null;
+            if (imported)
+            {
+                StatusText = import.ResultMessage ?? StatusText;
+                await CalendarPage.ReloadAsync();
+            }
+        };
+        Overlay = import;
     }
 
     /// <summary>The number of running polls on "Terminumfragen" (and "!" for those over but not fixed).</summary>

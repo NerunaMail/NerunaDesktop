@@ -40,6 +40,23 @@ public interface ICalendarProvider : IAsyncDisposable
 }
 
 /// <summary>
+/// A server that keeps the occurrences of a series as items of their own (Exchange): one occurrence is changed or
+/// removed there, not by saving the whole series with an override or EXDATE (what other servers get).
+/// </summary>
+public interface ICalendarOccurrences
+{
+    /// <param name="series">The stored series.</param>
+    /// <param name="originalStart">The occurrence's start in the series.</param>
+    /// <param name="occurrenceId">The server's id of the occurrence, if the stored series knows it (<see cref="EventDraft.OccurrenceIdProperty"/>).</param>
+    /// <param name="occurrenceData">The occurrence as a single event.</param>
+    /// <returns>The series as it is now.</returns>
+    Task<CalendarObject> SaveOccurrenceAsync(CalendarInfo calendar, CalendarObject series, DateTimeOffset originalStart, string? occurrenceId, string occurrenceData, CancellationToken cancellationToken = default);
+
+    /// <returns>The series as it is now.</returns>
+    Task<CalendarObject> DeleteOccurrenceAsync(CalendarInfo calendar, CalendarObject series, DateTimeOffset originalStart, string? occurrenceId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
 /// A calendar whose server creates online meetings itself (Microsoft 365: Teams through Exchange): an event saved with a
 /// pending <see cref="Meetings.OnlineMeeting"/> of one of these kinds gets its link from the server.
 /// </summary>

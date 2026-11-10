@@ -112,6 +112,7 @@ public class CloudConnectionsTests
             services.AddSingleton<CloudTextTemplateSync>();
             services.AddSingleton<MailTagService>();
             services.AddSingleton<CloudMailTagSync>();
+            services.AddSingleton<Neruna.Core.Calendar.CalendarCategoryService>();
             services.AddSingleton<CloudCertificateSync>();
             services.AddSingleton<CloudAccountSync>();
             services.AddSingleton<SettingsBackupService>();
@@ -137,6 +138,8 @@ public class CloudConnectionsTests
         // Tags: the first server is older (no tags yet), the partner has one.
         http.Responses[First + "api/v1/mail-tags"] = (HttpStatusCode.NotFound, """{"message":"Not found"}""");
         http.Responses[Second + "api/v1/mail-tags"] = (HttpStatusCode.OK, """{"available":true,"tags":[{"id":"T","name":"Offerte","keyword":"offerte","color":"#e8590c","updatedAt":"2026-10-27T12:00:00+01:00"}]}""");
+        http.Responses[First + "api/v1/calendar-categories"] = (HttpStatusCode.NotFound, """{"message":"Not found"}""");
+        http.Responses[Second + "api/v1/calendar-categories"] = (HttpStatusCode.OK, """{"available":true,"categories":[{"id":"K","name":"Kunde","color":"#2f9e44","updatedAt":"2026-11-10T12:00:00+01:00"}]}""");
 
         var device = new DeviceInfo("Testgerät", "0.8.2", "Linux", "Debian 13", "anna");
         var example = await cloud.ConnectAsync(new Uri(First), "CODE", "123456", device, ct);
@@ -150,6 +153,13 @@ public class CloudConnectionsTests
         await env.Get<CloudMailTagSync>().SyncAsync(ct);
         var tags = env.Get<MailTagService>();
         Assert.Equal(["offerte", "$label1"], (await tags.GetAllAsync(ct)).Take(2).Select(t => t.Keyword));
+
+        // The organisation's category comes first and takes the place of the own one of the same name.
+        var categories = env.Get<Neruna.Core.Calendar.CalendarCategoryService>();
+        var known = await categories.GetAllAsync(ct);
+        Assert.Equal(("Kunde", "#2f9e44", true), (known[0].Name, known[0].Color, known[0].IsFromCloud));
+        Assert.Single(known, c => c.Matches("kunde"));
+        Assert.Equal(Neruna.Core.Calendar.CalendarCategoryService.Defaults.Count, known.Count);
 
         // Blocked in the partner's portal: its tokens are void, a new one is refused.
         http.Responses[Second + "api/v1/signatures"] = (HttpStatusCode.Unauthorized, """{"error":"unauthenticated","message":"Token ungültig"}""");
@@ -166,6 +176,7 @@ public class CloudConnectionsTests
         Assert.Null(await credentials.GetSecretAsync(partner.VaultKeyId, ct));
         Assert.Equal(["Eigene", "Example AG"], (await signatures.GetAllAsync(ct)).Select(s => s.Name).Order());
         Assert.DoesNotContain(await tags.GetAllAsync(ct), t => t.IsFromCloud);
+        Assert.DoesNotContain(await categories.GetAllAsync(ct), c => c.IsFromCloud);
 
         // Any other refusal (wrong key, server error) removes nothing.
         http.Responses[First + "api/v1/signatures"] = (HttpStatusCode.Unauthorized, """{"error":"unauthenticated","message":"Token ungültig"}""");

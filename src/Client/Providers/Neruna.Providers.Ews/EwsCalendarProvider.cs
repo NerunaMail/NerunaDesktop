@@ -12,7 +12,7 @@ namespace Neruna.Providers.Ews;
 /// is its change key. Exchange sends invitations, updates, cancellations and answers itself: saving an invitation with
 /// a new own answer accepts or declines it on the server, deleting someone else's meeting declines it.
 /// </summary>
-internal sealed partial class EwsCalendarProvider(ServiceConnection connection, EwsConnectionFactory connections) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy
+internal sealed partial class EwsCalendarProvider(ServiceConnection connection, EwsConnectionFactory connections) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy, ICalendarOccurrences
 {
     /// <summary>
     /// Free/busy of people in the organisation (GetUserAvailability) – also without their calendar being shared;
@@ -210,6 +210,11 @@ internal sealed partial class EwsCalendarProvider(ServiceConnection connection, 
             return; // already gone
         }
 
+        await DeleteItemAsync(client, current, cancellationToken);
+    }
+
+    private static async Task DeleteItemAsync(EwsClient client, XElement current, CancellationToken cancellationToken)
+    {
         // Someone else's meeting that still counts: declined (the organizer learns it), which also removes it.
         if (IsForeignMeeting(current) && !current.Bool("IsCancelled") && current.Val("MyResponseType") != "Decline")
         {
@@ -221,7 +226,62 @@ internal sealed partial class EwsCalendarProvider(ServiceConnection connection, 
         var cancel = current.Bool("IsMeeting") && !IsForeignMeeting(current) && !current.Bool("IsCancelled");
         await client.CallAsync(X.Msg("DeleteItem", new XAttribute("DeleteType", "MoveToDeletedItems"),
             new XAttribute("SendMeetingCancellations", cancel ? "SendToAllAndSaveCopy" : "SendToNone"),
-            X.Msg("ItemIds", X.ItemId(item.RemoteId))), cancellationToken, "ErrorItemNotFound");
+            X.Msg("ItemIds", X.ItemId(current.Id()!))), cancellationToken, "ErrorItemNotFound");
+    }
+
+    // ---- One occurrence of a series: an item of its own in Exchange ----
+
+    public async Task<CalendarObject> SaveOccurrenceAsync(CalendarInfo calendar, CalendarObject series, DateTimeOffset originalStart, string? occurrenceId,
+        string occurrenceData, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(series);
+        var client = await ClientAsync(cancellationToken);
+        var current = await OccurrenceAsync(client, series, originalStart, occurrenceId, cancellationToken) ?? throw new RemoteConflictException();
+
+        // An occurrence has no recurrence of its own.
+        var fields = EwsCalendarConverter.FieldsOf(occurrenceData, out var attendees).Where(f => f.Field != "calendar:Recurrence").ToList();
+        if (IsForeignMeeting(current))
+        {
+            await AnswerAsync(client, current, occurrenceData, fields, cancellationToken);
+        }
+        else
+        {
+            await UpdateAsync(client, current, fields, attendees.Count > 0, cancellationToken);
+        }
+
+        return (await LoadAsync(client, [series.RemoteId], cancellationToken)).SingleOrDefault() ?? throw new RemoteConflictException();
+    }
+
+    public async Task<CalendarObject> DeleteOccurrenceAsync(CalendarInfo calendar, CalendarObject series, DateTimeOffset originalStart, string? occurrenceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(series);
+        var client = await ClientAsync(cancellationToken);
+        if (await OccurrenceAsync(client, series, originalStart, occurrenceId, cancellationToken) is { } current)
+        {
+            await DeleteItemAsync(client, current, cancellationToken);
+        }
+
+        return (await LoadAsync(client, [series.RemoteId], cancellationToken)).SingleOrDefault() ?? throw new RemoteConflictException();
+    }
+
+    // A changed occurrence by its id; any other by its place in the series (Exchange counts from 1, deleted ones too).
+    private static async Task<XElement?> OccurrenceAsync(EwsClient client, CalendarObject series, DateTimeOffset originalStart, string? occurrenceId, CancellationToken cancellationToken)
+    {
+        if (occurrenceId is not null)
+        {
+            return await CurrentAsync(client, occurrenceId, cancellationToken);
+        }
+
+        if (EwsCalendarConverter.InstanceIndexOf(series.ICalendarData, originalStart) is not { } index)
+        {
+            return null;
+        }
+
+        var response = (await client.CallAsync(X.Msg("GetItem", EwsOperations.Shape(EwsCalendarConverter.Fields, "Text"),
+            X.Msg("ItemIds", X.Typ("OccurrenceItemId", new XAttribute("RecurringMasterId", series.RemoteId), new XAttribute("InstanceIndex", index)))),
+            cancellationToken, "ErrorItemNotFound", "ErrorCalendarOccurrenceIndexIsOutOfRecurrenceRange", "ErrorCalendarOccurrenceIsDeletedFromRecurrence")).Single();
+        return response.IsSuccess() ? response.FirstItem() : null;
     }
 
     /// <summary>Exchange sends invitations and answers itself.</summary>

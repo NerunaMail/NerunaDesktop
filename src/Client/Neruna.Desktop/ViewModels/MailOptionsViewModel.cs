@@ -2,6 +2,7 @@ using System.Globalization;
 using Avalonia.Data.Converters;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Neruna.Core;
+using Neruna.Core.Mail;
 using Neruna.Desktop.Editor;
 using static Neruna.Core.Localization.Texts;
 
@@ -11,11 +12,13 @@ namespace Neruna.Desktop.ViewModels;
 internal sealed partial class MailOptionsViewModel : ViewModelBase
 {
     private readonly ISettingsStore _settings;
+    private readonly AttachmentReminderService _attachmentReminder;
     private bool _loading;
 
-    public MailOptionsViewModel(ISettingsStore settings)
+    public MailOptionsViewModel(ISettingsStore settings, AttachmentReminderService attachmentReminder)
     {
         _settings = settings;
+        _attachmentReminder = attachmentReminder;
         MarkAsReadOptions =
         [
             new(MarkAsReadMode.OnSelect, T("Beim Anklicken (sofort)"), Select),
@@ -274,6 +277,13 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         try
         {
             ComposeInWindow = await _settings.GetBoolAsync(SettingKeys.ComposeInWindow);
+            AttachmentReminder = await _attachmentReminder.GetEnabledAsync();
+            AttachmentKeywords.Clear();
+            foreach (var keyword in await _attachmentReminder.GetKeywordsAsync())
+            {
+                AttachmentKeywords.Add(keyword);
+            }
+
             AutoLists = await _settings.GetBoolAsync(SettingKeys.ComposeAutoLists, fallback: true);
             SpellLanguage = SpellLanguages.Find(await _settings.GetAsync(SettingKeys.ComposeSpellLanguage));
             var pdfAttachments = await _settings.GetAsync(SettingKeys.MailPdfAttachments);
@@ -295,6 +305,65 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         {
             _loading = false;
         }
+    }
+
+    // ── Anhang-Erinnerung: words that announce an attachment ──
+
+    /// <summary>Einstellungen → Schreiben: remind of a missing attachment (bar while writing, question when sending).</summary>
+    [ObservableProperty]
+    public partial bool AttachmentReminder { get; set; } = true;
+
+    public System.Collections.ObjectModel.ObservableCollection<string> AttachmentKeywords { get; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddAttachmentKeywordCommand))]
+    public partial string NewAttachmentKeyword { get; set; } = string.Empty;
+
+    partial void OnAttachmentReminderChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = _attachmentReminder.SetEnabledAsync(value);
+        }
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand(CanExecute = nameof(CanAddAttachmentKeyword))]
+    private void AddAttachmentKeyword()
+    {
+        // Several at once, separated by commas ("Beilage, Offerte").
+        foreach (var keyword in AttachmentReminderService.Clean(NewAttachmentKeyword.Split(',')))
+        {
+            if (!AttachmentKeywords.Contains(keyword, StringComparer.OrdinalIgnoreCase))
+            {
+                AttachmentKeywords.Add(keyword);
+            }
+        }
+
+        NewAttachmentKeyword = string.Empty;
+        _ = _attachmentReminder.SetKeywordsAsync(AttachmentKeywords);
+    }
+
+    private bool CanAddAttachmentKeyword() => !string.IsNullOrWhiteSpace(NewAttachmentKeyword);
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void RemoveAttachmentKeyword(string? keyword)
+    {
+        if (keyword is not null && AttachmentKeywords.Remove(keyword))
+        {
+            _ = _attachmentReminder.SetKeywordsAsync(AttachmentKeywords);
+        }
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ResetAttachmentKeywords()
+    {
+        AttachmentKeywords.Clear();
+        foreach (var keyword in AttachmentReminderService.DefaultKeywords)
+        {
+            AttachmentKeywords.Add(keyword);
+        }
+
+        _ = _attachmentReminder.SetKeywordsAsync(null);
     }
 
     partial void OnComposeInWindowChanged(bool value) => Save(SettingKeys.ComposeInWindow, value.ToString(CultureInfo.InvariantCulture));

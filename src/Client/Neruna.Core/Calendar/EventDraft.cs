@@ -82,7 +82,8 @@ public sealed record EventAttendee(string Email, string? Name = null, Participat
 
 /// <summary>
 /// The editable part of an event. Applied to existing iCalendar data it only touches these fields, so attendees,
-/// alarms, exceptions and vendor properties survive a round trip. Recurring events are edited as a whole series.
+/// alarms, exceptions and vendor properties survive a round trip. A series is edited as a whole, or one occurrence of it
+/// alone (<see cref="ToOccurrenceICalendar"/>, an override with RECURRENCE-ID).
 /// </summary>
 /// <param name="Start">Local wall-clock time; for all-day events only the date counts.</param>
 /// <param name="End">Exclusive end; for all-day events the day after the last day (iCalendar semantics).</param>
@@ -163,9 +164,28 @@ public sealed record EventDraft(
         new(string.Empty, null, null, start, start.AddHours(1), false, RecurrenceKind.None, reminderMinutes, []);
 
     /// <exception cref="FormatException">The data contains no event.</exception>
-    public static EventDraft FromICalendar(string iCalendarData)
+    public static EventDraft FromICalendar(string iCalendarData) => FromEvent(MasterOf(Load(iCalendarData)));
+
+    /// <summary>
+    /// One occurrence of a series as a single event: its override if it has one, else the series at that time.
+    /// </summary>
+    /// <param name="originalStart">The occurrence's start in the series (<see cref="CalendarOccurrence.RecurrenceId"/>).</param>
+    /// <exception cref="FormatException">The data contains no event.</exception>
+    public static EventDraft FromOccurrence(string iCalendarData, DateTimeOffset originalStart)
     {
-        var master = MasterOf(Load(iCalendarData));
+        var calendar = Load(iCalendarData);
+        if (OverrideOf(calendar, originalStart) is { } own)
+        {
+            return FromEvent(own) with { Recurrence = RecurrenceKind.None };
+        }
+
+        var series = FromEvent(MasterOf(calendar));
+        var start = series.IsAllDay ? originalStart.Date : originalStart.LocalDateTime;
+        return series with { Start = start, End = start + (series.End - series.Start), Recurrence = RecurrenceKind.None };
+    }
+
+    private static EventDraft FromEvent(CalendarEvent master)
+    {
         var start = ToLocal(master.DtStart ?? throw new FormatException("Event has no start."));
         var end = master.DtEnd is { } dtEnd
             ? ToLocal(dtEnd)
@@ -261,6 +281,136 @@ public sealed record EventDraft(
             master = MasterOf(calendar);
         }
 
+        Write(calendar, master, existingData is not null, series: true);
+        return Serialize(calendar);
+    }
+
+    /// <summary>
+    /// The series in <paramref name="existingData"/> with only the occurrence at <paramref name="originalStart"/> changed
+    /// to this draft: its override (an event with the series' UID and RECURRENCE-ID) is created or updated. The series
+    /// itself and its other occurrences stay as they are; <see cref="Recurrence"/> is ignored.
+    /// </summary>
+    /// <exception cref="FormatException">The data contains no event.</exception>
+    public string ToOccurrenceICalendar(string existingData, DateTimeOffset originalStart)
+    {
+        var calendar = Load(existingData);
+        var own = OverrideOf(calendar, originalStart);
+        if (own is null)
+        {
+            var master = MasterOf(calendar);
+            own = master.Copy<CalendarEvent>() ?? throw new FormatException("The event cannot be copied.");
+            own.RecurrenceRule = null;
+            own.RecurrenceDates.Clear();
+            own.ExceptionDates.Clear();
+            own.RecurrenceIdentifier = new RecurrenceIdentifier(SeriesTime(master, originalStart), null);
+            calendar.Events.Add(own);
+        }
+
+        Write(calendar, own, existing: true, series: false);
+        return Serialize(calendar);
+    }
+
+    /// <summary>
+    /// The series without the occurrence at <paramref name="originalStart"/>: an EXDATE for it, its override removed.
+    /// </summary>
+    /// <exception cref="FormatException">The data contains no event.</exception>
+    public static string WithoutOccurrence(string existingData, DateTimeOffset originalStart)
+    {
+        var calendar = Load(existingData);
+        var master = MasterOf(calendar);
+        if (OverrideOf(calendar, originalStart) is { } own)
+        {
+            // By reference: Ical.Net's Remove compares events by value and may take the series with the same UID.
+            var keep = calendar.Events.Where(e => !ReferenceEquals(e, own)).ToList();
+            calendar.Events.Clear();
+            foreach (var evt in keep)
+            {
+                calendar.Events.Add(evt);
+            }
+        }
+
+        master.ExceptionDates.Add(SeriesTime(master, originalStart));
+        master.Sequence++;
+        master.DtStamp = new CalDateTime(DateTime.UtcNow, "UTC");
+        master.LastModified = master.DtStamp;
+        return Serialize(calendar);
+    }
+
+    /// <summary>
+    /// The occurrence at <paramref name="originalStart"/> as a VCALENDAR of its own (without RECURRENCE-ID), for servers
+    /// that keep occurrences as items of their own; null when it has no override.
+    /// </summary>
+    public static string? OccurrenceAlone(string iCalendarData, DateTimeOffset originalStart)
+    {
+        var calendar = Load(iCalendarData);
+        if (OverrideOf(calendar, originalStart) is not { } own)
+        {
+            return null;
+        }
+
+        var alone = new ICalendar { ProductId = calendar.ProductId };
+        foreach (var zone in calendar.TimeZones)
+        {
+            alone.TimeZones.Add(zone);
+        }
+
+        var copy = own.Copy<CalendarEvent>() ?? throw new FormatException("The event cannot be copied.");
+        copy.RecurrenceIdentifier = null;
+        alone.Events.Add(copy);
+        return Serialize(alone);
+    }
+
+    /// <summary>An X-property a provider may put on an override: the server's own id of that occurrence.</summary>
+    public const string OccurrenceIdProperty = "X-NERUNA-OCCURRENCE-ID";
+
+    /// <summary>The server's id of the occurrence at <paramref name="originalStart"/> (see <see cref="OccurrenceIdProperty"/>).</summary>
+    public static string? OccurrenceIdOf(string iCalendarData, DateTimeOffset originalStart) =>
+        OverrideOf(Load(iCalendarData), originalStart)?.Properties.Get<string>(OccurrenceIdProperty);
+
+    /// <summary>The override of the occurrence that starts at <paramref name="originalStart"/> in the series, if any.</summary>
+    private static CalendarEvent? OverrideOf(ICalendar calendar, DateTimeOffset originalStart) =>
+        calendar.Events.FirstOrDefault(e => e.RecurrenceIdentifier is { } id && SameStart(id.StartTime, originalStart));
+
+    private static bool SameStart(CalDateTime value, DateTimeOffset start) =>
+        value.HasTime ? CalendarController.ToDateTimeOffset(value) == start : DateOnly.FromDateTime(value.Value) == DateOnly.FromDateTime(start.Date);
+
+    // The occurrence's start as the series writes it (same time zone or date form): what RECURRENCE-ID and EXDATE need.
+    private static CalDateTime SeriesTime(CalendarEvent master, DateTimeOffset originalStart)
+    {
+        var from = new CalDateTime(originalStart.UtcDateTime.AddDays(-1), "UTC");
+        var until = originalStart.AddDays(1);
+        foreach (var occurrence in master.GetOccurrences(from))
+        {
+            var start = CalendarController.ToDateTimeOffset(occurrence.Period.StartTime);
+            if (start > until)
+            {
+                break;
+            }
+
+            if (SameStart(occurrence.Period.StartTime, originalStart))
+            {
+                return occurrence.Period.StartTime;
+            }
+        }
+
+        // Not in the rule (anymore): written like the series' start.
+        var first = master.DtStart ?? throw new FormatException("Event has no start.");
+        if (!first.HasTime)
+        {
+            return new CalDateTime(DateOnly.FromDateTime(originalStart.Date));
+        }
+
+        return first.TzId is { } tzId && TimeZoneInfo.TryFindSystemTimeZoneById(tzId, out var zone)
+            ? new CalDateTime(DateTime.SpecifyKind(TimeZoneInfo.ConvertTime(originalStart, zone).DateTime, DateTimeKind.Unspecified), tzId)
+            : new CalDateTime(originalStart.UtcDateTime, "UTC");
+    }
+
+    private static string Serialize(ICalendar calendar) =>
+        new CalendarSerializer().SerializeToString(calendar) ?? throw new InvalidOperationException("Serializing the event failed.");
+
+    // Writes the draft's fields into one event of the calendar (a series master, single event or override).
+    private void Write(ICalendar calendar, CalendarEvent master, bool existing, bool series)
+    {
         master.Summary = Summary;
         master.Location = string.IsNullOrWhiteSpace(Location) ? null : Location;
         master.Description = string.IsNullOrWhiteSpace(Description) ? null : Description;
@@ -289,7 +439,7 @@ public sealed record EventDraft(
             master.DtEnd = new CalDateTime(DateTime.SpecifyKind(End > Start ? End : Start.AddMinutes(30), DateTimeKind.Unspecified), tzId);
         }
 
-        if (Recurrence != KindOf(master.RecurrenceRule))
+        if (series && Recurrence != KindOf(master.RecurrenceRule))
         {
             master.RecurrenceRule = Recurrence switch
             {
@@ -312,16 +462,13 @@ public sealed record EventDraft(
         }
 
         // Other clients only pick up changes reliably when SEQUENCE and DTSTAMP move forward.
-        if (existingData is not null)
+        if (existing)
         {
             master.Sequence++;
         }
 
         master.DtStamp = new CalDateTime(DateTime.UtcNow, "UTC");
         master.LastModified = master.DtStamp;
-
-        return new CalendarSerializer().SerializeToString(calendar)
-               ?? throw new InvalidOperationException("Serializing the event failed.");
     }
 
     // Only when the user changed it: other alarms (several, e-mail alarms of the server) stay untouched otherwise.

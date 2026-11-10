@@ -82,7 +82,7 @@ internal sealed partial class CategoryChoice(string name, string? color, bool is
 /// <summary>One invited person with their answer, shown below the attendee field.</summary>
 internal sealed record AttendeeStatus(string Text, string State);
 
-/// <summary>Create/edit/delete one event. Recurring events are edited as a whole series.</summary>
+/// <summary>Create/edit/delete one event: a series as a whole, or one occurrence of it (<see cref="Occurrence"/>).</summary>
 internal sealed partial class EventEditorViewModel : ViewModelBase
 {
     private readonly CalendarController _calendar;
@@ -307,6 +307,17 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     /// <summary>Contacts suggested while typing the attendees (none in tests).</summary>
     public Infrastructure.RecipientDirectory? Recipients { get; init; }
+
+    /// <summary>
+    /// Only this occurrence of the series is edited (its start in the series): saving changes it alone, deleting
+    /// removes it alone; recurrence and calendar stay.
+    /// </summary>
+    public DateTimeOffset? Occurrence { get; init; }
+
+    public bool IsOccurrence => Occurrence is not null;
+
+    /// <summary>Recurrence and calendar: not for a single occurrence (they belong to the series).</summary>
+    public bool CanChangeSeries => CanEdit && !IsOccurrence;
 
     /// <summary>The event as saved (calendar, its id there, what was saved) – for the mail it was made from.</summary>
     public (CalendarInfo Calendar, string RemoteId, EventDraft Draft)? Saved { get; private set; }
@@ -562,7 +573,9 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         await RunAsync(async () =>
         {
             var previous = _existing is { } e ? (await _calendar.GetObjectAsync(e.Calendar, e.RemoteId))?.ICalendarData : null;
-            var saved = await _calendar.SaveEventAsync(target, draft, _existing);
+            var saved = Occurrence is { } at && _existing is { } series
+                ? await _calendar.SaveOccurrenceAsync(series.Calendar, series.RemoteId, at, draft)
+                : await _calendar.SaveEventAsync(target, draft, _existing);
             Saved = (target, saved.RemoteId, draft);
             if (!IsOrganizer)
             {
@@ -624,7 +637,9 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         {
             try
             {
-                ResultMessage = await DeleteStoredAsync(_calendar, _invitations, existing.Calendar, existing.RemoteId, IsOrganizer, Organizer);
+                ResultMessage = Occurrence is { } at
+                    ? await DeleteOccurrenceAsync(_calendar, _invitations, existing.Calendar, existing.RemoteId, at, IsOrganizer)
+                    : await DeleteStoredAsync(_calendar, _invitations, existing.Calendar, existing.RemoteId, IsOrganizer, Organizer);
                 return true;
             }
             catch (EventDeletionException ex)
@@ -665,6 +680,31 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
         await calendar.DeleteEventAsync(target, remoteId);
         return message;
+    }
+
+    /// <summary>
+    /// Removes one occurrence of a series; the organizer's attendees get the changed series, where the server does not
+    /// tell them itself. Returns what was sent (null: nothing).
+    /// </summary>
+    internal static async Task<string?> DeleteOccurrenceAsync(CalendarController calendar, InvitationService invitations, CalendarInfo target, string remoteId,
+        DateTimeOffset originalStart, bool isOrganizer)
+    {
+        var previous = (await calendar.GetObjectAsync(target, remoteId))?.ICalendarData;
+        var saved = await calendar.DeleteOccurrenceAsync(target, remoteId, originalStart);
+        if (!isOrganizer || previous is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var sent = await invitations.SendAfterSaveAsync(target, previous, saved.ICalendarData);
+            return sent > 0 ? F("Gelöscht – Änderung an {0} Person(en) gesendet.", sent) : null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return T("Gelöscht, aber die Teilnehmer konnten nicht benachrichtigt werden: ") + ex.Message;
+        }
     }
 
     [RelayCommand]

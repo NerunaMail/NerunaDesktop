@@ -21,6 +21,7 @@ internal sealed class ViewLocator : IDataTemplate
         PollEditorViewModel => new PollEditorView(),
         AccountSetupViewModel => new AccountSetupView(),
         IcsSubscriptionViewModel => new IcsSubscriptionView(),
+        IcsImportViewModel => new IcsImportView(),
         PstAccountViewModel => new PstAccountView(),
         SearchIndexViewModel => new SearchIndexView(),
         LocalDataViewModel => new LocalDataView(),

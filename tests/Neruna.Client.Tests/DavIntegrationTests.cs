@@ -91,6 +91,71 @@ public sealed class DavIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task CalDav_changes_and_removes_one_occurrence_and_imports_a_file_twice_without_doubling()
+    {
+        Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");
+        var ct = TestContext.Current.CancellationToken;
+        await MakeCollectionAsync($"{_user}/arbeit/", "calendar", "Arbeit", ct);
+        await using var env = await CreateEnvironmentAsync(ServiceKind.Calendar, ProviderIds.CalDav);
+        Assert.Empty((await env.Calendar.SyncAllAsync(ct)).Failures);
+        var calendar = Assert.Single(await env.Calendar.GetCalendarsAsync(ct));
+
+        var start = new DateTime(2026, 10, 12, 9, 0, 0);
+        var series = await env.Calendar.SaveEventAsync(calendar, EventDraft.New(start) with { Summary = "Daily", Recurrence = RecurrenceKind.Daily }, null, ct);
+        var from = new DateTimeOffset(start.Date);
+        var week = await env.Calendar.GetOccurrencesAsync([calendar], from, from.AddDays(5), ct);
+        Assert.Equal(5, week.Count);
+
+        // Only Wednesday moves to the afternoon; only Thursday is removed.
+        var wednesday = week[2].RecurrenceId!.Value;
+        var single = EventDraft.FromOccurrence(series.ICalendarData, wednesday);
+        await env.Calendar.SaveOccurrenceAsync(calendar, series.RemoteId, wednesday, single with { Summary = "Daily (später)", Start = single.Start.AddHours(5), End = single.End.AddHours(5) }, ct);
+        await env.Calendar.DeleteOccurrenceAsync(calendar, series.RemoteId, week[3].RecurrenceId!.Value, ct);
+
+        await env.Calendar.SyncAllAsync(ct);
+        week = await env.Calendar.GetOccurrencesAsync([calendar], from, from.AddDays(5), ct);
+        Assert.Equal(["Daily", "Daily", "Daily (später)", "Daily"], week.Select(o => o.Summary));
+        Assert.Equal(14, week[2].Start.LocalDateTime.Hour);
+        var onServer = await GetStringAsync(series.RemoteId, ct);
+        Assert.Contains("RECURRENCE-ID", onServer, StringComparison.Ordinal);
+        Assert.Contains("EXDATE", onServer, StringComparison.Ordinal);
+
+        // A timetable: imported, then imported again (a newer version) – updated, not doubled.
+        const string Timetable = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Fahrplan//DE
+            METHOD:PUBLISH
+            BEGIN:VEVENT
+            UID:zug-1@fahrplan.example
+            DTSTAMP:20261001T000000Z
+            DTSTART:20261020T061200Z
+            DTEND:20261020T070500Z
+            SUMMARY:IC 5 Zürich – Bern
+            ORGANIZER:mailto:noreply@fahrplan.example
+            END:VEVENT
+            BEGIN:VEVENT
+            UID:zug-2@fahrplan.example
+            DTSTAMP:20261001T000000Z
+            DTSTART:20261020T163200Z
+            DTEND:20261020T172500Z
+            SUMMARY:IC 8 Bern – Zürich
+            END:VEVENT
+            END:VCALENDAR
+            """;
+        var events = CalendarImport.Read(Timetable);
+        Assert.Equal(new ImportResult(2, 0, 0, null), await env.Calendar.ImportAsync(calendar, events, null, ct));
+        var day = new DateTimeOffset(2026, 10, 20, 0, 0, 0, TimeSpan.Zero);
+        Assert.Equal(2, (await env.Calendar.GetOccurrencesAsync([calendar], day, day.AddDays(1), ct)).Count(o => o.Summary.StartsWith("IC", StringComparison.Ordinal)));
+
+        var newer = CalendarImport.Read(Timetable.Replace("IC 8 Bern – Zürich", "IC 8 Bern – Zürich HB", StringComparison.Ordinal));
+        Assert.Equal(new ImportResult(0, 2, 0, null), await env.Calendar.ImportAsync(calendar, newer, null, ct));
+        await env.Calendar.SyncAllAsync(ct);
+        var trains = await env.Calendar.GetOccurrencesAsync([calendar], day, day.AddDays(1), ct);
+        Assert.Equal(["IC 5 Zürich – Bern", "IC 8 Bern – Zürich HB"], trains.Select(o => o.Summary).Where(s => s.StartsWith("IC", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public async Task CalDav_colours_go_to_the_server_only_when_the_account_stores_them_there()
     {
         Assert.SkipWhen(ServerUrl is null, "NERUNA_TEST_DAV_URL not set");

@@ -294,7 +294,7 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
             when.Add(F("in «{0}»", action.When.FolderName));
         }
 
-        var steps = string.Join(" → ", action.Steps.Select(s => StepEditor.TitleOf(s.Kind)));
+        var steps = string.Join(" → ", action.Steps.Select(s => s is { Kind: QuickActionStepKind.Forward, AsAttachment: true } ? T("Als Anhang weiterleiten") : StepEditor.TitleOf(s.Kind)));
         return (when.Count == 0 ? T("Bei jeder E-Mail") : string.Join(", ", when)) + (steps.Length > 0 ? ": " + steps : string.Empty);
     }
 
@@ -306,7 +306,7 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
     {
         var options = await LoadOptionsAsync();
         var action = item?.Action ?? new QuickAction(Guid.NewGuid(), T("Neue Aktion"), Colors[0],
-            new QuickActionCondition { Attachment = QuickActionAttachmentKind.Pdf }, []);
+            new QuickActionCondition { Attachment = QuickActionAttachmentKind.None }, []);
         Editing = new QuickActionEditor(action, options, files, SaveEditedAsync, () => Editing = null)
         {
             TakenShortcuts = _actions.Where(a => a.Id != action.Id && a.Shortcut is not null).ToDictionary(a => a.Shortcut!, a => a.Label, StringComparer.OrdinalIgnoreCase),
@@ -698,6 +698,7 @@ internal sealed partial class StepEditor : ObservableObject
                  ?? Senders[0];
         MoveFolder = MoveFolders.FirstOrDefault(f => f.IsFolder && f.RemoteId == step.FolderRemoteId) ?? MoveFolders.FirstOrDefault(f => f.IsFolder && f.Name == step.FolderName);
         AskFolder = step.AskFolder;
+        AsAttachment = step.AsAttachment;
         Folder = step.Folder ?? string.Empty;
         FileName = step.FileName ?? string.Empty;
         To = step.To ?? string.Empty;
@@ -729,6 +730,7 @@ internal sealed partial class StepEditor : ObservableObject
         QuickActionStepKind.StampPdf => T("Das PDF öffnet sich in der Vorschau – Sie klicken auf die Stelle für den Stempel."),
         QuickActionStepKind.Print => T("Geht an den Standarddrucker."),
         QuickActionStepKind.Reply or QuickActionStepKind.ReplyAll => T("Mit den gestempelten PDFs als Anhang; die Antwort öffnet sich zum Prüfen und Senden."),
+        QuickActionStepKind.Forward when AsAttachment => T("Die ganze E-Mail unverändert als .eml-Anhang, gestempelte PDFs zusätzlich in der neuen Fassung; öffnet sich zum Prüfen und Senden."),
         QuickActionStepKind.Forward => T("Mit allen Anhängen, gestempelte in der neuen Fassung; öffnet sich zum Prüfen und Senden."),
         QuickActionStepKind.NewMail => T("Eine neue E-Mail mit den Anhängen; öffnet sich zum Prüfen und Senden."),
         _ => null,
@@ -743,6 +745,13 @@ internal sealed partial class StepEditor : ObservableObject
     public bool ShowsTo => Kind is QuickActionStepKind.Forward or QuickActionStepKind.NewMail;
 
     public bool ShowsSubject => Kind == QuickActionStepKind.NewMail;
+
+    public bool ShowsAsAttachment => Kind == QuickActionStepKind.Forward;
+
+    /// <summary>Forward: the whole mail as .eml attachment.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Hint))]
+    public partial bool AsAttachment { get; set; }
 
     public bool ShowsMoveFolder => Kind == QuickActionStepKind.MoveToFolder;
 
@@ -830,5 +839,6 @@ internal sealed partial class StepEditor : ObservableObject
         FolderRemoteId = ShowsMoveFolder && !AskFolder ? MoveFolder?.RemoteId : null,
         FolderName = ShowsMoveFolder && !AskFolder ? MoveFolder?.Name : null,
         AskFolder = ShowsMoveFolder && AskFolder,
+        AsAttachment = ShowsAsAttachment && AsAttachment,
     };
 }

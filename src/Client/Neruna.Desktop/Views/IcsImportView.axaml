@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:cal="using:Neruna.Core.Calendar"
+             x:Class="Neruna.Desktop.Views.IcsImportView"
+             x:DataType="vm:IcsImportViewModel">
+
+  <StackPanel>
+    <TextBlock Text="{l:T 'Termine importieren'}" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Classes="subtle" TextWrapping="Wrap" Margin="0,4,0,8"
+               Text="{l:T 'Die Termine einer .ics-Datei, z. B. ein Fahrplan oder Stundenplan, werden in einen eigenen Kalender kopiert und lassen sich dort wie alle Termine ändern. Für Kalender, die sich laufend ändern, ist «Internet-Kalender abonnieren» besser.'}" />
+    <TextBlock Classes="error" Margin="0,4,0,0" IsVisible="{Binding NoCalendar}"
+               Text="{l:T 'Kein beschreibbarer Kalender vorhanden. Bitte ein Konto mit CalDAV hinzufügen.'}" />
+
+    <TextBlock Classes="label" Text="{l:T 'Datei'}" />
+    <Grid ColumnDefinitions="*,8,Auto">
+      <TextBox Text="{Binding FileName}" IsReadOnly="True" PlaceholderText="{l:T 'Keine Datei gewählt'}" />
+      <Button Grid.Column="2" Content="{l:T 'Datei wählen …'}" Command="{Binding PickFileCommand}" />
+    </Grid>
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" Text="{Binding Found}"
+               IsVisible="{Binding Found, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <TextBlock Classes="label" Text="{l:T 'In Kalender'}" />
+    <ComboBox ItemsSource="{Binding Calendars}" SelectedItem="{Binding SelectedCalendar}" HorizontalAlignment="Stretch">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="cal:CalendarInfo">
+          <TextBlock Text="{Binding Name}" />
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+               Text="{l:T 'Wird dieselbe Datei später nochmals importiert, werden die Termine aktualisiert statt verdoppelt (nicht bei Microsoft 365 und Exchange). Einladungen werden keine verschickt.'}" />
+
+    <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap" Margin="0,12,0,0"
+               IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <Grid ColumnDefinitions="Auto,8,Auto,*,Auto,Auto" Margin="0,20,0,0">
+      <ProgressBar IsIndeterminate="True" Width="80" MinWidth="0" Height="4" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="2" Classes="subtle" FontSize="12" Text="{Binding Progress}" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+      <Button Grid.Column="4" Content="{l:T 'Schliessen'}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="5" Classes="accent" Content="{l:T 'Importieren'}" Command="{Binding ImportCommand}" />
+    </Grid>
+  </StackPanel>
+</UserControl>

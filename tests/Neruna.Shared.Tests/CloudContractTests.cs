@@ -87,6 +87,15 @@ public class CloudContractTests
     }
 
     [Fact]
+    public void Client_reads_the_calendar_categories()
+    {
+        var response = JsonSerializer.Deserialize<CalendarCategoriesResponse>(ContractFixtures.Read("calendar-categories-example.json"), NerunaJson.Options)!;
+
+        var category = Assert.Single(response.Categories);
+        Assert.Equal(("Kundentermin", "#2f9e44"), (category.Name, category.Color));
+    }
+
+    [Fact]
     public void Client_reads_the_polls()
     {
         var response = JsonSerializer.Deserialize<PollsResponse>(ContractFixtures.Read("polls-example.json"), NerunaJson.Options)!;

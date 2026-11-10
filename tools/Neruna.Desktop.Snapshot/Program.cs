@@ -350,6 +350,18 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "settings-quick-actions.png");
 
+        // A new one: "egal" preset for attachments; a forward step with "Als Anhang weiterleiten".
+        await vm.SettingsPage.QuickActions.NewCommand.ExecuteAsync(null);
+        if (vm.SettingsPage.QuickActions.Editing is { } editor)
+        {
+            editor.AddStepCommand.Execute(Neruna.Desktop.ViewModels.QuickActionEditor.StepKinds.First(k => k.Value == Neruna.Core.Mail.QuickActionStepKind.Forward));
+            editor.Steps[^1].AsAttachment = true;
+            Console.WriteLine($"New quick action: attachment {editor.AttachmentKind.Title}, forward as attachment {editor.Steps[^1].ToStep().AsAttachment}");
+            await Task.Delay(300);
+            await SaveAsync(window, output, "settings-quick-action-new.png");
+            vm.SettingsPage.QuickActions.Editing = null;
+        }
+
         // Schlagwörter: one from the organisation, the chips in the list, the right-click submenu and the settings page.
         var tagService = services.GetRequiredService<Neruna.Core.Mail.MailTagService>();
         await tagService.SetCloudAsync("snapshot", [new Neruna.Core.Mail.MailTag("offerte", "Offerte", "#e8590c", "snapshot")]);
@@ -696,6 +708,12 @@ internal static class Snapshots
         vm.MailPage.Compose.RemoveAttachmentCommand.Execute(vm.MailPage.Compose.Attachments[0]);
         File.Delete(pdfFile);
 
+        // Anhang-Erinnerung: the text announces an attachment, nothing is attached.
+        await Task.Delay(1000);
+        vm.MailPage.Compose.MissingAttachmentHint = Neruna.Core.Localization.Texts.F("Im Text steht «{0}», aber es ist nichts angehängt.", "Anhang");
+        await SaveAsync(window, output, "compose-attachment-reminder.png");
+        vm.MailPage.Compose.MissingAttachmentHint = null;
+
         // An: typing suggests contacts and groups; the "An …" button opens the picker (several at once).
         var toBox = window.GetVisualDescendants().OfType<Neruna.Desktop.Controls.RecipientBox>().First();
         // Letter by letter (each one replaces the suggestions; the first versions crashed here on Windows).
@@ -1029,6 +1047,10 @@ internal static class Snapshots
         };
         vm.Overlay = categoryEditor;
         await SaveAsync(window, output, "event-categories.png");
+        // Only one occurrence of a series: repetition and calendar stay with the series.
+        vm.Overlay = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal],
+            meeting with { Attendees = [] }, (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com") { Occurrence = new DateTimeOffset(meeting.Start) };
+        await SaveAsync(window, output, "event-occurrence.png");
         if (window.GetVisualDescendants().OfType<DropDownButton>().FirstOrDefault(b => b.IsEffectivelyVisible && b.Flyout is Flyout) is { } categoryButton)
         {
             categoryButton.Flyout!.ShowAt(categoryButton);
@@ -1193,6 +1215,22 @@ internal static class Snapshots
             await Task.Delay(200);
             await SaveAsync(window, output, "calendar-subscribe-file.png");
             subscription.CancelCommand.Execute(null);
+        }
+
+        // "Termine importieren": a timetable file read, into an own calendar.
+        vm.CalendarPage.ImportCommand.Execute(null);
+        await Task.Delay(300);
+        if (vm.Overlay is IcsImportViewModel import)
+        {
+            var timetable = Path.Combine(Path.GetTempPath(), "Fahrplan Pendeln.ics");
+            await File.WriteAllTextAsync(timetable, "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Demo//DE\r\n"
+                + string.Concat(Enumerable.Range(0, 10).Select(i => $"BEGIN:VEVENT\r\nUID:zug-{i}@demo\r\nDTSTAMP:20261001T000000Z\r\nDTSTART:202610{12 + i / 2:00}T{(i % 2 == 0 ? "061200" : "163200")}Z\r\nDURATION:PT53M\r\nSUMMARY:{(i % 2 == 0 ? "IC 5 Zürich – Bern" : "IC 8 Bern – Zürich")}\r\nEND:VEVENT\r\n"))
+                + "END:VCALENDAR\r\n");
+            await import.LoadAsync(timetable);
+            await Task.Delay(200);
+            await SaveAsync(window, output, "calendar-import.png");
+            import.CancelCommand.Execute(null);
+            File.Delete(timetable);
         }
 
         // The navigator: drag over three days of next week, then Ctrl+click a day after – only those days on the right

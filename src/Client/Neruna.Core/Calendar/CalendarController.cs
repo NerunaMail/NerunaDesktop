@@ -28,6 +28,12 @@ public sealed record CalendarOccurrence(
 
     /// <summary>Categories by name (iCalendar CATEGORIES).</summary>
     public IReadOnlyList<string> Categories { get; init; } = [];
+
+    /// <summary>
+    /// An occurrence of a series: its start as the series has it (RECURRENCE-ID), also when it was moved; null for a
+    /// single event. Identifies it for <see cref="CalendarController.SaveOccurrenceAsync"/>.
+    /// </summary>
+    public DateTimeOffset? RecurrenceId { get; init; }
 }
 
 /// <summary>A calendar offered by the server, for choosing which ones to show (Thunderbird only offers this at setup).</summary>
@@ -276,6 +282,127 @@ public sealed class CalendarController(
         }
 
         return saved;
+    }
+
+    /// <summary>
+    /// Changes only one occurrence of the series at <paramref name="remoteId"/> (the one that starts at
+    /// <paramref name="originalStart"/> in the series) to <paramref name="draft"/>; the series stays as it is.
+    /// </summary>
+    /// <exception cref="RemoteConflictException">Someone changed or deleted the series on the server; sync and retry.</exception>
+    public async Task<CalendarObject> SaveOccurrenceAsync(
+        CalendarInfo calendar,
+        string remoteId,
+        DateTimeOffset originalStart,
+        EventDraft draft,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        ArgumentNullException.ThrowIfNull(draft);
+        var current = await GetObjectAsync(calendar, remoteId, cancellationToken) ?? throw new RemoteConflictException();
+        var data = draft.ToOccurrenceICalendar(current.ICalendarData, originalStart);
+        CalendarObject saved;
+        await using (var provider = providers.CreateCalendar(await ConnectionAsync(calendar.ConnectionId, cancellationToken)))
+        {
+            saved = provider is ICalendarOccurrences occurrences
+                ? await occurrences.SaveOccurrenceAsync(calendar, current, originalStart,
+                    EventDraft.OccurrenceIdOf(current.ICalendarData, originalStart), EventDraft.OccurrenceAlone(data, originalStart)!, cancellationToken)
+                : await provider.SaveAsync(calendar, current with { ICalendarData = data }, cancellationToken);
+        }
+
+        await store.UpsertObjectAsync(calendar, saved, cancellationToken);
+        return saved;
+    }
+
+    /// <summary>Removes only one occurrence of the series at <paramref name="remoteId"/>; the others stay.</summary>
+    /// <exception cref="RemoteConflictException">Someone changed or deleted the series on the server; sync and retry.</exception>
+    public async Task<CalendarObject> DeleteOccurrenceAsync(
+        CalendarInfo calendar,
+        string remoteId,
+        DateTimeOffset originalStart,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        var current = await GetObjectAsync(calendar, remoteId, cancellationToken) ?? throw new RemoteConflictException();
+        CalendarObject saved;
+        await using (var provider = providers.CreateCalendar(await ConnectionAsync(calendar.ConnectionId, cancellationToken)))
+        {
+            saved = provider is ICalendarOccurrences occurrences
+                ? await occurrences.DeleteOccurrenceAsync(calendar, current, originalStart, EventDraft.OccurrenceIdOf(current.ICalendarData, originalStart), cancellationToken)
+                : await provider.SaveAsync(calendar, current with { ICalendarData = EventDraft.WithoutOccurrence(current.ICalendarData, originalStart) }, cancellationToken);
+        }
+
+        await store.UpsertObjectAsync(calendar, saved, cancellationToken);
+        return saved;
+    }
+
+    /// <summary>
+    /// Copies imported events into <paramref name="target"/>. An event imported there before (same UID) is updated, so a
+    /// newer version of the same file replaces the events instead of doubling them; one whose UID is in another calendar
+    /// of the account gets a new UID (servers refuse the same UID twice or mix the two up). One failure does not stop the rest.
+    /// </summary>
+    /// <param name="progress">The number of events done so far.</param>
+    public async Task<ImportResult> ImportAsync(CalendarInfo target, IReadOnlyList<ImportedEvent> events, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(events);
+        var here = new Dictionary<string, CalendarObject>(StringComparer.Ordinal);
+        var elsewhere = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var calendar in (await store.GetCalendarsAsync(target.ConnectionId, cancellationToken)).Where(c => c.HasEvents))
+        {
+            var same = calendar.RemoteId == target.RemoteId;
+            foreach (var item in await store.GetObjectsAsync(calendar.ConnectionId, calendar.RemoteId, cancellationToken))
+            {
+                if (EventDraft.UidOf(item.ICalendarData) is { } uid)
+                {
+                    if (same)
+                    {
+                        here.TryAdd(uid, item);
+                    }
+                    else
+                    {
+                        elsewhere.Add(uid);
+                    }
+                }
+            }
+        }
+
+        int added = 0, updated = 0, failed = 0, done = 0;
+        string? firstError = null;
+        await using (var provider = providers.CreateCalendar(await ConnectionAsync(target.ConnectionId, cancellationToken)))
+        {
+            foreach (var imported in events)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var known = here.GetValueOrDefault(imported.Uid);
+                    var toSave = known is null && elsewhere.Contains(imported.Uid) ? CalendarImport.WithNewUid(imported) : imported;
+                    var saved = await provider.SaveAsync(target, known is null
+                        ? new CalendarObject(string.Empty, null, toSave.ICalendarData)
+                        : known with { ICalendarData = toSave.ICalendarData }, cancellationToken);
+                    await store.UpsertObjectAsync(target, saved, cancellationToken);
+                    if (known is null)
+                    {
+                        added++;
+                    }
+                    else
+                    {
+                        updated++;
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    failed++;
+                    firstError ??= ex is RemoteConflictException ? T("Der Termin wurde inzwischen auf dem Server geändert.") : ex.Message;
+                    logger.LogWarning(ex, "Importing an event into {Calendar} failed", target.RemoteId);
+                }
+
+                progress?.Report(++done);
+            }
+        }
+
+        logger.LogInformation("Imported into {Calendar}: {Added} added, {Updated} updated, {Failed} failed", target.RemoteId, added, updated, failed);
+        return new ImportResult(added, updated, failed, firstError);
     }
 
     /// <summary>The stored event with this UID (an invitation's event), in whichever calendar it is.</summary>
@@ -701,10 +828,13 @@ public sealed class CalendarController(
         {
             ShowAs = EventDraft.ShowAsOf(evt),
             Categories = EventDraft.CategoriesOf(evt),
+            RecurrenceId = evt.RecurrenceIdentifier is { } id ? ToDateTimeOffset(id.StartTime)
+                : evt.RecurrenceRule is not null || evt.RecurrenceDates.GetAllDates().Any() ? start : null,
         };
     }
 
-    internal static DateTimeOffset ToDateTimeOffset(CalDateTime value)
+    /// <summary>An iCalendar time as a local DateTimeOffset (all-day dates and floating times: wall clock here).</summary>
+    public static DateTimeOffset ToDateTimeOffset(CalDateTime value)
     {
         if (!value.HasTime || value.IsFloating)
         {
