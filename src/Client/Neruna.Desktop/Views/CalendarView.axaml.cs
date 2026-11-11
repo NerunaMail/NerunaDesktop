@@ -421,10 +421,12 @@ internal sealed partial class CalendarView : UserControl
         else
         {
             var occurrence = drag.Target!.Item.Occurrence;
-            var days = drag.Kind == CalendarDragKind.Move ? DayAt(position.X) - drag.OriginDay : 0;
+            column = drag.Kind == CalendarDragKind.Move ? DayAt(position.X) : drag.OriginDay;
+            // Days between the two columns' dates, not columns: days picked in the mini calendar (1 and 10 December)
+            // need not follow each other.
+            var days = (vm.Days[column].Date.Date - vm.Days[drag.OriginDay].Date.Date).Days;
             drag.Times = CalendarDrag.Change(drag.Kind, occurrence.Start.LocalDateTime, occurrence.End.LocalDateTime,
                 minutes - MinutesAt(drag.Origin.Y), days, slot);
-            column = drag.Kind == CalendarDragKind.Move ? DayAt(position.X) : drag.OriginDay;
         }
 
         ShowPreview(vm, drag, column);

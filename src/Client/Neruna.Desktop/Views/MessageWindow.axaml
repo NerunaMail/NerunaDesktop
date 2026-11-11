@@ -14,6 +14,7 @@
     <KeyBinding Gesture="Ctrl+R" Command="{Binding ReplyCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" />
     <KeyBinding Gesture="Ctrl+F" Command="{Binding ForwardCommand}" />
+    <KeyBinding Gesture="Ctrl+P" Command="{Binding Pane.PrintCommand}" />
     <KeyBinding Gesture="Delete" Command="{Binding DeleteCommand}" />
     <KeyBinding Gesture="Escape" Command="{Binding $parent[Window].Close}" />
   </Window.KeyBindings>

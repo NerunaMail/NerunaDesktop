@@ -20,6 +20,10 @@
   #editor ul, #editor ol { margin: 0; padding-left: 1.3em; }
   #editor ol { padding-left: 1.8em; }
   #editor > ul, #editor > ol { margin: 0 0 var(--paragraph-spacing, 0.5em) 0; }
+  /* The line above a list ("Erbschaft Mutter:") belongs to it: no gap in between, whether the browser keeps the list
+     inside that line's block or puts it next to it (which deleting an empty line above can change). The negative
+     margin cancels the line's own spacing; cleanHtml sets it to 0 in the sent mail. */
+  #editor > div + ul, #editor > div + ol, #editor > p + ul, #editor > p + ol { margin-top: calc(-1 * var(--paragraph-spacing, 0.5em)); }
   #editor blockquote { margin: 0 0 0 4px; padding-left: 10px; border-left: 2px solid #c8c8c8; }
   #editor img { max-width: 100%; }
   /* A fine frame around pictures while writing, so white or transparent ones can be seen (not sent: CSS of the editor). */
@@ -237,7 +241,8 @@
     // The paragraph spacing travels with the mail (inline, which every mail program understands).
     Array.prototype.slice.call(clone.children).forEach(function (el) {
       if ((el.tagName === "DIV" || el.tagName === "P") && !el.style.margin && !el.style.marginBottom) {
-        el.style.margin = "0 0 " + paragraphSpacing + " 0";
+        var next = el.nextElementSibling;
+        el.style.margin = "0 0 " + (next && (next.tagName === "UL" || next.tagName === "OL") ? "0" : paragraphSpacing) + " 0";
       }
     });
     Array.prototype.slice.call(clone.querySelectorAll("ul, ol")).forEach(function (list) {
@@ -699,15 +704,32 @@
     imageGrip.addEventListener("pointercancel", up);
   });
 
+  /**
+   * The outermost element that starts with the marker (signature or quote) – so a block holding just the signature
+   * goes with it. It stops where own text comes before: a draft that comes back from getHtml() (popped out, opened
+   * again) has everything inside the font wrapper, and the wrapper itself must not count as the signature.
+   */
+  function blockOf(marker) {
+    var node = marker;
+    while (node.parentNode && node.parentNode !== editor && startsWith(node.parentNode, node)) node = node.parentNode;
+    return node;
+  }
+
+  function startsWith(parent, child) {
+    for (var n = parent.firstChild; n && n !== child; n = n.nextSibling) {
+      if (n.nodeType === 1 && (n.tagName === "IMG" || n.querySelector("img") || n.textContent.replace(/[\s\u200B]/g, "") !== "")) return false;
+      if (n.nodeType === 3 && n.nodeValue.replace(/[\s\u200B]/g, "") !== "") return false;
+    }
+    return true;
+  }
+
   // AI: the user's own text runs from the start up to the signature or the quoted message, whichever comes first.
   function ownRange() {
     var range = document.createRange();
     range.setStart(editor, 0);
     var marker = editor.querySelector("#neruna-signature, #neruna-quote");
     if (marker) {
-      var node = marker;
-      while (node.parentNode && node.parentNode !== editor) node = node.parentNode;
-      range.setEndBefore(node);
+      range.setEndBefore(blockOf(marker));
     } else {
       range.setEnd(editor, editor.childNodes.length);
     }
@@ -737,9 +759,8 @@
       var quote = editor.querySelector("#neruna-quote");
       var quoted = "";
       if (quote) {
-        while (quote.parentNode && quote.parentNode !== editor) quote = quote.parentNode;
         var range = document.createRange();
-        range.setStartBefore(quote);
+        range.setStartBefore(blockOf(quote));
         range.setEnd(editor, editor.childNodes.length);
         quoted = textOf(range.cloneContents());
       }
