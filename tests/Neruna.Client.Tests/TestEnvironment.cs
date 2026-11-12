@@ -58,6 +58,7 @@ internal sealed class TestEnvironment : IAsyncDisposable
         services.AddSingleton<IProviderFactory<IMailProvider>>(_ => new FakeMailProviderFactory(env!.MailServer));
         services.AddSingleton<IProviderFactory<ICalendarProvider>>(_ => new IcsProviderFactory(new HttpClient(env!.Http)));
         services.AddSingleton<ProviderRegistry>();
+        services.AddSingleton(new LocalDraftStore(directory));
         services.AddSingleton<MailController>();
         services.AddSingleton<MailPushService>();
         services.AddSingleton<Neruna.Core.Calendar.ReminderService>();

@@ -41,6 +41,20 @@ public sealed class SystemDavDns : IDavDns
         }
     }
 
+    /// <summary>The mail servers (MX) of a domain, best first; used to tell the provider of an own domain.</summary>
+    public async Task<IReadOnlyList<string>> MxAsync(string domain, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var answer = await _client.Value.QueryAsync(domain, QueryType.MX, cancellationToken: cancellationToken);
+            return [.. answer.Answers.OfType<MxRecord>().OrderBy(r => r.Preference).Select(r => r.Exchange.Value.TrimEnd('.'))];
+        }
+        catch (Exception ex) when (ex is DnsResponseException or System.Net.Sockets.SocketException or InvalidOperationException)
+        {
+            return [];
+        }
+    }
+
     public async Task<IReadOnlyList<string>> TxtAsync(string name, CancellationToken cancellationToken)
     {
         try

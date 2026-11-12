@@ -66,15 +66,10 @@ internal sealed partial class MailView : UserControl
             }
         });
 
-        // Ctrl+E: into the quick search.
+        // Ctrl+F into the search: MainWindow, for every page.
         KeyDown += (_, e) =>
         {
-            if (e.Key == Key.E && e.KeyModifiers == KeyModifiers.Control)
-            {
-                this.FindControl<TextBox>("QuickSearch")?.Focus();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None && !e.Handled && ViewModel is { } current && DeletesMessage(current))
+            if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None && !e.Handled && ViewModel is { } current && DeletesMessage(current))
             {
                 current.DeleteCommand.Execute(null);
                 e.Handled = true;
@@ -266,8 +261,25 @@ internal sealed partial class MailView : UserControl
     // Right click on a mail: the "Schlagwörter" submenu gets each tag (ticked when all selected mails have it), then "Verwalten …".
     private async void OnMessageMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (sender is not ContextMenu menu || DataContext is not MailViewModel vm
-            || menu.Items.OfType<MenuItem>().FirstOrDefault(i => i.Tag as string == "tags") is not { } tagsItem)
+        if (sender is not ContextMenu menu || DataContext is not MailViewModel vm)
+        {
+            return;
+        }
+
+        var (anyUnread, anyRead) = vm.ReadStates();
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            if (item.Tag as string == "read")
+            {
+                item.IsVisible = anyUnread;
+            }
+            else if (item.Tag as string == "unread")
+            {
+                item.IsVisible = anyRead;
+            }
+        }
+
+        if (menu.Items.OfType<MenuItem>().FirstOrDefault(i => i.Tag as string == "tags") is not { } tagsItem)
         {
             return;
         }

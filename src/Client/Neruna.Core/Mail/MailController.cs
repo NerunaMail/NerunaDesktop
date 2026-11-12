@@ -18,8 +18,12 @@ public sealed class MailController(
     ProviderRegistry providers,
     ILogger<MailController> logger,
     SyncActivity? activity = null,
-    ISettingsStore? settings = null)
+    ISettingsStore? settings = null,
+    LocalDraftStore? localDrafts = null)
 {
+    /// <summary>Safety copies of drafts on this device; null where they are not kept (tests, the app).</summary>
+    public LocalDraftStore? LocalDrafts => localDrafts;
+
     // Per sync run and account at most this much is fetched ahead for offline use; the next run goes on.
     private const int OfflineBatch = 200;
     private const long OfflineBytesPerRun = 100L * 1024 * 1024;
@@ -31,8 +35,15 @@ public sealed class MailController(
     /// <summary>One folder of a full sync is done – the UI can show it before the others (raised on the syncing thread).</summary>
     public event EventHandler<MailFolder>? FolderSynced;
 
-    public Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default) =>
-        SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Mail, SyncConnectionAsync, logger, cancellationToken, activity);
+    public async Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default)
+    {
+        if (localDrafts is not null)
+        {
+            localDrafts.Prune([.. (await accounts.GetAccountsAsync(cancellationToken)).SelectMany(a => a.ConnectionsOf(ServiceKind.Mail)).Select(c => c.Id)]);
+        }
+
+        return await SyncReport.ForEachConnectionAsync(accounts, ServiceKind.Mail, SyncConnectionAsync, logger, cancellationToken, activity);
+    }
 
     public async Task SyncConnectionAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
     {
@@ -51,6 +62,56 @@ public sealed class MailController(
         }
 
         await KeepOfflineAsync(provider, connection, folders, cancellationToken);
+        await StoreWaitingDraftsAsync(connection, cancellationToken);
+    }
+
+    /// <summary>
+    /// Drafts that only got as far as this device (no connection when they were saved, or Neruna ended unexpectedly)
+    /// go into "Entwürfe" now that the account was reached; each copy is removed once the server has it.
+    /// </summary>
+    /// <returns>How many were stored.</returns>
+    public async Task<int> StoreWaitingDraftsAsync(ServiceConnection connection, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        if (localDrafts is null)
+        {
+            return 0;
+        }
+
+        var stored = 0;
+        foreach (var key in localDrafts.Waiting(connection.Id))
+        {
+            try
+            {
+                MimeMessage draft;
+                try
+                {
+                    draft = await localDrafts.LoadAsync(key, cancellationToken);
+                }
+                catch (FormatException)
+                {
+                    localDrafts.Remove(key); // unreadable (cut off while writing): nothing to store
+                    continue;
+                }
+
+                // An earlier version already in "Entwürfe" (saved before the connection was lost) is replaced.
+                await SaveDraftAsync(connection, draft, LocalDraftStore.RemoteIdOf(key), cancellationToken);
+
+                localDrafts.Remove(key);
+                stored++;
+            }
+            catch (NotSupportedException)
+            {
+                localDrafts.Remove(key); // this account has no "Entwürfe"
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+            {
+                logger.LogInformation(ex, "A draft kept on this device could not be stored in the drafts folder yet");
+                break; // the next sync tries again
+            }
+        }
+
+        return stored;
     }
 
     /// <summary>How far back the account keeps its mail complete on this device (Einstellungen → Konten).</summary>
@@ -370,17 +431,69 @@ public sealed class MailController(
         return folders;
     }
 
-    public Task<IReadOnlyList<MessageSummary>> GetMessagesAsync(MailFolder folder, int skip = 0, int take = 200, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<MessageSummary>> GetMessagesAsync(MailFolder folder, int skip = 0, int take = 200, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(folder);
-        return store.GetMessagesAsync(folder.ConnectionId, folder.RemoteId, skip, take, cancellationToken);
+        var stored = await store.GetMessagesAsync(folder.ConnectionId, folder.RemoteId, skip, take, cancellationToken);
+        if (folder.Role != FolderRole.Drafts || skip > 0 || localDrafts is null)
+        {
+            return stored;
+        }
+
+        // "Entwürfe" also shows the drafts that are only on this device so far (no connection when they were saved):
+        // they can be opened and written on; the account's next sync puts them on the server.
+        var waiting = await WaitingDraftsAsync(folder.ConnectionId, cancellationToken);
+        return waiting.Count == 0 ? stored : [.. waiting, .. stored];
     }
+
+    private async Task<IReadOnlyList<MessageSummary>> WaitingDraftsAsync(Guid connectionId, CancellationToken cancellationToken)
+    {
+        var summaries = new List<MessageSummary>();
+        foreach (var key in localDrafts!.Waiting(connectionId))
+        {
+            try
+            {
+                var draft = await localDrafts.LoadAsync(key, cancellationToken);
+                static MailAddress Address(MailboxAddress m) => new(string.IsNullOrWhiteSpace(m.Name) ? null : m.Name, m.Address);
+                summaries.Add(new MessageSummary(
+                    LocalDraftStore.RemoteIdOf(key),
+                    draft.MessageId,
+                    draft.InReplyTo,
+                    draft.Subject ?? string.Empty,
+                    draft.From.Mailboxes.Select(Address).FirstOrDefault(),
+                    [.. draft.To.Mailboxes.Select(Address)],
+                    localDrafts.SavedAt(key),
+                    MessageFlags.Seen | MessageFlags.Draft,
+                    0,
+                    draft.Attachments.Any(),
+                    T("Nur auf diesem Gerät – kommt in «Entwürfe», sobald das Konto erreichbar ist.")));
+            }
+            catch (Exception ex) when (ex is IOException or FormatException or UnauthorizedAccessException)
+            {
+                logger.LogInformation(ex, "A draft kept on this device could not be read for the list");
+            }
+        }
+
+        summaries.Reverse(); // newest first, like the list
+        return summaries;
+    }
+
+    // Drafts only on this device are no messages of the server: flags, tags and moving leave them out.
+    private static IReadOnlyCollection<string> OnServer(IReadOnlyCollection<string> remoteIds) =>
+        remoteIds.Any(LocalDraftStore.IsLocal) ? [.. remoteIds.Where(id => !LocalDraftStore.IsLocal(id))] : remoteIds;
 
     /// <summary>Returns the full message, from the offline cache when possible.</summary>
     public async Task<MimeMessage> GetMessageAsync(ServiceConnection connection, MailFolder folder, string remoteId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(folder);
+
+        if (LocalDraftStore.TryKey(remoteId, out var localKey))
+        {
+            return localDrafts is not null && localDrafts.Exists(localKey)
+                ? await localDrafts.LoadAsync(localKey, cancellationToken)
+                : throw new InvalidOperationException(T("Dieser Entwurf ist inzwischen in «Entwürfe» auf dem Server."));
+        }
 
         var cached = await store.OpenMessageContentAsync(folder.ConnectionId, folder.RemoteId, remoteId, cancellationToken);
         if (cached is not null)
@@ -405,6 +518,11 @@ public sealed class MailController(
     public async Task SetFlagsAsync(ServiceConnection connection, MailFolder folder, IReadOnlyCollection<string> remoteIds, MessageFlags flags, bool add, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(folder);
+        remoteIds = OnServer(remoteIds);
+        if (remoteIds.Count == 0)
+        {
+            return;
+        }
 
         await using var provider = providers.CreateMail(connection);
         await provider.SetFlagsAsync(folder, remoteIds, flags, add, cancellationToken);
@@ -423,6 +541,11 @@ public sealed class MailController(
     {
         ArgumentNullException.ThrowIfNull(folder);
         ArgumentNullException.ThrowIfNull(tag);
+        remoteIds = OnServer(remoteIds);
+        if (remoteIds.Count == 0)
+        {
+            return;
+        }
 
         await using var provider = providers.CreateMail(connection);
         await provider.SetTagAsync(folder, remoteIds, tag, add, cancellationToken);
@@ -476,6 +599,11 @@ public sealed class MailController(
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
+        remoteIds = OnServer(remoteIds);
+        if (remoteIds.Count == 0)
+        {
+            return;
+        }
 
         await using var provider = providers.CreateMail(connection);
         await provider.MoveAsync(source, remoteIds, target, cancellationToken);
@@ -618,6 +746,21 @@ public sealed class MailController(
     public async Task DeleteAsync(ServiceConnection connection, MailFolder folder, IReadOnlyCollection<string> remoteIds, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(folder);
+
+        // A draft that is only on this device: deleting removes its copy (there is no trash for it).
+        foreach (var id in remoteIds)
+        {
+            if (LocalDraftStore.TryKey(id, out var localKey))
+            {
+                localDrafts?.Remove(localKey);
+            }
+        }
+
+        remoteIds = OnServer(remoteIds);
+        if (remoteIds.Count == 0)
+        {
+            return;
+        }
 
         var trash = await FindFolderAsync(folder.ConnectionId, FolderRole.Trash, cancellationToken);
         if (trash is not null && trash.RemoteId != folder.RemoteId)
@@ -779,6 +922,15 @@ public sealed class MailController(
 
         draft.MessageId ??= Privacy.OutgoingMail.NewMessageId(draft.From.Mailboxes.FirstOrDefault()?.Address);
         var folder = await GetDraftsFolderAsync(provider, connection.Id, cancellationToken);
+
+        // The version before is a copy on this device (opened from the list while the account could not be reached):
+        // what it replaces on the server is an earlier version of the same draft, if one got there.
+        if (LocalDraftStore.IsLocal(previousRemoteId))
+        {
+            previousRemoteId = (await store.FindByMessageIdAsync(draft.MessageId, cancellationToken))
+                .FirstOrDefault(h => h.ConnectionId == connection.Id && h.FolderRemoteId == folder.RemoteId).RemoteId;
+        }
+
         await provider.AppendAsync(folder, draft, MessageFlags.Seen | MessageFlags.Draft, DateTimeOffset.Now, cancellationToken);
 
         // Only now that the new version is stored: remove the old one.
@@ -797,6 +949,12 @@ public sealed class MailController(
     public async Task DeleteDraftAsync(ServiceConnection connection, string remoteId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        if (LocalDraftStore.TryKey(remoteId, out var localKey))
+        {
+            localDrafts?.Remove(localKey);
+            return;
+        }
+
         if (await FindFolderAsync(connection.Id, FolderRole.Drafts, cancellationToken) is not { } folder)
         {
             return;

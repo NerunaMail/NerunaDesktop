@@ -30,7 +30,8 @@ public sealed partial class ImapMailProvider(
     ICredentialStore credentials,
     ILogger<ImapMailProvider> logger,
     string? protocolLogDirectory = null,
-    int maxInitialMessages = ImapMailProvider.DefaultMaxInitialMessages) : IMailProvider, IAutoReplyProvider
+    int maxInitialMessages = ImapMailProvider.DefaultMaxInitialMessages,
+    ImapSessionPool? sessions = null) : IMailProvider, IAutoReplyProvider
 {
     /// <summary>On first sync only the newest messages are fetched; older ones are loaded on demand (scrolling down).</summary>
     public const int DefaultMaxInitialMessages = 2000;
@@ -50,6 +51,9 @@ public sealed partial class ImapMailProvider(
 
     private ImapClient? _imap;
     private IMailFolder? _selected;
+
+    // Testing an account must really connect and sign in (a kept connection would also "work" with a wrong password).
+    private bool _ownConnectionOnly;
 
     public MailProviderCapabilities Capabilities =>
         MailProviderCapabilities.Send | MailProviderCapabilities.Flags | MailProviderCapabilities.Move |
@@ -97,6 +101,8 @@ public sealed partial class ImapMailProvider(
 
     public async Task TestConnectionAsync(CancellationToken cancellationToken = default)
     {
+        _ownConnectionOnly = true;
+        sessions?.Forget(connectionId); // settings or password may just have changed: nothing kept from before
         await GetImapAsync(cancellationToken);
         using var smtp = await ConnectSmtpAsync(cancellationToken);
         await smtp.DisconnectAsync(true, cancellationToken);
@@ -654,6 +660,13 @@ public sealed partial class ImapMailProvider(
     {
         if (_imap is { } imap)
         {
+            if (await KeepForReuseAsync(imap))
+            {
+                _imap = null;
+                _selected = null;
+                return;
+            }
+
             if (imap.IsConnected)
             {
                 try
@@ -678,11 +691,59 @@ public sealed partial class ImapMailProvider(
         }
     }
 
+    // The connection goes back to the pool for the next action on this account (ImapSessionPool) – with no folder
+    // selected, so that action selects afresh. UNSELECT only: CLOSE would expunge messages marked as deleted.
+    private async Task<bool> KeepForReuseAsync(ImapClient imap)
+    {
+        if (sessions is null || _ownConnectionOnly || !imap.IsConnected || !imap.IsAuthenticated || imap.IsIdle)
+        {
+            return false;
+        }
+
+        try
+        {
+            foreach (var folder in new[] { _selected, imap.Inbox }.Distinct())
+            {
+                if (folder is { IsOpen: true })
+                {
+                    if (!imap.Capabilities.HasFlag(ImapCapabilities.Unselect))
+                    {
+                        return false;
+                    }
+
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await folder.CloseAsync(false, timeout.Token);
+                }
+            }
+
+            if (!imap.IsConnected)
+            {
+                return false;
+            }
+
+            sessions.Return(ImapSessionPool.KeyOf(connectionId, settings), imap);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or ImapProtocolException or ImapCommandException or OperationCanceledException or ServiceNotConnectedException)
+        {
+            logger.LogDebug(ex, "The IMAP connection is not kept for reuse");
+            return false;
+        }
+    }
+
     private async Task<ImapClient> GetImapAsync(CancellationToken cancellationToken)
     {
         if (_imap is { IsConnected: true, IsAuthenticated: true })
         {
             return _imap;
+        }
+
+        if (sessions is not null && !_ownConnectionOnly
+            && await sessions.TakeAsync(ImapSessionPool.KeyOf(connectionId, settings), cancellationToken) is { } kept)
+        {
+            _imap = kept;
+            _selected = null;
+            return kept;
         }
 
         var imap = new ImapClient(CreateProtocolLogger("imap")) { ServerCertificateValidationCallback = settings.AcceptAnyCertificate ? TlsCertificates.For(acceptAny: true) : TlsCertificates.For(settings.Raw) };

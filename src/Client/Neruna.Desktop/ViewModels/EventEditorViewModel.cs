@@ -377,10 +377,21 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     public bool CanEditAttendees => CanEdit && IsOrganizer;
 
     /// <summary>The second click on "Löschen" says whether mail goes out.</summary>
-    public string DeleteConfirmText =>
-        !IsOrganizer ? T("Löschen und absagen?")
-        : _attendees.Any(a => !string.Equals(a.Email, Organizer, StringComparison.OrdinalIgnoreCase)) ? T("Löschen und Absage an alle?")
-        : T("Wirklich löschen?");
+    /// <summary>
+    /// The question before deleting: an answer that goes out (decline, cancellation) is asked every time; otherwise the
+    /// question can be switched off ("Nicht mehr fragen").
+    /// </summary>
+    internal static Task<bool> AskDeleteAsync(string? title, bool isOrganizer, bool hasAttendees, bool wholeSeries)
+    {
+        var heading = F("«{0}» löschen", string.IsNullOrWhiteSpace(title) ? T("Termin") : title.Trim());
+        var what = wholeSeries ? T("Die ganze Serie wird gelöscht.") + " " : string.Empty;
+        return !isOrganizer
+            ? Infrastructure.DeleteConfirmation.AskAlwaysAsync(heading, what + T("Der Organisator erhält eine Absage."), T("Löschen und absagen"))
+            : hasAttendees
+                ? Infrastructure.DeleteConfirmation.AskAlwaysAsync(heading, what + T("Alle Teilnehmer erhalten eine Absage."), T("Löschen und absagen"))
+                : Infrastructure.DeleteConfirmation.AskAsync(Infrastructure.DeleteKind.Event, heading,
+                    what + T("Der Termin wird auch auf dem Server gelöscht und lässt sich nicht wiederherstellen."));
+    }
 
     public string OrganizerText => F("Organisiert von {0} – Ihre Antwort geben Sie in der Einladungsmail.", Organizer);
 
@@ -444,9 +455,6 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(DeleteCommand))]
     public partial bool IsBusy { get; set; }
-
-    [ObservableProperty]
-    public partial bool ConfirmDelete { get; set; }
 
     // Moving the start keeps the duration.
     partial void OnStartDateChanged(DateTime? oldValue, DateTime? newValue)
@@ -627,9 +635,9 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             return;
         }
 
-        if (!ConfirmDelete)
+        var hasAttendees = _attendees.Any(a => !string.Equals(a.Email, Organizer, StringComparison.OrdinalIgnoreCase));
+        if (!await AskDeleteAsync(Title, IsOrganizer, hasAttendees, wholeSeries: Occurrence is null && Recurrence.Kind != RecurrenceKind.None))
         {
-            ConfirmDelete = true;
             return;
         }
 

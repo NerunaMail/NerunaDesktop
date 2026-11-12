@@ -13,7 +13,7 @@
     <!-- Command bar: new task, quick add, filter, search -->
     <Border Classes="pane" Padding="8,6" Margin="0,0,0,6">
       <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-        <Button Classes="accent" Command="{Binding NewTaskCommand}" Padding="12,6" Margin="0,0,8,0">
+        <Button Classes="accent pageNew" Command="{Binding NewTaskCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip.Tip="Ctrl+N">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
             <TextBlock Text="{l:T 'Neue Aufgabe'}" />
@@ -25,7 +25,11 @@
           </TextBox.KeyBindings>
         </TextBox>
         <ComboBox Grid.Column="2" ItemsSource="{Binding Filters}" SelectedIndex="{Binding FilterIndex}" MinWidth="230" Margin="12,0,8,0" VerticalAlignment="Center" />
-        <TextBox ctl:SearchBox.Clearable="True" Grid.Column="3" Text="{Binding Search}" PlaceholderText="{l:T 'Suchen'}" Width="200" VerticalAlignment="Center" />
+        <TextBox ctl:SearchBox.Clearable="True" Classes="pageSearch" Grid.Column="3" Text="{Binding Search}" PlaceholderText="{l:T 'Suchen (Ctrl+F)'}" Width="200" VerticalAlignment="Center">
+          <TextBox.InnerLeftContent>
+            <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
+          </TextBox.InnerLeftContent>
+        </TextBox>
       </Grid>
     </Border>
 

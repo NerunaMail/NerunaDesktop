@@ -98,7 +98,15 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
     private bool CanDelete() => !IsBusy && IsExisting && CanEdit;
 
     [RelayCommand(CanExecute = nameof(CanDelete))]
-    private Task DeleteAsync() => RunAsync(() => _tasks.DeleteAsync(_existing!));
+    private async Task DeleteAsync()
+    {
+        if (await Infrastructure.DeleteConfirmation.AskAsync(Infrastructure.DeleteKind.Task,
+                F("«{0}» löschen", string.IsNullOrWhiteSpace(Summary) ? T("Aufgabe") : Summary.Trim()),
+                T("Die Aufgabe wird auch auf dem Server gelöscht und lässt sich nicht wiederherstellen.")))
+        {
+            await RunAsync(() => _tasks.DeleteAsync(_existing!));
+        }
+    }
 
     [RelayCommand]
     private void Cancel() => Finished?.Invoke(this, false);

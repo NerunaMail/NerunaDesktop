@@ -6,7 +6,10 @@
              xmlns:app="using:Neruna.Desktop"
              xmlns:views="using:Neruna.Desktop.Views"
              x:Class="Neruna.Desktop.Views.AccountsView"
+             x:Name="Root"
              x:DataType="vm:AccountsViewModel">
+  <!-- Two uses: Einstellungen → Konten (the accounts), and Kalender → Zusatzkalender (Extras: birthdays, holidays,
+       subscribed calendars) – the same cards, each list on its own page. -->
 
   <ScrollViewer>
     <!-- As wide as there is room, at most 820 px, on the left -->
@@ -16,7 +19,7 @@
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="*,Auto">
+        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !#Root.Extras}">
           <TextBlock Text="{l:T 'Konten'}" FontSize="22" FontWeight="SemiBold" />
           <!-- One button: an account, or a calendar subscribed by address -->
           <Button Grid.Column="1" Classes="accent" Padding="12,6">
@@ -28,16 +31,53 @@
             <Button.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedRight">
                 <MenuItem Header="{l:T 'Konto hinzufügen'}" Command="{Binding AddAccountCommand}" />
-                <MenuItem Header="{l:T 'Internet-Kalender abonnieren'}" Command="{Binding SubscribeCommand}" />
                 <MenuItem Header="{l:T 'Outlook-Datendatei (.pst) einbinden …'}" Command="{Binding AddPstCommand}" />
+                <Separator />
+                <!-- Birthdays, holidays and subscribed calendars live under Kalender now -->
+                <MenuItem Header="{l:T 'Geburtstage, Feiertage, Internet-Kalender …'}" Command="{Binding ShowExtrasCommand}" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding #Root.Extras}">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{l:T 'Zusatzkalender'}" FontSize="16" FontWeight="SemiBold" />
+            <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left"
+                       Text="{l:T 'Geburtstage aus den Kontakten, Feiertage und abonnierte Internet-Kalender. Sie gehören zu keinem Konto und werden nur gelesen.'}" />
+          </StackPanel>
+          <Button Grid.Column="1" Padding="12,6" VerticalAlignment="Top">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
+              <TextBlock Text="{l:T 'Hinzufügen'}" />
+              <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10" />
+            </StackPanel>
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuItem Header="{l:T 'Geburtstage oder Feiertage …'}" Command="{Binding AddSpecialCommand}" />
+                <MenuItem Header="{l:T 'Internet-Kalender abonnieren'}" Command="{Binding SubscribeCommand}" />
               </MenuFlyout>
             </Button.Flyout>
           </Button>
         </Grid>
 
-        <TextBlock Classes="subtle" Text="{l:T 'Noch keine Konten eingerichtet.'}" IsVisible="{Binding !HasAccounts}" Margin="0,12" />
+        <TextBlock Classes="subtle" Text="{l:T 'Noch keine Konten eingerichtet.'}" Margin="0,12">
+          <TextBlock.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="!HasAccounts" />
+              <Binding Path="!#Root.Extras" />
+            </MultiBinding>
+          </TextBlock.IsVisible>
+        </TextBlock>
+        <TextBlock Classes="subtle" Text="{l:T 'Keine Zusatzkalender.'}" Margin="0,8">
+          <TextBlock.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="!HasExtraCalendars" />
+              <Binding Path="#Root.Extras" />
+            </MultiBinding>
+          </TextBlock.IsVisible>
+        </TextBlock>
 
-        <ItemsControl ItemsSource="{Binding Items}" Margin="0,8,0,0">
+        <ItemsControl x:Name="Cards" Margin="0,8,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AccountItem">
               <!-- Compact: who and which services; servers, offline and the rest under "Bearbeiten" and "⋯" -->
@@ -94,7 +134,7 @@
                       <!-- How far back mail is complete on this computer: chosen right here -->
                       <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasServerMail}" Margin="0,0,10,0"
                                   ToolTip.Tip="{l:T 'Wie weit zurück die Mails samt Anhängen auf diesem Computer liegen'}">
-                        <TextBlock Text="{l:T 'Offline:'}" FontSize="12" Classes="subtle" VerticalAlignment="Center" />
+                        <TextBlock Text="{l:T 'Auf diesem Computer behalten:'}" FontSize="12" Classes="subtle" VerticalAlignment="Center" />
                         <ComboBox ItemsSource="{Binding OfflineChoices}" SelectedItem="{Binding SelectedOffline}" FontSize="12" Padding="6,2" MinHeight="0">
                           <ComboBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:OfflineChoice">
@@ -138,19 +178,11 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                   </StackPanel>
-                  <!-- The main actions in sight: order, edit, more, remove -->
-                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                    <Button Classes="command" Padding="6" ToolTip.Tip="{l:T 'Nach oben'}" IsEnabled="{Binding CanMoveUp}"
-                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
-                      <PathIcon Data="{StaticResource IconChevronUp}" Width="12" Height="12" Margin="0" />
-                    </Button>
-                    <Button Classes="command" Padding="6" ToolTip.Tip="{l:T 'Nach unten'}" IsEnabled="{Binding CanMoveDown}" Margin="0,0,6,0"
-                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
-                      <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" Margin="0" />
-                    </Button>
+                  <!-- In sight: Bearbeiten; ordering and removing under "⋯" -->
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <Button Content="{l:T 'Bearbeiten'}"
                             Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
-                    <Button Padding="8,6" ToolTip.Tip="{l:T 'Weitere Aktionen'}">
+                    <Button Padding="8,6" ToolTip.Tip="{l:T 'Weitere Aktionen'}" AutomationProperties.Name="{l:T 'Weitere Aktionen'}">
                       <TextBlock Text="⋯" FontWeight="Bold" />
                       <Button.Flyout>
                         <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -160,22 +192,30 @@
                                     Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).ServerRulesCommand}" CommandParameter="{Binding}" />
                           <MenuItem Header="{l:T 'Aufs Handy übertragen'}" IsVisible="{Binding CanTransfer}"
                                     Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).TransferCommand}" CommandParameter="{Binding}" />
+                          <Separator IsVisible="{Binding HasServerMail}" />
+                          <MenuItem Header="{l:T 'Nach oben'}" IsEnabled="{Binding CanMoveUp}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconChevronUp}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="{l:T 'Nach unten'}" IsEnabled="{Binding CanMoveDown}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconChevronDown}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <!-- Accounts of the organisation are removed by the organisation, not here -->
+                          <Separator IsVisible="{Binding !IsFromCloud}" />
+                          <MenuItem Header="{Binding RemoveText}" IsVisible="{Binding !IsFromCloud}"
+                                    Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
+                          </MenuItem>
                         </MenuFlyout>
                       </Button.Flyout>
-                    </Button>
-                    <!-- Accounts of the organisation cannot be removed here: the bin keeps its place (invisible), so the buttons
-                         of all cards stay in one line -->
-                    <Button Classes="command" Padding="6" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Konto entfernen …'}"
-                            Opacity="{Binding !IsFromCloud, Converter={x:Static app:Converters.OpaqueIf}}" IsHitTestVisible="{Binding !IsFromCloud}" Focusable="{Binding !IsFromCloud}"
-                            Command="{Binding $parent[UserControl].((vm:AccountsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
-                      <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15" Margin="0" />
                     </Button>
                   </StackPanel>
                   <!-- "Entfernen …": asked once more, right in the card -->
                   <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" IsVisible="{Binding ConfirmRemove}" Margin="0,10,0,0" Padding="10,8" CornerRadius="4"
                           Background="{DynamicResource InfoBackgroundBrush}">
                     <Grid ColumnDefinitions="*,Auto,Auto">
-                      <TextBlock Text="{l:T 'Dieses Konto samt seinen Daten auf diesem Computer entfernen? Auf dem Server bleibt alles.'}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding RemoveQuestion}" TextWrapping="Wrap" VerticalAlignment="Center" />
                       <Button Grid.Column="1" Content="{l:T 'Abbrechen'}" Margin="8,0,0,0"
                               Command="{Binding CancelRemoveCommand}" />
                       <Button Grid.Column="2" Content="{l:T 'Entfernen'}" Margin="6,0,0,0" Foreground="{DynamicResource ErrorBrush}"

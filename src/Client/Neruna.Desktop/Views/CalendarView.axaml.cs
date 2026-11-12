@@ -115,15 +115,10 @@ internal sealed partial class CalendarView : UserControl
         ColumnMemory.Attach(this, "columns.calendar", 0);
         _nowTimer.Tick += (_, _) => (DataContext as CalendarViewModel)?.RefreshNow();
 
-        // Ctrl+E: into "Termine suchen" (as in the mail list).
+        // Ctrl+F into "Termine suchen", Ctrl+N a new event: MainWindow, for every page.
         KeyDown += (_, e) =>
         {
-            if (e.Key == Key.E && e.KeyModifiers == KeyModifiers.Control)
-            {
-                this.FindControl<TextBox>("EventSearch")?.Focus();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Escape && _drag is { IsActive: true })
+            if (e.Key == Key.Escape && _drag is { IsActive: true })
             {
                 CancelDrag();
                 e.Handled = true;
@@ -544,6 +539,27 @@ internal sealed partial class CalendarView : UserControl
         {
             control.Opacity = 1;
         }
+    }
+
+    private void OnMonthGridSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (DataContext is CalendarViewModel vm && e.NewSize.Height > 0)
+        {
+            _ = vm.SetMonthHeightAsync(e.NewSize.Height);
+        }
+    }
+
+    /// <summary>Month: a double-click on a day's free space – a new event that day (an event or a button handles its own).</summary>
+    private void OnMonthDayDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not Control { DataContext: CalendarDay day } || DataContext is not CalendarViewModel vm
+            || (e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<Button>().Any() == true)
+        {
+            return;
+        }
+
+        vm.NewEventCommand.Execute(day.Date);
+        e.Handled = true;
     }
 
     private void OnTimeGridDoubleTapped(object? sender, TappedEventArgs e)

@@ -39,7 +39,7 @@ Verschlüsseln, Prüfen, Entschlüsseln, Zertifikate aus signierten Mails automa
 anlegen/bearbeiten/verschieben/löschen, Serien), CardDAV (Kontakte anlegen/bearbeiten/löschen; unbekannte vCard-Felder
 bleiben erhalten), ICS-Abos, Konto-Erkennung (Autoconfig, ISPDB, `/.well-known`), Kontenverwaltung, Logs.
 
-Tastenkürzel Mail: `Ctrl+N` neu, `Ctrl+R` antworten, `Ctrl+Shift+R` allen antworten, `Ctrl+F` weiterleiten,
+Tastenkürzel Mail: `Ctrl+N` neu, `Ctrl+R` antworten, `Ctrl+Shift+R` allen antworten, `Ctrl+L` weiterleiten, `Ctrl+F` suchen,
 `Entf` löschen, `Ctrl+Q` gelesen/ungelesen, `Ctrl+Enter` senden, `F5` synchronisieren.
 
 ### Ausführbare Version bauen (auch für Windows, direkt unter Linux)

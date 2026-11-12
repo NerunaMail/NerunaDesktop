@@ -413,7 +413,8 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         var from = since?.ToUnixTimeMilliseconds() ?? long.MinValue;
         var candidates = await db.Messages.Where(m => m.FolderId == folderId && m.DateUnixMs >= from)
             .OrderByDescending(m => m.DateUnixMs).Select(m => new { m.RemoteId, m.Size }).ToListAsync(cancellationToken);
-        return [.. candidates.Where(m => !File.Exists(files.PathFor(connectionId, folderRemoteId, m.RemoteId))).Take(take).Select(m => (m.RemoteId, m.Size))];
+        var onDisk = files.ContentCheckFor(connectionId, folderRemoteId);
+        return [.. candidates.Where(m => !onDisk(m.RemoteId)).Take(take).Select(m => (m.RemoteId, m.Size))];
     }
 
     public async Task<int> RemoveMessageContentBeforeAsync(Guid connectionId, string folderRemoteId, DateTimeOffset before, CancellationToken cancellationToken = default)
@@ -423,7 +424,8 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         var until = before.ToUnixTimeMilliseconds();
         var old = folderId is null ? [] : await db.Messages.Where(m => m.FolderId == folderId && m.DateUnixMs < until)
             .Select(m => m.RemoteId).ToListAsync(cancellationToken);
-        var cached = old.Where(id => File.Exists(files.PathFor(connectionId, folderRemoteId, id))).ToList();
+        var onDisk = files.ContentCheckFor(connectionId, folderRemoteId);
+        var cached = old.Where(onDisk).ToList();
         files.DeleteMessages(connectionId, folderRemoteId, cached);
         return cached.Count;
     }

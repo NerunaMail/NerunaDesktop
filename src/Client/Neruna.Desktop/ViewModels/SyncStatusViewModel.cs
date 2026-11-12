@@ -71,7 +71,10 @@ internal sealed partial class SyncStatusViewModel : ViewModelBase
             SyncState.Running => new SyncRow(entry.Account, service, F("Läuft seit {0}", Elapsed(now - entry.StartedAt)), lastSuccess, true, false),
             SyncState.Failed => new SyncRow(entry.Account, service, F("Fehlgeschlagen um {0:t}", ended.LocalDateTime), entry.Error + (lastSuccess is null ? string.Empty : " · " + lastSuccess), false, true),
             SyncState.Skipped => new SyncRow(entry.Account, service, T("In dieser Version nicht unterstützt"), null, false, false),
-            _ => new SyncRow(entry.Account, service, F("Synchronisiert um {0:t} ({1})", ended.LocalDateTime, Elapsed(entry.Duration ?? TimeSpan.Zero)), null, false, false),
+            // How long it took only when it is worth mentioning (not "(0 s)")
+            _ => new SyncRow(entry.Account, service, entry.Duration is { TotalSeconds: >= 2 } took
+                ? F("Synchronisiert um {0:t}, Dauer {1}", ended.LocalDateTime, Elapsed(took))
+                : F("Synchronisiert um {0:t}", ended.LocalDateTime), null, false, false),
         };
     }
 

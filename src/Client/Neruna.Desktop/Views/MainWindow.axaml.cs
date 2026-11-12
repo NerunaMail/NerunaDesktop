@@ -13,6 +13,27 @@ internal sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // The usual keys on every page: Ctrl+F (or Ctrl+E) into the page's search field, Ctrl+N its "Neu" – also when
+        // the focus is still on the navigation. Pages mark these with the classes "pageSearch" and "pageNew".
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Handled || e.KeyModifiers != Avalonia.Input.KeyModifiers.Control || DataContext is MainWindowViewModel { Overlay: not null })
+            {
+                return;
+            }
+
+            if (e.Key is Avalonia.Input.Key.F or Avalonia.Input.Key.E && FindOnPage<TextBox>("pageSearch") is { } search)
+            {
+                search.Focus();
+                search.SelectAll();
+                e.Handled = true;
+            }
+            else if (e.Key == Avalonia.Input.Key.N && FindOnPage<Button>("pageNew") is { Command: { } command } button && command.CanExecute(button.CommandParameter))
+            {
+                command.Execute(button.CommandParameter);
+                e.Handled = true;
+            }
+        });
         DataContextChanged += (_, _) =>
         {
             if (DataContext is MainWindowViewModel vm)
@@ -84,4 +105,9 @@ internal sealed partial class MainWindow : Window
         return await ChoiceDialog.ShowAsync(this, T("Neruna beenden"), message,
             (T("Speichern"), CloseChoice.Save, true), (T("Nicht speichern"), CloseChoice.Discard, false), (T("Abbrechen"), CloseChoice.Cancel, false));
     }
+
+    // The first visible control with this class on the page shown (not in a dialog over it).
+    private T? FindOnPage<T>(string className) where T : Control =>
+        Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(this).OfType<T>()
+            .FirstOrDefault(c => c.Classes.Contains(className) && c.IsEffectivelyVisible && c.IsEffectivelyEnabled);
 }

@@ -32,7 +32,7 @@
         <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Text="{Binding ExportStatus}" TextWrapping="Wrap"
                    IsVisible="{Binding ExportStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </Grid>
-      <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="24,16,24,8">
+      <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="24,16,24,8">
         <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentTextBrush}" VerticalAlignment="Top" ClipToBounds="True">
           <Panel>
             <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
@@ -41,29 +41,35 @@
           </Panel>
         </Border>
         <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
-          <StackPanel Orientation="Horizontal" Spacing="4">
+          <!-- A grid, not a horizontal stack: the sender gets the width there is and wraps, instead of running under
+               «Sicherheit prüfen». Left-aligned, so the button stays right after the name. -->
+          <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
             <SelectableTextBlock Text="{Binding From}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
             <!-- The sender is in no address book: save as a contact in one click -->
-            <Button Classes="command" Padding="5,2" VerticalAlignment="Center" Command="{Binding AddSenderContactCommand}" IsVisible="{Binding CanAddSender}"
+            <Button Grid.Column="1" Classes="command" Padding="5,2" Margin="4,0,0,0" VerticalAlignment="Center" Command="{Binding AddSenderContactCommand}" IsVisible="{Binding CanAddSender}"
                     ToolTip.Tip="{l:T 'Absender als Kontakt speichern'}">
               <PathIcon Data="{StaticResource IconAccountAdd}" Width="15" Height="15" Margin="0" />
             </Button>
-          </StackPanel>
+          </Grid>
           <!-- An/Cc: cut off after one line; when cut, a click shows every address (and another click one line again) -->
           <StackPanel x:Name="RecipientLines" Background="Transparent" Spacing="2" Tapped="OnRecipientsTapped">
             <TextBlock x:Name="ToLine" Classes="subtle" FontSize="12" Text="{Binding To, Converter={x:Static l:Fmt.Instance}, ConverterParameter='An: {0}'}" TextTrimming="CharacterEllipsis" />
             <TextBlock x:Name="CcLine" Classes="subtle" FontSize="12" Text="{Binding Cc, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
           </StackPanel>
-          <TextBlock Classes="subtle" FontSize="12" Text="{Binding Date}" />
+          <!-- Date and the security check in one line; where that is too narrow, the check goes below the date.
+               (Beside the sender it took the width the name needs.) -->
+          <WrapPanel Orientation="Horizontal" ItemSpacing="12">
+            <TextBlock Classes="subtle" FontSize="12" Text="{Binding Date}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <!-- Security check: sender, envelope, display name, links, attachments -->
+            <Button Classes="command" Padding="0,2" Command="{Binding ToggleAnalysisCommand}" AutomationProperties.Name="{l:T 'Sicherheit prüfen'}"
+                    ToolTip.Tip="{l:T 'Prüft Absender, Links und Anhänge auf typische Merkmale von Phishing'}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Data="{StaticResource IconShield}" Width="14" Height="14" Margin="0" />
+                <TextBlock Text="{l:T 'Sicherheit prüfen'}" FontSize="12" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </WrapPanel>
         </StackPanel>
-        <!-- Security check: sender, envelope, display name, links, attachments -->
-        <Button Grid.Column="2" Classes="command" VerticalAlignment="Top" Command="{Binding ToggleAnalysisCommand}"
-                ToolTip.Tip="{l:T 'Prüft Absender, Links und Anhänge auf typische Merkmale von Phishing'}">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconShield}" Width="15" Height="15" />
-            <TextBlock Text="{l:T 'Sicherheit prüfen'}" FontSize="12" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
       </Grid>
 
       <StackPanel Grid.Row="2">
@@ -173,12 +179,12 @@
             </Grid.Styles>
             <TextBlock Classes="key subtle" Text="{l:T 'Absender'}" />
             <SelectableTextBlock Grid.Column="1" Text="{Binding SenderFrom}" />
-            <TextBlock Grid.Row="1" Classes="key subtle" Text="{l:T 'Umschlag (Return-Path)'}" />
+            <TextBlock Grid.Row="1" Classes="key subtle" Text="{l:T 'Technischer Absender'}" ToolTip.Tip="{l:T 'Return-Path: wohin Unzustellbarkeitsmeldungen gehen, gesetzt vom sendenden Server'}" />
             <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SenderEnvelope}" />
             <TextBlock Grid.Row="2" Classes="key subtle" Text="{l:T 'Antwort an'}" />
             <SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SenderReplyTo}" />
-            <TextBlock Grid.Row="3" Classes="key subtle" Text="{l:T 'Prüfung Ihres Servers'}" />
-            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SenderAuthentication}" />
+            <TextBlock Grid.Row="3" Classes="key subtle" Text="{l:T 'Echtheitsprüfung durch Ihren Mailserver'}" ToolTip.Tip="{Binding SenderAuthenticationDetails}" />
+            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SenderAuthentication}" ToolTip.Tip="{Binding SenderAuthenticationDetails}" />
             <TextBlock Grid.Row="4" Classes="key subtle" Text="{l:T 'Spam-Bewertung Ihres Servers'}" />
             <SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SenderSpam}" />
           </Grid>

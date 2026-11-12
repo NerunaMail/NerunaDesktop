@@ -15,7 +15,7 @@
     <!-- Command bar: new note, new notebook, search -->
     <Border Classes="pane" Padding="8,6" Margin="0,0,0,6">
       <Grid ColumnDefinitions="Auto,Auto,*,Auto">
-        <Button Classes="accent" Command="{Binding NewNoteCommand}" Padding="12,6" Margin="0,0,8,0" HotKey="Ctrl+N">
+        <Button Classes="accent pageNew" Command="{Binding NewNoteCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip.Tip="Ctrl+N">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
             <TextBlock Text="{l:T 'Neue Notiz'}" />
@@ -27,7 +27,11 @@
             <TextBlock Text="{l:T 'Neues Notizbuch'}" />
           </StackPanel>
         </Button>
-        <TextBox ctl:SearchBox.Clearable="True" Grid.Column="3" Text="{Binding SearchText}" PlaceholderText="{l:T 'Notizen durchsuchen'}" Width="240" VerticalAlignment="Center" />
+        <TextBox ctl:SearchBox.Clearable="True" Classes="pageSearch" Grid.Column="3" Text="{Binding SearchText}" PlaceholderText="{l:T 'Notizen durchsuchen'}" ToolTip.Tip="Ctrl+F" Width="240" VerticalAlignment="Center">
+          <TextBox.InnerLeftContent>
+            <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
+          </TextBox.InnerLeftContent>
+        </TextBox>
       </Grid>
     </Border>
 
@@ -140,7 +144,7 @@
                          Text="{l:T 'Diese Notiz wurde gleichzeitig auf einem anderen Gerät geändert. Neruna hat beide Fassungen behalten – übernehmen Sie, was Sie brauchen, und löschen Sie die überzählige.'}" />
             </Border>
 
-            <views:FormattingToolbar Grid.Row="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
+            <views:FormattingToolbar Grid.Row="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" ShowSpellLanguage="True" />
 
             <Border Grid.Row="3" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
               <ed:HtmlEditor x:Name="Editor" />

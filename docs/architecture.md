@@ -195,6 +195,20 @@ Internet (keine DNS-Sperrlisten, keine Favicon- oder Whois-Abfragen).
   Geprüft wird nur der eigene Text (`neruna.texts().own`, im Nur-Text-Modus ohne «> »-Zeilen, Signatur und
   Originalnachricht), ein Wort am Wortanfang, eine Endung («.pdf») nach einem Namen. Ohne Anhang: Balken unter dem Text
   («Anhang hinzufügen», × = für diese Mail nicht mehr) und beim Senden die Frage Ja/Nein.
+- IMAP-Verbindungen bleiben nach einer Aktion 60 s angemeldet offen (`ImapSessionPool`, nur Desktop; auch Google-Konten)
+  und dienen der nächsten Aktion desselben Kontos – sonst meldet sich jede Aktion neu an. Schlüssel: Verbindungs-ID +
+  Server/Port/Sicherheit/Benutzer (Konten teilen nie); eine Verbindung gehört immer nur einem Provider, höchstens 2
+  warten pro Konto. Vor der Wiederverwendung NOOP (max. 5 s), sonst neu verbinden. Zurück geht sie ohne gewählten Ordner
+  (UNSELECT, nie CLOSE – das würde als gelöscht markierte Mails entfernen); Server ohne UNSELECT: wie bisher schliessen.
+  `TestConnectionAsync` meldet sich immer neu an und verwirft Wartende. Tests: `ImapSessionPoolTests` (Dovecot im Testlabor).
+- Entwürfe lokal gesichert (`LocalDraftStore`, `drafts/<Verbindung>_<id>.eml` im Datenordner, neben den offline
+  gehaltenen Mails): vor jedem Speichern in «Entwürfe» geschrieben, entfernt, sobald der Server den Entwurf hat, er
+  gesendet oder verworfen ist. Bleibt eine Kopie liegen (keine Verbindung, Neruna unerwartet beendet), legt sie der
+  nächste Abgleich des Kontos in «Entwürfe» ab (`MailController.StoreWaitingDraftsAsync`, ersetzt eine ältere Fassung
+  mit derselben Message-ID). Kopien offener Formulare fasst der Abgleich nicht an; Kopien entfernter Konten werden gelöscht.
+  Wartende Kopien zeigt `MailController.GetMessagesAsync` im Ordner «Entwürfe» mit an (RemoteId
+  `neruna-local-draft:<Schlüssel>`, Vorschau «Nur auf diesem Gerät …»): öffnen und weiterschreiben geht offline (das
+  Formular übernimmt die Kopie), Löschen entfernt die Datei; Markieren, Schlagwörter und Verschieben lassen sie aus.
 
 ### PDF: Vorschau, Stempel, Kennwort
 

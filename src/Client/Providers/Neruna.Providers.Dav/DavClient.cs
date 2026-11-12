@@ -178,8 +178,17 @@ internal sealed class DavClient(HttpClient http, Func<CancellationToken, Task<Au
     /// <summary>
     /// Retries reads and deletes when the connection drops mid-response (flaky networks, small WSGI servers), and reads
     /// that a gateway answers with 502/503/504 now and then (Google's CardDAV does every few syncs).
-    /// PUT is not retried: a retried create could report a false conflict after the first attempt succeeded.
+    /// PUT is retried once, and only when the server closed the connection without a single byte of answer: that is a
+    /// kept connection the server had already closed (it never saw the request) – servers that close after every
+    /// answer without saying so, like Radicale's own, lose every fifth save that follows another request at once. The
+    /// PUT must carry If-Match or If-None-Match, so even if a first attempt did arrive, the second cannot write twice
+    /// (it gets 412). Other PUT failures and POST are not retried: a retried create could report a false conflict.
     /// </summary>
+    // The server ended the connection before answering at all (or reset it while the request was written).
+    private static bool ClosedUnanswered(HttpRequestException ex) =>
+        ex.HttpRequestError == HttpRequestError.ResponseEnded
+        || ex.InnerException is IOException { InnerException: System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.ConnectionReset or System.Net.Sockets.SocketError.ConnectionAborted or System.Net.Sockets.SocketError.Shutdown } };
+
     private async Task<HttpResponseMessage> SendWithRetryAsync(HttpRequestMessage request, HttpMethod method, CancellationToken cancellationToken)
     {
         var retryable = method != HttpMethod.Put && method != HttpMethod.Post;
@@ -190,6 +199,12 @@ internal sealed class DavClient(HttpClient http, Func<CancellationToken, Task<Au
             try
             {
                 response = await http.SendAsync(attempt == 1 ? request : await CloneAsync(request), HttpCompletionOption.ResponseContentRead, cancellationToken);
+            }
+            catch (HttpRequestException ex) when (attempt == 1 && method == HttpMethod.Put && ClosedUnanswered(ex)
+                                                  && (request.Headers.IfMatch.Count > 0 || request.Headers.IfNoneMatch.Count > 0))
+            {
+                logger.LogDebug(ex, "DAV PUT {Url}: the kept connection was closed by the server, sending again on a new one", request.RequestUri);
+                continue;
             }
             catch (HttpRequestException ex) when (retryable && attempt < MaxAttempts && ex.InnerException is IOException)
             {

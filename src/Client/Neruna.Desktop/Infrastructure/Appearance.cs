@@ -28,12 +28,21 @@ internal enum ColorScheme
 /// </summary>
 internal static class Appearance
 {
-    private sealed record Scheme(Color Accent, Color AccentDark, Color HeaderDark, Color TodayLight, Color TodayDark);
+    /// <param name="Selection">
+    /// Selected list rows (light, dark), when the accent at the usual opacity is too loud: in red the selection would look
+    /// like an error, so it is a light red instead.
+    /// </param>
+    private sealed record Scheme(Color Accent, Color AccentDark, Color HeaderDark, Color TodayLight, Color TodayDark, (Color Light, Color Dark)? Selection = null);
+
+    // Fluent's brushes for selected (and selected + hovered, pressed) list, tree and grid rows.
+    private static readonly string[] SelectionKeys =
+        ["SystemControlHighlightListAccentLowBrush", "SystemControlHighlightListAccentMediumBrush", "SystemControlHighlightListAccentHighBrush"];
 
     private static readonly Dictionary<ColorScheme, Scheme> Schemes = new()
     {
         [ColorScheme.Blue] = new(Color.Parse("#0F6CBD"), Color.Parse("#479EF5"), Color.Parse("#0C3B5E"), Color.Parse("#EBF3FC"), Color.Parse("#0C3B5E")),
-        [ColorScheme.Red] = new(Color.Parse("#C50F1F"), Color.Parse("#F1707B"), Color.Parse("#6E0811"), Color.Parse("#FDF3F4"), Color.Parse("#4A0A10")),
+        [ColorScheme.Red] = new(Color.Parse("#C50F1F"), Color.Parse("#F1707B"), Color.Parse("#6E0811"), Color.Parse("#FDF3F4"), Color.Parse("#4A0A10"),
+            (Color.Parse("#F9DADD"), Color.Parse("#5A1A20"))),
         [ColorScheme.Green] = new(Color.Parse("#107C10"), Color.Parse("#54B054"), Color.Parse("#0B5A08"), Color.Parse("#F1FAF1"), Color.Parse("#0A3A0A")),
     };
 
@@ -71,20 +80,36 @@ internal static class Appearance
 
         if (app.Resources.ThemeDictionaries.TryGetValue(ThemeVariant.Light, out var light) && light is IResourceDictionary l)
         {
-            SetBrushes(l, header: colors.Accent, text: colors.Accent, today: colors.TodayLight);
+            SetBrushes(l, header: colors.Accent, text: colors.Accent, today: colors.TodayLight, selection: colors.Selection?.Light);
         }
 
         if (app.Resources.ThemeDictionaries.TryGetValue(ThemeVariant.Dark, out var dark) && dark is IResourceDictionary d)
         {
-            SetBrushes(d, header: colors.HeaderDark, text: colors.AccentDark, today: colors.TodayDark);
+            SetBrushes(d, header: colors.HeaderDark, text: colors.AccentDark, today: colors.TodayDark, selection: colors.Selection?.Dark);
         }
     }
 
-    private static void SetBrushes(IResourceDictionary resources, Color header, Color text, Color today)
+    private static void SetBrushes(IResourceDictionary resources, Color header, Color text, Color today, Color? selection)
     {
+        for (var step = 0; step < SelectionKeys.Length; step++)
+        {
+            if (selection is { } row)
+            {
+                // A touch darker when hovered or pressed, so the row still reacts (in dark mode: lighter)
+                var shift = (row.R + row.G + row.B > 384 ? -12 : 12) * step;
+                resources[SelectionKeys[step]] = new SolidColorBrush(Color.FromRgb(Shift(row.R, shift), Shift(row.G, shift), Shift(row.B, shift)));
+            }
+            else
+            {
+                resources.Remove(SelectionKeys[step]); // back to Fluent's accent-based ones
+            }
+        }
+
         resources["HeaderBackgroundBrush"] = new SolidColorBrush(header);
         resources["UnreadBarBrush"] = new SolidColorBrush(text);
         resources["AccentTextBrush"] = new SolidColorBrush(text);
         resources["TodayBrush"] = new SolidColorBrush(today);
     }
+
+    private static byte Shift(byte value, int by) => (byte)Math.Clamp(value + by, 0, 255);
 }

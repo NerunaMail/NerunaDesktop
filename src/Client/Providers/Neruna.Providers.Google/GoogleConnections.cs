@@ -161,7 +161,7 @@ public sealed class GoogleSignIn(GoogleConnectionFactory google) : IAccountSignI
     }
 }
 
-public sealed class GoogleMailProviderFactory(GoogleConnectionFactory google, ICredentialStore credentials, ILoggerFactory loggerFactory) : IProviderFactory<IMailProvider>
+public sealed class GoogleMailProviderFactory(GoogleConnectionFactory google, ICredentialStore credentials, ILoggerFactory loggerFactory, ImapSessionPool? sessions = null) : IProviderFactory<IMailProvider>
 {
     public string ProviderId => ProviderIds.Google;
 
@@ -170,7 +170,7 @@ public sealed class GoogleMailProviderFactory(GoogleConnectionFactory google, IC
     public IMailProvider Create(ServiceConnection connection)
     {
         ArgumentNullException.ThrowIfNull(connection);
-        return new ImapMailProvider(connection.Id, Settings(connection.Settings), credentials, loggerFactory.CreateLogger<ImapMailProvider>())
+        return new ImapMailProvider(connection.Id, Settings(connection.Settings), credentials, loggerFactory.CreateLogger<ImapMailProvider>(), sessions: sessions)
         {
             AccessToken = google.AccessTokenFor(connection),
         };

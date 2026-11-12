@@ -6,22 +6,40 @@
              xmlns:app="using:Neruna.Desktop"
              x:Class="Neruna.Desktop.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
+  <UserControl.Styles>
+    <!-- Where a search hit is: marked for a moment after jumping there -->
+    <Style Selector="TextBlock.searchHit">
+      <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
+    </Style>
+    <Style Selector="TemplatedControl.searchHit">
+      <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
+    </Style>
+  </UserControl.Styles>
   <!-- Areas on the left, in groups under headings; the chosen one on the right -->
   <Border Classes="pane" Padding="0">
-    <Grid ColumnDefinitions="230,*">
+    <Grid ColumnDefinitions="240,*">
       <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0" Padding="10,14">
-        <ListBox ItemsSource="{x:Static vm:SettingsViewModel.Navigation}" SelectedItem="{Binding SelectedNav}" Background="Transparent">
+        <Grid RowDefinitions="Auto,*">
+          <!-- Search over the texts of all pages (and a few other words for them); a hit opens its page there -->
+          <TextBox x:Name="SearchBox" Classes="pageSearch" PlaceholderText="{l:T 'Einstellungen durchsuchen'}" ToolTip.Tip="{l:T 'Einstellungen durchsuchen (Ctrl+F)'}" Margin="0,0,0,8"
+                   AutomationProperties.Name="{l:T 'Einstellungen durchsuchen'}" TextChanged="OnSearchChanged" KeyDown="OnSearchKeyDown">
+            <TextBox.InnerLeftContent>
+              <PathIcon Data="{StaticResource IconSearch}" Width="13" Height="13" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
+            </TextBox.InnerLeftContent>
+          </TextBox>
+        <ListBox x:Name="NavList" Grid.Row="1" ItemsSource="{x:Static vm:SettingsViewModel.Navigation}" SelectedItem="{Binding SelectedNav}" Background="Transparent">
           <ListBox.Styles>
             <Style Selector="ListBoxItem" x:DataType="vm:SettingsNavItem">
               <Setter Property="Padding" Value="10,7" />
               <Setter Property="CornerRadius" Value="6" />
               <Setter Property="IsEnabled" Value="{Binding !IsHeading}" />
+              <Setter Property="MinHeight" Value="0" />
             </Style>
           </ListBox.Styles>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:SettingsNavItem">
-              <Panel Margin="{Binding Indent}">
-                <TextBlock Text="{Binding Title}" IsVisible="{Binding IsHeading}" Classes="subtle" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0" />
+              <Panel>
+                <TextBlock Text="{Binding Title}" IsVisible="{Binding IsTitled}" Classes="subtle" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0" />
                 <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding !IsHeading}">
                   <PathIcon Data="{Binding IconKey, Converter={x:Static app:Converters.Icon}}" Width="16" Height="16" VerticalAlignment="Center" />
                   <TextBlock Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" />
@@ -40,24 +58,59 @@
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
+          <Panel x:Name="ResultsPanel" Grid.Row="1" IsVisible="False">
+            <ListBox x:Name="Results" Background="Transparent" SelectionChanged="OnResultChosen">
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="10,6" />
+                  <Setter Property="CornerRadius" Value="6" />
+                </Style>
+              </ListBox.Styles>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="views:SettingsSearchHit">
+                  <StackPanel>
+                    <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Text}" />
+                    <TextBlock Text="{Binding Page}" Classes="subtle" FontSize="12" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock x:Name="NoResults" Classes="subtle" Text="{l:T 'Nichts gefunden.'}" Margin="10,6" TextWrapping="Wrap" IsVisible="False" />
+          </Panel>
+        </Grid>
       </Border>
-      <Panel Grid.Column="1" Margin="24,16,16,0">
-        <ContentControl Content="{Binding Accounts}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=0}" />
-        <ContentControl Content="{Binding MailOptions}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=1}" />
-        <ContentControl Content="{Binding CalendarOptions}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=2}" />
-        <ContentControl Content="{Binding Signatures}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=3}" />
-        <ContentControl Content="{Binding TextTemplates}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=4}" />
-        <ContentControl Content="{Binding Certificates}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=5}" />
-        <ContentControl Content="{Binding Appearance}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=6}" />
-        <ContentControl Content="{Binding Cloud}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=7}" />
-        <ContentControl Content="{Binding Ai}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=8}" />
-        <ContentControl Content="{Binding QuickActions}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=11}" />
+      <Panel x:Name="Pages" Grid.Column="1" Margin="24,16,16,0">
+        <ContentControl Content="{Binding Accounts}" Tag="Accounts" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Accounts}" />
+        <ContentControl Content="{Binding MailOptions}" Tag="Mail" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Mail}" />
+        <!-- Kalender: the options, below them the extra calendars (birthdays, holidays, subscriptions) -->
+        <ScrollViewer Tag="Calendar" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Calendar}">
+          <StackPanel Spacing="28" Margin="0,0,0,20">
+            <ContentControl Content="{Binding CalendarOptions}" />
+            <views:AccountsView DataContext="{Binding Accounts}" Extras="True" />
+          </StackPanel>
+        </ScrollViewer>
+        <ContentControl Content="{Binding Signatures}" Tag="Signatures" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Signatures}" />
+        <ContentControl Content="{Binding TextTemplates}" Tag="TextTemplates" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=TextTemplates}" />
+        <ContentControl Content="{Binding Certificates}" Tag="Certificates" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Certificates}" />
+        <ContentControl Content="{Binding Appearance}" Tag="Appearance" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Appearance}" />
+        <ContentControl Content="{Binding Cloud}" Tag="Cloud" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Cloud}" />
+        <ContentControl Content="{Binding Ai}" Tag="Ai" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Ai}" />
+        <ContentControl Content="{Binding QuickActions}" Tag="QuickActions" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=QuickActions}" />
         <!-- Daten: backup, search index, local database and the folders, one under the other -->
-        <ScrollViewer IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=10}">
+        <ScrollViewer Tag="Data" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Data}">
           <StackPanel Spacing="28" Margin="0,0,0,20">
             <ContentControl Content="{Binding FileBackup}" />
             <ContentControl Content="{Binding SearchIndex}" />
             <ContentControl Content="{Binding LocalData}" />
+            <!-- Undoes a ticked "Nicht mehr fragen" (and switches the question off without it) -->
+            <StackPanel Spacing="8" MaxWidth="640" HorizontalAlignment="Left" DataContext="{Binding DeleteConfirmations}" x:DataType="vm:DeleteConfirmationsViewModel">
+              <TextBlock Text="{l:T 'Vor dem Löschen fragen'}" FontSize="18" FontWeight="SemiBold" />
+              <TextBlock Classes="subtle" TextWrapping="Wrap"
+                         Text="{l:T 'Kontakte, Termine und Aufgaben werden auch auf dem Server gelöscht und landen nicht im Papierkorb. Mails gehen ohne Rückfrage in den Papierkorb; endgültig gelöscht wird nur nach Rückfrage.'}" />
+              <CheckBox IsChecked="{Binding Contacts}" Content="{l:T 'Kontakte und Gruppen'}" />
+              <CheckBox IsChecked="{Binding Events}" Content="{l:T 'Termine'}" />
+              <CheckBox IsChecked="{Binding Tasks}" Content="{l:T 'Aufgaben'}" />
+            </StackPanel>
             <StackPanel Spacing="10" MaxWidth="640" HorizontalAlignment="Left">
               <TextBlock Text="{l:T 'Ordner'}" FontSize="18" FontWeight="SemiBold" />
               <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="6">
@@ -72,21 +125,21 @@
             </StackPanel>
           </StackPanel>
         </ScrollViewer>
-        <ContentControl Content="{Binding Privacy}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=14}" />
+        <ContentControl Content="{Binding Privacy}" Tag="Privacy" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Privacy}" />
         <!-- Profile und Workspaces: the profiles (each its own Neruna) on top, the workspaces of this one below -->
-        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=15}">
+        <Grid RowDefinitions="Auto,Auto,*" Tag="Workspaces" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Workspaces}">
           <ContentControl Content="{Binding Profiles}" MaxHeight="360" />
           <TextBlock Grid.Row="1" Text="{l:T 'Workspaces'}" FontSize="20" FontWeight="SemiBold" Margin="0,8,0,10" />
           <ContentControl Grid.Row="2" Content="{Binding Workspaces}" />
         </Grid>
-        <views:IntegrationView DataContext="{Binding MailOptions}" IsVisible="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=23}" />
-        <ContentControl Content="{Binding News}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=16}" />
-        <ContentControl Content="{Binding Meetings}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=18}" />
-        <ContentControl Content="{Binding Pdf}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=19}" />
-        <ContentControl Content="{Binding ServerRules}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=20}" />
-        <ContentControl Content="{Binding MailTags}" IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=21}" />
-        <views:ComposeOptionsView DataContext="{Binding MailOptions}" IsVisible="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=17}" />
-        <views:AboutView IsVisible="{Binding SelectedTab, Converter={x:Static app:Converters.IsTab}, ConverterParameter=9}" />
+        <views:IntegrationView DataContext="{Binding MailOptions}" Tag="Integration" IsVisible="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Integration}" />
+        <ContentControl Content="{Binding News}" Tag="News" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=News}" />
+        <ContentControl Content="{Binding Meetings}" Tag="Meetings" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Meetings}" />
+        <ContentControl Content="{Binding Pdf}" Tag="Pdf" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Pdf}" />
+        <ContentControl Content="{Binding ServerRules}" Tag="ServerRules" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=ServerRules}" />
+        <ContentControl Content="{Binding MailTags}" Tag="MailTags" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=MailTags}" />
+        <views:ComposeOptionsView DataContext="{Binding MailOptions}" Tag="Compose" IsVisible="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=Compose}" />
+        <views:AboutView Tag="About" IsVisible="{Binding Section, Converter={x:Static app:Converters.IsSection}, ConverterParameter=About}" />
       </Panel>
     </Grid>
   </Border>

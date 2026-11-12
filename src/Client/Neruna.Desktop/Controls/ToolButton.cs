@@ -184,6 +184,9 @@ internal static class ToolContent
         button.Padding = compact ? new Thickness(6, 4) : showLabel ? new Thickness(6, 4) : new Thickness(8, 6);
     }
 
-    public static void UpdateTip(Control button, string? label, string? shortcut, string? hint) =>
+    public static void UpdateTip(Control button, string? label, string? shortcut, string? hint)
+    {
         ToolTip.SetTip(button, hint is { Length: > 0 } ? hint : shortcut is { Length: > 0 } key ? $"{label} ({key})" : label);
+        Avalonia.Automation.AutomationProperties.SetName(button, label); // screen readers: the name also without visible text
+    }
 }

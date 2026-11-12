@@ -70,6 +70,13 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
     [ObservableProperty]
     public partial bool IsChecklist { get; set; }
 
+    /// <summary>Something to undo in the text (Rückgängig shown disabled otherwise).</summary>
+    [ObservableProperty]
+    public partial bool CanUndo { get; set; }
+
+    [ObservableProperty]
+    public partial bool CanRedo { get; set; }
+
     /// <summary>The checklist button (notes; a mail shows a checklist as a bulleted list).</summary>
     public bool ShowChecklist { get; init; }
 
@@ -121,7 +128,7 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
         }
 
         IsRichText = !editor.IsPlainText;
-        ApplyState(new EditorState(false, false, false, false, false, false, font, sizePt, "#000000"));
+        ApplyState(new EditorState(false, false, false, false, false, false, font, sizePt, "#000000", CanUndo: !IsRichText, CanRedo: !IsRichText));
         editor.Load(html, font, sizePt, placeholder);
     }
 
@@ -143,7 +150,14 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
                 Problem?.Invoke(this, T("Das Bild aus der Zwischenablage konnte nicht gelesen werden."));
             }
         };
-        editor.ModeChanged += (_, rich) => IsRichText = rich;
+        editor.ModeChanged += (_, rich) =>
+        {
+            IsRichText = rich;
+            if (!rich)
+            {
+                CanUndo = CanRedo = true; // the plain-text box keeps its own history
+            }
+        };
     }
 
     public Task RunAsync(string script) => _editor?.RunAsync(script) ?? Task.CompletedTask;
@@ -285,10 +299,12 @@ internal sealed partial class FormattingViewModel(IFileService files) : ViewMode
             IsBulletList = state.BulletList;
             IsNumberedList = state.NumberedList;
             IsChecklist = state.Checklist;
+            CanUndo = state.CanUndo;
+            CanRedo = state.CanRedo;
             SelectedFont = FontCatalog.Find(state.Font);
             CurrentFontName = state.Font;
             SelectedSize = FontCatalog.Sizes.Contains(state.Size) ? state.Size : null;
-            CurrentSizeText = state.Size > 0 ? state.Size.ToString(CultureInfo.CurrentCulture) : string.Empty;
+            CurrentSizeText = state.Size > 0 ? state.Size.ToString(CultureInfo.CurrentCulture) + " pt" : string.Empty;
         }
         finally
         {

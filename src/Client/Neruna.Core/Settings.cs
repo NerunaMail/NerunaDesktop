@@ -27,8 +27,11 @@ public static class SettingKeys
     /// <summary>Cipher of S/MIME encryption: "aes256" (default), "aes192" or "aes128" (see SecureMimeAlgorithms).</summary>
     public const string SmimeCipher = "smime.cipher";
 
-    /// <summary>"true": new mails, replies and forwards open in their own window instead of the reading pane.</summary>
+    /// <summary>"true": replies and forwards open in their own window instead of the reading pane (default: pane).</summary>
     public const string ComposeInWindow = "compose.openInWindow";
+
+    /// <summary>"false": new mails open in the reading pane instead of their own window (default: window).</summary>
+    public const string ComposeNewInWindow = "compose.newInWindow";
 
     /// <summary>Messages whose pictures the user loaded once (JSON list of Message-IDs, newest last, limited).</summary>
     public const string RemoteContentAllowed = "mail.remoteContentAllowed";
@@ -135,8 +138,20 @@ public static class SettingKeys
     /// <summary>"true": the week view shows Monday–Friday only (before <see cref="CalendarDays"/>; still read as its default).</summary>
     public const string CalendarWorkWeek = "calendar.workWeek";
 
-    /// <summary>Days shown: "7" (week), "5" (Monday–Friday) or "1" (one day).</summary>
+    /// <summary>Days shown: "7" (week), "5" (Monday–Friday), "1" (one day) or "31" (the month).</summary>
     public const string CalendarDays = "calendar.days";
+
+    /// <summary>
+    /// "false": no question before deleting a contact (or group), an event or a task – "Nicht mehr fragen" was ticked in
+    /// the question, or it was switched off under Einstellungen → Daten. Missing: ask.
+    /// </summary>
+    public const string ConfirmDeleteContacts = "confirm.delete.contacts";
+
+    /// <inheritdoc cref="ConfirmDeleteContacts"/>
+    public const string ConfirmDeleteEvents = "confirm.delete.events";
+
+    /// <inheritdoc cref="ConfirmDeleteContacts"/>
+    public const string ConfirmDeleteTasks = "confirm.delete.tasks";
 
     /// <summary>Time grid: the hours that fill the view ("7" and "21": 07:00–21:00); the rest is reached by scrolling.</summary>
     public const string CalendarVisibleFrom = "calendar.visibleFrom";
@@ -196,6 +211,12 @@ public static class SettingKeys
 
     /// <summary>"Konto hinzufügen" in the navigation rail (default: shown; accounts can always be added in Einstellungen → Konten).</summary>
     public const string ShowAddAccountButton = "ui.showAddAccountButton";
+
+    /// <summary>"true": the navigation rail shows the names beside the icons (the » / « button at its top).</summary>
+    public const string NavigationExpanded = "ui.navigationExpanded";
+
+    /// <summary>The settings page used last (a SettingsSection name), shown again when the settings open.</summary>
+    public const string SettingsPage = "ui.settingsPage";
 
     /// <summary>Navigation rail: order and visibility of E-Mail, Kalender, Kontakte, Chat (JSON list of {section, visible}).</summary>
     public const string NavigationItems = "ui.navigation";

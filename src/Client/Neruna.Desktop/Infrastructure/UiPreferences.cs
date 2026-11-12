@@ -26,6 +26,13 @@ internal sealed partial class UiPreferences : ObservableObject
     [ObservableProperty]
     public partial bool ToolbarLabels { get; set; } = true;
 
+    /// <summary>The navigation rail with the names beside the icons (opened and closed at its top).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NavigationToggleHint))]
+    public partial bool NavigationExpanded { get; set; }
+
+    public string NavigationToggleHint => NavigationExpanded ? Neruna.Core.Localization.Texts.T("Navigation einklappen") : Neruna.Core.Localization.Texts.T("Navigation mit Beschriftung ausklappen");
+
     /// <summary>"Konto hinzufügen" at the bottom of the navigation rail.</summary>
     [ObservableProperty]
     public partial bool ShowAddAccountButton { get; set; } = true;
@@ -49,6 +56,7 @@ internal sealed partial class UiPreferences : ObservableObject
         {
             ToolbarLabels = await settings.GetBoolAsync(SettingKeys.ToolbarLabels, fallback: true);
             ShowAddAccountButton = await settings.GetBoolAsync(SettingKeys.ShowAddAccountButton, fallback: true);
+            NavigationExpanded = await settings.GetBoolAsync(SettingKeys.NavigationExpanded);
             LoadNavigation(await settings.GetAsync(SettingKeys.NavigationItems));
             MailPaper.ParagraphLines = await settings.GetParagraphSpacingAsync();
         }
@@ -144,6 +152,14 @@ internal sealed partial class UiPreferences : ObservableObject
     }
 
     private sealed record NavigationState(Section Section, bool Visible);
+
+    partial void OnNavigationExpandedChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = settings.SetBoolAsync(SettingKeys.NavigationExpanded, value);
+        }
+    }
 
     partial void OnToolbarLabelsChanged(bool value)
     {

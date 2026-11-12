@@ -45,15 +45,36 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="#30000000" />
     </Style>
+    <!-- In "⋯": a heading per section, buttons with their text -->
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Margin" Value="0,6,0,2" />
+    </Style>
+    <Style Selector="Button.item, ToggleButton.item">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Padding" Value="6,4" />
+    </Style>
+    <Style Selector="ToggleButton.item:unchecked">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector=":is(Button).item PathIcon">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
     <Style Selector="ComboBoxItem" x:DataType="ed:FontChoice">
       <Setter Property="IsEnabled" Value="{Binding IsFont}" />
     </Style>
   </UserControl.Styles>
 
+  <!-- One line, never wrapped: what does not fit goes into "⋯", sorted into sections (FormattingToolbar.Fit). -->
   <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1,1,1,0" CornerRadius="4,4,0,0" Padding="6,4">
-    <WrapPanel Orientation="Horizontal">
-      <ComboBox ItemsSource="{x:Static ed:FontCatalog.Fonts}" SelectedItem="{Binding SelectedFont}" PlaceholderText="{Binding CurrentFontName}"
-                Width="200" MaxDropDownHeight="440" ToolTip.Tip="{l:T 'Schriftart'}" Margin="0,0,4,0">
+    <StackPanel x:Name="Bar" Orientation="Horizontal" HorizontalAlignment="Left">
+      <ComboBox x:Name="FontBox" ItemsSource="{x:Static ed:FontCatalog.Fonts}" SelectedItem="{Binding SelectedFont}" PlaceholderText="{Binding CurrentFontName}"
+                Width="170" MaxDropDownHeight="440" ToolTip.Tip="{l:T 'Schriftart'}" AutomationProperties.Name="{l:T 'Schriftart'}" Margin="0,0,4,0">
         <ComboBox.ItemTemplate>
           <DataTemplate x:DataType="ed:FontChoice">
             <Panel>
@@ -65,38 +86,43 @@
         </ComboBox.ItemTemplate>
       </ComboBox>
       <ComboBox ItemsSource="{x:Static ed:FontCatalog.Sizes}" SelectedItem="{Binding SelectedSize}" PlaceholderText="{Binding CurrentSizeText}"
-                Width="72" MaxDropDownHeight="360" ToolTip.Tip="{l:T 'Schriftgrad'}" />
-      <!-- The spell check's language for this text (not on macOS: the system picks it) -->
-      <ComboBox ItemsSource="{x:Static ed:FormattingViewModel.SpellLanguageChoices}" SelectedItem="{Binding SpellLanguage}"
-                IsVisible="{x:Static ed:FormattingViewModel.CanChooseSpellLanguage}" Width="150" Margin="4,0,0,0"
-                ToolTip.Tip="{l:T 'Sprache der Rechtschreibprüfung für diese Nachricht'}" />
+                Width="84" MaxDropDownHeight="360" ToolTip.Tip="{l:T 'Schriftgrösse'}" AutomationProperties.Name="{l:T 'Schriftgrösse'}">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="x:Double">
+            <TextBlock Text="{Binding StringFormat='{}{0} pt'}" />
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
 
       <Border Classes="group-separator" />
-      <ToggleButton Classes="fmt" IsChecked="{Binding IsBold, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="bold" ToolTip.Tip="{l:T 'Fett (Ctrl+B)'}">
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsBold, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="bold" ToolTip.Tip="{l:T 'Fett (Ctrl+B)'}" AutomationProperties.Name="{l:T 'Fett'}">
         <TextBlock Text="{l:T 'F'}" FontWeight="Bold" FontSize="15" />
       </ToggleButton>
-      <ToggleButton Classes="fmt" IsChecked="{Binding IsItalic, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="italic" ToolTip.Tip="{l:T 'Kursiv (Ctrl+I)'}">
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsItalic, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="italic" ToolTip.Tip="{l:T 'Kursiv (Ctrl+I)'}" AutomationProperties.Name="{l:T 'Kursiv'}">
         <TextBlock Text="{l:T 'K'}" FontStyle="Italic" FontSize="15" FontFamily="Georgia, Times New Roman, serif" />
       </ToggleButton>
-      <ToggleButton Classes="fmt" IsChecked="{Binding IsUnderline, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="underline" ToolTip.Tip="{l:T 'Unterstrichen (Ctrl+U)'}">
+      <ToggleButton Classes="fmt" IsChecked="{Binding IsUnderline, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="underline" ToolTip.Tip="{l:T 'Unterstrichen (Ctrl+U)'}" AutomationProperties.Name="{l:T 'Unterstrichen'}">
         <TextBlock Text="{l:T 'U'}" TextDecorations="Underline" FontSize="15" />
       </ToggleButton>
-      <ToggleButton Classes="fmt" IsChecked="{Binding IsStrikethrough, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="strikeThrough" ToolTip.Tip="{l:T 'Durchgestrichen'}">
+      <ToggleButton x:Name="StrikeButton" Classes="fmt" IsChecked="{Binding IsStrikethrough, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="strikeThrough"
+                    ToolTip.Tip="{l:T 'Durchgestrichen'}" AutomationProperties.Name="{l:T 'Durchgestrichen'}">
         <TextBlock Text="{l:T 'abc'}" TextDecorations="Strikethrough" FontSize="14" />
       </ToggleButton>
 
-      <Border Classes="group-separator" />
-      <!-- Text color: click applies the last color, the arrow opens the palette -->
-      <SplitButton x:Name="TextColorButton" Classes="fmt" Command="{Binding ApplyTextColorCommand}" CommandParameter="{Binding LastTextColor}" ToolTip.Tip="{l:T 'Schriftfarbe'}" Padding="6,0">
-        <StackPanel Spacing="1">
-          <TextBlock Text="A" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
-          <Border Height="3" Width="16" Background="{Binding LastTextColor, Converter={x:Static app:Converters.ColorBrush}}" />
-        </StackPanel>
-        <SplitButton.Flyout>
-          <Flyout Placement="BottomEdgeAlignedLeft">
-            <StackPanel Spacing="6">
-              <TextBlock Text="{l:T 'Schriftfarbe'}" FontWeight="SemiBold" FontSize="12" />
-              <ItemsControl ItemsSource="{x:Static ed:FormattingViewModel.TextColors}" Width="220" Button.Click="OnTextColorPicked">
+      <StackPanel x:Name="ColorGroup" Orientation="Horizontal">
+        <Border Classes="group-separator" />
+        <!-- Text color: click applies the last color, the arrow opens the palette -->
+        <SplitButton x:Name="TextColorButton" Classes="fmt" Command="{Binding ApplyTextColorCommand}" CommandParameter="{Binding LastTextColor}" ToolTip.Tip="{l:T 'Schriftfarbe'}"
+                     AutomationProperties.Name="{l:T 'Schriftfarbe'}" Padding="6,0">
+          <StackPanel Spacing="1">
+            <TextBlock Text="A" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
+            <Border Height="3" Width="16" Background="{Binding LastTextColor, Converter={x:Static app:Converters.ColorBrush}}" />
+          </StackPanel>
+          <SplitButton.Flyout>
+            <Flyout Placement="BottomEdgeAlignedLeft">
+              <StackPanel Spacing="6">
+                <TextBlock Text="{l:T 'Schriftfarbe'}" FontWeight="SemiBold" FontSize="12" />
+                <ItemsControl ItemsSource="{x:Static ed:FormattingViewModel.TextColors}" Width="220" Button.Click="OnTextColorPicked">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel />
@@ -108,11 +134,13 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-            </StackPanel>
-          </Flyout>
-        </SplitButton.Flyout>
-      </SplitButton>
-      <SplitButton x:Name="HighlightButton" Classes="fmt" Command="{Binding ApplyHighlightCommand}" CommandParameter="{Binding LastHighlightColor}" ToolTip.Tip="{l:T 'Texthervorhebungsfarbe'}" Padding="6,0">
+              </StackPanel>
+            </Flyout>
+          </SplitButton.Flyout>
+        </SplitButton>
+      </StackPanel>
+      <SplitButton x:Name="HighlightButton" Classes="fmt" Command="{Binding ApplyHighlightCommand}" CommandParameter="{Binding LastHighlightColor}" ToolTip.Tip="{l:T 'Texthervorhebungsfarbe'}"
+                   AutomationProperties.Name="{l:T 'Texthervorhebungsfarbe'}" Padding="6,0">
         <StackPanel Spacing="1">
           <TextBlock Text="{l:T 'ab'}" FontSize="14" HorizontalAlignment="Center" />
           <Border Height="3" Width="16" Background="{Binding LastHighlightColor, Converter={x:Static app:Converters.ColorBrush}}" />
@@ -139,54 +167,190 @@
         </SplitButton.Flyout>
       </SplitButton>
 
-      <Border Classes="group-separator" />
-      <ToggleButton Classes="fmt" IsChecked="{Binding IsBulletList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertUnorderedList" ToolTip.Tip="{l:T 'Aufzählungszeichen'}">
-        <PathIcon Data="{StaticResource IconBullets}" />
-      </ToggleButton>
-      <ToggleButton Classes="fmt" IsChecked="{Binding IsNumberedList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertOrderedList" ToolTip.Tip="{l:T 'Nummerierung'}">
-        <PathIcon Data="{StaticResource IconNumbering}" />
-      </ToggleButton>
-      <ToggleButton Classes="fmt" IsChecked="{Binding IsChecklist, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="checklist" IsVisible="{Binding ShowChecklist}"
-                    ToolTip.Tip="{l:T 'Checkliste'}">
-        <PathIcon Data="{StaticResource IconTasks}" />
-      </ToggleButton>
-      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="outdent" ToolTip.Tip="{l:T 'Einzug verkleinern (Shift+Tab)'}">
-        <PathIcon Data="{StaticResource IconOutdent}" />
-      </Button>
-      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="indent" ToolTip.Tip="{l:T 'Einzug vergrössern'}">
-        <PathIcon Data="{StaticResource IconIndent}" />
+      <StackPanel x:Name="ListGroup" Orientation="Horizontal">
+        <Border Classes="group-separator" />
+        <ToggleButton Classes="fmt" IsChecked="{Binding IsBulletList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertUnorderedList" ToolTip.Tip="{l:T 'Aufzählungszeichen'}" AutomationProperties.Name="{l:T 'Aufzählungszeichen'}">
+          <PathIcon Data="{StaticResource IconBullets}" />
+        </ToggleButton>
+        <ToggleButton Classes="fmt" IsChecked="{Binding IsNumberedList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertOrderedList" ToolTip.Tip="{l:T 'Nummerierung'}" AutomationProperties.Name="{l:T 'Nummerierung'}">
+          <PathIcon Data="{StaticResource IconNumbering}" />
+        </ToggleButton>
+        <ToggleButton Classes="fmt" IsChecked="{Binding IsChecklist, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="checklist" IsVisible="{Binding ShowChecklist}"
+                      ToolTip.Tip="{l:T 'Checkliste'}" AutomationProperties.Name="{l:T 'Checkliste'}">
+          <PathIcon Data="{StaticResource IconTasks}" />
+        </ToggleButton>
+      </StackPanel>
+      <StackPanel x:Name="IndentGroup" Orientation="Horizontal">
+        <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="outdent" ToolTip.Tip="{l:T 'Einzug verkleinern (Shift+Tab)'}" AutomationProperties.Name="{l:T 'Einzug verkleinern'}">
+          <PathIcon Data="{StaticResource IconOutdent}" />
+        </Button>
+        <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="indent" ToolTip.Tip="{l:T 'Einzug vergrössern'}" AutomationProperties.Name="{l:T 'Einzug vergrössern'}">
+          <PathIcon Data="{StaticResource IconIndent}" />
+        </Button>
+      </StackPanel>
+
+      <StackPanel x:Name="AlignGroup" Orientation="Horizontal">
+        <Border Classes="group-separator" />
+        <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyLeft" ToolTip.Tip="{l:T 'Linksbündig'}" AutomationProperties.Name="{l:T 'Linksbündig'}">
+          <PathIcon Data="{StaticResource IconAlignLeft}" />
+        </Button>
+        <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyCenter" ToolTip.Tip="{l:T 'Zentriert'}" AutomationProperties.Name="{l:T 'Zentriert'}">
+          <PathIcon Data="{StaticResource IconAlignCenter}" />
+        </Button>
+        <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyRight" ToolTip.Tip="{l:T 'Rechtsbündig'}" AutomationProperties.Name="{l:T 'Rechtsbündig'}">
+          <PathIcon Data="{StaticResource IconAlignRight}" />
+        </Button>
+      </StackPanel>
+
+      <StackPanel x:Name="InsertGroup" Orientation="Horizontal">
+        <Border Classes="group-separator" />
+        <Button x:Name="LinkButton" Classes="fmt" ToolTip.Tip="{l:T 'Link einfügen'}" AutomationProperties.Name="{l:T 'Link einfügen'}">
+          <PathIcon Data="{StaticResource IconLink}" />
+          <Button.Flyout>
+            <Flyout Placement="BottomEdgeAlignedLeft" Opened="OnLinkFlyoutOpened">
+              <StackPanel Spacing="8" Width="320">
+                <TextBlock Text="{l:T 'Link für den markierten Text'}" FontWeight="SemiBold" FontSize="12" />
+                <TextBox Text="{Binding LinkUrl}" PlaceholderText="{l:T 'https://…, mailto:… oder tel:+41…'}" KeyDown="OnLinkUrlKeyDown" />
+                <Button Classes="accent" Content="{l:T 'Einfügen'}" HorizontalAlignment="Right" Click="OnInsertLink" />
+              </StackPanel>
+            </Flyout>
+          </Button.Flyout>
+        </Button>
+        <Button Classes="fmt" Command="{Binding InsertImageCommand}" ToolTip.Tip="{l:T 'Bild einfügen (z. B. Logo)'}" AutomationProperties.Name="{l:T 'Bild einfügen'}">
+          <PathIcon Data="{StaticResource IconImage}" />
+        </Button>
+      </StackPanel>
+      <Button x:Name="ClearButton" Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="removeFormat" ToolTip.Tip="{l:T 'Formatierung löschen'}" AutomationProperties.Name="{l:T 'Formatierung löschen'}">
+        <PathIcon Data="{StaticResource IconClearFormat}" />
       </Button>
 
-      <Border Classes="group-separator" />
-      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyLeft" ToolTip.Tip="{l:T 'Linksbündig'}">
-        <PathIcon Data="{StaticResource IconAlignLeft}" />
-      </Button>
-      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyCenter" ToolTip.Tip="{l:T 'Zentriert'}">
-        <PathIcon Data="{StaticResource IconAlignCenter}" />
-      </Button>
-      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyRight" ToolTip.Tip="{l:T 'Rechtsbündig'}">
-        <PathIcon Data="{StaticResource IconAlignRight}" />
-      </Button>
+      <!-- The spell check's language, only where no other menu has it (notes; not on macOS: the system picks it) -->
+      <StackPanel x:Name="SpellGroup" Orientation="Horizontal">
+        <Border Classes="group-separator" />
+        <ComboBox ItemsSource="{x:Static ed:FormattingViewModel.SpellLanguageChoices}" SelectedItem="{Binding SpellLanguage}" Width="150"
+                  ToolTip.Tip="{l:T 'Sprache der Rechtschreibprüfung'}" AutomationProperties.Name="{l:T 'Sprache der Rechtschreibprüfung'}" />
+      </StackPanel>
 
-      <Border Classes="group-separator" />
-      <Button x:Name="LinkButton" Classes="fmt" ToolTip.Tip="{l:T 'Link einfügen'}">
-        <PathIcon Data="{StaticResource IconLink}" />
+      <!-- What the width leaves out -->
+      <Button x:Name="MoreButton" Classes="fmt" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Weitere Formatierungen'}" AutomationProperties.Name="{l:T 'Weitere Formatierungen'}">
+        <PathIcon Data="{StaticResource IconMore}" />
         <Button.Flyout>
-          <Flyout Placement="BottomEdgeAlignedLeft" Opened="OnLinkFlyoutOpened">
-            <StackPanel Spacing="8" Width="320">
-              <TextBlock Text="{l:T 'Link für den markierten Text'}" FontWeight="SemiBold" FontSize="12" />
-              <TextBox x:Name="LinkUrlBox" Text="{Binding LinkUrl}" PlaceholderText="{l:T 'https://…, mailto:… oder tel:+41…'}" KeyDown="OnLinkUrlKeyDown" />
-              <Button Classes="accent" Content="{l:T 'Einfügen'}" HorizontalAlignment="Right" Click="OnInsertLink" />
+          <Flyout Placement="BottomEdgeAlignedRight">
+            <StackPanel Width="260" KeyDown="OnMoreKeyDown">
+              <TextBlock x:Name="FontSection" Classes="section" Text="{l:T 'Schrift und Farben'}" />
+              <ComboBox x:Name="MenuFontBox" ItemsSource="{x:Static ed:FontCatalog.Fonts}" SelectedItem="{Binding SelectedFont}" PlaceholderText="{Binding CurrentFontName}"
+                        HorizontalAlignment="Stretch" MaxDropDownHeight="440" AutomationProperties.Name="{l:T 'Schriftart'}" Margin="0,2">
+                <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="ed:FontChoice">
+            <Panel>
+              <!-- Each font is shown in itself. -->
+              <TextBlock Text="{Binding Name}" FontFamily="{Binding Family}" FontSize="15" IsVisible="{Binding IsFont}" TextTrimming="CharacterEllipsis" />
+              <Border IsVisible="{Binding IsSeparator}" Height="1" Background="{DynamicResource DividerBrush}" Margin="0,4" />
+            </Panel>
+          </DataTemplate>
+        </ComboBox.ItemTemplate>
+              </ComboBox>
+              <ToggleButton x:Name="MenuStrike" Classes="item" IsChecked="{Binding IsStrikethrough, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="strikeThrough">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="{l:T 'abc'}" TextDecorations="Strikethrough" Margin="0,0,8,0" />
+                  <TextBlock Text="{l:T 'Durchgestrichen'}" />
+                </StackPanel>
+              </ToggleButton>
+              <StackPanel x:Name="MenuTextColor" Spacing="2" Margin="0,4,0,0">
+                <TextBlock Text="{l:T 'Schriftfarbe'}" FontSize="12" Classes="subtle" />
+                <ItemsControl ItemsSource="{x:Static ed:FormattingViewModel.TextColors}" Width="220" Button.Click="OnMenuTextColorPicked">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <Button Classes="swatch" Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              </StackPanel>
+              <StackPanel x:Name="MenuHighlight" Spacing="2" Margin="0,4,0,0">
+                <TextBlock Text="{l:T 'Hervorheben'}" FontSize="12" Classes="subtle" />
+                <ItemsControl ItemsSource="{x:Static ed:FormattingViewModel.HighlightColors}" Width="220" Button.Click="OnMenuHighlightPicked">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <Button Classes="swatch" Background="{Binding Converter={x:Static app:Converters.ColorBrush}}" ToolTip.Tip="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+                <Button Content="{l:T 'Keine Farbe'}" FontSize="12" Click="OnMenuHighlightPicked" />
+              </StackPanel>
+              <Button x:Name="MenuClear" Classes="item" Command="{Binding FormatCommand}" CommandParameter="removeFormat" Click="OnMenuItemClick">
+                <StackPanel Orientation="Horizontal">
+                  <PathIcon Data="{StaticResource IconClearFormat}" />
+                  <TextBlock Text="{l:T 'Formatierung löschen'}" />
+                </StackPanel>
+              </Button>
+
+              <TextBlock x:Name="ParagraphSection" Classes="section" Text="{l:T 'Absatz und Listen'}" />
+              <StackPanel x:Name="MenuLists" Orientation="Horizontal">
+                <ToggleButton Classes="fmt" IsChecked="{Binding IsBulletList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertUnorderedList" ToolTip.Tip="{l:T 'Aufzählungszeichen'}" AutomationProperties.Name="{l:T 'Aufzählungszeichen'}">
+                  <PathIcon Data="{StaticResource IconBullets}" />
+                </ToggleButton>
+                <ToggleButton Classes="fmt" IsChecked="{Binding IsNumberedList, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="insertOrderedList" ToolTip.Tip="{l:T 'Nummerierung'}" AutomationProperties.Name="{l:T 'Nummerierung'}">
+                  <PathIcon Data="{StaticResource IconNumbering}" />
+                </ToggleButton>
+                <ToggleButton Classes="fmt" IsChecked="{Binding IsChecklist, Mode=OneWay}" Command="{Binding FormatCommand}" CommandParameter="checklist" IsVisible="{Binding ShowChecklist}"
+                              ToolTip.Tip="{l:T 'Checkliste'}" AutomationProperties.Name="{l:T 'Checkliste'}">
+                  <PathIcon Data="{StaticResource IconTasks}" />
+                </ToggleButton>
+              </StackPanel>
+              <StackPanel x:Name="MenuIndent" Orientation="Horizontal">
+                <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="outdent" ToolTip.Tip="{l:T 'Einzug verkleinern (Shift+Tab)'}" AutomationProperties.Name="{l:T 'Einzug verkleinern'}">
+                  <PathIcon Data="{StaticResource IconOutdent}" />
+                </Button>
+                <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="indent" ToolTip.Tip="{l:T 'Einzug vergrössern'}" AutomationProperties.Name="{l:T 'Einzug vergrössern'}">
+                  <PathIcon Data="{StaticResource IconIndent}" />
+                </Button>
+              </StackPanel>
+              <StackPanel x:Name="MenuAlign" Orientation="Horizontal">
+                <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyLeft" ToolTip.Tip="{l:T 'Linksbündig'}" AutomationProperties.Name="{l:T 'Linksbündig'}">
+                  <PathIcon Data="{StaticResource IconAlignLeft}" />
+                </Button>
+                <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyCenter" ToolTip.Tip="{l:T 'Zentriert'}" AutomationProperties.Name="{l:T 'Zentriert'}">
+                  <PathIcon Data="{StaticResource IconAlignCenter}" />
+                </Button>
+                <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="justifyRight" ToolTip.Tip="{l:T 'Rechtsbündig'}" AutomationProperties.Name="{l:T 'Rechtsbündig'}">
+                  <PathIcon Data="{StaticResource IconAlignRight}" />
+                </Button>
+              </StackPanel>
+
+              <TextBlock x:Name="InsertSection" Classes="section" Text="{l:T 'Einfügen'}" />
+              <StackPanel x:Name="MenuInsert" Spacing="4">
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Content="{l:T 'Link'}" Click="OnMenuInsertLink" Margin="4,0,0,0" ToolTip.Tip="{l:T 'Link für den markierten Text'}" />
+                  <TextBox Text="{Binding LinkUrl}" PlaceholderText="{l:T 'https://…, mailto:… oder tel:+41…'}" KeyDown="OnMenuLinkKeyDown"
+                           AutomationProperties.Name="{l:T 'Link für den markierten Text'}" />
+                </DockPanel>
+                <Button Classes="item" Command="{Binding InsertImageCommand}" Click="OnMenuItemClick">
+                  <StackPanel Orientation="Horizontal">
+                    <PathIcon Data="{StaticResource IconImage}" />
+                    <TextBlock Text="{l:T 'Bild einfügen (z. B. Logo)'}" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+
+              <StackPanel x:Name="MenuSpell">
+                <TextBlock Classes="section" Text="{l:T 'Sprache der Rechtschreibprüfung'}" />
+                <ComboBox ItemsSource="{x:Static ed:FormattingViewModel.SpellLanguageChoices}" SelectedItem="{Binding SpellLanguage}" HorizontalAlignment="Stretch"
+                          AutomationProperties.Name="{l:T 'Sprache der Rechtschreibprüfung'}" />
+              </StackPanel>
             </StackPanel>
           </Flyout>
         </Button.Flyout>
       </Button>
-      <Button Classes="fmt" Command="{Binding InsertImageCommand}" ToolTip.Tip="{l:T 'Bild einfügen (z. B. Logo)'}">
-        <PathIcon Data="{StaticResource IconImage}" />
-      </Button>
-      <Button Classes="fmt" Command="{Binding FormatCommand}" CommandParameter="removeFormat" ToolTip.Tip="{l:T 'Formatierung löschen'}">
-        <PathIcon Data="{StaticResource IconClearFormat}" />
-      </Button>
-    </WrapPanel>
+    </StackPanel>
   </Border>
 </UserControl>

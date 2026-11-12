@@ -129,6 +129,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         AutoReplies = autoReplies;
         _reminders = reminders;
         _settings = settings;
+        Infrastructure.DeleteConfirmation.Settings = settings;
         _cloudController = cloudController;
         _cloudSignatures = cloudSignatures;
         _cloudTemplates = cloudTemplates;
@@ -412,7 +413,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         ChatPage.CloudSetupRequested += (_, _) =>
         {
             CurrentPage = SettingsPage;
-            SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+            SettingsPage.Section = SettingsSection.Cloud;
         };
     }
 
@@ -460,6 +461,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             }
         };
         accountsPage.SubscribeRequested += (_, _) => ShowIcsSubscription();
+        accountsPage.SpecialRequested += async (_, _) => await ShowSpecialCalendarAsync();
+        accountsPage.ExtrasRequested += (_, _) => SettingsPage.Section = SettingsSection.Calendar;
         accountsPage.PstRequested += (_, _) => ShowPstAccount();
         // "Serverregeln …" of an account: their own settings page, on this account.
         accountsPage.ServerRulesRequested += async (_, account) => await SettingsPage.ShowServerRulesAsync(account.Id);
@@ -670,7 +673,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 _cloudLinkOpened = true;
                 Overlay = Overlay is CrashReportViewModel ? Overlay : null;
                 CurrentPage = SettingsPage;
-                SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+                SettingsPage.Section = SettingsSection.Cloud;
                 SettingsPage.Cloud.OpenLink(link);
             }
         }
@@ -1109,7 +1112,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             {
                 Overlay = null;
                 CurrentPage = SettingsPage;
-                SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+                SettingsPage.Section = SettingsSection.Cloud;
             };
         }
 
@@ -1325,7 +1328,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         {
             Overlay = null;
             CurrentPage = SettingsPage;
-            SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+            SettingsPage.Section = SettingsSection.Cloud;
         };
         view.MailRequested += async (_, request) =>
         {
@@ -1617,7 +1620,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     {
         ShowBackupHint = false;
         CurrentPage = SettingsPage;
-        SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        SettingsPage.Section = SettingsSection.Cloud;
         await SettingsPage.Cloud.StartBackupAsync();
     }
 

@@ -29,6 +29,7 @@ internal sealed partial class App : Application
         {
             // Language: as last chosen (file next to the database), the system's at first; see Neruna.Core.Localization.
             Neruna.Core.Localization.Texts.Use(LanguageFile.Read(Options.DataDirectory));
+            KeyNames.Use();
 
             // "Bei jedem Start Profil abfragen": which one, before its data is opened. Closed without a choice: end.
             if (Options.AskForProfile)
@@ -50,6 +51,7 @@ internal sealed partial class App : Application
 
                 CrashHandler.Install(Options);
                 Neruna.Core.Localization.Texts.Use(LanguageFile.Read(Options.DataDirectory));
+                KeyNames.Use();
             }
 
             // Splash first, so the user sees something while the database opens and the window is built.
@@ -82,6 +84,7 @@ internal sealed partial class App : Application
                 && language != LanguageFile.Read(Options.DataDirectory))
             {
                 Neruna.Core.Localization.Texts.Use(language);
+                KeyNames.Use();
                 LanguageFile.Write(Options.DataDirectory, language);
             }
 

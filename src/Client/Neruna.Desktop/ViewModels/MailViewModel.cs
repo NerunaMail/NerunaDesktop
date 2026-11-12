@@ -227,7 +227,7 @@ internal sealed partial class MailViewModel(
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedMessage), nameof(HasSelection), nameof(ShowMessageActions), nameof(IsDraftsFolder), nameof(IsSentFolder))]
-    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(EditDraftCommand), nameof(OpenAsDraftCommand), nameof(ForwardAsAttachmentCommand), nameof(SaveAsEmlCommand), nameof(PrintCommand), nameof(NewNoteCommand), nameof(MoveToChosenFolderCommand), nameof(CopyToChosenFolderCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ArchiveCommand), nameof(ToggleFlagCommand), nameof(ToggleReadCommand), nameof(MarkReadCommand), nameof(MarkUnreadCommand), nameof(EditDraftCommand), nameof(OpenAsDraftCommand), nameof(ForwardAsAttachmentCommand), nameof(SaveAsEmlCommand), nameof(PrintCommand), nameof(NewNoteCommand), nameof(MoveToChosenFolderCommand), nameof(CopyToChosenFolderCommand))]
     public partial MessageListEntry? SelectedEntry { get; set; }
 
     [ObservableProperty]
@@ -854,16 +854,36 @@ internal sealed partial class MailViewModel(
     private IReadOnlyList<MessageItemViewModel> ActionTargets =>
         SelectedMessages.Count > 0 ? SelectedMessages : SelectedMessage is { } message ? [message] : [];
 
-    [RelayCommand(CanExecute = nameof(HasSelection))]
+    // Concurrent: Delete pressed again while the server still works on the one before must delete the next mail, not
+    // be swallowed (a command that is still running would refuse). The list changes at once; the server work queues up
+    // in RunOnMessagesAsync. The same for archiving, flagging and marking as read.
+    [RelayCommand(CanExecute = nameof(HasSelection), AllowConcurrentExecutions = true)]
     private async Task DeleteAsync()
     {
-        if (!InReadOnly(ActionTargets))
+        var targets = ActionTargets;
+        if (!InReadOnly(targets) && await ConfirmPermanentAsync(targets))
         {
-            await RunOnMessagesAsync(ActionTargets, T("Löschen"), (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true, movesTo: TrashOf);
+            await RunOnMessagesAsync(targets, T("Löschen"), (connection, folder, ids) => mail.DeleteAsync(connection, folder, ids), removesMessages: true, movesTo: TrashOf);
         }
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelection))]
+    /// <summary>
+    /// Into the trash: no question (Ctrl+Z brings it back). Inside the trash, or in an account without one, mail is gone
+    /// for good: asked every time.
+    /// </summary>
+    private async Task<bool> ConfirmPermanentAsync(IReadOnlyList<MessageItemViewModel> messages)
+    {
+        var gone = messages.Count(m => FolderOf(m) is { } folder && TrashOf(folder) is null);
+        return gone == 0 || await AskPermanentAsync(gone);
+    }
+
+    private static Task<bool> AskPermanentAsync(int gone) =>
+        Infrastructure.DeleteConfirmation.AskAlwaysAsync(T("Endgültig löschen"),
+            gone == 1 ? T("Die Nachricht wird endgültig gelöscht. Das lässt sich nicht rückgängig machen.")
+                : F("{0} Nachrichten werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.", gone),
+            T("Endgültig löschen"));
+
+    [RelayCommand(CanExecute = nameof(HasSelection), AllowConcurrentExecutions = true)]
     private async Task ArchiveAsync()
     {
         if (!InReadOnly(ActionTargets))
@@ -885,7 +905,7 @@ internal sealed partial class MailViewModel(
         return true;
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelection))]
+    [RelayCommand(CanExecute = nameof(HasSelection), AllowConcurrentExecutions = true)]
     private async Task ToggleFlagAsync()
     {
         // The first selected message decides whether all get flagged or unflagged.
@@ -901,11 +921,25 @@ internal sealed partial class MailViewModel(
         }, removesMessages: false);
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelection))]
+    [RelayCommand(CanExecute = nameof(HasSelection), AllowConcurrentExecutions = true)]
     private Task ToggleReadAsync()
     {
         var targets = ActionTargets;
         return SetReadAsync(targets, targets[0].IsUnread);
+    }
+
+    /// <summary>Right-click menu: all selected mails read, or all unread (both offered when the selection is mixed).</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection), AllowConcurrentExecutions = true)]
+    private Task MarkReadAsync() => SetReadAsync(ActionTargets, read: true);
+
+    [RelayCommand(CanExecute = nameof(HasSelection), AllowConcurrentExecutions = true)]
+    private Task MarkUnreadAsync() => SetReadAsync(ActionTargets, read: false);
+
+    /// <summary>Which of the two the menu offers for the selected mails.</summary>
+    internal (bool AnyUnread, bool AnyRead) ReadStates()
+    {
+        var targets = ActionTargets;
+        return (targets.Any(m => m.IsUnread), targets.Any(m => !m.IsUnread));
     }
 
     private Task SetReadAsync(MessageItemViewModel message, bool read) => SetReadAsync([message], read);
@@ -961,6 +995,12 @@ internal sealed partial class MailViewModel(
 
     private static string[] OwnAddresses(Account account) => [.. account.Identities.Select(i => i.Email)];
 
+    // New mails open in their own window (more room), replies and forwards in the reading pane – both as set in
+    // Einstellungen → Schreiben. Without a reading pane there is no room for it inline: always a window.
+    private async Task<bool> OpensInWindowAsync(bool newMail) =>
+        ListLayout.Pane == ReadingPanePosition.None
+        || await settings.GetBoolAsync(newMail ? SettingKeys.ComposeNewInWindow : SettingKeys.ComposeInWindow, fallback: newMail);
+
     /// <returns>The compose form shown, or null when none could be opened.</returns>
     /// <param name="inWindow">Its own window whatever the setting (from a message window); null: as set.</param>
     private async Task<ComposeViewModel?> StartComposeAsync(ComposeDraft draft, ComposeKind kind, bool encrypt = false, Func<Task>? afterSent = null, bool? inWindow = null)
@@ -975,7 +1015,7 @@ internal sealed partial class MailViewModel(
         try
         {
             // Without a reading pane there is no room for it inline: its own window.
-            var window = inWindow ?? (ListLayout.Pane == ReadingPanePosition.None || await settings.GetBoolAsync(SettingKeys.ComposeInWindow));
+            var window = inWindow ?? await OpensInWindowAsync(kind == ComposeKind.New);
             var compose = CreateCompose(account.Account, account.Connection, draft, kind, encrypt, window);
             compose.AfterSent = afterSent;
             await compose.InitializeAsync();
@@ -1088,11 +1128,16 @@ internal sealed partial class MailViewModel(
         compose.PopOutRequested += async (_, _) =>
         {
             // The draft moves over as HTML (with its saved copy); the inline editor is discarded afterwards.
+            // One draft only: the window goes on with the same saved copy, recipients, attachments, text and caret.
             var dirty = compose.IsDirty;
+            var caret = await compose.CaretAsync();
             var (current, sign, encryptCurrent) = await compose.CaptureAsync();
             var window = CreateCompose(compose.Account, compose.Connection, current, compose.Kind, encryptCurrent, inWindow: true);
             window.AfterSent = compose.AfterSent;
             window.Formatting.SpellLanguage = compose.Formatting.SpellLanguage; // the popped-out draft keeps its spell check
+            window.StartCaret = caret;
+            window.ShowCc = compose.ShowCc;
+            window.ShowBcc = compose.ShowBcc;
             if (dirty)
             {
                 window.MarkChanged();
@@ -1224,6 +1269,11 @@ internal sealed partial class MailViewModel(
 
     private async Task<bool> DeleteFromWindowAsync(MessageItemViewModel message, MailFolderNode folder)
     {
+        if (TrashOf(folder) is null && !await AskPermanentAsync(1))
+        {
+            return false;
+        }
+
         // Still in the list: delete like from the toolbar (the list and counters follow).
         if (_allMessages.Contains(message))
         {
@@ -1260,7 +1310,7 @@ internal sealed partial class MailViewModel(
                 return;
             }
 
-            var inWindow = await settings.GetBoolAsync(SettingKeys.ComposeInWindow);
+            var inWindow = await OpensInWindowAsync(newMail: draft.InReplyTo is null);
             var compose = CreateCompose(folder.Account.Account, folder.Account.Connection, draft, ComposeKind.New, encrypt: false, inWindow);
             await compose.InitializeAsync();
             await ShowComposeAsync(compose);
@@ -1290,7 +1340,7 @@ internal sealed partial class MailViewModel(
             var opened = await secureMime.OpenAsync(await mail.GetMessageAsync(folder.Account.Connection, folder.Folder, message.Summary.RemoteId));
             // A new draft: no draft id (nothing to replace) and a new Message-ID when it is sent.
             var draft = MessageComposer.FromDraft(opened.Readable, string.Empty) with { DraftRemoteId = null, MessageId = null };
-            var inWindow = await settings.GetBoolAsync(SettingKeys.ComposeInWindow);
+            var inWindow = await OpensInWindowAsync(newMail: true);
             var compose = CreateCompose(folder.Account.Account, folder.Account.Connection, draft, ComposeKind.New, opened.Security.WasEncrypted, inWindow);
             await compose.InitializeAsync();
             await ShowComposeAsync(compose);

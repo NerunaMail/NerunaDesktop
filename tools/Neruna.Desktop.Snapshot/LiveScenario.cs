@@ -127,7 +127,7 @@ internal static class LiveScenario
         Console.WriteLine($"Search: {vm.MailPage.Search.SearchInfo}; {vm.MailPage.Entries.OfType<MessageItemViewModel>().Count()} hits");
         await Snapshots.SaveAsync(window, output, "pst-4-search.png");
         vm.NavigateCommand.Execute(Section.Settings);
-        vm.SettingsPage.SelectedNav = SettingsViewModel.Navigation.First(n => n.Tab == 12);
+        vm.SettingsPage.SelectedNav = SettingsViewModel.Navigation.First(n => !n.IsHeading && n.Section == SettingsSection.Data);
         await Task.Delay(800);
         Console.WriteLine($"Index: {vm.SettingsPage.SearchIndex.StateText} {string.Join("; ", vm.SettingsPage.SearchIndex.Accounts.Select(a => a.Details))}");
         await Snapshots.SaveAsync(window, output, "pst-5-index.png");
@@ -148,7 +148,7 @@ internal static class LiveScenario
         Console.WriteLine($"First: {cloud.ConnectedText ?? cloud.Error}");
 
         vm.NavigateCommand.Execute(Section.Settings);
-        vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        vm.SettingsPage.Section = SettingsSection.Cloud;
         cloud.AddConnectionCommand.Execute(null);
         (cloud.Server, cloud.Code, cloud.Pin) = (server, code2, pin2);
         await Task.Delay(300);
@@ -213,7 +213,7 @@ internal static class LiveScenario
 
         Console.WriteLine($"Accounts: {cloud.AccountsText}");
         vm.NavigateCommand.Execute(Section.Settings);
-        vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        vm.SettingsPage.Section = SettingsSection.Cloud;
         await Task.Delay(500);
         await Snapshots.SaveAsync(window, output, "cloud-accounts-1-status.png");
         for (var i = 0; i < 50 && vm.Overlay is not CloudAccountPasswordViewModel; i++)
@@ -235,7 +235,7 @@ internal static class LiveScenario
         }
 
         await Task.Delay(3000);
-        vm.SettingsPage.SelectedTab = 0;
+        vm.SettingsPage.Section = SettingsSection.Accounts;
         await vm.SettingsPage.Accounts.ReloadAsync();
         await Snapshots.SaveAsync(window, output, "cloud-accounts-3-settings.png");
         Console.WriteLine($"Accounts here: {string.Join(", ", vm.SettingsPage.Accounts.Items.Select(a => a.Title + (a.IsFromCloud ? " (cloud)" : string.Empty)))}");
@@ -267,7 +267,7 @@ internal static class LiveScenario
             (cloud.Server, cloud.Code, cloud.Pin, cloud.DeviceName) = (server, code1, pin1, "Büro-PC");
             await cloud.ConnectCommand.ExecuteAsync(null);
             vm.NavigateCommand.Execute(Section.Settings);
-            vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+            vm.SettingsPage.Section = SettingsSection.Cloud;
             await Task.Delay(300);
             Console.WriteLine($"A connected: {cloud.ConnectedText ?? cloud.Error}, setup={cloud.ShowVaultSetup}, error={cloud.BackupError}");
             await Snapshots.SaveAsync(window, output, "backup-1-setup.png");
@@ -307,7 +307,7 @@ internal static class LiveScenario
             (cloud.Server, cloud.Code, cloud.Pin, cloud.DeviceName) = (server, code2, pin2, "Neuer Laptop");
             await cloud.ConnectCommand.ExecuteAsync(null);
             vm.NavigateCommand.Execute(Section.Settings);
-            vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+            vm.SettingsPage.Section = SettingsSection.Cloud;
             await Task.Delay(300);
             Console.WriteLine($"B connected: {cloud.ConnectedText ?? cloud.Error}, unlock={cloud.ShowVaultUnlock}");
             await Snapshots.SaveAsync(window, output, "backup-6-unlock.png");
@@ -345,7 +345,7 @@ internal static class LiveScenario
         cloud.DeviceName = "Anna – Notebook";
         await cloud.ConnectCommand.ExecuteAsync(null);
         vm.NavigateCommand.Execute(Section.Settings);
-        vm.SettingsPage.SelectedTab = SettingsViewModel.CloudTab;
+        vm.SettingsPage.Section = SettingsSection.Cloud;
         Console.WriteLine($"Connected: {cloud.ConnectedText ?? cloud.Error}");
         Console.WriteLine($"Status: {cloud.CertificatesText}");
         await Snapshots.SaveAsync(window, output, "certificates-waiting.png");
@@ -371,7 +371,7 @@ internal static class LiveScenario
         Console.WriteLine($"Status: {cloud.CertificatesText}");
         Console.WriteLine($"Cloud certificates: {string.Join("; ", own.Select(c => $"{string.Join(",", c.EmailAddresses)} key={c.HasPrivateKey}"))}");
         await Snapshots.SaveAsync(window, output, "certificates-cloud-status.png");
-        vm.SettingsPage.SelectedTab = 5;
+        vm.SettingsPage.Section = SettingsSection.Certificates;
         await vm.SettingsPage.Certificates.ReloadAsync();
         await Task.Delay(300);
         await Snapshots.SaveAsync(window, output, "certificates-received.png");
@@ -393,6 +393,7 @@ internal static class LiveScenario
         await vm.InitializeAsync();
 
         var setup = (AccountSetupViewModel)vm.Overlay!;
+        setup.ChooseImapCommand.Execute(null);
         setup.DisplayName = "Anna Muster";
         setup.Email = "anna@example.com";
         setup.Password = "geheim";
@@ -418,7 +419,7 @@ internal static class LiveScenario
 
         // Einstellungen → Konten → Bearbeiten: the stored servers prefilled, a label for the folder tree.
         vm.NavigateCommand.Execute(Section.Settings);
-        vm.SettingsPage.SelectedTab = 0;
+        vm.SettingsPage.Section = SettingsSection.Accounts;
         await vm.SettingsPage.Accounts.ReloadAsync();
         vm.SettingsPage.Accounts.EditCommand.Execute(vm.SettingsPage.Accounts.Items[0]);
         await Task.Delay(300);
@@ -504,6 +505,8 @@ internal static class LiveScenario
         await certificates.ImportDataAsync("testlab-ca.crt", await File.ReadAllBytesAsync(Path.Combine(CertDir, "testlab-ca.crt")), null);
         await certificates.ImportDataAsync("lea.crt", LeaCertificate().Export(System.Security.Cryptography.X509Certificates.X509ContentType.Cert), null);
 
+        // New mails open in their own window by default; the scenario works in the reading pane.
+        await services.GetRequiredService<Neruna.Core.ISettingsStore>().SetAsync(Neruna.Core.SettingKeys.ComposeNewInWindow, "false");
         var vm = services.GetRequiredService<MainWindowViewModel>();
         var window = new MainWindow { DataContext = vm, Width = 1440, Height = 880 };
         window.Show();
@@ -763,10 +766,10 @@ internal static class LiveScenario
         vm.NavigateCommand.Execute(Section.Settings);
         await Snapshots.SaveAsync(window, output, "live-accounts.png");
         await vm.SettingsPage.ReloadAsync();
-        vm.SettingsPage.SelectedTab = 5;
+        vm.SettingsPage.Section = SettingsSection.Certificates;
         Console.WriteLine($"Certificates: own={vm.SettingsPage.Certificates.Own.Count}, contacts={vm.SettingsPage.Certificates.Contacts.Count} ({string.Join(", ", vm.SettingsPage.Certificates.Contacts.Select(c => c.Emails))}), CAs={vm.SettingsPage.Certificates.Authorities.Count}");
         await Snapshots.SaveAsync(window, output, "live-certificates.png");
-        vm.SettingsPage.SelectedTab = 0;
+        vm.SettingsPage.Section = SettingsSection.Accounts;
 
         vm.ShowAccountSetupCommand.Execute(null);
         await Snapshots.SaveAsync(window, output, "live-account-setup.png");
@@ -903,11 +906,8 @@ internal static class LiveScenario
         await Snapshots.SaveAsync(window, output, "live-open-as-draft.png");
         if (compose is not null)
         {
+            compose.AskDiscardAsync = (_, _, _) => Task.FromResult(true); // "Entwurf verwerfen?" – yes
             await compose.DiscardCommand.ExecuteAsync(null);
-            if (!compose.IsFinished)
-            {
-                await compose.DiscardCommand.ExecuteAsync(null); // "wirklich verwerfen?"
-            }
         }
     }
 

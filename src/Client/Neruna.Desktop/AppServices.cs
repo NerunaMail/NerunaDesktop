@@ -92,10 +92,13 @@ internal static class AppServices
         services.AddNerunaStorage(options.DataDirectory, useSystemCredentials: true, profileId: options.Profile?.Id ?? Guid.Empty);
 
         // Providers. New protocols (EWS, JMAP, LDAP …) are added here and nowhere else.
+        // IMAP connections stay signed in for a minute after use, for the next action on the same account.
+        services.AddSingleton<ImapSessionPool>();
         services.AddSingleton<IProviderFactory<IMailProvider>>(sp => new ImapProviderFactory(
             sp.GetRequiredService<ICredentialStore>(),
             sp.GetRequiredService<ILoggerFactory>(),
-            options.ProtocolLog ? Path.Combine(options.LogDirectory, "protocol") : null));
+            options.ProtocolLog ? Path.Combine(options.LogDirectory, "protocol") : null,
+            sessions: sp.GetRequiredService<ImapSessionPool>()));
         services.AddSingleton<IProviderFactory<ICalendarProvider>>(sp => new CalDavProviderFactory(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("dav"), sp.GetRequiredService<ICredentialStore>(), sp.GetRequiredService<ILoggerFactory>()));
         services.AddSingleton<IProviderFactory<IContactProvider>>(sp => new CardDavProviderFactory(
@@ -152,6 +155,12 @@ internal static class AppServices
         }
 
         services.AddSingleton<ProviderRegistry>();
+        // Safety copies of drafts on this device, for when "Entwürfe" cannot be reached (demo: nothing is kept)
+        if (!options.Demo)
+        {
+            services.AddSingleton(new Neruna.Core.Mail.LocalDraftStore(options.DataDirectory));
+        }
+
         services.AddSingleton<MailController>();
         services.AddSingleton<MailPushService>();
         services.AddSingleton<Neruna.Core.Calendar.ReminderService>();
@@ -236,6 +245,7 @@ internal static class AppServices
         services.AddSingleton<MailSearchIndexer>();
         services.AddSingleton<SearchIndexViewModel>();
         services.AddSingleton<LocalDataViewModel>();
+        services.AddSingleton<DeleteConfirmationsViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
 

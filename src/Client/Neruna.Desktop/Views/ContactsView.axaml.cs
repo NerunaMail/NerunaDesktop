@@ -13,6 +13,16 @@ internal sealed partial class ContactsView : UserControl
     {
         InitializeComponent();
         ColumnMemory.Attach(this, "columns.contacts", 0, 2);
+        // Enter or F2 in the list opens the selected contact for editing (as a double-click).
+        ContactList.KeyDown += (_, e) =>
+        {
+            if (e.Key is Key.Enter or Key.F2 && e.KeyModifiers == KeyModifiers.None
+                && DataContext is ContactsViewModel { EditCommand: var edit } && edit.CanExecute(null))
+            {
+                edit.Execute(null);
+                e.Handled = true;
+            }
+        };
         DataContextChanged += (_, _) =>
         {
             if (_vm is not null)

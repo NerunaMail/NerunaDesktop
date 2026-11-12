@@ -14,7 +14,7 @@
     <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenMailFileCommand}" />
     <KeyBinding Gesture="Ctrl+R" Command="{Binding ReplyCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" />
-    <KeyBinding Gesture="Ctrl+F" Command="{Binding ForwardCommand}" />
+    <KeyBinding Gesture="Ctrl+L" Command="{Binding ForwardCommand}" />
     <KeyBinding Gesture="Ctrl+Q" Command="{Binding ToggleReadCommand}" />
     <KeyBinding Gesture="Ctrl+P" Command="{Binding PrintCommand}" />
   </UserControl.KeyBindings>
@@ -29,7 +29,7 @@
         <DockPanel>
           <!-- The arrow beside it: what is needed now and then (a saved .eml file) without a button of its own -->
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="1" Margin="6,0,6,8">
-            <Button Classes="accent" Command="{Binding NewMailCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+            <Button Classes="accent pageNew" Command="{Binding NewMailCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                     Padding="12,7" CornerRadius="4,0,0,4" ToolTip.Tip="{l:T 'Neue E-Mail (Ctrl+N)'}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
@@ -218,7 +218,7 @@
                          IsVisible="{Binding SelectionText, Converter={x:Static ObjectConverters.IsNotNull}}" />
             </Grid>
             <Grid ColumnDefinitions="*,Auto,Auto">
-              <TextBox ctl:SearchBox.Clearable="True" x:Name="QuickSearch" Text="{Binding SearchText}" PlaceholderText="{l:T 'Suchen (Ctrl+E)'}">
+              <TextBox ctl:SearchBox.Clearable="True" x:Name="QuickSearch" Classes="pageSearch" Text="{Binding SearchText}" PlaceholderText="{l:T 'Suchen (Ctrl+F)'}">
                 <TextBox.InnerLeftContent>
                   <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
                 </TextBox.InnerLeftContent>
@@ -284,7 +284,7 @@
                 </Button>
                 <Button Classes="command" Command="{Binding Search.SearchServerCommand}" IsVisible="{Binding ShowServerSearchHint}" Padding="0,2" FontSize="12"
                         ToolTip.Tip="{l:T 'Auch den Text von Nachrichten durchsuchen, die nur auf dem Server liegen (Enter)'}">
-                  <TextBlock Text="{l:T 'Auch auf dem Server suchen'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" />
+                  <TextBlock Text="{l:T 'Nicht gefunden? Auch ältere Nachrichten durchsuchen, die noch nicht auf diesem Computer sind'}" Foreground="{DynamicResource AccentTextBrush}" TextDecorations="Underline" TextWrapping="Wrap" />
                 </Button>
               </StackPanel>
             </Grid>
@@ -364,11 +364,17 @@
                   <ContextMenu Opening="OnMessageMenuOpening">
                     <MenuItem Header="{l:T 'Antworten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ReplyCommand}" InputGesture="Ctrl+R" />
                     <MenuItem Header="{l:T 'Allen antworten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ReplyAllCommand}" InputGesture="Ctrl+Shift+R" />
-                    <MenuItem Header="{l:T 'Weiterleiten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ForwardCommand}" InputGesture="Ctrl+F" />
+                    <MenuItem Header="{l:T 'Weiterleiten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ForwardCommand}" InputGesture="Ctrl+L" />
                     <MenuItem Header="{l:T 'Als Anhang weiterleiten'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ForwardAsAttachmentCommand}" />
                     <MenuItem Header="{l:T 'Als Entwurf öffnen'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).OpenAsDraftCommand}"
                               IsVisible="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).IsSentFolder}" />
                     <Separator />
+                    <!-- Shown by the selected mails when the menu opens (OnMessageMenuOpening): unread ones → "gelesen",
+                         read ones → "ungelesen", a mixed selection both -->
+                    <MenuItem Header="{l:T 'Als gelesen markieren'}" Tag="read"
+                              Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MarkReadCommand}" />
+                    <MenuItem Header="{l:T 'Als ungelesen markieren'}" Tag="unread"
+                              Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).MarkUnreadCommand}" />
                     <!-- Filled when the menu opens (OnMessageMenuOpening): each tag, then "Verwalten …" -->
                     <MenuItem Header="{l:T 'Schlagwörter'}" Tag="tags">
                       <MenuItem Header="{l:T 'Verwalten …'}" Command="{Binding $parent[UserControl].((vm:MailViewModel)DataContext).ManageTagsCommand}" />
@@ -501,9 +507,9 @@
                                 Command="{Binding OpenAsDraftCommand}" IsVisible="{Binding IsSentFolder}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
                 <ctl:ToolButton Icon="{StaticResource IconReply}" Label="{l:T 'Antworten'}" Shortcut="Ctrl+R" Command="{Binding ReplyCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
                 <ctl:ToolButton Icon="{StaticResource IconReplyAll}" Label="{l:T 'Allen antworten'}" Shortcut="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
-                <ctl:ToolButton Icon="{StaticResource IconForward}" Label="{l:T 'Weiterleiten'}" Shortcut="Ctrl+F" Command="{Binding ForwardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+                <ctl:ToolButton Icon="{StaticResource IconForward}" Label="{l:T 'Weiterleiten'}" Shortcut="Ctrl+L" Command="{Binding ForwardCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
                 <Separator Width="1" Height="28" Margin="4,0" VerticalAlignment="Center" Background="{DynamicResource DividerBrush}" />
-                <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{l:T 'Löschen'}" Shortcut="Entf" Command="{Binding DeleteCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
+                <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{l:T 'Löschen'}" Shortcut="{l:T 'Entf'}" Command="{Binding DeleteCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
                 <ctl:ToolButton Icon="{StaticResource IconArchive}" Label="{l:T 'Archivieren'}" Command="{Binding ArchiveCommand}" ShowLabel="{Binding Preferences.ToolbarLabels}" />
               </WrapPanel>
               <WrapPanel Orientation="Horizontal" ItemSpacing="0" LineSpacing="2" VerticalAlignment="Center" Margin="6,0,0,0">

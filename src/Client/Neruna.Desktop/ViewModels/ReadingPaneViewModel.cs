@@ -515,7 +515,16 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     public string SenderReplyTo => Assessment?.Sender.ReplyTo ?? T("(wie Absender)");
 
-    public string SenderAuthentication => Assessment?.Sender.Authentication ?? T("(kein verwertbares Ergebnis Ihres Servers)");
+    public string SenderAuthentication => Assessment?.Sender.Authentication is { Length: > 0 } results
+        ? results.Contains("fail", StringComparison.Ordinal)
+            ? T("Nicht bestanden – der Absender ist möglicherweise gefälscht")
+            : results.Split(", ").All(r => r.EndsWith(": pass", StringComparison.Ordinal))
+                ? T("Bestanden – die Mail kommt von der Domain des Absenders")
+                : T("Ohne klares Ergebnis")
+        : T("(kein verwertbares Ergebnis Ihres Servers)");
+
+    /// <summary>The technical results behind <see cref="SenderAuthentication"/> ("SPF: pass, DKIM: pass, DMARC: pass"), as its tooltip.</summary>
+    public string? SenderAuthenticationDetails => Assessment?.Sender.Authentication;
 
     /// <summary>The mail server's spam rating from the headers ("5.8 von 6 Punkten (SpamAssassin) – knapp unter der Spam-Schwelle").</summary>
     public string SenderSpam => Assessment?.Sender.Spam?.Text ?? T("(keine Angabe Ihres Servers)");
@@ -536,6 +545,7 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         OnPropertyChanged(nameof(SenderSpam));
         OnPropertyChanged(nameof(SenderReplyTo));
         OnPropertyChanged(nameof(SenderAuthentication));
+        OnPropertyChanged(nameof(SenderAuthenticationDetails));
     }
 
     /// <summary>A link in the mail was clicked: checked, shown first if the settings say so, then opened (cleaned up if set).</summary>

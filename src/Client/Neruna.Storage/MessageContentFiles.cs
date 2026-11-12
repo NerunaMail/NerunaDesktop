@@ -14,6 +14,22 @@ public sealed class MessageContentFiles(string rootDirectory)
     public string PathFor(Guid connectionId, string folderRemoteId, string remoteId) =>
         Path.Combine(FolderDirectory(connectionId, folderRemoteId), Hash(remoteId) + ".eml");
 
+    /// <summary>
+    /// Tells for many messages of one folder whether their content is on disk: the folder's directory is listed once
+    /// instead of asking the file system for every message (a sync asks for every message of every folder).
+    /// </summary>
+    public Func<string, bool> ContentCheckFor(Guid connectionId, string folderRemoteId)
+    {
+        var directory = FolderDirectory(connectionId, folderRemoteId);
+        if (!Directory.Exists(directory))
+        {
+            return _ => false;
+        }
+
+        var names = new HashSet<string>(Directory.EnumerateFiles(directory, "*.eml").Select(Path.GetFileName)!, StringComparer.OrdinalIgnoreCase);
+        return names.Count == 0 ? _ => false : remoteId => names.Contains(Hash(remoteId) + ".eml");
+    }
+
     public void DeleteMessages(Guid connectionId, string folderRemoteId, IEnumerable<string> remoteIds)
     {
         foreach (var remoteId in remoteIds)

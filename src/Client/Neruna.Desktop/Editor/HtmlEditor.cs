@@ -19,7 +19,9 @@ internal sealed record EditorState(
     string Font,
     double Size,
     string Color,
-    bool Checklist = false);
+    bool Checklist = false,
+    bool CanUndo = true,
+    bool CanRedo = true);
 
 /// <summary>What the compose view model needs from the editor, independent of how it is implemented.</summary>
 internal interface IHtmlEditor
@@ -89,7 +91,11 @@ internal interface IHtmlEditor
     /// <summary>Space after a paragraph (Enter) in lines, also in the sent mail (Einstellungen → Schreiben).</summary>
     void SetParagraphSpacing(double lines);
 
-    void FocusEditor();
+    /// <param name="caret">Where the caret goes, from <see cref="GetCaretAsync"/>; -1: where it was, or the start.</param>
+    void FocusEditor(int caret = -1);
+
+    /// <summary>The caret as a character offset in the text, -1 without one (carried over by "Loslösen").</summary>
+    Task<int> GetCaretAsync();
 
     /// <summary>The language of the spell check (null: the system's); the editor starts again with it, keeping the text.</summary>
     Task SetSpellLanguageAsync(string? code);
@@ -531,16 +537,42 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         }
     }
 
-    public void FocusEditor()
+    public void FocusEditor(int caret = -1)
     {
         if (_fallback is not null)
         {
             _fallback.Focus();
+            if (caret >= 0)
+            {
+                _fallback.CaretIndex = Math.Min(caret, _fallback.Text?.Length ?? 0);
+            }
         }
         else
         {
             _web?.Focus();
-            _ = RunAsync("neruna.focus()");
+            _ = RunAsync(caret >= 0 ? $"neruna.focusAt({caret.ToString(System.Globalization.CultureInfo.InvariantCulture)})" : "neruna.focus()");
+        }
+    }
+
+    public async Task<int> GetCaretAsync()
+    {
+        if (_fallback is not null)
+        {
+            return _fallback.CaretIndex;
+        }
+
+        if (!IsRich || _web is null)
+        {
+            return -1;
+        }
+
+        try
+        {
+            return int.TryParse(Unwrap(await ScriptAsync("neruna.caret()")), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var at) ? at : -1;
+        }
+        catch (InvalidOperationException)
+        {
+            return -1;
         }
     }
 
@@ -769,7 +801,9 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                     message.TryGetProperty("font", out var font) ? font.GetString() ?? string.Empty : string.Empty,
                     message.TryGetProperty("size", out var size) && size.TryGetDouble(out var pt) ? pt : 0,
                     message.TryGetProperty("color", out var color) ? color.GetString() ?? "#000000" : "#000000",
-                    Bool(message, "checklist")));
+                    Bool(message, "checklist"),
+                    !message.TryGetProperty("canUndo", out var undo) || undo.ValueKind != JsonValueKind.False,
+                    !message.TryGetProperty("canRedo", out var redo) || redo.ValueKind != JsonValueKind.False));
                 break;
         }
     }

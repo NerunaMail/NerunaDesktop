@@ -24,12 +24,17 @@ internal sealed partial class CalendarViewModel
 {
     /// <summary>Toolbar "Planung" instead of the week (remembered).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowTimeGrid), nameof(ShowList))]
+    [NotifyPropertyChangedFor(nameof(ShowTimeGrid), nameof(ShowList), nameof(ShowMonth), nameof(ShowPlanning))]
     public partial bool IsPlanning { get; set; }
 
-    public bool ShowTimeGrid => IsTimeGrid && !IsPlanning;
+    /// <summary>The month has no planning view: "Planung" waits until a week or a day is shown again.</summary>
+    public bool ShowPlanning => IsPlanning && !IsMonth;
 
-    public bool ShowList => !IsTimeGrid && !IsPlanning;
+    public bool ShowMonth => IsMonth;
+
+    public bool ShowTimeGrid => IsTimeGrid && !ShowPlanning && !IsMonth;
+
+    public bool ShowList => !IsTimeGrid && !ShowPlanning && !IsMonth;
 
     public ObservableCollection<PlanningRow> PlanningRows { get; } = [];
 

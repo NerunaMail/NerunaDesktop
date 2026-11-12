@@ -109,6 +109,11 @@
     return (family || "").split(",")[0].trim().replace(/^["']|["']$/g, "");
   }
 
+  // Whether Rückgängig / Wiederherstellen have something to do (the engine's own history); unknown: yes.
+  function commandEnabled(name) {
+    try { return document.queryCommandEnabled(name); } catch (e) { return true; }
+  }
+
   function reportState() {
     var el = selectionElement();
     var style = window.getComputedStyle(el);
@@ -123,7 +128,9 @@
       numberedList: document.queryCommandState("insertOrderedList"),
       font: firstFamily(style.fontFamily),
       size: Math.round(parseFloat(style.fontSize) * 0.75 * 2) / 2,
-      color: toHex(style.color)
+      color: toHex(style.color),
+      canUndo: commandEnabled("undo"),
+      canRedo: commandEnabled("redo")
     };
     var json = JSON.stringify(state);
     if (json !== lastState) {
@@ -268,11 +275,25 @@
     } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey && currentCell()) {
       e.preventDefault();
       nextCell(currentCell(), e.shiftKey ? -1 : 1);
+    } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey && currentListItem()) {
+      // In a list: Tab moves the point one level in, Shift+Tab back out; elsewhere Tab stays a tab.
+      e.preventDefault();
+      exec(e.shiftKey ? "outdent" : "indent");
     } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       exec(e.shiftKey ? "outdent" : "insertText", e.shiftKey ? undefined : "    ");
     }
   });
+
+  /** The list item the caret is in, or null. */
+  function currentListItem() {
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+    var node = selection.getRangeAt(0).startContainer;
+    var el = node.nodeType === 1 ? node : node.parentNode;
+    var item = el && el.closest ? el.closest("li") : null;
+    return item && editor.contains(item) ? item : null;
+  }
 
   // Pasted bitmaps become inline images (sent as embedded attachments).
   // Files dragged in from outside: the app decides what happens (attach, link, ask); the page never opens them.
@@ -917,6 +938,35 @@
         selection.addRange(range);
       }
       return "ok";
+    },
+    /** The caret as a character offset in the text (-1 without one) – "Loslösen" puts it back in the new window. */
+    caret: function () {
+      var selection = window.getSelection();
+      var at = selection.rangeCount && editor.contains(selection.getRangeAt(0).startContainer) ? selection.getRangeAt(0) : lastRange;
+      if (!at || !editor.contains(at.startContainer)) return "-1";
+      var range = document.createRange();
+      range.selectNodeContents(editor);
+      range.setEnd(at.startContainer, at.startOffset);
+      return String(range.toString().length);
+    },
+    /** Focus with the caret at an offset from caret(); beyond the text (or none) as focus() does. */
+    focusAt: function (offset) {
+      if (offset < 0) return window.neruna.focus();
+      editor.focus();
+      var walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT), node, left = offset;
+      while ((node = walker.nextNode())) {
+        if (left <= node.length) {
+          var range = document.createRange();
+          range.setStart(node, left);
+          range.collapse(true);
+          var selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          return "ok";
+        }
+        left -= node.length;
+      }
+      return window.neruna.focus();
     },
     state: function () { lastState = ""; reportState(); return "ok"; },
     /** Linux: WebKitGTK in the app's web view gets the keys but draws no caret – Neruna draws one itself. */

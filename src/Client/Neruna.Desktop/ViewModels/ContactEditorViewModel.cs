@@ -14,7 +14,7 @@ internal sealed record FieldKind(string? Value, string Label)
     public static IReadOnlyList<FieldKind> EmailKinds { get; } = [new(null, "—"), new("work", T("Geschäftlich")), new("home", T("Privat"))];
 
     public static IReadOnlyList<FieldKind> PhoneKinds { get; } =
-        [new(null, "—"), new("work", "Geschäftlich"), new("home", "Privat"), new("cell", "Mobil"), new("fax", "Fax")];
+        [new(null, "—"), new("work", T("Geschäftlich")), new("home", T("Privat")), new("cell", T("Mobil")), new("fax", T("Fax"))];
 
     public static FieldKind Find(IReadOnlyList<FieldKind> kinds, string? value) =>
         kinds.FirstOrDefault(k => string.Equals(k.Value, value, StringComparison.OrdinalIgnoreCase)) ?? new FieldKind(value, value ?? "—");
@@ -244,9 +244,6 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(DeleteCommand))]
     public partial bool IsBusy { get; set; }
 
-    [ObservableProperty]
-    public partial bool ConfirmDelete { get; set; }
-
     /// <summary>Any picture becomes a 256×256 JPEG, cropped to a centered square.</summary>
     [RelayCommand]
     private async Task ChoosePhotoAsync()
@@ -342,9 +339,11 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
             return;
         }
 
-        if (!ConfirmDelete)
+        var name = $"{GivenName} {FamilyName}".Trim() is { Length: > 0 } person ? person
+            : !string.IsNullOrWhiteSpace(Organization) ? Organization.Trim() : T("Kontakt");
+        if (!await Infrastructure.DeleteConfirmation.AskAsync(Infrastructure.DeleteKind.Contact, F("«{0}» löschen", name),
+                T("Der Kontakt wird auch auf dem Server gelöscht und lässt sich nicht wiederherstellen.")))
         {
-            ConfirmDelete = true;
             return;
         }
 

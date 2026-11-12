@@ -10,9 +10,10 @@
 
       <StackPanel Spacing="8">
         <TextBlock Text="{l:T 'Neue E-Mails'}" FontSize="16" FontWeight="SemiBold" />
-        <CheckBox IsChecked="{Binding Push}" Content="{l:T 'Neue E-Mails sofort abrufen'}" />
+        <!-- The technical name only as a tooltip, for those who look for it -->
+        <CheckBox IsChecked="{Binding Push}" Content="{l:T 'Neue E-Mails sofort abrufen'}" ToolTip.Tip="{l:T 'Technisch: IMAP IDLE'}" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
-                   Text="{l:T 'Der Server meldet neue Nachrichten im Posteingang sofort (IMAP IDLE). Server ohne diese Funktion werden alle 2 Minuten abgefragt; alle anderen Ordner alle 5 Minuten.'}" />
+                   Text="{l:T 'Der Server meldet neue Nachrichten im Posteingang sofort. Server ohne diese Funktion werden alle 2 Minuten abgefragt; alle anderen Ordner alle 5 Minuten.'}" />
         <CheckBox IsChecked="{Binding Notifications}" Content="{l:T 'Desktop-Benachrichtigung bei neuen E-Mails'}" />
         <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" Margin="28,-6,0,0"
                    Text="{l:T 'Unten rechts mit Absender und Betreff – ausser Sie schauen in Neruna gerade genau diesen Posteingang an. Ein Klick öffnet die Nachricht.'}" />

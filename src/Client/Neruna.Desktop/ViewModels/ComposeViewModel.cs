@@ -78,6 +78,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         _signatures = signatures;
         _kind = kind;
         Formatting = new FormattingViewModel(files);
+        Formatting.PropertyChanged += OnFormattingChanged;
         Formatting.Problem += (_, message) => Error = message;
         _mail = mail;
         _account = account;
@@ -103,6 +104,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         Cc = draft.Cc;
         Bcc = draft.Bcc;
         ShowBcc = draft.Bcc.Trim().Length > 0;
+        ShowCc = draft.Cc.Trim().Length > 0;
         Subject = draft.Subject;
         foreach (var attachment in draft.Attachments)
         {
@@ -110,6 +112,15 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
 
         _draftRemoteId = draft.DraftRemoteId;
+        // A draft that is only on this device so far (opened from "Entwürfe", or taken over from the inline form):
+        // its copy is this form's from now on.
+        if (LocalDraftStore.TryKey(_draftRemoteId, out var localKey) && mail.LocalDrafts is { } localDrafts)
+        {
+            localDrafts.Adopt(localKey);
+            _localKey = localKey;
+            _hasLocalCopy = localDrafts.Exists(localKey);
+        }
+
         _messageId = draft.MessageId ?? Neruna.Core.Privacy.OutgoingMail.NewMessageId(draft.From);
         PropertyChanged += (_, e) =>
         {
@@ -149,19 +160,96 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>The editor once attached (the AI reads and replaces text through it).</summary>
     internal IHtmlEditor? Editor => _editor;
 
-    /// <summary>"Rückgängig" in the text (also Ctrl+Z in the editor itself).</summary>
-    [RelayCommand]
+    /// <summary>"Rückgängig" in the text (also Ctrl+Z in the editor itself); disabled with nothing to undo.</summary>
+    [RelayCommand(CanExecute = nameof(CanUndo))]
     private Task UndoAsync() => _editor?.UndoAsync(redo: false) ?? Task.CompletedTask;
 
     /// <summary>"Wiederherstellen" (also Ctrl+Y in the editor itself).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRedo))]
     private Task RedoAsync() => _editor?.UndoAsync(redo: true) ?? Task.CompletedTask;
+
+    private bool CanUndo() => Formatting.CanUndo;
+
+    private bool CanRedo() => Formatting.CanRedo;
+
+    /// <summary>"Mehr → KI" in a narrow form (the button is in the bar otherwise).</summary>
+    [RelayCommand]
+    private void ToggleAi()
+    {
+        if (Ai is { } ai)
+        {
+            ai.IsOpen = !ai.IsOpen;
+        }
+    }
+
+    /// <summary>"Mehr → Signieren".</summary>
+    [RelayCommand]
+    private void ToggleSign() => Sign = !Sign;
+
+    /// <summary>"Mehr → Verschlüsseln".</summary>
+    [RelayCommand]
+    private void ToggleEncrypt() => Encrypt = !Encrypt;
+
+    /// <summary>"Mehr → Rechtschreibsprache: Deutsch (Schweiz)": the language of this mail's spell check at a glance.</summary>
+    public string SpellLanguageHeader => F("Rechtschreibsprache: {0}", Formatting.SpellLanguage.Name);
+
+    /// <summary>The languages to choose in "Mehr → Rechtschreibsprache", the current one checked.</summary>
+    public IReadOnlyList<SpellLanguageMenuItem> SpellLanguageMenu => _spellLanguageMenu ??=
+        [.. FormattingViewModel.SpellLanguageChoices.Select(l => new SpellLanguageMenuItem(l, ChooseSpellLanguageCommand) { IsChecked = l == Formatting.SpellLanguage })];
+
+    private IReadOnlyList<SpellLanguageMenuItem>? _spellLanguageMenu;
+
+    public static bool CanChooseSpellLanguage => FormattingViewModel.CanChooseSpellLanguage;
+
+    [RelayCommand]
+    private void ChooseSpellLanguage(SpellLanguage language) => Formatting.SpellLanguage = language;
+
+    private void OnFormattingChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(FormattingViewModel.CanUndo):
+                UndoCommand.NotifyCanExecuteChanged();
+                break;
+            case nameof(FormattingViewModel.CanRedo):
+                RedoCommand.NotifyCanExecuteChanged();
+                break;
+            case nameof(FormattingViewModel.SpellLanguage):
+                OnPropertyChanged(nameof(SpellLanguageHeader));
+                foreach (var item in _spellLanguageMenu ?? [])
+                {
+                    item.IsChecked = item.Language == Formatting.SpellLanguage;
+                }
+
+                break;
+        }
+    }
 
     /// <summary>The address books, for completing An/Cc and the contact picker (none in tests).</summary>
     public RecipientDirectory? Recipients { get; init; }
 
     /// <summary>Toolbar with or without text below the icons (Einstellungen → Design), as in the reading pane.</summary>
-    public Neruna.Desktop.Infrastructure.UiPreferences? Preferences { get; init; }
+    public Neruna.Desktop.Infrastructure.UiPreferences? Preferences
+    {
+        get;
+        init
+        {
+            field = value;
+            if (value is not null)
+            {
+                value.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(UiPreferences.ToolbarLabels))
+                    {
+                        OnPropertyChanged(nameof(ShowToolLabels));
+                    }
+                };
+            }
+        }
+    }
+
+    /// <summary>Text below the icons of the big buttons: as set, and only while the width allows it.</summary>
+    public bool ShowToolLabels => (Preferences?.ToolbarLabels ?? true) && !CompactBar;
 
     /// <summary>Adds chosen contacts/groups to An, Cc or Bcc; addresses already in the field are not added twice.</summary>
     public void AddRecipients(RecipientField target, IEnumerable<RecipientEntry> entries)
@@ -215,12 +303,27 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [ObservableProperty]
     public partial string? DraftStatus { get; set; }
 
-    /// <summary>"Verwerfen" asks once ("Wirklich verwerfen?") when something would be lost.</summary>
+    /// <summary>
+    /// How much of the toolbar fits beside "Senden" (set by the view from its width): 0 everything with text, 1 small
+    /// buttons without text, 2 Textvorlage/Signatur/KI in "Mehr", 3 also Rückgängig/Wiederherstellen in "Mehr".
+    /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DiscardLabel))]
-    public partial bool ConfirmDiscard { get; set; }
+    [NotifyPropertyChangedFor(nameof(CompactBar), nameof(ToolsInBar), nameof(UndoInBar), nameof(ShowToolLabels))]
+    public partial int ToolbarLevel { get; set; }
 
-    public string DiscardLabel => ConfirmDiscard ? T("Wirklich?") : T("Verwerfen");
+    public bool CompactBar => ToolbarLevel >= 1;
+
+    public bool ToolsInBar => ToolbarLevel < 2;
+
+    public bool UndoInBar => ToolbarLevel < 3;
+
+    /// <summary>"Entwurf gespeichert um …" fits beside the buttons; otherwise it is the first line of "Mehr".</summary>
+    [ObservableProperty]
+    public partial bool DraftStatusInBar { get; set; } = true;
+
+    /// <summary>A narrow form (the reading pane beside a list): the sender shown with its address only.</summary>
+    [ObservableProperty]
+    public partial bool IsNarrow { get; set; }
 
     /// <summary>Carries unsaved edits over when the draft moves to its own window.</summary>
     public void MarkChanged() => _changes++;
@@ -282,6 +385,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             OnPropertyChanged();
             OnPropertyChanged(nameof(From));
             OnPropertyChanged(nameof(FromText));
+            OnPropertyChanged(nameof(FromAddress));
             MarkChanged();
             _ = RefreshSignAsync();
             if (value.Account.Id != previous.Account.Id)
@@ -344,6 +448,9 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     public string FromText => From.ToString();
 
+    /// <summary>The sender's address alone, for a narrow form (the full text is the tooltip).</summary>
+    public string FromAddress => From.Email;
+
     public Account Account => _account;
 
     public ServiceConnection Connection => _connection;
@@ -367,8 +474,20 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [ObservableProperty]
     public partial string Bcc { get; set; } = string.Empty;
 
+    /// <summary>Bcc only when wanted: shown by "Bcc" beside "An", or when the draft already has some.</summary>
     [ObservableProperty]
     public partial bool ShowBcc { get; set; }
+
+    /// <summary>Cc like Bcc: shown on request ("Cc" beside "An"), or when the mail has some (e.g. "Allen antworten").</summary>
+    [ObservableProperty]
+    public partial bool ShowCc { get; set; }
+
+    [RelayCommand]
+    private void ShowCcField() => ShowCc = true;
+
+    [RelayCommand]
+    private void ShowBccField() => ShowBcc = true;
+
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WindowTitle))]
@@ -413,6 +532,10 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Verschlüsseln is on, but a recipient has no certificate: shown beside "Senden"; sending asks.</summary>
+    [ObservableProperty]
+    public partial bool EncryptIncomplete { get; set; }
+
     /// <summary>Tooltip of "Verschlüsseln": why it was switched on or off automatically.</summary>
     [ObservableProperty]
     public partial string EncryptHint { get; set; } = T("Mit S/MIME verschlüsseln (Zertifikate aller Empfänger nötig)");
@@ -438,6 +561,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     // Once the user switches encryption themselves, recipients no longer change it.
     partial void OnEncryptChanged(bool value)
     {
+        if (!value)
+        {
+            EncryptIncomplete = false;
+        }
+
         OnPropertyChanged(nameof(ShowEncrypt));
         if (!_settingEncrypt)
         {
@@ -491,9 +619,17 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         return Formatting.RunAsync($"neruna.setSignature({FormattingViewModel.Js(signature?.Html ?? string.Empty)})");
     }
 
-    partial void OnCcChanged(string value) => ScheduleEncryptionCheck();
+    partial void OnCcChanged(string value)
+    {
+        ShowCc |= !string.IsNullOrWhiteSpace(value); // e.g. added by the contact picker
+        ScheduleEncryptionCheck();
+    }
 
-    partial void OnBccChanged(string value) => ScheduleEncryptionCheck();
+    partial void OnBccChanged(string value)
+    {
+        ShowBcc |= !string.IsNullOrWhiteSpace(value);
+        ScheduleEncryptionCheck();
+    }
 
     private void ScheduleEncryptionCheck()
     {
@@ -565,6 +701,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     {
         if (!Encrypt)
         {
+            EncryptIncomplete = false;
             EncryptHint = T("Mit S/MIME verschlüsseln (Zertifikate aller Empfänger nötig)");
             return;
         }
@@ -572,6 +709,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         var missing = await MissingCertificatesAsync();
         if (version == _recipientVersion && Encrypt)
         {
+            EncryptIncomplete = missing.Count > 0;
             EncryptHint = missing.Count == 0
                 ? T("Verschlüsselt: Zertifikate aller Empfänger sind bekannt")
                 : T("Kein Zertifikat für: ") + string.Join(", ", missing) + T(" – beim Senden wird nachgefragt");
@@ -733,7 +871,21 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             await Task.Delay(50);
         }
 
-        return (await SnapshotAsync(), Sign, Encrypt);
+        // A copy on this device goes over to the window with the draft.
+        var draft = await SnapshotAsync();
+        if (_hasLocalCopy && _localKey is { } key && draft.DraftRemoteId is null)
+        {
+            draft = draft with { DraftRemoteId = LocalDraftStore.RemoteIdOf(key) };
+        }
+        else if (!LocalDraftStore.IsLocal(draft.DraftRemoteId))
+        {
+            // The window goes on with the version on the server and saves its own copy within moments; this one left
+            // behind would be stored a second time by the next sync.
+            RemoveLocalCopy();
+        }
+
+        ReleaseLocalCopy();
+        return (draft, Sign, Encrypt);
     }
 
     // The current state as a draft: recipients, subject, text (HTML or plain), attachments, identity of the saved copy.
@@ -786,7 +938,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            DraftStatus = T("Entwurf nicht gespeichert: ") + ex.Message;
+            DraftStatus = (_hasLocalCopy ? T("Entwurf nur auf diesem Gerät gesichert: ") : T("Entwurf nicht gespeichert: ")) + ex.Message;
         }
         finally
         {
@@ -798,9 +950,63 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     private async Task StoreDraftAsync(ComposeDraft draft, int version)
     {
         var message = MessageComposer.Build(SenderAddress, draft, [], forDraft: true);
-        _draftRemoteId = await _mail.SaveDraftAsync(_connection, message, _draftRemoteId);
+        await KeepLocalCopyAsync(message);
+        try
+        {
+            _draftRemoteId = await _mail.SaveDraftAsync(_connection, message, _draftRemoteId);
+        }
+        catch (NotSupportedException)
+        {
+            RemoveLocalCopy(); // this account has no "Entwürfe": the copy could never get there
+            throw;
+        }
+
+        RemoveLocalCopy(); // the server has it now
         _savedChanges = version;
         DraftChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // The safety copy on this device (LocalDraftStore): written before every save to "Entwürfe", so a draft survives a
+    // lost connection or Neruna ending unexpectedly; the account's next sync puts a copy left behind into "Entwürfe".
+    private string? _localKey;
+    private bool _hasLocalCopy;
+
+    private async Task KeepLocalCopyAsync(MimeMessage message)
+    {
+        if (_mail.LocalDrafts is not { } local)
+        {
+            return;
+        }
+
+        try
+        {
+            _localKey ??= local.Begin(_connection.Id);
+            await local.SaveAsync(_localKey, message);
+            _hasLocalCopy = true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _hasLocalCopy = false; // disk full or not writable: "Entwürfe" on the server is still tried
+        }
+    }
+
+    private void RemoveLocalCopy()
+    {
+        if (_localKey is { } key && _hasLocalCopy)
+        {
+            _mail.LocalDrafts?.Remove(key);
+            _hasLocalCopy = false;
+        }
+    }
+
+    // The form is gone: a copy still on this device is from now on the sync's to put into "Entwürfe".
+    private void ReleaseLocalCopy()
+    {
+        if (_localKey is { } key)
+        {
+            _mail.LocalDrafts?.End(key);
+            _localKey = null;
+        }
     }
 
     /// <summary>
@@ -839,7 +1045,18 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            Notice?.Invoke(this, T("Entwurf konnte nicht gespeichert werden: ") + ex.Message);
+            Notice?.Invoke(this, _hasLocalCopy
+                ? T("Entwurf auf diesem Gerät gesichert. Er kommt in «Entwürfe», sobald das Konto wieder erreichbar ist.")
+                : T("Entwurf konnte nicht gespeichert werden: ") + ex.Message);
+        }
+        finally
+        {
+            var waiting = _hasLocalCopy;
+            ReleaseLocalCopy();
+            if (waiting)
+            {
+                DraftChanged?.Invoke(this, EventArgs.Empty); // "Entwürfe" shows the copy on this device
+            }
         }
     }
 
@@ -872,6 +1089,11 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            if (_hasLocalCopy)
+            {
+                return true; // safe on this device; the next start puts it into "Entwürfe"
+            }
+
             Error = T("Entwurf nicht gespeichert: ") + ex.Message;
             _finished = false;
             return false;
@@ -899,6 +1121,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             await Task.Delay(50);
         }
 
+        RemoveLocalCopy();
+        ReleaseLocalCopy();
         if (_draftRemoteId is not { } id)
         {
             return;
@@ -930,7 +1154,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             return;
         }
 
-        if (!await MaySendWithoutAttachmentAsync())
+        if (!await MaySendWithoutSubjectAsync() || !await MaySendWithoutAttachmentAsync())
         {
             return;
         }
@@ -1094,16 +1318,63 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [RelayCommand]
     private async Task DiscardAsync()
     {
-        // Asks once when typed text or a saved draft would be lost.
-        if (!ConfirmDiscard && (IsDirty || _draftRemoteId is not null))
+        // Asks only when something would be lost: typed text or a draft saved in "Entwürfe" or on this device. Saving
+        // stops while asking, so the draft cannot come back by autosave after it was discarded.
+        if (IsDirty || _draftRemoteId is not null || _hasLocalCopy)
         {
-            ConfirmDiscard = true;
-            return;
+            _autosave.Stop();
+            if (!await AskDiscardAsync(T("Entwurf verwerfen?"), T("Der Text und der gespeicherte Entwurf werden gelöscht."), T("Verwerfen")))
+            {
+                if (!_finished)
+                {
+                    _autosave.Start();
+                }
+
+                return;
+            }
         }
 
         Finish();
         await RemoveSavedDraftAsync();
         Closed?.Invoke(this, false);
+    }
+
+    /// <summary>Where the caret goes when the editor opens (-1: the usual place); "Loslösen" carries it over.</summary>
+    public int StartCaret { get; set; } = -1;
+
+    /// <summary>The caret in the text now, -1 without one.</summary>
+    public Task<int> CaretAsync() => _editor?.GetCaretAsync() ?? Task.FromResult(-1);
+
+    /// <summary>The question before discarding (replaceable in tests, where no window can ask).</summary>
+    internal Func<string, string, string, Task<bool>> AskDiscardAsync { get; set; } = Neruna.Desktop.Infrastructure.DeleteConfirmation.AskAlwaysAsync;
+
+    /// <summary>Asks before sending without a subject (true: send anyway); replaced in the snapshot tool.</summary>
+    internal Func<Task<bool>> ConfirmSendWithoutSubject { get; set; } = () =>
+        Views.ChoiceDialog.ShowInFrontAsync(T("Ohne Betreff senden?"),
+            T("Diese E-Mail hat keinen Betreff. Ein Betreff hilft den Empfängern, die Nachricht einzuordnen und wiederzufinden."),
+            (T("Ohne Betreff senden"), true, false), (T("Betreff eingeben"), false, true));
+
+    /// <summary>"Betreff eingeben": the view puts the cursor into the subject field.</summary>
+    public event EventHandler? SubjectRequested;
+
+    private bool _sendWithoutSubject;
+
+    // An empty subject asks once; "Ohne Betreff senden" is not asked again for this mail (e.g. after another question).
+    private async Task<bool> MaySendWithoutSubjectAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Subject) || _sendWithoutSubject)
+        {
+            return true;
+        }
+
+        if (await ConfirmSendWithoutSubject())
+        {
+            _sendWithoutSubject = true;
+            return true;
+        }
+
+        SubjectRequested?.Invoke(this, EventArgs.Empty);
+        return false;
     }
 
     [RelayCommand]
@@ -1235,6 +1506,19 @@ internal sealed class SenderChoice(Account account, ServiceConnection connection
     public bool ShowAccount { get; set; }
 
     public override string ToString() => ShowAccount ? $"{Identity} – {Account.Title}" : Identity.ToString();
+}
+
+/// <summary>One language in "Mehr → Rechtschreibsprache".</summary>
+internal sealed partial class SpellLanguageMenuItem(SpellLanguage language, System.Windows.Input.ICommand command) : ObservableObject
+{
+    public SpellLanguage Language { get; } = language;
+
+    public string Title => Language.Name;
+
+    public System.Windows.Input.ICommand Command { get; } = command;
+
+    [ObservableProperty]
+    public partial bool IsChecked { get; set; }
 }
 
 internal sealed record SignatureMenuItem(string Title, Signature? Signature, System.Windows.Input.ICommand Command);

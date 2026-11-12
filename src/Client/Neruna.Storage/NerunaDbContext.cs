@@ -71,6 +71,7 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
             e.HasIndex(m => new { m.FolderId, m.RemoteId }).IsUnique();
             e.HasIndex(m => new { m.FolderId, m.DateUnixMs });
             e.HasIndex(m => new { m.SearchLevel, m.DateUnixMs });
+            e.HasIndex(m => m.MessageId); // FindByMessageIdAsync: after moving mail, links to a mail
             e.HasOne<MailFolderEntity>().WithMany().HasForeignKey(m => m.FolderId).OnDelete(DeleteBehavior.Cascade);
         });
 

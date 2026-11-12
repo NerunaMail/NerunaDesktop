@@ -43,6 +43,9 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
     public event EventHandler? SubscribeRequested;
 
+    /// <summary>"Geburtstage oder Feiertage …" under Zusatzkalender.</summary>
+    public event EventHandler? SpecialRequested;
+
     /// <summary>"⋯ → Serverregeln …" of an account.</summary>
     public event EventHandler<Account>? ServerRulesRequested;
 
@@ -85,6 +88,17 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
     public ObservableCollection<AccountItem> Items { get; } = [];
 
+    /// <summary>Settings → Konten: the real accounts (mail, calendar, contacts, data files).</summary>
+    public ObservableCollection<AccountItem> MainItems { get; } = [];
+
+    /// <summary>
+    /// Settings → Kalender → Zusatzkalender: birthdays, holidays and subscribed internet calendars – no account to sign
+    /// in to, so not among the accounts.
+    /// </summary>
+    public ObservableCollection<AccountItem> ExtraCalendars { get; } = [];
+
+    public bool HasExtraCalendars => ExtraCalendars.Count > 0;
+
     public string DataDirectory => options.DataDirectory;
 
     public string LogDirectory => options.LogDirectory;
@@ -93,7 +107,7 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         ? T("Protokoll-Mitschnitt ist AKTIV (IMAP/SMTP/DAV, Passwörter geschwärzt) – nur zur Fehlersuche verwenden.")
         : T("Protokoll-Mitschnitt aus. Zum Aktivieren mit --protocol-log oder NERUNA_PROTOCOL_LOG=1 starten.");
 
-    public bool HasAccounts => Items.Count > 0;
+    public bool HasAccounts => MainItems.Count > 0;
 
     private IReadOnlySet<Guid> _autoReplies = new HashSet<Guid>();
 
@@ -186,6 +200,7 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
         UpdatePositions();
 
         OnPropertyChanged(nameof(HasAccounts));
+        OnPropertyChanged(nameof(HasExtraCalendars));
         var transferable = (await transfer.GetTransferableAsync()).Select(a => a.Id).ToHashSet();
         foreach (var item in Items)
         {
@@ -198,6 +213,15 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
 
     [RelayCommand]
     private void Subscribe() => SubscribeRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>"Hinzufügen → Geburtstage, Feiertage, Internet-Kalender …": to Kalender → Zusatzkalender.</summary>
+    public event EventHandler? ExtrasRequested;
+
+    [RelayCommand]
+    private void ShowExtras() => ExtrasRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void AddSpecial() => SpecialRequested?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
     private void AddPst() => PstRequested?.Invoke(this, EventArgs.Empty);
@@ -237,27 +261,50 @@ internal sealed partial class AccountsViewModel(IAccountStore accounts, AccountS
     [RelayCommand]
     private Task MoveDownAsync(AccountItem item) => MoveAsync(item, +1);
 
+    // Within its own list (accounts, or the extra calendars); the accounts stay before the extra calendars.
     private async Task MoveAsync(AccountItem item, int delta)
     {
-        var index = Items.IndexOf(item);
+        var list = item.IsExtraCalendar ? ExtraCalendars : MainItems;
+        var index = list.IndexOf(item);
         var target = index + delta;
-        if (index < 0 || target < 0 || target >= Items.Count)
+        if (index < 0 || target < 0 || target >= list.Count)
         {
             return;
         }
 
-        Items.Move(index, target);
-        UpdatePositions();
+        list.Move(index, target);
+        Items.Clear();
+        foreach (var each in MainItems.Concat(ExtraCalendars))
+        {
+            Items.Add(each);
+        }
+
+        SetPositions(MainItems);
+        SetPositions(ExtraCalendars);
         await accounts.SetOrderAsync(Items.Select(i => i.Account.Id).ToList());
         AccountsChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    // The two lists from Items (in the saved order), each with its first and last for "Nach oben / Nach unten".
     private void UpdatePositions()
     {
-        for (var i = 0; i < Items.Count; i++)
+        MainItems.Clear();
+        ExtraCalendars.Clear();
+        foreach (var item in Items)
         {
-            Items[i].IsFirst = i == 0;
-            Items[i].IsLast = i == Items.Count - 1;
+            (item.IsExtraCalendar ? ExtraCalendars : MainItems).Add(item);
+        }
+
+        SetPositions(MainItems);
+        SetPositions(ExtraCalendars);
+    }
+
+    private static void SetPositions(ObservableCollection<AccountItem> list)
+    {
+        for (var i = 0; i < list.Count; i++)
+        {
+            list[i].IsFirst = i == 0;
+            list[i].IsLast = i == list.Count - 1;
         }
     }
 
@@ -296,7 +343,8 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     [NotifyPropertyChangedFor(nameof(HasSignInError))]
     public partial string? SignInError { get; set; }
 
-    public bool HasSignInError => !string.IsNullOrEmpty(SignInError);
+    /// <summary>The server's error only when it says more than the hint above it (not "Die Anmeldung ist abgelaufen" twice).</summary>
+    public bool HasSignInError => !string.IsNullOrEmpty(SignInError) && SignInError != T("Die Anmeldung ist abgelaufen – bitte erneut anmelden.");
 
     /// <summary>The red box: the sign-in is needed, or one is being checked.</summary>
     public bool ShowSignIn => NeedsSignIn || IsSigningIn;
@@ -338,6 +386,17 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
 
     /// <summary>An Outlook data file: read only – no out-of-office, no offline choice, nothing to transfer.</summary>
     public bool IsDataFile => Account.Connections.Any(c => c.ProviderId == ProviderIds.Pst);
+
+    /// <summary>"Konto entfernen …" or, for an extra calendar, "Kalender entfernen …" (under "⋯").</summary>
+    public string RemoveText => IsExtraCalendar ? T("Kalender entfernen …") : T("Konto entfernen …");
+
+    public string RemoveQuestion => IsExtraCalendar
+        ? T("Diesen Kalender entfernen? Er lässt sich jederzeit wieder hinzufügen.")
+        : T("Dieses Konto samt seinen Daten auf diesem Computer entfernen? Auf dem Server bleibt alles.");
+
+    /// <summary>Birthdays, holidays or a subscribed internet calendar: shown under Kalender → Zusatzkalender.</summary>
+    public bool IsExtraCalendar => Account.Connections.Count > 0
+        && Account.Connections.All(c => c.ProviderId is ProviderIds.Birthdays or ProviderIds.Holidays or ProviderIds.Ics);
 
     /// <summary>Mail of a server (out-of-office and offline choice apply).</summary>
     public bool HasServerMail => HasMail && !IsDataFile;
@@ -438,10 +497,7 @@ internal sealed partial class AccountItem(Account account, Func<ServiceConnectio
     public IReadOnlyList<ConnectionLine> Connections { get; } = account.Connections.OrderBy(c => c.Kind).Select(c => ConnectionLine.From(c, summary(c))).ToList();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(RemoveText))]
     public partial bool ConfirmRemove { get; set; }
-
-    public string RemoveText => ConfirmRemove ? T("Wirklich entfernen?") : T("Entfernen");
 
     [RelayCommand]
     private void CancelRemove() => ConfirmRemove = false;

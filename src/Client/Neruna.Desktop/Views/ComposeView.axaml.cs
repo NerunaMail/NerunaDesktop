@@ -13,8 +13,18 @@ internal sealed partial class ComposeView : UserControl
     private ComposeViewModel? _attached;
 
     // "Senden" keeps its accent look; it follows the other buttons with or without text.
+    // Without text below the icons (setting, or narrow): icon and "Senden" side by side – the text always stays.
     public static readonly Avalonia.Data.Converters.IValueConverter SendPadding =
-        new Avalonia.Data.Converters.FuncValueConverter<bool, Avalonia.Thickness>(labels => labels ? new Avalonia.Thickness(10, 4) : new Avalonia.Thickness(12, 6));
+        new Avalonia.Data.Converters.FuncValueConverter<bool, Avalonia.Thickness>(labels => labels ? new Avalonia.Thickness(10, 4) : new Avalonia.Thickness(10, 5));
+
+    public static readonly Avalonia.Data.Converters.IValueConverter SendOrientation =
+        new Avalonia.Data.Converters.FuncValueConverter<bool, Avalonia.Layout.Orientation>(labels => labels ? Avalonia.Layout.Orientation.Vertical : Avalonia.Layout.Orientation.Horizontal);
+
+    public static readonly Avalonia.Data.Converters.IValueConverter SendFontSize =
+        new Avalonia.Data.Converters.FuncValueConverter<bool, double>(labels => labels ? 11 : 13);
+
+    public static readonly Avalonia.Data.Converters.IValueConverter SendTextMargin =
+        new Avalonia.Data.Converters.FuncValueConverter<bool, Avalonia.Thickness>(labels => labels ? new Avalonia.Thickness(0, 3, 0, 0) : new Avalonia.Thickness(6, 0, 0, 0));
 
     public ComposeView()
     {
@@ -44,6 +54,90 @@ internal sealed partial class ComposeView : UserControl
         // The same view back on screen (the WebView has reloaded its page): the parked text goes into it again.
         AttachedToVisualTree += async (_, _) => await AttachAsync();
         DataContextChanged += async (_, _) => await AttachAsync();
+        // "Betreff eingeben" in the question before sending without a subject: into the subject field
+        DataContextChanged += (_, _) =>
+        {
+            _subjectAsker?.SubjectRequested -= OnSubjectRequested;
+            _subjectAsker = DataContext as ComposeViewModel;
+            _subjectAsker?.SubjectRequested += OnSubjectRequested;
+        };
+
+        // The toolbar follows the width of the form (reading pane or window), not of the screen.
+        ActionBar.SizeChanged += (_, _) => FitToolbar();
+    }
+
+    private ComposeViewModel? _fitted;
+
+    // Badges and buttons that come and go change the width the line needs.
+    private static readonly HashSet<string> WidthProperties =
+    [
+        nameof(ComposeViewModel.Sign), nameof(ComposeViewModel.Encrypt), nameof(ComposeViewModel.EncryptIncomplete),
+        nameof(ComposeViewModel.CanPopOut), nameof(ComposeViewModel.CanSign),
+    ];
+
+    private void OnWidthPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is { } name && WidthProperties.Contains(name))
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(FitToolbar);
+        }
+    }
+
+    /// <summary>
+    /// The actions in one line: everything with text when there is room; then without text, then Textvorlage, Signatur
+    /// and KI under "Mehr", then also Rückgängig/Wiederherstellen – measured, not guessed. "Senden" always keeps its text.
+    /// </summary>
+    private void FitToolbar()
+    {
+        if (DataContext is not ComposeViewModel vm)
+        {
+            return;
+        }
+
+        if (_fitted != vm)
+        {
+            _fitted?.PropertyChanged -= OnWidthPropertyChanged;
+            vm.PropertyChanged += OnWidthPropertyChanged;
+            _fitted = vm;
+        }
+
+        var available = ActionBar.Bounds.Width;
+        if (available <= 0)
+        {
+            return;
+        }
+
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Control;
+        const int Last = 3;
+        for (var level = 0; level <= Last; level++)
+        {
+            vm.ToolbarLevel = level;
+            MainTools.Measure(Size.Infinity);
+            SideTools.Measure(Size.Infinity);
+            if (MainTools.DesiredSize.Width + SideTools.DesiredSize.Width + 16 <= available)
+            {
+                break;
+            }
+        }
+
+        vm.IsNarrow = available < 460;
+        vm.DraftStatusInBar = available - MainTools.DesiredSize.Width - SideTools.DesiredSize.Width - 16 >= 150;
+
+        // A button that just went into "Mehr" had the focus: on to "Mehr" instead of nowhere.
+        if (focused is not null && Avalonia.VisualTree.VisualExtensions.IsVisualAncestorOf(MainTools, focused) && !focused.IsEffectivelyVisible)
+        {
+            MoreButton.Focus();
+        }
+    }
+
+    // "Cc" / "Bcc" beside "An": the field appears (by the command) and gets the cursor.
+    private void OnShowField(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.Tag is string name)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<Neruna.Desktop.Controls.RecipientBox>(name)?.FocusText(),
+                Avalonia.Threading.DispatcherPriority.Loaded);
+        }
     }
 
     private async Task AttachAsync()
@@ -56,15 +150,16 @@ internal sealed partial class ComposeView : UserControl
         _attached = vm;
         await vm.AttachEditorAsync(this.FindControl<HtmlEditor>("Editor")!);
 
-        // New mail or forward (no recipient yet): start in "An". A reply has its recipient: start typing the answer.
-        if (string.IsNullOrWhiteSpace(vm.To))
+        // New mail or forward (no recipient yet): start in "An". A reply has its recipient: start typing the answer –
+        // above signature and quote. Popped out: where the caret was.
+        if (vm.StartCaret < 0 && string.IsNullOrWhiteSpace(vm.To))
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<Neruna.Desktop.Controls.RecipientBox>("ToBox")?.FocusText(),
                 Avalonia.Threading.DispatcherPriority.Loaded);
         }
         else
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<HtmlEditor>("Editor")?.FocusEditor(),
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => this.FindControl<HtmlEditor>("Editor")?.FocusEditor(vm.StartCaret),
                 Avalonia.Threading.DispatcherPriority.Loaded);
         }
     }
@@ -205,4 +300,8 @@ internal sealed partial class ComposeView : UserControl
         var chosen = await RecipientPicker.ShowAsync(owner, field switch { RecipientField.Cc => "Cc", RecipientField.Bcc => "Bcc", _ => "An" }, directory);
         vm.AddRecipients(field, chosen);
     }
+
+    private ComposeViewModel? _subjectAsker;
+
+    private void OnSubjectRequested(object? sender, EventArgs e) => SubjectBox.Focus();
 }

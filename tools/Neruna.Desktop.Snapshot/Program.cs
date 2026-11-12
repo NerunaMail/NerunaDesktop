@@ -345,7 +345,7 @@ internal static class Snapshots
         await SaveAsync(window, output, "mail-quick-actions.png");
         Console.WriteLine($"Quick action buttons: {string.Join(", ", vm.MailPage.QuickActionButtons.Select(b => b.Label))}");
         vm.NavigateCommand.Execute(Section.Settings);
-        vm.SettingsPage.SelectedTab = 11;
+        vm.SettingsPage.Section = SettingsSection.QuickActions;
         await vm.SettingsPage.QuickActions.ReloadAsync();
         await Task.Delay(300);
         await SaveAsync(window, output, "settings-quick-actions.png");
@@ -403,7 +403,7 @@ internal static class Snapshots
             await Task.Delay(300);
             Console.WriteLine($"Tag colour picked: {row.Color} (flyout open: {tagColorButton.Flyout.IsOpen})");
         }
-        vm.SettingsPage.SelectedTab = 11;
+        vm.SettingsPage.Section = SettingsSection.QuickActions;
         await Task.Delay(300);
         await vm.SettingsPage.QuickActions.EditCommand.ExecuteAsync(vm.SettingsPage.QuickActions.Actions[0]);
         await Task.Delay(300);
@@ -555,7 +555,7 @@ internal static class Snapshots
             row0.ShowChecked(DateTimeOffset.Now, reachable: true);
             await SaveAsync(window, output, "auto-reply-notice.png");
             vm.NavigateCommand.Execute(Section.Settings);
-            vm.SettingsPage.SelectedTab = 0;
+            vm.SettingsPage.Section = SettingsSection.Accounts;
             await Task.Delay(300);
             await SaveAsync(window, output, "auto-reply-accounts.png");
             vm.NavigateCommand.Execute(Section.Mail);
@@ -661,6 +661,8 @@ internal static class Snapshots
         await textTemplates.SaveAsync(new Neruna.Core.Mail.TextTemplate(Guid.NewGuid(), "Terminbestätigung", "<p>Gerne bestätige ich Ihnen den Termin.</p>", DateTimeOffset.Now, Shortcut: "termin"));
 
         // The editor shows a formatted preview here (no WebView headless): toolbar, text and signature as on Windows.
+        // New mails open in their own window by default; for these pictures in the reading pane.
+        await services.GetRequiredService<ISettingsStore>().SetAsync(SettingKeys.ComposeNewInWindow, "false");
         await vm.MailPage.NewMailCommand.ExecuteAsync(null);
         await Task.Delay(300);
         var focused = window.FocusManager?.GetFocusedElement() as Control;
@@ -789,6 +791,97 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "reply.png");
         vm.MailPage.Compose = null;
+        await vm.MailPage.ReplyAllCommand.ExecuteAsync(null);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "reply-all.png");
+        vm.MailPage.Compose = null;
+        await vm.MailPage.ForwardCommand.ExecuteAsync(null);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "forward.png");
+
+        // The compose form at fixed widths of its own, light and dark: both toolbars in one line, the rest in the menus.
+        var sized = vm.MailPage.Compose!;
+        sized.To = "Marco Bernasconi <marco@bernasconi.example>";
+        vm.NavigateCommand.Execute(Section.Calendar);
+        await Task.Delay(300);
+        var sizedView = new ComposeView { DataContext = sized };
+        var host = new Window { Width = 1064, Height = 760, Content = sizedView };
+        host.Bind(Window.BackgroundProperty, host.GetResourceObservable("PaneBackgroundBrush"));
+        host.Show();
+        foreach (var mode in new[] { ThemeMode.Light, ThemeMode.Dark })
+        {
+            Appearance.Apply(mode, ColorScheme.Blue);
+            foreach (var width in new[] { 1024, 720, 480, 360 })
+            {
+                host.Width = width + 40;
+                await Task.Delay(300);
+                await SaveAsync(host, output, $"compose-{width}{(mode == ThemeMode.Dark ? "-dark" : string.Empty)}.png");
+                var bar = sizedView.FindControl<Grid>("ActionBar")!;
+                Console.WriteLine($"Compose {width}: level {sized.ToolbarLevel}, narrow {sized.IsNarrow}, bar {bar.Bounds.Height:0} high, needs {sizedView.FindControl<StackPanel>("MainTools")!.DesiredSize.Width + sizedView.FindControl<StackPanel>("SideTools")!.DesiredSize.Width:0} of {bar.Bounds.Width:0}");
+            }
+        }
+
+        Appearance.Apply(ThemeMode.Light, ColorScheme.Blue);
+        // Signed and encrypted, and encryption not possible for every recipient: shown beside the actions.
+        host.Width = 760;
+        sized.Sign = true;
+        sized.Encrypt = true;
+        await Task.Delay(300);
+        await SaveAsync(host, output, "compose-secure.png");
+        sized.EncryptIncomplete = true;
+        await Task.Delay(300);
+        await SaveAsync(host, output, "compose-secure-incomplete.png");
+        sized.Encrypt = false;
+        sized.Sign = false;
+        host.Width = 400;
+        await Task.Delay(300);
+        var mainMore = sizedView.FindControl<Neruna.Desktop.Controls.ToolButton>("MoreButton")!;
+        mainMore.Flyout!.ShowAt(mainMore);
+        await Task.Delay(300);
+        await SaveAsync(host, output, "compose-more-menu.png");
+        mainMore.Flyout.Hide();
+        var formatBar = sizedView.GetVisualDescendants().OfType<FormattingToolbar>().First();
+        var formatMore = formatBar.FindControl<Button>("MoreButton")!;
+        formatMore.Flyout!.ShowAt(formatMore);
+        await Task.Delay(300);
+        await SaveAsync(host, output, "compose-format-menu.png");
+        formatMore.Flyout.Hide();
+        // Sending without a subject: asked first; closing the question (= "Betreff eingeben") puts the cursor into the subject.
+        host.Width = 760;
+        sized.Subject = string.Empty;
+        sized.ConfirmSendWithoutSubject = async () =>
+        {
+            var asking = ChoiceDialog.ShowAsync(host, Neruna.Core.Localization.Texts.T("Ohne Betreff senden?"),
+                Neruna.Core.Localization.Texts.T("Diese E-Mail hat keinen Betreff. Ein Betreff hilft den Empfängern, die Nachricht einzuordnen und wiederzufinden."),
+                (Neruna.Core.Localization.Texts.T("Ohne Betreff senden"), true, false), (Neruna.Core.Localization.Texts.T("Betreff eingeben"), false, true));
+            Dispatcher.UIThread.RunJobs();
+            if (ChoiceDialog.Open is { } subjectDialog)
+            {
+                await SaveAsync(subjectDialog, output, "compose-no-subject.png");
+                subjectDialog.Close();
+            }
+
+            return await asking;
+        };
+        await sized.SendCommand.ExecuteAsync(null);
+        await Task.Delay(300);
+        Console.WriteLine($"No subject: asked, sending stopped, cursor in subject: {sizedView.FindControl<TextBox>("SubjectBox")!.IsFocused}");
+        host.Close();
+        vm.NavigateCommand.Execute(Section.Mail);
+        await Task.Delay(300);
+        vm.MailPage.Compose = null;
+
+        // Discarding a draft with text: asked once.
+        var discard = ChoiceDialog.ShowAsync(window, "Entwurf verwerfen?", "Der Text und der gespeicherte Entwurf werden gelöscht.",
+            ("Verwerfen", true, false), ("Abbrechen", false, true));
+        Dispatcher.UIThread.RunJobs();
+        if (ChoiceDialog.Open is { } discardDialog)
+        {
+            await SaveAsync(discardDialog, output, "compose-discard.png");
+            discardDialog.Close();
+        }
+
+        await discard;
 
         // The question when closing with a changed draft open.
         var question = ChoiceDialog.ShowAsync(window, "Neruna beenden",
@@ -802,6 +895,20 @@ internal static class Snapshots
         }
 
         await question;
+
+        // Before deleting a contact (also events and tasks): with "Nicht mehr fragen".
+        var deleteQuestion = ChoiceDialog.ShowWithCheckAsync(window, "«Lea Keller» löschen",
+            "Der Kontakt wird auch auf dem Server gelöscht und lässt sich nicht wiederherstellen.", "Beim Löschen von Kontakten nicht mehr fragen",
+            ("Löschen", true, false), ("Abbrechen", false, true));
+        Dispatcher.UIThread.RunJobs();
+
+        if (ChoiceDialog.Open is { } deleteDialog)
+        {
+            await SaveAsync(deleteDialog, output, "delete-question.png");
+            deleteDialog.Close();
+        }
+
+        await deleteQuestion;
 
         // The question for a large picture: three buttons, the dialog as wide as they need.
         var imageQuestion = ChoiceDialog.ShowAsync(window, "Grosses Bild",
@@ -1135,6 +1242,16 @@ internal static class Snapshots
         await SaveAsync(window, output, "calendar-workweek.png");
         vm.CalendarPage.IsWorkWeek = false;
         await Task.Delay(300);
+        // Month: whole weeks, "+N weitere" when a day is full; the day's number opens that day.
+        vm.CalendarPage.IsMonth = true;
+        await Task.Delay(800);
+        Console.WriteLine($"Month: {vm.CalendarPage.RangeTitle}, days={vm.CalendarPage.Days.Count}, rows={vm.CalendarPage.MonthRows}, events={vm.CalendarPage.Days.Sum(d => d.Events.Count)}");
+        await SaveAsync(window, output, "calendar-month.png");
+        await vm.CalendarPage.ShowDayCommand.ExecuteAsync(DateTime.Today);
+        await Task.Delay(300);
+        Console.WriteLine($"Month → day: {vm.CalendarPage.RangeTitle}");
+        vm.CalendarPage.IsFullWeek = true;
+        await Task.Delay(300);
         vm.CalendarPage.GridMinutes = 15;
         await SaveAsync(window, output, "calendar-timegrid-15.png");
         vm.CalendarPage.GridMinutes = 30;
@@ -1406,17 +1523,17 @@ internal static class Snapshots
         vm.NavigateCommand.Execute(Section.Mail);
         vm.NavigateCommand.Execute(Section.Settings);
         await vm.SettingsPage.ReloadAsync();
-        vm.SettingsPage.SelectedTab = 1;
+        vm.SettingsPage.Section = SettingsSection.Mail;
         await SaveAsync(window, output, "settings-mail.png");
         // The pages that bring several areas together.
-        foreach (var (tab, file) in new[] { (Neruna.Desktop.ViewModels.SettingsViewModel.WorkspacesTab, "settings-profiles-workspaces.png"), (Neruna.Desktop.ViewModels.SettingsViewModel.DataTab, "settings-data.png"), (Neruna.Desktop.ViewModels.SettingsViewModel.IntegrationTab, "settings-integration.png"), (Neruna.Desktop.ViewModels.SettingsViewModel.PdfTab, "settings-pdf.png") })
+        foreach (var (tab, file) in new[] { (SettingsSection.Workspaces, "settings-profiles-workspaces.png"), (SettingsSection.Data, "settings-data.png"), (SettingsSection.Integration, "settings-integration.png"), (SettingsSection.Pdf, "settings-pdf.png") })
         {
-            vm.SettingsPage.SelectedNav = Neruna.Desktop.ViewModels.SettingsViewModel.Navigation.FirstOrDefault(n => n.Tab == tab);
-            vm.SettingsPage.SelectedTab = tab;
+            vm.SettingsPage.SelectedNav = Neruna.Desktop.ViewModels.SettingsViewModel.Navigation.FirstOrDefault(n => !n.IsHeading && n.Section == tab);
+            vm.SettingsPage.Section = tab;
             await Task.Delay(300);
             await SaveAsync(window, output, file);
         }
-        vm.SettingsPage.SelectedTab = 2;
+        vm.SettingsPage.Section = SettingsSection.Calendar;
         await SaveAsync(window, output, "settings-calendar.png");
         if (window.GetVisualDescendants().OfType<CalendarCategoriesView>().FirstOrDefault(v => v.IsEffectivelyVisible) is { } categoriesView)
         {
@@ -1439,7 +1556,7 @@ internal static class Snapshots
         await vm.SettingsPage.Workspaces.ReloadAsync();
         await vm.SettingsPage.Workspaces.EditCommand.ExecuteAsync(null);
         vm.NavigateCommand.Execute(Section.Settings);
-        vm.SettingsPage.SelectedTab = 15;
+        vm.SettingsPage.Section = SettingsSection.Workspaces;
         await SaveAsync(window, output, "settings-workspaces.png");
         vm.SettingsPage.Workspaces.ShowAsTabs = true;
         vm.NavigateCommand.Execute(Section.Mail);
@@ -1459,23 +1576,23 @@ internal static class Snapshots
         if (File.Exists(feedFile))
         {
             vm.SettingsPage.News.Show(Neruna.Core.News.DevblogFeed.Parse(await File.ReadAllTextAsync(feedFile)));
-            vm.SettingsPage.SelectedTab = SettingsViewModel.NewsTab;
+            vm.SettingsPage.Section = SettingsSection.News;
             await SaveAsync(window, output, "settings-news.png");
         }
 
         // Einstellungen → PDF: stamps and the recipients with a password.
         await vm.SettingsPage.Pdf.LoadAsync();
-        vm.SettingsPage.SelectedTab = SettingsViewModel.PdfTab;
+        vm.SettingsPage.Section = SettingsSection.Pdf;
         await SaveAsync(window, output, "settings-pdf.png");
 
         // Einstellungen → Besprechungen.
         await vm.SettingsPage.Meetings.LoadAsync();
-        vm.SettingsPage.SelectedTab = SettingsViewModel.MeetingsTab;
+        vm.SettingsPage.Section = SettingsSection.Meetings;
         await SaveAsync(window, output, "settings-meetings.png");
 
         // Einstellungen → E-Mail → Schreiben.
         await vm.SettingsPage.MailOptions.ReloadAsync();
-        vm.SettingsPage.SelectedTab = 17;
+        vm.SettingsPage.Section = SettingsSection.Compose;
         await SaveAsync(window, output, "settings-compose.png");
 
         // Datenschutz with a few trusted senders, and with many (the list scrolls in its own box).
@@ -1498,7 +1615,7 @@ internal static class Snapshots
 
         await statistics.RecordLinkAsync(warned: true, cleaned: true);
         await vm.SettingsPage.Privacy.ReloadAsync();
-        vm.SettingsPage.SelectedTab = 14;
+        vm.SettingsPage.Section = SettingsSection.Privacy;
         await SaveAsync(window, output, "settings-privacy.png");
         // Further down: the phishing protection with the list of known phishing sites.
         if (window.GetVisualDescendants().OfType<PrivacyOptionsView>().FirstOrDefault(v => v.IsEffectivelyVisible)?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault() is { } privacyScroll)
@@ -1523,7 +1640,7 @@ internal static class Snapshots
 
         // Konto bearbeiten with a label and an alias (sender address of the same mailbox).
         var editedAccount = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync())[0];
-        vm.SettingsPage.SelectedTab = 0;
+        vm.SettingsPage.Section = SettingsSection.Accounts;
         await vm.SettingsPage.Accounts.ReloadAsync();
         await SaveAsync(window, output, "settings-accounts.png");
         // The sign-in of the first account expired: its card in red with "Wieder anmelden", a "!" on "Konten" and on the
@@ -1564,7 +1681,7 @@ internal static class Snapshots
         await vm.SettingsPage.ShowServerRulesAsync(vm.SettingsPage.Accounts.Items[0].Account.Id);
         await Task.Delay(1500);
         await SaveAsync(window, output, "settings-server-rules.png");
-        vm.SettingsPage.SelectedTab = 0;
+        vm.SettingsPage.Section = SettingsSection.Accounts;
         // "⋯" of the first account, with "Offline verfügbar" opened.
         if (window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Flyout is MenuFlyout && b.Content is TextBlock { Text: "⋯" }) is { Flyout: MenuFlyout accountMenu } moreButton)
         {
@@ -1580,11 +1697,63 @@ internal static class Snapshots
             accountMenu.Hide();
         }
 
-        vm.SettingsPage.SelectedTab = 9;
+        // Settings reorganised: the list in its new order, Kalender with the extra calendars, the search – light and dark.
+        {
+            var holidays = new SpecialCalendarViewModel(services.GetRequiredService<Neruna.Core.Accounts.AccountSetupService>(), await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync())
+            {
+                IsHolidays = true,
+            };
+            holidays.SelectedCountry = holidays.Countries.FirstOrDefault(c => c.Code == "CH") ?? holidays.Countries[0];
+            holidays.SelectedRegion = holidays.Regions.FirstOrDefault();
+            await holidays.AddCommand.ExecuteAsync(null);
+            await vm.SettingsPage.Accounts.ReloadAsync();
+            Console.WriteLine($"Settings: {vm.SettingsPage.Accounts.MainItems.Count} accounts, {vm.SettingsPage.Accounts.ExtraCalendars.Count} extra calendars");
+            var settingsView = window.GetVisualDescendants().OfType<SettingsView>().First();
+            var searchBox = settingsView.FindControl<TextBox>("SearchBox")!;
+            foreach (var (variant, suffix) in new[] { (ThemeVariant.Light, ""), (ThemeVariant.Dark, "-dark") })
+            {
+                Application.Current!.RequestedThemeVariant = variant;
+                vm.SettingsPage.SelectedNav = SettingsViewModel.Navigation.First(n => !n.IsHeading && n.Section == SettingsSection.Accounts);
+                await SaveAsync(window, output, $"settings-new-accounts{suffix}.png");
+                vm.SettingsPage.SelectedNav = SettingsViewModel.Navigation.First(n => !n.IsHeading && n.Section == SettingsSection.Calendar);
+                await Task.Delay(300);
+                if (window.GetVisualDescendants().OfType<AccountsView>().FirstOrDefault(v => v.Extras && v.IsEffectivelyVisible) is { } extras)
+                {
+                    extras.BringIntoView();
+                }
+
+                await SaveAsync(window, output, $"settings-new-calendar{suffix}.png");
+                searchBox.Text = "Signatur";
+                await Task.Delay(300);
+                await SaveAsync(window, output, $"settings-new-search{suffix}.png");
+                searchBox.Text = "sofort";
+                await Task.Delay(300);
+                if (settingsView.FindControl<ListBox>("Results") is { ItemCount: > 0 } results)
+                {
+                    results.SelectedIndex = 0;
+                    await Task.Delay(500);
+                }
+
+                await SaveAsync(window, output, $"settings-new-search-hit{suffix}.png");
+                searchBox.Text = string.Empty;
+            }
+
+            Application.Current!.RequestedThemeVariant = ThemeVariant.Light;
+            vm.SettingsPage.Section = SettingsSection.Accounts;
+            if (window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Flyout is MenuFlyout && b.Content is TextBlock { Text: "⋯" } && b.IsEffectivelyVisible) is { Flyout: MenuFlyout rowMenu } rowButton)
+            {
+                rowMenu.ShowAt(rowButton);
+                await Task.Delay(300);
+                await SaveAsync(window, output, "settings-new-account-menu.png");
+                rowMenu.Hide();
+            }
+        }
+
+        vm.SettingsPage.Section = SettingsSection.About;
         await SaveAsync(window, output, "settings-about-diagnosis.png");
-        vm.SettingsPage.SelectedTab = 10;
+        vm.SettingsPage.Section = SettingsSection.Data;
         await SaveAsync(window, output, "settings-file-backup.png");
-        vm.SettingsPage.SelectedTab = 0;
+        vm.SettingsPage.Section = SettingsSection.Accounts;
         vm.SettingsPage.Accounts.EditCommand.Execute(vm.SettingsPage.Accounts.Items[0]);
         await Task.Delay(300);
         if (vm.Overlay is AccountSetupViewModel accountEdit)
@@ -1595,7 +1764,10 @@ internal static class Snapshots
             accountEdit.CalDavUrl = "https://mail.example.com/SOGo/dav/";
             accountEdit.CardDavUrl = "https://mail.example.com/SOGo/dav/";
             accountEdit.Aliases.Add(new AliasRow { Email = "info@" + editedAccount.EmailAddress!.Split('@')[1], DisplayName = "Muster Informatik AG" });
+            accountEdit.ShowAdvanced = false;
             await SaveAsync(window, output, "account-edit.png");
+            accountEdit.ShowAdvanced = true;
+            await SaveAsync(window, output, "account-edit-advanced.png");
             accountEdit.CancelCommand.Execute(null);
         }
         var notifications = services.GetRequiredService<NotificationService>();
@@ -1606,13 +1778,13 @@ internal static class Snapshots
         {
             open.Close();
         }
-        vm.SettingsPage.SelectedTab = 3;
+        vm.SettingsPage.Section = SettingsSection.Signatures;
         await SaveAsync(window, output, "settings-signatures.png");
-        vm.SettingsPage.SelectedTab = 4;
+        vm.SettingsPage.Section = SettingsSection.TextTemplates;
         await vm.SettingsPage.TextTemplates.ReloadAsync();
         await SaveAsync(window, output, "settings-text-templates.png");
         await CertificateTabsAsync(vm, window, services, output);
-        vm.SettingsPage.SelectedTab = 6;
+        vm.SettingsPage.Section = SettingsSection.Appearance;
         await SaveAsync(window, output, "settings-design.png");
         var preferences = services.GetRequiredService<UiPreferences>();
         preferences.ShowAddAccountButton = false;
@@ -1644,12 +1816,12 @@ internal static class Snapshots
         preferences.MoveNavigationItem(preferences.NavigationItems.First(n => n.Section == Section.Chat), 2);
         // Einstellungen → Cloud: not connected; connected when a code for a running server is given
         // (NERUNA_SNAPSHOT_CLOUD=<url> NERUNA_SNAPSHOT_CLOUD_CODE=… NERUNA_SNAPSHOT_CLOUD_PIN=…).
-        vm.SettingsPage.SelectedTab = 7;
+        vm.SettingsPage.Section = SettingsSection.Cloud;
         vm.SettingsPage.Cloud.DeviceName = "Anna – Notebook";
         await SaveAsync(window, output, "settings-cloud.png");
 
         // Einstellungen → KI: not connected (sign-in with the subscription or an API key), then connected (demo AI).
-        vm.SettingsPage.SelectedTab = 8;
+        vm.SettingsPage.Section = SettingsSection.Ai;
         vm.SettingsPage.Ai.SelectedProvider = vm.SettingsPage.Ai.Providers.First(p => p.Id == "openai");
         await Task.Delay(200);
         await SaveAsync(window, output, "settings-ai.png");
@@ -1713,6 +1885,7 @@ internal static class Snapshots
             await SaveAsync(window, output, "compose-ai-confirm.png");
             composeAi.ConfirmText = null;
             // Writing into the text needs the real editor (a WebView), which the snapshot tool does not have; see tests/editor.
+            vm.MailPage.Compose.AskDiscardAsync = (_, _, _) => Task.FromResult(true); // "Entwurf verwerfen?" – yes
             await vm.MailPage.Compose.DiscardCommand.ExecuteAsync(null);
             await Task.Delay(300);
         }
@@ -1732,12 +1905,12 @@ internal static class Snapshots
             vm.SettingsPage.Cloud.Pin = Environment.GetEnvironmentVariable("NERUNA_SNAPSHOT_CLOUD_PIN") ?? string.Empty;
             await vm.SettingsPage.Cloud.ConnectCommand.ExecuteAsync(null);
             Console.WriteLine($"Cloud: {vm.SettingsPage.Cloud.ConnectedText ?? vm.SettingsPage.Cloud.Error}");
-            vm.SettingsPage.SelectedTab = 7; // Neruna Cloud (the AI shots before left Einstellungen → KI open)
+            vm.SettingsPage.Section = SettingsSection.Cloud; // Neruna Cloud (the AI shots before left Einstellungen → KI open)
             await Task.Delay(300);
             await SaveAsync(window, output, "settings-cloud-connected.png");
 
             // The organisation's signatures arrived with the connection.
-            vm.SettingsPage.SelectedTab = 3;
+            vm.SettingsPage.Section = SettingsSection.Signatures;
             await vm.SettingsPage.Signatures.ReloadAsync();
             vm.SettingsPage.Signatures.Selected = vm.SettingsPage.Signatures.Signatures.FirstOrDefault(s => s.IsFromCloud);
             Console.WriteLine($"Cloud signatures: {string.Join(", ", vm.SettingsPage.Signatures.Signatures.Where(s => s.IsFromCloud).Select(s => s.Name))}");
@@ -1798,7 +1971,7 @@ internal static class Snapshots
             vm.NavigateCommand.Execute(Section.Settings);
         }
 
-        vm.SettingsPage.SelectedTab = SettingsViewModel.AboutTab;
+        vm.SettingsPage.Section = SettingsSection.About;
         await SaveAsync(window, output, "settings-about.png");
 
         // Crash report offered after a crash: "Details anzeigen" shows exactly what is sent (cleaned).
@@ -1822,6 +1995,19 @@ internal static class Snapshots
         vm.Overlay = null;
         vm.NavigateCommand.Execute(Section.Settings);
 
+        // The navigation with its names (» at the top), light and dark; « closes it again.
+        vm.NavigateCommand.Execute(Section.Mail);
+        vm.MailPage.Preferences.NavigationExpanded = true;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "nav-expanded.png");
+        Appearance.Apply(ThemeMode.Dark, ColorScheme.Blue);
+        await Task.Delay(200);
+        await SaveAsync(window, output, "nav-expanded-dark.png");
+        Appearance.Apply(ThemeMode.Light, ColorScheme.Blue);
+        vm.MailPage.Preferences.NavigationExpanded = false;
+        await Task.Delay(200);
+        await SaveAsync(window, output, "nav-collapsed.png");
+
         // Color schemes and dark mode applied to the running app.
         vm.NavigateCommand.Execute(Section.Mail);
         Appearance.Apply(ThemeMode.Dark, ColorScheme.Red);
@@ -1831,10 +2017,13 @@ internal static class Snapshots
         await SaveAsync(window, output, "theme-light-green.png");
         Appearance.Apply(ThemeMode.Light, ColorScheme.Blue);
         vm.NavigateCommand.Execute(Section.Settings);
-        vm.SettingsPage.SelectedTab = 0;
+        vm.SettingsPage.Section = SettingsSection.Accounts;
 
         vm.NavigateCommand.Execute(Section.Mail);
         vm.ShowAccountSetupCommand.Execute(null);
+        ((AccountSetupViewModel)vm.Overlay!).Email = "anna.muster@example.com";
+        await SaveAsync(window, output, "account-setup-address.png");
+        ((AccountSetupViewModel)vm.Overlay!).ChooseManuallyCommand.Execute(null);
         await SaveAsync(window, output, "account-setup-kind.png");
         // Google (only in a build with the client secret): the sign-in step with the note on the test phase.
         ((AccountSetupViewModel)vm.Overlay!).Step = "google";
@@ -2073,7 +2262,7 @@ internal static class Snapshots
             await manager.ImportAsync(user.Certificate.GetEncoded(), null);
         }
 
-        vm.SettingsPage.SelectedTab = 5;
+        vm.SettingsPage.Section = SettingsSection.Certificates;
         await vm.SettingsPage.Certificates.ReloadAsync();
         await SaveAsync(window, output, "settings-certificates.png");
         var tabs = window.GetVisualDescendants().OfType<TabControl>().Last(t => t.Items.Count == 3);

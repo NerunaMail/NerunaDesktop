@@ -120,10 +120,7 @@
 
     <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,20,0,0">
       <Button Command="{Binding DeleteCommand}" IsVisible="{Binding IsExisting}">
-        <Panel>
-          <TextBlock Text="{l:T 'Löschen'}" IsVisible="{Binding !ConfirmDelete}" />
-          <TextBlock Text="{l:T 'Wirklich löschen?'}" IsVisible="{Binding ConfirmDelete}" />
-        </Panel>
+        <TextBlock Text="{l:T 'Löschen'}" />
       </Button>
       <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="60" MinWidth="0" Height="4" Margin="12,0" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
       <Button Grid.Column="3" Content="{l:T 'Abbrechen'}" Command="{Binding CancelCommand}" Margin="0,0,8,0" />

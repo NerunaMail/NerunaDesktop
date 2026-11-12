@@ -22,7 +22,7 @@
           </StackPanel>
         </Button>
       <StackPanel Orientation="Horizontal" Spacing="4">
-        <Button Classes="accent" Command="{Binding NewContactCommand}" Padding="12,6" Margin="0,0,4,0">
+        <Button Classes="accent pageNew" Command="{Binding NewContactCommand}" Padding="12,6" Margin="0,0,4,0" ToolTip.Tip="Ctrl+N">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
             <TextBlock Text="{l:T 'Neuer Kontakt'}" />
@@ -58,7 +58,7 @@
                 ToolTip.Tip="{l:T 'Zwischen Liste und Visitenkarten umschalten'}">
           <StackPanel Orientation="Horizontal">
             <Panel>
-              <PathIcon Data="{StaticResource IconWorkspaces}" IsVisible="{Binding IsListView}" />
+              <PathIcon Data="{StaticResource IconCards}" IsVisible="{Binding IsListView}" />
               <PathIcon Data="{StaticResource IconBullets}" IsVisible="{Binding IsCardView}" />
             </Panel>
             <TextBlock Text="{l:T 'Visitenkarten'}" IsVisible="{Binding IsListView}" />
@@ -110,7 +110,7 @@
           <StackPanel Margin="12,12,12,6" Spacing="8">
             <TextBlock Text="{l:T 'Kontakte und Gruppen'}" FontSize="16" FontWeight="SemiBold" />
             <Grid ColumnDefinitions="*,Auto" Width="{Binding IsCardView, Converter={x:Static app:Converters.CardSearchWidth}}" HorizontalAlignment="Left">
-              <TextBox ctl:SearchBox.Clearable="True" Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}">
+              <TextBox ctl:SearchBox.Clearable="True" Classes="pageSearch" Text="{Binding SearchText}" PlaceholderText="{l:T 'Name, Firma oder E-Mail suchen'}" ToolTip.Tip="Ctrl+F">
                 <TextBox.InnerLeftContent>
                   <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
                 </TextBox.InnerLeftContent>
@@ -211,7 +211,7 @@
                         <DataTemplate x:DataType="vm:LabeledValue">
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <SelectableTextBlock Text="{Binding Value}" Foreground="{DynamicResource AccentTextBrush}" />
-                            <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasLabel}" />
                           </StackPanel>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
@@ -226,7 +226,7 @@
                             <HyperlinkButton Content="{Binding Value}" NavigateUri="{Binding TelUri}" Padding="0" IsVisible="{Binding HasTelUri}"
                                              ToolTip.Tip="{l:T 'Anrufen'}" />
                             <SelectableTextBlock Text="{Binding Value}" IsVisible="{Binding !HasTelUri}" />
-                            <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasLabel}" />
                           </StackPanel>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>

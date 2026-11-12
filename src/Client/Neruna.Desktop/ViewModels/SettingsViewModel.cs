@@ -4,30 +4,28 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>"Einstellungen": accounts with diagnostics, mail options, signatures and S/MIME certificates.</summary>
-internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, ProfilesViewModel profiles, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf, ServerRulesPageViewModel serverRules, MailTagsViewModel mailTags) : ViewModelBase
+internal sealed partial class SettingsViewModel(AccountsViewModel accounts, MailOptionsViewModel mailOptions, CalendarOptionsViewModel calendarOptions, SignaturesViewModel signatures, CertificatesViewModel certificates, AppearanceViewModel appearance, Neruna.Core.Security.ICredentialStore credentials, Neruna.Desktop.Infrastructure.UpdateService updates, CloudViewModel cloud, TextTemplatesViewModel textTemplates, CrashReportsOptionsViewModel crashReports, AiOptionsViewModel ai, FileBackupViewModel fileBackup, QuickActionsViewModel quickActions, SearchIndexViewModel searchIndex, LocalDataViewModel localData, PrivacyOptionsViewModel privacy, WorkspacesViewModel workspaces, ProfilesViewModel profiles, NewsViewModel news, MeetingsOptionsViewModel meetings, PdfOptionsViewModel pdf, ServerRulesPageViewModel serverRules, MailTagsViewModel mailTags, DeleteConfirmationsViewModel deleteConfirmations, Neruna.Core.ISettingsStore settingsStore) : ViewModelBase
 {
     /// <summary>Settings → Schlagwörter.</summary>
     public MailTagsViewModel MailTags => mailTags;
 
-    public const int MailTagsTab = 21;
 
     /// <summary>Opens Einstellungen → Schlagwörter ("Verwalten" in a mail's tag menu).</summary>
     public async Task ShowMailTagsAsync()
     {
-        SelectedTab = MailTagsTab;
+        Section = SettingsSection.MailTags;
         await MailTags.ReloadAsync();
     }
 
     /// <summary>Settings → Serverregeln: the rules of every mail account in one place.</summary>
     public ServerRulesPageViewModel ServerRules => serverRules;
 
-    public const int ServerRulesTab = 20;
 
     /// <summary>Opens Einstellungen → Serverregeln on this account.</summary>
     public async Task ShowServerRulesAsync(Guid accountId)
     {
         _ruleAccount = accountId;
-        SelectedTab = ServerRulesTab;
+        Section = SettingsSection.ServerRules;
         if (_ruleAccount is { } id)
         {
             _ruleAccount = null;
@@ -40,7 +38,6 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     /// <summary>Settings → Programm → News: the devblog.</summary>
     public NewsViewModel News => news;
 
-    public const int NewsTab = 16;
 
     /// <summary>Settings → Workspaces.</summary>
     public WorkspacesViewModel Workspaces => workspaces;
@@ -48,22 +45,14 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     /// <summary>Settings → Profile.</summary>
     public ProfilesViewModel Profiles => profiles;
 
-    /// <summary>Profiles share the page with the workspaces.</summary>
-    public const int ProfilesTab = WorkspacesTab;
 
-    /// <summary>«Integration»: default mail program, sending from other programs.</summary>
-    public const int IntegrationTab = 23;
 
-    /// <summary>«Daten»: backup, search index, the local database and the data and log folders on one page.</summary>
-    public const int DataTab = 10;
 
-    /// <summary>Index of the «Workspaces» tab (the switcher's "Workspaces verwalten").</summary>
-    public const int WorkspacesTab = 15;
 
     /// <summary>Opens Einstellungen → Workspaces.</summary>
     public void ShowWorkspaces()
     {
-        SelectedTab = WorkspacesTab;
+        Section = SettingsSection.Workspaces;
         Profiles.Reload();
         _ = Workspaces.ReloadAsync();
     }
@@ -76,6 +65,9 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
 
     /// <summary>Settings → Daten → Lokale Daten.</summary>
     public LocalDataViewModel LocalData => localData;
+
+    /// <summary>"Vor dem Löschen fragen" (Daten).</summary>
+    public DeleteConfirmationsViewModel DeleteConfirmations => deleteConfirmations;
 
     /// <summary>Settings → E-Mail → Suchindex.</summary>
     public SearchIndexViewModel SearchIndex => searchIndex;
@@ -92,13 +84,10 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     /// <summary>Settings → Besprechungen: Teams, Zoom, Jitsi.</summary>
     public MeetingsOptionsViewModel Meetings => meetings;
 
-    /// <summary>Index of the «Besprechungen» tab.</summary>
-    public const int MeetingsTab = 18;
 
     /// <summary>Settings → PDF: stamps and passwords for PDF attachments.</summary>
     public PdfOptionsViewModel Pdf => pdf;
 
-    public const int PdfTab = 19;
 
     /// <summary>Settings → Info: crash reports.</summary>
     public CrashReportsOptionsViewModel CrashReports => crashReports;
@@ -127,48 +116,46 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
 
     public AppearanceViewModel Appearance { get; } = appearance;
 
-    /// <summary>Index of the «Cloud» tab (the chat sends people there to connect).</summary>
-    public const int CloudTab = 7;
 
-    /// <summary>«Über Neruna»: the settings open on it (first in the list).</summary>
-    public const int AboutTab = 9;
 
+    /// <summary>The page shown; opening the settings shows the one used last (the first time «Konten»).</summary>
     [ObservableProperty]
-    public partial int SelectedTab { get; set; } = AboutTab;
+    public partial SettingsSection Section { get; set; } = SettingsSection.Accounts;
 
     /// <summary>
-    /// The list on the left: areas, the mail ones under a heading. <see cref="SettingsNavItem.Tab"/> keeps the old tab
-    /// numbers, so jumps into the settings (e.g. to <see cref="CloudTab"/>) keep working.
+    /// The list on the left: the pages most people need first (accounts, mail, calendar), the rarely used ones
+    /// («Erweitert», «Über Neruna») at the end. Headings group them.
     /// </summary>
     public static IReadOnlyList<SettingsNavItem> Navigation { get; } =
     [
-        new(-1, T("Programm"), null, IsHeading: true),
-        new(AboutTab, T("Über Neruna"), "IconInfo"),
-        new(NewsTab, T("News"), "IconRss"),
-        new(6, T("Darstellung"), "IconPalette"),
-        new(WorkspacesTab, T("Profile und Workspaces"), "IconWorkspaces"),
-        new(8, T("KI"), "IconAi"),
-        .. MailOptionsViewModel.CanBeDefaultApp || MailOptionsViewModel.CanOfferMapi ? [new SettingsNavItem(IntegrationTab, T("Integration"), "IconLink")] : Array.Empty<SettingsNavItem>(),
-        new(-1, T("Konten"), null, IsHeading: true),
-        new(0, T("Konten"), "IconPeople"),
-        new(ServerRulesTab, T("Serverregeln"), "IconInbox"),
-        new(7, T("Neruna Cloud"), "IconCloud"),
-        new(-1, T("E-Mail"), null, IsHeading: true),
-        new(1, T("Allgemein"), "IconMail"),
-        new(17, T("Schreiben"), "IconEdit"),
-        new(3, T("Signaturen"), "IconSignature"),
-        new(4, T("Textvorlagen"), "IconTextTemplate"),
-        new(MailTagsTab, T("Schlagwörter"), "IconTag"),
-        new(11, T("Schnellaktionen"), "IconFlash"),
-        new(-1, T("Sicherheit"), null, IsHeading: true),
-        new(14, T("Datenschutz"), "IconShield"),
-        new(5, T("Zertifikate (S/MIME)"), "IconCertificate"),
-        new(PdfTab, "PDF", "IconLock"),
-        new(-1, T("Kalender"), null, IsHeading: true),
-        new(2, T("Kalender"), "IconCalendar"),
-        new(MeetingsTab, T("Besprechungen"), "IconVideo"),
-        new(-1, T("Daten"), null, IsHeading: true),
-        new(DataTab, T("Daten"), "IconArchive"),
+        new(SettingsSection.Accounts, T("Konten"), "IconPeople"),
+        new(SettingsSection.Cloud, T("Neruna Cloud"), "IconCloud"),
+        SettingsNavItem.Heading(T("E-Mail")),
+        new(SettingsSection.Mail, T("Allgemein"), "IconMail"),
+        new(SettingsSection.Compose, T("Schreiben"), "IconEdit"),
+        new(SettingsSection.Signatures, T("Signaturen"), "IconSignature"),
+        new(SettingsSection.TextTemplates, T("Textvorlagen"), "IconTextTemplate"),
+        new(SettingsSection.MailTags, T("Schlagwörter"), "IconTag"),
+        new(SettingsSection.QuickActions, T("Schnellaktionen"), "IconFlash"),
+        new(SettingsSection.ServerRules, T("Serverregeln"), "IconInbox"),
+        SettingsNavItem.Heading(T("Kalender")),
+        new(SettingsSection.Calendar, T("Kalender"), "IconCalendar"),
+        new(SettingsSection.Meetings, T("Besprechungen"), "IconVideo"),
+        SettingsNavItem.Gap,
+        new(SettingsSection.Appearance, T("Darstellung"), "IconPalette"),
+        SettingsNavItem.Heading(T("Sicherheit")),
+        new(SettingsSection.Privacy, T("Datenschutz"), "IconShield"),
+        new(SettingsSection.Certificates, T("Zertifikate (S/MIME)"), "IconCertificate"),
+        new(SettingsSection.Pdf, "PDF", "IconLock"),
+        SettingsNavItem.Gap,
+        new(SettingsSection.Data, T("Daten"), "IconArchive"),
+        SettingsNavItem.Heading(T("Erweitert")),
+        new(SettingsSection.Workspaces, T("Profile und Workspaces"), "IconWorkspaces"),
+        new(SettingsSection.Ai, T("KI"), "IconAi"),
+        .. MailOptionsViewModel.CanBeDefaultApp || MailOptionsViewModel.CanOfferMapi ? [new SettingsNavItem(SettingsSection.Integration, T("Integration"), "IconLink")] : Array.Empty<SettingsNavItem>(),
+        SettingsNavItem.Heading(T("Über Neruna")),
+        new(SettingsSection.About, T("Über Neruna"), "IconInfo"),
+        new(SettingsSection.News, T("News"), "IconRss"),
     ];
 
     /// <summary>An account has to be signed in again: "Konten" in the list carries a "!".</summary>
@@ -176,13 +163,38 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     public partial bool AccountsNeedSignIn { get; set; }
 
     [ObservableProperty]
-    public partial SettingsNavItem? SelectedNav { get; set; } = Navigation.First(n => n.Tab == AboutTab);
+    public partial SettingsNavItem? SelectedNav { get; set; } = Navigation[0];
 
-    partial void OnSelectedTabChanged(int value)
+    private bool _restoring;
+
+    partial void OnSectionChanged(SettingsSection value)
     {
-        if (SelectedNav?.Tab != value)
+        if (SelectedNav?.Section != value || SelectedNav.IsHeading)
         {
-            SelectedNav = Navigation.FirstOrDefault(n => n.Tab == value);
+            SelectedNav = Navigation.FirstOrDefault(n => !n.IsHeading && n.Section == value);
+        }
+
+        if (!_restoring)
+        {
+            _ = settingsStore.SetAsync(Neruna.Core.SettingKeys.SettingsPage, value.ToString());
+        }
+    }
+
+    /// <summary>The page used last (saved with each change), shown when Neruna starts.</summary>
+    public async Task RestoreSectionAsync()
+    {
+        if (Enum.TryParse<SettingsSection>(await settingsStore.GetAsync(Neruna.Core.SettingKeys.SettingsPage), out var last)
+            && Navigation.Any(n => !n.IsHeading && n.Section == last))
+        {
+            _restoring = true;
+            try
+            {
+                Section = last;
+            }
+            finally
+            {
+                _restoring = false;
+            }
         }
     }
 
@@ -190,36 +202,33 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     {
         if (value is { IsHeading: false } item)
         {
-            SelectedTab = item.Tab;
-            if (item.Tab == DataTab)
+            Section = item.Section;
+            switch (item.Section)
             {
-                _ = SearchIndex.ReloadAsync();
-                LocalData.ShowDatabaseSize();
-            }
-            else if (item.Tab == ServerRulesTab && _ruleAccount is null)
-            {
-                _ = ServerRules.LoadAsync();
-            }
-            else if (item.Tab == MailTagsTab)
-            {
-                _ = MailTags.ReloadAsync();
-            }
-            else if (item.Tab == PdfTab)
-            {
-                _ = Pdf.LoadAsync();
-            }
-            else if (item.Tab == MeetingsTab)
-            {
-                _ = Meetings.LoadAsync();
-            }
-            else if (item.Tab == NewsTab)
-            {
-                _ = News.ShowAsync();
-            }
-            else if (item.Tab == WorkspacesTab)
-            {
-                Profiles.Reload();
-                _ = Workspaces.ReloadAsync();
+                case SettingsSection.Data:
+                    _ = SearchIndex.ReloadAsync();
+                    LocalData.ShowDatabaseSize();
+                    _ = DeleteConfirmations.LoadAsync();
+                    break;
+                case SettingsSection.ServerRules when _ruleAccount is null:
+                    _ = ServerRules.LoadAsync();
+                    break;
+                case SettingsSection.MailTags:
+                    _ = MailTags.ReloadAsync();
+                    break;
+                case SettingsSection.Pdf:
+                    _ = Pdf.LoadAsync();
+                    break;
+                case SettingsSection.Meetings:
+                    _ = Meetings.LoadAsync();
+                    break;
+                case SettingsSection.News:
+                    _ = News.ShowAsync();
+                    break;
+                case SettingsSection.Workspaces:
+                    Profiles.Reload();
+                    _ = Workspaces.ReloadAsync();
+                    break;
             }
         }
     }
@@ -237,6 +246,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
 
     public async Task ReloadAsync()
     {
+        await RestoreSectionAsync();
         await Accounts.ReloadAsync();
         await MailOptions.ReloadAsync();
         await Privacy.ReloadAsync();
@@ -251,11 +261,43 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
     }
 }
 
-/// <summary>An entry of the settings navigation (or a heading over a group).</summary>
-internal sealed record SettingsNavItem(int Tab, string Title, string? IconKey, bool IsHeading = false, bool IsIndented = false)
+/// <summary>The pages of the settings, by name (jumps from elsewhere use these, not positions in the list).</summary>
+internal enum SettingsSection
 {
-    public Avalonia.Thickness Indent => IsIndented ? new Avalonia.Thickness(14, 0, 0, 0) : default;
+    Accounts,
+    Cloud,
+    Mail,
+    Compose,
+    Signatures,
+    TextTemplates,
+    MailTags,
+    QuickActions,
+    ServerRules,
+    Calendar,
+    Meetings,
+    Appearance,
+    Privacy,
+    Certificates,
+    Pdf,
+    Data,
+    Workspaces,
+    Ai,
+    Integration,
+    About,
+    News,
+}
+
+/// <summary>An entry of the settings navigation (or a heading over a group).</summary>
+internal sealed record SettingsNavItem(SettingsSection Section, string Title, string? IconKey, bool IsHeading = false)
+{
+    public static SettingsNavItem Heading(string title) => new(default, title, null, IsHeading: true);
+
+    /// <summary>Space between groups of one page each (a heading would only repeat the page's name).</summary>
+    public static SettingsNavItem Gap => new(default, string.Empty, null, IsHeading: true);
+
+    /// <summary>A heading with text (a gap has none and stays low).</summary>
+    public bool IsTitled => IsHeading && Title.Length > 0;
 
     /// <summary>The accounts page (where a "!" can show an account to sign in again).</summary>
-    public bool IsAccounts => Tab == 0;
+    public bool IsAccounts => !IsHeading && Section == SettingsSection.Accounts;
 }

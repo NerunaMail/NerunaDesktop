@@ -70,7 +70,12 @@
 
       <StackPanel Spacing="8">
         <TextBlock Text="{l:T 'Verfassen'}" FontSize="16" FontWeight="SemiBold" />
-        <TextBlock Classes="subtle" Text="{l:T 'Neue E-Mails, Antworten und Weiterleitungen öffnen'}" />
+        <TextBlock Classes="subtle" Text="{l:T 'Neue E-Mails öffnen'}" />
+        <StackPanel Orientation="Horizontal" Spacing="16">
+          <RadioButton GroupName="ComposeNewTarget" Content="{l:T 'Im Lesebereich'}" IsChecked="{Binding ComposeNewInline}" />
+          <RadioButton GroupName="ComposeNewTarget" Content="{l:T 'In eigenem Fenster'}" IsChecked="{Binding ComposeNewInWindow}" />
+        </StackPanel>
+        <TextBlock Classes="subtle" Text="{l:T 'Antworten und Weiterleitungen öffnen'}" />
         <StackPanel Orientation="Horizontal" Spacing="16">
           <RadioButton GroupName="ComposeTarget" Content="{l:T 'Im Lesebereich'}" IsChecked="{Binding ComposeInline}" />
           <RadioButton GroupName="ComposeTarget" Content="{l:T 'In eigenem Fenster'}" IsChecked="{Binding ComposeInWindow}" />

@@ -14,7 +14,8 @@ using static Neruna.Core.Localization.Texts;
 namespace Neruna.Desktop.ViewModels;
 
 /// <summary>
-/// "Konto hinzufügen": email + password → discovery → editable server settings → verify → save.
+/// "Konto hinzufügen": the address first – Neruna tells the provider (Microsoft, Google, Proton: their own way) or
+/// looks up the servers; "Manuell einrichten" offers the kinds of account. Then password → verify → save.
 /// The account is assembled through <see cref="AccountSetupService"/>, so every registered provider
 /// takes what it understands from the configuration (IMAP/SMTP, CalDAV, CardDAV).
 /// Leaving the IMAP server empty creates a calendar/contacts-only account.
@@ -43,6 +44,10 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         var (address, fromCloud) = await Neruna.Core.Mail.ReplyAddress.GetAsync(Settings, account);
         ReplyTo = address ?? string.Empty;
         IsReplyToFromCloud = fromCloud;
+        if (ReplyTo.Length > 0)
+        {
+            ShowAdvanced = true;
+        }
     }
 
     /// <summary>The user's own Antwortadresse (not when the organisation set one).</summary>
@@ -55,6 +60,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
 
         Error = F("«{0}» ist keine gültige E-Mail-Adresse.", ReplyTo.Trim());
+        ShowAdvanced = true;
         return false;
     }
 
@@ -69,17 +75,128 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     /// <summary>Set by the shell: picks a certificate file.</summary>
     public IFileService? Files { get; init; }
 
-    // ── Step 1 for a new account: which kind. Everything with IMAP/CalDAV/CardDAV is one choice (found automatically);
-    //    only providers that need their own sign-in are listed separately. ──
+    // ── Step 1 for a new account: the address (the provider is told from it), or "Manuell einrichten": which kind.
+    //    Everything with IMAP/CalDAV/CardDAV is one kind (found automatically); only providers with their own sign-in are separate. ──
 
-    /// <summary>"choose", "imap", "exchange", "proton", "nextcloud", "dav", "microsoft" or "google".</summary>
+    /// <summary>"address", "choose", "imap", "exchange", "proton", "nextcloud", "dav", "microsoft" or "google".</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsNextcloud), nameof(IsDav), nameof(IsMailForm), nameof(IsMicrosoft), nameof(IsGoogle), nameof(IsSignInStep), nameof(SignInText), nameof(SignInNote), nameof(ShowGoogleTesting), nameof(CanGoBack),
+    [NotifyPropertyChangedFor(nameof(IsAddressStep), nameof(IsChoosing), nameof(IsImap), nameof(IsExchange), nameof(IsProton), nameof(IsNextcloud), nameof(IsDav), nameof(IsMailForm), nameof(IsMicrosoft), nameof(IsGoogle), nameof(IsSignInStep), nameof(SignInText), nameof(SignInNote), nameof(ShowGoogleTesting), nameof(CanGoBack),
         nameof(Subtitle), nameof(NeedsPassword), nameof(PasswordLabel))]
     [NotifyCanExecuteChangedFor(nameof(CreateCommand), nameof(SaveDavCommand))]
-    public partial string Step { get; set; } = "choose";
+    public partial string Step { get; set; } = "address";
+
+    /// <summary>A new account starts here: only the address, and the ways around it (Neruna Cloud, manual setup).</summary>
+    public bool IsAddressStep => Step == "address";
 
     public bool IsChoosing => Step == "choose";
+
+    /// <summary>Reached through "Manuell einrichten": "Zurück" leads to the kinds again, not to the address.</summary>
+    private bool _viaChoice;
+
+    /// <summary>"Erweiterte Optionen" (Antwortadresse, aliases, any certificate): folded unless one of them is in use.</summary>
+    [ObservableProperty]
+    public partial bool ShowAdvanced { get; set; }
+
+    /// <summary>Set by the shell (replaceable in the snapshots): the mail servers (MX) of a domain.</summary>
+    public Func<string, CancellationToken, Task<IReadOnlyList<string>>>? LookupMailExchangers { get; init; } = SystemDavDns.Instance.MxAsync;
+
+    [RelayCommand]
+    private void ChooseManually()
+    {
+        Error = null;
+        _viaChoice = true;
+        Step = "choose";
+    }
+
+    /// <summary>
+    /// "Weiter" after the address: a known provider (by its domain, else by its mail servers) goes to its own sign-in or
+    /// the Bridge; the settings of the user's organisation win over that; everything else is looked up for IMAP.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanDiscover))]
+    private async Task DetectAsync()
+    {
+        Error = null;
+        var email = Email.Trim();
+        if (!DiscoveryPlaceholders.TrySplitAddress(email, out _, out var domain))
+        {
+            Error = T("Bitte eine gültige E-Mail-Adresse eingeben.");
+            return;
+        }
+
+        Email = email;
+        _viaChoice = false;
+        IsBusy = true;
+        BusyText = T("Suche Servereinstellungen …");
+        try
+        {
+            var host = MailHostRecognition.ByDomain(domain);
+            DiscoveryResult? found = null;
+            if (host == MailHost.Other)
+            {
+                found = await discovery.DiscoverAsync(email);
+                if (found?.OrganizationName is null && LookupMailExchangers is { } lookup)
+                {
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                    try
+                    {
+                        host = MailHostRecognition.ByMailExchangers(await lookup(domain, timeout.Token));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // No answer from the DNS: set up as an ordinary mail account.
+                    }
+                }
+            }
+
+            if (host == MailHost.Microsoft && MicrosoftAvailable)
+            {
+                Step = "microsoft";
+                return;
+            }
+
+            if (host == MailHost.Google && GoogleAvailable)
+            {
+                Step = "google";
+                return;
+            }
+
+            if (host == MailHost.Proton)
+            {
+                IsBusy = false;
+                await ChooseProtonAsync();
+                return;
+            }
+
+            if (found is null && host != MailHost.Other)
+            {
+                found = await discovery.DiscoverAsync(email); // a build without Microsoft's or Google's sign-in: IMAP, if they offer it
+            }
+
+            // Exchange without IMAP in the domain's configuration (e.g. from the organisation).
+            if (found?.Config.Ews is { } ews && found.Config.PreferredIncoming is null)
+            {
+                Step = "exchange";
+                ShowLinks(found.Config);
+                ExchangeServer = ews.ServerUrl.AbsoluteUri;
+                Username = DiscoveryPlaceholders.Expand(ews.UsernameTemplate, email);
+                ShowServerSettings = true;
+                await LoadCertificatesAsync(null);
+                return;
+            }
+
+            Step = "imap";
+            await ApplyDiscoveryAsync(email, domain, found);
+        }
+        catch (FormatException)
+        {
+            Error = T("Bitte eine gültige E-Mail-Adresse eingeben.");
+        }
+        finally
+        {
+            IsBusy = false;
+            BusyText = null;
+        }
+    }
 
     public bool IsImap => Step == "imap";
 
@@ -353,8 +470,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         }
     }
 
-    /// <summary>Back to the choice of kind: for a new account after choosing one.</summary>
-    public bool CanGoBack => !IsChoosing && !IsEditing;
+    /// <summary>Back to the address (or to the kinds, when one was chosen there): for a new account.</summary>
+    public bool CanGoBack => !IsAddressStep && !IsEditing;
 
     /// <summary>Microsoft 365 needs Neruna's app registration; without its client id the choice stays off.</summary>
     public bool MicrosoftAvailable => setup.CanSignIn(Neruna.Core.Providers.ProviderIds.Graph);
@@ -418,7 +535,12 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     {
         Error = null;
         ShowServerSettings = false;
-        Step = "choose";
+        if (IsChoosing)
+        {
+            _viaChoice = false;
+        }
+
+        Step = _viaChoice ? "choose" : "address";
     }
 
     /// <summary>
@@ -520,7 +642,9 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
 
     public string SaveText => IsEditing ? T("Speichern") : T("Konto hinzufügen");
 
-    public string Subtitle => IsChoosing && !IsEditing
+    public string Subtitle => IsAddressStep && !IsEditing
+        ? T("Geben Sie Ihre E-Mail-Adresse ein – Neruna erkennt den Anbieter und sucht die Einstellungen selbst.")
+        : IsChoosing && !IsEditing
         ? T("Welche Art von Konto möchten Sie einrichten?")
         : IsMicrosoft
             ? T("Mail, Kalender und Kontakte Ihres Microsoft-Kontos – angemeldet wird im Browser.")
@@ -569,6 +693,8 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             Aliases.Add(new AliasRow { Email = alias.Email, DisplayName = alias.DisplayName });
         }
 
+        ShowAdvanced = Aliases.Count > 0;
+
         Email = account.EmailAddress ?? string.Empty;
         _linkSettings = account.Connections.Select(c => c.Settings).FirstOrDefault(s => s.Keys.Any(k => k.StartsWith("provider.", StringComparison.Ordinal)))
             ?.Where(p => p.Key.StartsWith("provider.", StringComparison.Ordinal)).ToDictionary(p => p.Key, p => p.Value) ?? [];
@@ -600,6 +726,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
         CalDavUrl = config.CalDav?.ServerUrl.AbsoluteUri ?? string.Empty;
         CardDavUrl = config.CardDav?.ServerUrl.AbsoluteUri ?? string.Empty;
         AcceptAnyCertificate = account.Connections.Any(c => Neruna.Core.Security.TlsCertificates.AcceptsAnyCertificate(c.Settings));
+        ShowAdvanced |= AcceptAnyCertificate;
         if (ews is not null)
         {
             var settings = EwsConnectionFactory.SettingsOf(ews);
@@ -625,7 +752,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     }
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(DiscoverCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DiscoverCommand), nameof(DetectCommand))]
     public partial string Email { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -707,7 +834,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
     public partial string CardDavUrl { get; set; } = string.Empty;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(DiscoverCommand), nameof(CreateCommand), nameof(SaveDavCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DiscoverCommand), nameof(DetectCommand), nameof(CreateCommand), nameof(SaveDavCommand))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -731,31 +858,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
                 return;
             }
 
-            var result = await discovery.DiscoverAsync(email);
-            if (result is null)
-            {
-                DiscoverySource = null;
-                ImapHost = SmtpHost = "mail." + domain;
-                Username = email;
-                Error = T("Keine automatische Konfiguration gefunden. Bitte Serverdaten prüfen.");
-            }
-            else
-            {
-                Apply(result);
-            }
-
-            // Many SOGo/Nextcloud setups publish DAV only via /.well-known, not in autoconfig.
-            BusyText = T("Suche Kalender- und Kontaktdienst …");
-            string[] hosts = [domain, ImapHost.Trim()];
-            var caldav = CalDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "caldav", domain: domain) : null;
-            var carddav = CardDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "carddav", domain: domain) : null;
-            if (await AllowedAsync(caldav, carddav) is { } allowed)
-            {
-                CalDavUrl = allowed.Contains(caldav) ? caldav!.Url.AbsoluteUri : CalDavUrl;
-                CardDavUrl = allowed.Contains(carddav) ? carddav!.Url.AbsoluteUri : CardDavUrl;
-            }
-
-            ShowServerSettings = true;
+            await ApplyDiscoveryAsync(email, domain, await discovery.DiscoverAsync(email));
         }
         catch (FormatException)
         {
@@ -766,6 +869,35 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             IsBusy = false;
             BusyText = null;
         }
+    }
+
+    /// <summary>The found settings in the form (or a guess to check), then calendar and contacts looked for.</summary>
+    private async Task ApplyDiscoveryAsync(string email, string domain, DiscoveryResult? result)
+    {
+        if (result is null)
+        {
+            DiscoverySource = null;
+            ImapHost = SmtpHost = "mail." + domain;
+            Username = email;
+            Error = T("Keine automatische Konfiguration gefunden. Bitte Serverdaten prüfen.");
+        }
+        else
+        {
+            Apply(result);
+        }
+
+        // Many SOGo/Nextcloud setups publish DAV only via /.well-known, not in autoconfig.
+        BusyText = T("Suche Kalender- und Kontaktdienst …");
+        string[] hosts = [domain, ImapHost.Trim()];
+        var caldav = CalDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "caldav", domain: domain) : null;
+        var carddav = CardDavUrl.Length == 0 ? await DavProbe.FindAsync(davProbeClient, hosts, "carddav", domain: domain) : null;
+        if (await AllowedAsync(caldav, carddav) is { } allowed)
+        {
+            CalDavUrl = allowed.Contains(caldav) ? caldav!.Url.AbsoluteUri : CalDavUrl;
+            CardDavUrl = allowed.Contains(carddav) ? carddav!.Url.AbsoluteUri : CardDavUrl;
+        }
+
+        ShowServerSettings = true;
     }
 
     /// <summary>
@@ -911,6 +1043,7 @@ internal sealed partial class AccountSetupViewModel(AccountDiscovery discovery, 
             if (!MimeKit.MailboxAddress.TryParse(address, out var parsed) || parsed.Address != address || !address.Contains('@', StringComparison.Ordinal))
             {
                 Error = F("«{0}» ist keine gültige E-Mail-Adresse.", address);
+                ShowAdvanced = true;
                 return;
             }
 

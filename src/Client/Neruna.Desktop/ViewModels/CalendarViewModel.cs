@@ -10,7 +10,7 @@ using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
-/// <summary>Week view across all calendars, whatever provider they come from.</summary>
+/// <summary>Week (or day, or month) view across all calendars, whatever provider they come from.</summary>
 internal sealed partial class CalendarViewModel(CalendarController calendar, TaskController tasks, InvitationService invitations, ISettingsStore settings,
     Infrastructure.RecipientDirectory recipients, Neruna.Core.Workspaces.WorkspaceService workspaces, Neruna.Core.Meetings.MeetingController meetings, CalendarCategoryService categories) : ViewModelBase, ICollectionListHost
 {
@@ -96,11 +96,72 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
     public bool IsListLayout => !IsTimeGrid;
 
-    /// <summary>Days shown (toolbar "7 Tage", "Mo–Fr", "1 Tag"): 7, 5 or 1.</summary>
+    /// <summary><see cref="ShownDays"/> for the month (toolbar "Monat"); also the value kept in the settings.</summary>
+    internal const int MonthDays = 31;
+
+    /// <summary>Days shown (toolbar "7 Tage", "Mo–Fr", "1 Tag", "Monat"): 7, 5, 1 or <see cref="MonthDays"/>.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DayCount), nameof(RangeTitle), nameof(IsFullWeek), nameof(IsWorkWeek), nameof(IsSingleDay),
-        nameof(PreviousTip), nameof(NextTip))]
+    [NotifyPropertyChangedFor(nameof(DayCount), nameof(RangeTitle), nameof(IsFullWeek), nameof(IsWorkWeek), nameof(IsSingleDay), nameof(IsMonth),
+        nameof(PreviousTip), nameof(NextTip), nameof(ShowTimeGrid), nameof(ShowList), nameof(ShowMonth), nameof(ShowPlanning))]
     public partial int ShownDays { get; set; } = 7;
+
+    /// <summary>The month as a grid of weeks (whole weeks from the Monday before the 1st); <see cref="WeekStart"/> is the 1st.</summary>
+    public bool IsMonth
+    {
+        get => ShownDays == MonthDays && !HasChosenDays;
+        set
+        {
+            if (value)
+            {
+                ShowSpan(MonthDays);
+            }
+            else
+            {
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    // Height of the month's grid (set by the view): how many events fit into a day.
+    private double _monthHeight = 600;
+
+    /// <summary>Events per day in the month before "+N weitere": as many lines of 20 px as a week's row has room for.</summary>
+    private int MonthEventLimit => Math.Max(1, (int)((_monthHeight - 30) / Math.Max(1, MonthDates(WeekStart).Count / 7) - 30) / 20);
+
+    /// <summary>The month's grid changed its height: the days are filled again when another number of events fits.</summary>
+    public Task SetMonthHeightAsync(double height)
+    {
+        var before = MonthEventLimit;
+        _monthHeight = height;
+        return IsMonth && MonthEventLimit != before ? LoadWeekAsync() : Task.CompletedTask;
+    }
+
+    /// <summary>Weekday names above the month (Mo, Di …).</summary>
+    public static IReadOnlyList<string> MonthWeekdays { get; } =
+        [.. Enumerable.Range(1, 7).Select(d => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName((DayOfWeek)(d % 7)))];
+
+    /// <summary>The weeks of the month shown (4 to 6): the rows of its grid.</summary>
+    public int MonthRows => IsMonth ? Math.Max(1, ShownDates.Count / 7) : 1;
+
+    /// <summary>A day of the month (its number, "+N weitere") opens it on its own.</summary>
+    [RelayCommand]
+    private Task ShowDayAsync(DateTime date)
+    {
+        _previewDays = null;
+        SetChosenDays(null);
+        if (ShownDays == 1)
+        {
+            WeekStart = date.Date;
+            return LoadWeekAsync();
+        }
+
+        _jumpTo = date.Date;
+        ShownDays = 1;
+        return Task.CompletedTask;
+    }
+
+    // The day a change of span should show (a day of the month opened), instead of today or the period's start.
+    private DateTime? _jumpTo;
 
     public bool IsFullWeek
     {
@@ -150,11 +211,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         }
     }
 
-    public int DayCount => _chosenDays?.Count ?? ShownDays;
+    public int DayCount => _chosenDays?.Count ?? (ShownDays == MonthDays ? 7 : ShownDays);
 
-    public string PreviousTip => IsSingleDay ? T("Vorheriger Tag") : T("Vorherige Woche");
+    public string PreviousTip => IsSingleDay ? T("Vorheriger Tag") : IsMonth ? T("Vorheriger Monat") : T("Vorherige Woche");
 
-    public string NextTip => IsSingleDay ? T("Nächster Tag") : T("Nächste Woche");
+    public string NextTip => IsSingleDay ? T("Nächster Tag") : IsMonth ? T("Nächster Monat") : T("Nächste Woche");
 
     // ---- Days chosen in the navigator (drag over them, Ctrl+click): any days instead of the week ------------------
 
@@ -165,7 +226,10 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     public bool HasChosenDays => _chosenDays is not null;
 
     /// <summary>The days on screen, in order: the chosen ones, or the week (or day) as usual.</summary>
-    public IReadOnlyList<DateTime> ShownDates => _chosenDays ?? [.. Enumerable.Range(0, ShownDays).Select(i => WeekStart.AddDays(i))];
+    public IReadOnlyList<DateTime> ShownDates => _chosenDays ?? (ShownDays == MonthDays ? MonthDates(WeekStart)
+        : [.. Enumerable.Range(0, ShownDays).Select(i => WeekStart.AddDays(i))]);
+
+    internal static IReadOnlyList<DateTime> MonthDates(DateTime first) => CalendarMonth.Dates(first);
 
     /// <summary>Shows these days (any, also from two months) – as columns, list or planning, whatever is chosen.</summary>
     public Task ShowChosenDaysAsync(IEnumerable<DateTime> days)
@@ -198,8 +262,13 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         OnPropertyChanged(nameof(IsFullWeek));
         OnPropertyChanged(nameof(IsWorkWeek));
         OnPropertyChanged(nameof(IsSingleDay));
+        OnPropertyChanged(nameof(IsMonth));
         OnPropertyChanged(nameof(PreviousTip));
         OnPropertyChanged(nameof(NextTip));
+        OnPropertyChanged(nameof(ShowTimeGrid));
+        OnPropertyChanged(nameof(ShowList));
+        OnPropertyChanged(nameof(ShowMonth));
+        OnPropertyChanged(nameof(ShowPlanning));
     }
 
     // "7 Tage", "Mo–Fr", "1 Tag" after chosen days: from the first of them.
@@ -211,7 +280,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             SetChosenDays(null);
             if (ShownDays == days)
             {
-                WeekStart = days == 1 ? first : StartOfWeek(first);
+                WeekStart = days == 1 ? first : days == MonthDays ? FirstOfMonth(first) : StartOfWeek(first);
                 _ = LoadWeekAsync();
                 return;
             }
@@ -224,10 +293,13 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
     partial void OnShownDaysChanged(int oldValue, int newValue)
     {
-        // One day: today if it is in the week shown, otherwise the week's first day; back to a week: the day's week.
-        WeekStart = newValue == 1
-            ? (DateTime.Today >= WeekStart && DateTime.Today < WeekStart.AddDays(oldValue) ? DateTime.Today : WeekStart)
-            : StartOfWeek(WeekStart);
+        // One day: today if it is in the period shown, otherwise its first day; a week: that day's week; the month: its month.
+        var periodEnd = oldValue == MonthDays ? FirstOfMonth(WeekStart).AddMonths(1) : WeekStart.AddDays(oldValue);
+        var anchor = _jumpTo ?? (DateTime.Today >= WeekStart && DateTime.Today < periodEnd ? DateTime.Today : WeekStart);
+        _jumpTo = null;
+        WeekStart = newValue == 1 ? anchor
+            : newValue == MonthDays ? FirstOfMonth(anchor)
+            : StartOfWeek(anchor);
         if (!_loadingSettings)
         {
             _ = settings.SetAsync(SettingKeys.CalendarDays, newValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -319,6 +391,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
                 return $"{WeekStart:dddd, d. MMMM yyyy}";
             }
 
+            if (IsMonth)
+            {
+                return $"{WeekStart:MMMM yyyy}";
+            }
+
             var end = WeekStart.AddDays(DayCount - 1);
             return WeekStart.Month == end.Month
                 ? $"{WeekStart:d.}–{end:d. MMMM yyyy}"
@@ -353,7 +430,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         NavigatorMonthCount = int.TryParse(await settings.GetAsync(SettingKeys.CalendarNavigatorMonths), out var months) && months is 1 or 2 ? months : 1;
         IsTimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) != "list"; // default: time grid
         _loadingSettings = true;
-        ShownDays = int.TryParse(await settings.GetAsync(SettingKeys.CalendarDays), out var days) && days is 7 or 5 or 1 ? days
+        ShownDays = int.TryParse(await settings.GetAsync(SettingKeys.CalendarDays), out var days) && days is 7 or 5 or 1 or MonthDays ? days
             : await settings.GetBoolAsync(SettingKeys.CalendarWorkWeek) ? 5 : 7;
         IsPlanning = await settings.GetBoolAsync(SettingKeys.CalendarPlanning);
         PlanningPeopleText = await settings.GetAsync(SettingKeys.CalendarPlanningPeople) ?? string.Empty;
@@ -501,7 +578,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             return ShowChosenDaysAsync(chosen.Select(d => d.AddDays(-7))); // the same days a week earlier
         }
 
-        WeekStart = WeekStart.AddDays(IsSingleDay ? -1 : -7);
+        WeekStart = IsMonth ? WeekStart.AddMonths(-1) : WeekStart.AddDays(IsSingleDay ? -1 : -7);
         return LoadWeekAsync();
     }
 
@@ -513,7 +590,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             return ShowChosenDaysAsync(chosen.Select(d => d.AddDays(7)));
         }
 
-        WeekStart = WeekStart.AddDays(IsSingleDay ? 1 : 7);
+        WeekStart = IsMonth ? WeekStart.AddMonths(1) : WeekStart.AddDays(IsSingleDay ? 1 : 7);
         return LoadWeekAsync();
     }
 
@@ -521,7 +598,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     private Task TodayAsync()
     {
         SetChosenDays(null);
-        WeekStart = IsSingleDay ? DateTime.Today : StartOfWeek(DateTime.Today);
+        WeekStart = IsSingleDay ? DateTime.Today : IsMonth ? FirstOfMonth(DateTime.Today) : StartOfWeek(DateTime.Today);
         return LoadWeekAsync();
     }
 
@@ -539,13 +616,13 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         return RefreshNavigatorAsync();
     }
 
-    /// <summary>Clicking a day (or a week number) in the navigator shows that week – or, showing one day, that day.</summary>
+    /// <summary>Clicking a day (or a week number) in the navigator shows that week – or, showing one day or the month, that day or month.</summary>
     [RelayCommand]
     private Task SelectDayAsync(DateTime date)
     {
         SetChosenDays(null);
         _previewDays = null;
-        WeekStart = IsSingleDay ? date.Date : StartOfWeek(date);
+        WeekStart = IsSingleDay ? date.Date : IsMonth ? FirstOfMonth(date) : StartOfWeek(date);
         return LoadWeekAsync();
     }
 
@@ -973,9 +1050,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var draft = EventDraft.FromICalendar(stored.ICalendarData);
         var me = (await calendar.GetSourcesAsync()).FirstOrDefault(s => s.Connection.Id == occurrence.Calendar.ConnectionId)?.Account.EmailAddress;
         var isOrganizer = draft.Organizer is null || string.Equals(draft.Organizer, me, StringComparison.OrdinalIgnoreCase);
-        var question = !isOrganizer ? T("Löschen und absagen?")
-            : (draft.Attendees ?? []).Any(a => !string.Equals(a.Email, draft.Organizer, StringComparison.OrdinalIgnoreCase)) ? T("Löschen und Absage an alle?")
-            : T("Wirklich löschen?");
+        var hasAttendees = (draft.Attendees ?? []).Any(a => !string.Equals(a.Email, draft.Organizer, StringComparison.OrdinalIgnoreCase));
         var title = F("«{0}» löschen", string.IsNullOrWhiteSpace(item.Title) ? T("Termin") : item.Title);
         bool? onlyThis = false;
         if (occurrence.RecurrenceId is not null)
@@ -987,8 +1062,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             }
         }
 
-        if (onlyThis == false && !await Views.ChoiceDialog.ShowInFrontAsync(title, (occurrence.RecurrenceId is null ? string.Empty : T("Die ganze Serie wird gelöscht.") + "\n\n") + question,
-                (T("Löschen"), true, false), (T("Abbrechen"), false, true)))
+        // One occurrence of a series: choosing "Nur diesen Termin" was the question.
+        if (onlyThis == false && !await EventEditorViewModel.AskDeleteAsync(item.Title, isOrganizer, hasAttendees, wholeSeries: occurrence.RecurrenceId is not null))
         {
             return;
         }
@@ -1073,6 +1148,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         }
 
         Days.Clear();
+        var month = IsMonth ? WeekStart.Month : (int?)null;
         foreach (var day in dates)
         {
             var events = occurrences
@@ -1081,8 +1157,10 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
                 .ThenBy(o => o.Start)
                 .Select(o => new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0], known))
                 .ToList();
-            Days.Add(new CalendarDay(day, events));
+            Days.Add(new CalendarDay(day, events, month is { } m && day.Month != m, MonthEventLimit));
         }
+
+        OnPropertyChanged(nameof(MonthRows));
 
         BuildPlanning(occurrences);
 
@@ -1134,7 +1212,9 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         for (var i = 0; i < count; i++)
         {
             MiniMonths[i].Show(NavigatorMonth.AddMonths(i), i == 0, StartOfWeek(WeekStart), _busyDays,
-                _previewDays ?? (_chosenDays is { } chosen ? chosen.ToHashSet() : null));
+                _previewDays ?? (_chosenDays is { } chosen ? chosen.ToHashSet()
+                    : IsMonth ? Enumerable.Range(0, DateTime.DaysInMonth(WeekStart.Year, WeekStart.Month)).Select(d => FirstOfMonth(WeekStart).AddDays(d)).ToHashSet()
+                    : null));
         }
     }
 
@@ -1175,6 +1255,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     }
 
     internal static DateTime StartOfWeek(DateTime date) => date.Date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
+
+    internal static DateTime FirstOfMonth(DateTime date) => new(date.Year, date.Month, 1);
 }
 
 /// <summary>The calendars of one account in "Meine Kalender", under the account's name.</summary>
@@ -1207,9 +1289,24 @@ internal sealed class CalendarListItem(CalendarInfo info, string color) : Collec
     public override string SoloTip => IsSolo ? T("Wieder alle ausgewählten Kalender anzeigen") : T("Nur diesen Kalender anzeigen");
 }
 
-internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem> events)
+/// <param name="isOtherMonth">In the month view: a day of the month before or after (shown faint).</param>
+/// <param name="monthLimit">In the month view: events shown in the cell before "+N weitere".</param>
+internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem> events, bool isOtherMonth = false, int monthLimit = 4)
 {
     public DateTime Date { get; } = date;
+
+    public bool IsOtherMonth { get; } = isOtherMonth;
+
+    /// <summary>Month view: the day's number ("1. Dez" on the 1st).</summary>
+    public string MonthDayText => Date.Day == 1 ? Date.ToString("d. MMM", CultureInfo.CurrentCulture) : Date.Day.ToString(CultureInfo.CurrentCulture);
+
+    /// <summary>Month view: the first events of the day (all-day first, then by time); one line is left for "+N weitere" when more.</summary>
+    public IReadOnlyList<CalendarEventItem> MonthEvents { get; } =
+        events.Count <= Math.Max(1, monthLimit) ? events : [.. events.Take(Math.Max(1, monthLimit) - 1)];
+
+    public bool HasMoreEvents => MonthEvents.Count < Events.Count;
+
+    public string MoreEventsText => F("+{0} weitere", Events.Count - MonthEvents.Count);
 
     /// <summary>Time grid: all-day events in the row on top …</summary>
     public IReadOnlyList<CalendarEventItem> AllDayEvents { get; } = events.Where(e => e.Occurrence.IsAllDay).ToList();
@@ -1246,6 +1343,11 @@ internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string co
     public string TimeText => Occurrence.IsAllDay
         ? T("Ganztägig")
         : $"{Occurrence.Start.LocalDateTime:HH:mm}–{Occurrence.End.LocalDateTime:HH:mm}";
+
+    /// <summary>Month view: the start time only (none for all-day events, which show as a coloured bar).</summary>
+    public string StartText => Occurrence.IsAllDay ? string.Empty : $"{Occurrence.Start.LocalDateTime:HH:mm}";
+
+    public bool IsAllDay => Occurrence.IsAllDay;
 
     /// <summary>The colours of the event's categories (known ones, in the order of the settings).</summary>
     public IReadOnlyList<IBrush> CategoryBrushes { get; } = [.. CalendarCategoryService.Of(occurrence.Categories, categories ?? []).Select(c => Avalonia.Media.Brush.Parse(c.Color))];

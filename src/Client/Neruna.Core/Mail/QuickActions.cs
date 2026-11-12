@@ -143,7 +143,7 @@ public sealed record QuickAction(Guid Id, string Label, string Color, QuickActio
     /// <summary>Shortcuts Neruna itself uses while reading and writing – not for actions.</summary>
     public static IReadOnlySet<string> ReservedShortcuts { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "Ctrl+N", "Ctrl+R", "Ctrl+Shift+R", "Ctrl+F", "Ctrl+Q", "Ctrl+E", "Ctrl+S", "Ctrl+Enter", "Ctrl+C", "Ctrl+V", "Ctrl+X",
+        "Ctrl+N", "Ctrl+R", "Ctrl+Shift+R", "Ctrl+F", "Ctrl+L", "Ctrl+Q", "Ctrl+E", "Ctrl+S", "Ctrl+Enter", "Ctrl+C", "Ctrl+V", "Ctrl+X",
         "Ctrl+A", "Ctrl+Z", "Ctrl+Y", "Ctrl+P", "Ctrl+B", "Ctrl+I", "Ctrl+U", "Ctrl+K", "Delete", "F1", "F5", "Alt+F4",
     };
 }

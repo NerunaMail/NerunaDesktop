@@ -10,8 +10,74 @@
              x:DataType="vm:ComposeViewModel">
 
 
+  <UserControl.KeyBindings>
+    <!-- In the fields (the text itself reports Ctrl+S on its own) -->
+    <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveDraftCommand}" />
+  </UserControl.KeyBindings>
+
+  <UserControl.Resources>
+    <ControlTheme x:Key="TemplateMenuItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:TextTemplateMenuItem">
+      <Setter Property="Header" Value="{Binding Title}" />
+      <Setter Property="Command" Value="{Binding Command}" />
+      <Setter Property="CommandParameter" Value="{Binding Template}" />
+    </ControlTheme>
+    <ControlTheme x:Key="SignatureMenuItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SignatureMenuItem">
+      <Setter Property="Header" Value="{Binding Title}" />
+      <Setter Property="Command" Value="{Binding Command}" />
+      <Setter Property="CommandParameter" Value="{Binding Signature}" />
+    </ControlTheme>
+  </UserControl.Resources>
+
   <UserControl.Styles>
-    <!-- "Wirklich?" after the first click on Verwerfen -->
+    <!-- Von / An / Cc / Bcc / Betreff -->
+    <Style Selector="TextBlock.fieldLabel">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,12,0" />
+      <Setter Property="MinWidth" Value="44" />
+    </Style>
+    <!-- The contact picker beside a recipient field, and "Cc" / "Bcc" to show those fields -->
+    <Style Selector="Button.pick">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="6" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Margin" Value="4,3,0,3" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.pick PathIcon">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+    </Style>
+    <Style Selector="Button.field">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Margin" Value="2,3,0,3" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- "Signiert", "Verschlüsselt" beside the actions -->
+    <Style Selector="Border.badge">
+      <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="7,3" />
+    </Style>
+    <Style Selector="Border.badge TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.badge PathIcon">
+      <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+    </Style>
+    <Style Selector="Border.badge.warn">
+      <Setter Property="Background" Value="{DynamicResource WarnBackgroundBrush}" />
+    </Style>
+    <Style Selector="Border.badge.warn TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
+    </Style>
+    <Style Selector="Border.badge.warn PathIcon">
+      <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}" />
+    </Style>
     <!-- Signieren / Verschlüsseln: like the other buttons; switched on with the accent tint -->
     <Style Selector="ToggleButton.tool">
       <Setter Property="Background" Value="Transparent" />
@@ -22,146 +88,251 @@
       <Setter Property="Background" Value="{DynamicResource TodayBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     </Style>
-    <Style Selector="Button.tool.confirm">
-      <Setter Property="Foreground" Value="#C42B1C" />
-    </Style>
   </UserControl.Styles>
 
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnDefinitions="70,*" Margin="20,14,20,12">
+  <!-- Columns: labels · fields (all ending at the same place) · address book, Cc and Bcc behind the fields -->
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnDefinitions="Auto,*,Auto" Margin="20,14,20,12">
 
-    <!-- Actions -->
-    <Grid Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-      <!-- Big: Senden and Anhängen with their text. Beside them the small tools in groups; a narrow window wraps only
-           these (they never go below the big ones). -->
-      <ctl:SplitToolbar>
-        <WrapPanel Orientation="Horizontal" LineSpacing="2" ItemSpacing="4" VerticalAlignment="Top">
-            <Button Classes="accent" Command="{Binding SendCommand}" HotKey="Ctrl+Enter" ToolTip.Tip="{l:T 'Senden (Ctrl+Enter)'}" VerticalAlignment="Stretch"
-                    Padding="{Binding Preferences.ToolbarLabels, FallbackValue=True, Converter={x:Static views:ComposeView.SendPadding}}" MinWidth="64">
-              <StackPanel>
-                <PathIcon Data="{StaticResource IconSend}" Width="18" Height="18" HorizontalAlignment="Center" />
-                <TextBlock Text="{l:T 'Senden'}" FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,0" IsVisible="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-              </StackPanel>
-            </Button>
-            <ctl:ToolButton Icon="{StaticResource IconAttach}" Label="{l:T 'Anhängen'}" Hint="{l:T 'Datei anhängen'}" Command="{Binding AddAttachmentCommand}"
-                            ShowLabel="{Binding Preferences.ToolbarLabels, FallbackValue=True}" />
-        </WrapPanel>
-        <WrapPanel Orientation="Horizontal" ItemSpacing="0" LineSpacing="2" VerticalAlignment="Center" Margin="6,0,0,0">
-          <WrapPanel Orientation="Horizontal" ItemSpacing="1" LineSpacing="2">
-              <ctl:ToolButton Icon="{StaticResource IconUndo}" Label="{l:T 'Rückgängig'}" Shortcut="Ctrl+Z" Command="{Binding UndoCommand}" Compact="True" ShowLabel="False" />
-              <ctl:ToolButton Icon="{StaticResource IconRedo}" Label="{l:T 'Wiederherstellen'}" Hint="{l:T 'Wiederherstellen: rückgängig Gemachtes wieder ausführen (Ctrl+Y)'}" Command="{Binding RedoCommand}" Compact="True" ShowLabel="False" />
-          </WrapPanel>
-          <Border Classes="toolGroup">
-            <WrapPanel Orientation="Horizontal" ItemSpacing="1" LineSpacing="2">
-                <ctl:ToolToggleButton Icon="{StaticResource IconCertificate}" Label="{l:T 'Signieren'}" Hint="{Binding SignHint}" IsChecked="{Binding Sign}" IsVisible="{Binding CanSign}" Compact="True" ShowLabel="False" />
-                <ctl:ToolToggleButton Icon="{StaticResource IconLock}" Label="{l:T 'Verschlüsseln'}" Hint="{Binding EncryptHint}" IsChecked="{Binding Encrypt}" IsVisible="{Binding ShowEncrypt}"
-                                      Compact="True" ShowLabel="False" />
-            </WrapPanel>
-          </Border>
-          <Border Classes="toolGroup">
-            <WrapPanel Orientation="Horizontal" ItemSpacing="1" LineSpacing="2">
-                <!-- Termin: an event for this mail, the recipients as attendees (ComposeViewModel.Appointment) -->
-                <ctl:ToolButton Icon="{StaticResource IconCalendar}" Label="{l:T 'Termin'}" Hint="{l:T 'Termin zu dieser E-Mail erstellen – die Empfänger werden eingeladen'}"
-                                Command="{Binding MakeAppointmentCommand}" IsVisible="{Binding CanMakeAppointment}" Compact="True" ShowLabel="False" />
-                <!-- Terminumfrage: a poll with the recipients as invitees, its link into the text (ComposeViewModel.Poll) -->
-                <ctl:ToolButton Icon="{StaticResource IconPoll}" Label="{l:T 'Terminumfrage'}" Hint="{l:T 'Terminumfrage erstellen und den Link einfügen – die Empfänger wählen, welche Termine passen'}"
-                                Command="{Binding MakePollCommand}" IsVisible="{Binding CanMakePoll}" Compact="True" ShowLabel="False" />
-                <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
-                <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="{l:T 'Textvorlage'}" Hint="{l:T 'Textvorlage an der Cursorposition einfügen – oder «kürzel::» bzw. «kürzel» + Tab tippen'}"
-                                IsEnabled="{Binding HasTemplates}" Compact="True" ShowLabel="False">
-                  <ctl:ToolButton.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding TemplateMenu}">
-                      <MenuFlyout.ItemContainerTheme>
-                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:TextTemplateMenuItem">
-                          <Setter Property="Header" Value="{Binding Title}" />
-                          <Setter Property="Command" Value="{Binding Command}" />
-                          <Setter Property="CommandParameter" Value="{Binding Template}" />
-                        </ControlTheme>
-                      </MenuFlyout.ItemContainerTheme>
-                    </MenuFlyout>
-                  </ctl:ToolButton.Flyout>
-                </ctl:ToolButton>
-                <!-- Signatur: swap or remove the signature in the text -->
-                <ctl:ToolButton Icon="{StaticResource IconSignature}" Label="{l:T 'Signatur'}" Hint="{l:T 'Signatur einfügen oder wechseln'}" IsVisible="{Binding Formatting.IsRichText}"
-                                Compact="True" ShowLabel="False">
-                  <ctl:ToolButton.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding SignatureMenu}">
-                      <MenuFlyout.ItemContainerTheme>
-                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SignatureMenuItem">
-                          <Setter Property="Header" Value="{Binding Title}" />
-                          <Setter Property="Command" Value="{Binding Command}" />
-                          <Setter Property="CommandParameter" Value="{Binding Signature}" />
-                        </ControlTheme>
-                      </MenuFlyout.ItemContainerTheme>
-                    </MenuFlyout>
-                  </ctl:ToolButton.Flyout>
-                </ctl:ToolButton>
-                <!-- KI: the bar above the text ("Schreiben", "Verbessern" …), only with a connected AI -->
-                <ctl:ToolToggleButton Icon="{StaticResource IconAi}" Label="{l:T 'KI'}" Hint="{l:T 'Mit KI schreiben oder überarbeiten'}"
-                                      IsChecked="{Binding Ai.IsOpen, FallbackValue=False}" IsVisible="{Binding Ai.Available, FallbackValue=False}"
-                                      Compact="True" ShowLabel="False" />
-            </WrapPanel>
-          </Border>
-          <Border Classes="toolGroup">
-            <WrapPanel Orientation="Horizontal" ItemSpacing="1" LineSpacing="2">
-                <!-- Optionen: delivery and read receipt for this mail -->
-                <ctl:ToolButton Icon="{StaticResource IconSettings}" Label="{l:T 'Optionen'}" Hint="{l:T 'Übermittlungs- und Lesebestätigung'}"
-                                Compact="True" ShowLabel="False">
-                  <ctl:ToolButton.Flyout>
-                    <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                      <MenuItem Header="{l:T 'Übermittlungsbestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestDeliveryReceipt, Mode=OneWay}" Command="{Binding ToggleDeliveryReceiptCommand}"
-                                ToolTip.Tip="{l:T 'Der Mailserver meldet, wenn die Nachricht zugestellt wurde – sofern er das unterstützt.'}" />
-                      <MenuItem Header="{l:T 'Lesebestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestReadReceipt, Mode=OneWay}" Command="{Binding ToggleReadReceiptCommand}"
-                                ToolTip.Tip="{l:T 'Das Mailprogramm des Empfängers fragt, ob es das Lesen bestätigen soll – der Empfänger entscheidet.'}" />
-                    </MenuFlyout>
-                  </ctl:ToolButton.Flyout>
-                </ctl:ToolButton>
-                <ctl:ToolButton Icon="{StaticResource IconEdit}" Label="{l:T 'Speichern'}" Hint="{l:T 'Als Entwurf speichern (Ctrl+S) – geschieht auch automatisch'}"
-                                Command="{Binding SaveDraftCommand}" HotKey="Ctrl+S" Compact="True" ShowLabel="False" />
-                <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{Binding DiscardLabel}" Hint="{l:T 'Nachricht verwerfen (auch den gespeicherten Entwurf)'}"
-                                Command="{Binding DiscardCommand}" Compact="True" ShowLabel="{Binding ConfirmDiscard}"
-                                Classes.confirm="{Binding ConfirmDiscard}" />
-            </WrapPanel>
-          </Border>
-          <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,0,0,0" VerticalAlignment="Center">
-            <ProgressBar IsIndeterminate="True" Width="60" MinWidth="0" Height="4" IsVisible="{Binding IsSending}" VerticalAlignment="Center" />
-            <TextBlock Text="{Binding DraftStatus}" Classes="subtle" FontSize="12" VerticalAlignment="Center"
-                       IsVisible="{Binding DraftStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <!-- Actions: one line, never wrapped. What does not fit goes into "Mehr" (ComposeView.FitToolbars, ToolbarLevel). -->
+    <Grid x:Name="ActionBar" Grid.ColumnSpan="3" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
+      <StackPanel x:Name="MainTools" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+        <!-- Senden: the main action, always with its text -->
+        <Button Classes="accent" Command="{Binding SendCommand}" HotKey="Ctrl+Enter" ToolTip.Tip="{l:T 'Senden (Ctrl+Enter)'}" VerticalAlignment="Stretch"
+                AutomationProperties.Name="{l:T 'Senden'}" Padding="{Binding ShowToolLabels, Converter={x:Static views:ComposeView.SendPadding}}" MinWidth="64">
+          <StackPanel Orientation="{Binding ShowToolLabels, Converter={x:Static views:ComposeView.SendOrientation}}" VerticalAlignment="Center">
+            <PathIcon Data="{StaticResource IconSend}" Width="18" Height="18" HorizontalAlignment="Center" />
+            <TextBlock Text="{l:T 'Senden'}" FontSize="{Binding ShowToolLabels, Converter={x:Static views:ComposeView.SendFontSize}}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Margin="{Binding ShowToolLabels, Converter={x:Static views:ComposeView.SendTextMargin}}" />
           </StackPanel>
-        </WrapPanel>
-      </ctl:SplitToolbar>
-      <!-- Pop-out, icon-only ("In neuem Fenster öffnen") -->
-      <ctl:ToolButton Grid.Column="1" Icon="{StaticResource IconPopOut}" Label="{l:T 'Loslösen'}" Hint="{l:T 'Loslösen – in eigenem Fenster weiterschreiben'}"
-                      Command="{Binding PopOutCommand}" IsVisible="{Binding CanPopOut}" Margin="8,0,0,0" VerticalAlignment="Top" Compact="True" ShowLabel="False" />
+        </Button>
+        <ctl:ToolButton Icon="{StaticResource IconAttach}" Label="{l:T 'Anhängen'}" Hint="{l:T 'Datei anhängen'}" Command="{Binding AddAttachmentCommand}"
+                        ShowLabel="{Binding ShowToolLabels}" />
+        <StackPanel Orientation="Horizontal" Spacing="1" IsVisible="{Binding UndoInBar}" VerticalAlignment="Center" Margin="4,0,0,0">
+          <ctl:ToolButton Icon="{StaticResource IconUndo}" Label="{l:T 'Rückgängig'}" Shortcut="Ctrl+Z" Command="{Binding UndoCommand}" Compact="True" ShowLabel="False" />
+          <ctl:ToolButton Icon="{StaticResource IconRedo}" Label="{l:T 'Wiederherstellen'}" Shortcut="Ctrl+Y" Command="{Binding RedoCommand}" Compact="True" ShowLabel="False" />
+        </StackPanel>
+        <Border Classes="toolGroup" IsVisible="{Binding ToolsInBar}" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="1">
+            <!-- Textvorlage: inserted at the caret (also in plain-text mode) -->
+            <ctl:ToolButton Icon="{StaticResource IconTextTemplate}" Label="{l:T 'Textvorlage'}" Hint="{l:T 'Textvorlage an der Cursorposition einfügen – oder «kürzel::» bzw. «kürzel» + Tab tippen'}"
+                            IsEnabled="{Binding HasTemplates}" Compact="True" ShowLabel="False">
+              <ctl:ToolButton.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding TemplateMenu}" ItemContainerTheme="{StaticResource TemplateMenuItem}" />
+              </ctl:ToolButton.Flyout>
+            </ctl:ToolButton>
+            <!-- Signatur: swap or remove the signature in the text -->
+            <ctl:ToolButton Icon="{StaticResource IconSignature}" Label="{l:T 'Signatur'}" Hint="{l:T 'Signatur einfügen oder wechseln'}" IsVisible="{Binding Formatting.IsRichText}"
+                            Compact="True" ShowLabel="False">
+              <ctl:ToolButton.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding SignatureMenu}" ItemContainerTheme="{StaticResource SignatureMenuItem}" />
+              </ctl:ToolButton.Flyout>
+            </ctl:ToolButton>
+            <!-- KI: the bar above the text ("Schreiben", "Verbessern" …), only with a connected AI -->
+            <ctl:ToolToggleButton Icon="{StaticResource IconAi}" Label="{l:T 'KI'}" Hint="{l:T 'Mit KI schreiben oder überarbeiten'}"
+                                  IsChecked="{Binding Ai.IsOpen, FallbackValue=False}" IsVisible="{Binding Ai.Available, FallbackValue=False}"
+                                  Compact="True" ShowLabel="False" />
+          </StackPanel>
+        </Border>
+        <!-- Mehr: everything less frequent, and what the width leaves out -->
+        <ctl:ToolButton x:Name="MoreButton" Icon="{StaticResource IconMore}" Label="{l:T 'Mehr'}" Hint="{l:T 'Weitere Aktionen und Optionen'}" Compact="True" ShowLabel="False"
+                        VerticalAlignment="Center">
+          <ctl:ToolButton.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+              <!-- No room beside the buttons: when the draft was last saved, here -->
+              <MenuItem Header="{Binding DraftStatus}" IsEnabled="False">
+                <MenuItem.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="!DraftStatusInBar" />
+                    <Binding Path="DraftStatus" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                  </MultiBinding>
+                </MenuItem.IsVisible>
+              </MenuItem>
+              <MenuItem Header="{l:T 'Rückgängig'}" InputGesture="Ctrl+Z" Command="{Binding UndoCommand}" IsVisible="{Binding !UndoInBar}">
+                <MenuItem.Icon><PathIcon Data="{StaticResource IconUndo}" /></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem Header="{l:T 'Wiederherstellen'}" InputGesture="Ctrl+Y" Command="{Binding RedoCommand}" IsVisible="{Binding !UndoInBar}">
+                <MenuItem.Icon><PathIcon Data="{StaticResource IconRedo}" /></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem Header="{l:T 'Textvorlage'}" ItemsSource="{Binding TemplateMenu}" ItemContainerTheme="{StaticResource TemplateMenuItem}" IsEnabled="{Binding HasTemplates}"
+                        IsVisible="{Binding !ToolsInBar}">
+                <MenuItem.Icon><PathIcon Data="{StaticResource IconTextTemplate}" /></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem Header="{l:T 'Signatur'}" ItemsSource="{Binding SignatureMenu}" ItemContainerTheme="{StaticResource SignatureMenuItem}">
+                <MenuItem.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="!ToolsInBar" />
+                    <Binding Path="Formatting.IsRichText" />
+                  </MultiBinding>
+                </MenuItem.IsVisible>
+                <MenuItem.Icon><PathIcon Data="{StaticResource IconSignature}" /></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem Header="{l:T 'Mit KI schreiben'}" ToggleType="CheckBox" IsChecked="{Binding Ai.IsOpen, Mode=OneWay, FallbackValue=False}" Command="{Binding ToggleAiCommand}">
+                <MenuItem.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="!ToolsInBar" />
+                    <Binding Path="Ai.Available" FallbackValue="False" />
+                  </MultiBinding>
+                </MenuItem.IsVisible>
+              </MenuItem>
+              <Separator IsVisible="{Binding !ToolsInBar}" />
+              <!-- Termin: an event for this mail, the recipients as attendees (ComposeViewModel.Appointment) -->
+              <MenuItem Header="{l:T 'Termin erstellen …'}" Command="{Binding MakeAppointmentCommand}" IsVisible="{Binding CanMakeAppointment}"
+                        ToolTip.Tip="{l:T 'Termin zu dieser E-Mail erstellen – die Empfänger werden eingeladen'}">
+                <MenuItem.Icon><PathIcon Data="{StaticResource IconCalendar}" /></MenuItem.Icon>
+              </MenuItem>
+              <!-- Terminumfrage: a poll with the recipients as invitees, its link into the text (ComposeViewModel.Poll) -->
+              <MenuItem Header="{l:T 'Terminumfrage erstellen …'}" Command="{Binding MakePollCommand}" IsVisible="{Binding CanMakePoll}"
+                        ToolTip.Tip="{l:T 'Terminumfrage erstellen und den Link einfügen – die Empfänger wählen, welche Termine passen'}">
+                <MenuItem.Icon><PathIcon Data="{StaticResource IconPoll}" /></MenuItem.Icon>
+              </MenuItem>
+              <Separator>
+                <Separator.IsVisible>
+                  <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="CanMakeAppointment" />
+                    <Binding Path="CanMakePoll" />
+                  </MultiBinding>
+                </Separator.IsVisible>
+              </Separator>
+              <!-- S/MIME: only with an own certificate; Verschlüsseln only together with Signieren (see ShowEncrypt) -->
+              <MenuItem Header="{l:T 'Signieren'}" ToggleType="CheckBox" IsChecked="{Binding Sign, Mode=OneWay}" Command="{Binding ToggleSignCommand}" IsVisible="{Binding CanSign}"
+                        ToolTip.Tip="{Binding SignHint}" />
+              <MenuItem Header="{l:T 'Verschlüsseln'}" ToggleType="CheckBox" IsChecked="{Binding Encrypt, Mode=OneWay}" Command="{Binding ToggleEncryptCommand}" IsVisible="{Binding ShowEncrypt}"
+                        ToolTip.Tip="{Binding EncryptHint}" />
+              <Separator IsVisible="{Binding CanSign}" />
+              <MenuItem Header="{l:T 'Übermittlungsbestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestDeliveryReceipt, Mode=OneWay}" Command="{Binding ToggleDeliveryReceiptCommand}"
+                        ToolTip.Tip="{l:T 'Der Mailserver meldet, wenn die Nachricht zugestellt wurde – sofern er das unterstützt.'}" />
+              <MenuItem Header="{l:T 'Lesebestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestReadReceipt, Mode=OneWay}" Command="{Binding ToggleReadReceiptCommand}"
+                        ToolTip.Tip="{l:T 'Das Mailprogramm des Empfängers fragt, ob es das Lesen bestätigen soll – der Empfänger entscheidet.'}" />
+              <!-- The spell check's language for this mail (not on macOS: the system picks it) -->
+              <Separator IsVisible="{x:Static vm:ComposeViewModel.CanChooseSpellLanguage}" />
+              <MenuItem Header="{Binding SpellLanguageHeader}" ItemsSource="{Binding SpellLanguageMenu}" IsVisible="{x:Static vm:ComposeViewModel.CanChooseSpellLanguage}"
+                        ToolTip.Tip="{l:T 'Sprache der Rechtschreibprüfung für diese Nachricht'}">
+                <MenuItem.ItemContainerTheme>
+                  <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SpellLanguageMenuItem">
+                    <Setter Property="Header" Value="{Binding Title}" />
+                    <Setter Property="ToggleType" Value="Radio" />
+                    <Setter Property="IsChecked" Value="{Binding IsChecked, Mode=OneWay}" />
+                    <Setter Property="Command" Value="{Binding Command}" />
+                    <Setter Property="CommandParameter" Value="{Binding Language}" />
+                  </ControlTheme>
+                </MenuItem.ItemContainerTheme>
+              </MenuItem>
+              <Separator />
+              <MenuItem Header="{l:T 'Als Entwurf speichern'}" InputGesture="Ctrl+S" Command="{Binding SaveDraftCommand}"
+                        ToolTip.Tip="{l:T 'Geschieht auch automatisch alle 30 Sekunden'}" />
+              <MenuItem Header="{l:T 'Entwurf verwerfen …'}" Command="{Binding DiscardCommand}">
+                <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
+              </MenuItem>
+            </MenuFlyout>
+          </ctl:ToolButton.Flyout>
+        </ctl:ToolButton>
+        <!-- What is switched on for sending: signed and/or encrypted, or encryption not possible for everyone -->
+        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="4,0,0,0">
+          <Border Classes="badge" IsVisible="{Binding Sign}" ToolTip.Tip="{l:T 'Wird digital signiert (S/MIME) – unter «Mehr» abschaltbar'}"
+                  AutomationProperties.Name="{l:T 'Signiert'}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <PathIcon Data="{StaticResource IconCertificate}" Width="12" Height="12" />
+              <TextBlock Text="{l:T 'Signiert'}" IsVisible="{Binding !CompactBar}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="badge" ToolTip.Tip="{Binding EncryptHint}" AutomationProperties.Name="{l:T 'Verschlüsselt'}">
+            <Border.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="Encrypt" />
+                <Binding Path="!EncryptIncomplete" />
+              </MultiBinding>
+            </Border.IsVisible>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <PathIcon Data="{StaticResource IconLock}" Width="12" Height="12" />
+              <TextBlock Text="{l:T 'Verschlüsselt'}" IsVisible="{Binding !CompactBar}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="badge warn" IsVisible="{Binding EncryptIncomplete}" ToolTip.Tip="{Binding EncryptHint}"
+                  AutomationProperties.Name="{l:T 'Verschlüsselung nicht für alle Empfänger möglich'}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <PathIcon Data="{StaticResource IconWarning}" Width="12" Height="12" />
+              <TextBlock Text="{l:T 'Nicht für alle verschlüsselbar'}" IsVisible="{Binding !CompactBar}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+
+      <!-- Sending, or when the draft was last saved; shortened when space is short -->
+      <DockPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
+        <ProgressBar DockPanel.Dock="Left" IsIndeterminate="True" Width="60" MinWidth="0" Height="4" IsVisible="{Binding IsSending}" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <TextBlock Text="{Binding DraftStatus}" Classes="subtle" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                   ToolTip.Tip="{Binding DraftStatus}">
+          <TextBlock.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="DraftStatusInBar" />
+              <Binding Path="DraftStatus" Converter="{x:Static ObjectConverters.IsNotNull}" />
+            </MultiBinding>
+          </TextBlock.IsVisible>
+        </TextBlock>
+      </DockPanel>
+
+      <!-- Verwerfen and Loslösen, apart from the rest -->
+      <StackPanel x:Name="SideTools" Grid.Column="2" Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
+        <Border Classes="toolGroup">
+          <ctl:ToolButton Icon="{StaticResource IconDelete}" Label="{l:T 'Entwurf verwerfen'}" Hint="{l:T 'Entwurf verwerfen (auch den gespeicherten)'}"
+                          Command="{Binding DiscardCommand}" Compact="True" ShowLabel="False" />
+        </Border>
+        <ctl:ToolButton Icon="{StaticResource IconPopOut}" Label="{l:T 'Loslösen'}" Hint="{l:T 'Loslösen – in eigenem Fenster weiterschreiben'}"
+                        Command="{Binding PopOutCommand}" IsVisible="{Binding CanPopOut}" Compact="True" ShowLabel="False" />
+      </StackPanel>
     </Grid>
 
-    <TextBlock Grid.Row="1" Classes="subtle" Text="{l:T 'Von'}" VerticalAlignment="Center" />
-    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FromText}" Margin="0,6" IsVisible="{Binding !HasSenderChoice}" />
-    <!-- The sender to choose: every account with its aliases (a reply starts with the address the message was sent to) -->
-    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Senders}" SelectedItem="{Binding Sender}" IsVisible="{Binding HasSenderChoice}"
-              Margin="0,3" MinWidth="320" HorizontalAlignment="Left" />
+    <!-- Header: fixed labels on the left, the fields beside them -->
+    <TextBlock Grid.Row="1" Classes="subtle fieldLabel" Text="{l:T 'Von'}" />
+    <Panel Grid.Row="1" Grid.Column="1" Margin="0,6" IsVisible="{Binding !HasSenderChoice}" ToolTip.Tip="{Binding FromText}" Background="Transparent">
+      <TextBlock Text="{Binding FromText}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !IsNarrow}" />
+      <TextBlock Text="{Binding FromAddress}" TextTrimming="CharacterEllipsis" IsVisible="{Binding IsNarrow}" />
+    </Panel>
+    <!-- The sender to choose: every account with its aliases (a reply starts with the address the message was sent to);
+         narrow: the address only in the field, the full text in the list and tooltip -->
+    <ComboBox x:Name="SenderBox" Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Senders}" SelectedItem="{Binding Sender}" IsVisible="{Binding HasSenderChoice}"
+              Margin="0,3" MaxWidth="480" HorizontalAlignment="Left" ToolTip.Tip="{Binding Sender}" AutomationProperties.Name="{l:T 'Von'}">
+      <ComboBox.SelectionBoxItemTemplate>
+        <DataTemplate x:DataType="vm:SenderChoice">
+          <Panel>
+            <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !$parent[UserControl].((vm:ComposeViewModel)DataContext).IsNarrow, FallbackValue=True}" />
+            <TextBlock Text="{Binding Identity.Email}" TextTrimming="CharacterEllipsis" IsVisible="{Binding $parent[UserControl].((vm:ComposeViewModel)DataContext).IsNarrow, FallbackValue=False}" />
+          </Panel>
+        </DataTemplate>
+      </ComboBox.SelectionBoxItemTemplate>
+    </ComboBox>
 
-    <!-- An / Cc: the button opens the contact picker; typing suggests contacts and groups from the address books -->
-    <Button x:Name="ToButton" Grid.Row="2" Content="{l:T 'An …'}" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3"
-            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Kontakte auswählen'}" />
-    <ctl:RecipientBox x:Name="ToBox" Grid.Row="2" Grid.Column="1" Text="{Binding To}" Directory="{Binding Recipients}" Margin="0,3" PlaceholderText="{l:T 'Name oder Adresse eingeben, mehrere mit Komma trennen'}" />
+    <!-- An / Cc / Bcc: typing suggests contacts and groups from the address books; the button beside opens the picker -->
+    <TextBlock Grid.Row="2" Classes="subtle fieldLabel" Text="{l:T 'An'}" />
+    <ctl:RecipientBox x:Name="ToBox" Grid.Row="2" Grid.Column="1" Text="{Binding To}" Directory="{Binding Recipients}" Margin="0,3" PlaceholderText="{l:T 'Name oder Adresse eingeben, mehrere mit Komma trennen'}"
+                      AutomationProperties.Name="{l:T 'An'}" />
+    <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+      <Button x:Name="ToButton" Classes="pick" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «An» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «An» auswählen'}">
+        <PathIcon Data="{StaticResource IconPeople}" />
+      </Button>
+      <Button Classes="field" Content="{l:T 'Cc'}" Command="{Binding ShowCcFieldCommand}" Click="OnShowField" Tag="CcBox" IsVisible="{Binding !ShowCc}"
+              ToolTip.Tip="{l:T 'Kopie-Feld (Cc) einblenden'}" />
+      <Button Classes="field" Content="{l:T 'Bcc'}" Command="{Binding ShowBccFieldCommand}" Click="OnShowField" Tag="BccBox" IsVisible="{Binding !ShowBcc}"
+              ToolTip.Tip="{l:T 'Blindkopie-Feld (Bcc) einblenden – Empfänger sehen diese Adressen nicht'}" />
+    </StackPanel>
 
-    <Button x:Name="CcButton" Grid.Row="3" Content="{l:T 'Cc …'}" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3"
-            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Kontakte auswählen'}" />
-    <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,Auto">
-      <ctl:RecipientBox Text="{Binding Cc}" Directory="{Binding Recipients}" Margin="0,3" />
-      <!-- Bcc only when wanted: shown by this button, or when the draft already has some -->
-      <ToggleButton Grid.Column="1" Content="{l:T 'Bcc'}" IsChecked="{Binding ShowBcc}" Padding="10,4" Margin="8,3,0,3" VerticalAlignment="Center"
-                    ToolTip.Tip="{l:T 'Blindkopie-Feld ein- oder ausblenden'}" />
-    </Grid>
+    <TextBlock Grid.Row="3" Classes="subtle fieldLabel" Text="{l:T 'Cc'}" IsVisible="{Binding ShowCc}" />
+    <ctl:RecipientBox x:Name="CcBox" Grid.Row="3" Grid.Column="1" IsVisible="{Binding ShowCc}" Text="{Binding Cc}" Directory="{Binding Recipients}" Margin="0,3" AutomationProperties.Name="{l:T 'Cc'}" />
+    <Button x:Name="CcButton" Grid.Row="3" Grid.Column="2" Classes="pick" HorizontalAlignment="Left" IsVisible="{Binding ShowCc}" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «Cc» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «Cc» auswählen'}">
+      <PathIcon Data="{StaticResource IconPeople}" />
+    </Button>
 
-    <Button x:Name="BccButton" Grid.Row="4" Content="{l:T 'Bcc …'}" Click="OnPickRecipients" Padding="10,4" MinWidth="0" Margin="0,3,8,3" IsVisible="{Binding ShowBcc}"
-            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalAlignment="Center" ToolTip.Tip="{l:T 'Kontakte auswählen'}" />
-    <ctl:RecipientBox Grid.Row="4" Grid.Column="1" Text="{Binding Bcc}" Directory="{Binding Recipients}" Margin="0,3" IsVisible="{Binding ShowBcc}"
-                      PlaceholderText="{l:T 'Empfänger sehen diese Adressen nicht'}" />
+    <TextBlock Grid.Row="4" Classes="subtle fieldLabel" Text="{l:T 'Bcc'}" IsVisible="{Binding ShowBcc}" />
+    <ctl:RecipientBox x:Name="BccBox" Grid.Row="4" Grid.Column="1" IsVisible="{Binding ShowBcc}" Text="{Binding Bcc}" Directory="{Binding Recipients}" Margin="0,3" PlaceholderText="{l:T 'Empfänger sehen diese Adressen nicht'}"
+                        AutomationProperties.Name="{l:T 'Bcc'}" />
+    <Button x:Name="BccButton" Grid.Row="4" Grid.Column="2" Classes="pick" HorizontalAlignment="Left" IsVisible="{Binding ShowBcc}" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «Bcc» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «Bcc» auswählen'}">
+      <PathIcon Data="{StaticResource IconPeople}" />
+    </Button>
 
-    <TextBox x:Name="SubjectBox" Grid.Row="5" Grid.ColumnSpan="2" Text="{Binding Subject}" PlaceholderText="{l:T 'Betreff hinzufügen'}" Margin="0,10,0,6" FontWeight="SemiBold" />
+    <TextBlock Grid.Row="5" Classes="subtle fieldLabel" Text="{l:T 'Betreff'}" Margin="0,4,12,2" />
+    <TextBox x:Name="SubjectBox" Grid.Row="5" Grid.Column="1" Text="{Binding Subject}" Margin="0,4,0,6" FontWeight="SemiBold" AutomationProperties.Name="{l:T 'Betreff'}" />
 
-    <StackPanel Grid.Row="6" Grid.ColumnSpan="2">
+    <StackPanel Grid.Row="6" Grid.ColumnSpan="3">
     <!-- The event made for this mail; its details go into the text on request -->
     <Border IsVisible="{Binding HasAppointment}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
       <DockPanel>
@@ -185,7 +356,7 @@
           <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="8,2,2,2" Margin="0,0,6,6">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource IconAttach}" Width="12" Height="12" />
-              <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" MaxWidth="220" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FileName}" />
               <PathIcon Data="{StaticResource IconLock}" Width="11" Height="11" IsVisible="{Binding IsProtected}"
                         Foreground="{DynamicResource AccentTextBrush}" ToolTip.Tip="{l:T 'Mit Kennwort geschützt'}" />
               <Button Classes="command" Padding="4,2" IsVisible="{Binding CanProtect}" ToolTip.Tip="{l:T 'Mit Kennwort schützen'}"
@@ -245,7 +416,7 @@
 
     <!-- Formatting toolbar (hidden without WebView) -->
     <!-- The AI bar: instructions, "Schreiben", and rewriting the marked (or the own) text -->
-    <Border Grid.Row="7" Grid.ColumnSpan="2" IsVisible="{Binding Ai.IsOpen, FallbackValue=False}" Background="{DynamicResource InfoBackgroundBrush}"
+    <Border Grid.Row="7" Grid.ColumnSpan="3" IsVisible="{Binding Ai.IsOpen, FallbackValue=False}" Background="{DynamicResource InfoBackgroundBrush}"
             CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
       <StackPanel Spacing="8" DataContext="{Binding Ai}" x:DataType="vm:ComposeAiViewModel">
         <TextBox Text="{Binding Instruction}" PlaceholderText="{Binding Placeholder}" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="90" />
@@ -282,18 +453,18 @@
         <TextBlock Text="{Binding Error}" Classes="error" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       </StackPanel>
     </Border>
-    <views:FormattingToolbar Grid.Row="8" Grid.ColumnSpan="2" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
+    <views:FormattingToolbar Grid.Row="8" Grid.ColumnSpan="3" DataContext="{Binding Formatting}" IsVisible="{Binding IsRichText}" />
 
     <!-- Editor: a page in the app theme (dark: shown inverted; the mail is sent as written) -->
-    <Border Grid.Row="9" Grid.ColumnSpan="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
+    <Border Grid.Row="9" Grid.ColumnSpan="3" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="{Binding Formatting.IsRichText, Converter={x:Static app:Converters.EditorCorners}}" Background="{DynamicResource PaperBrush}" ClipToBounds="True">
       <ed:HtmlEditor x:Name="Editor" />
     </Border>
 
-    <TextBlock Grid.Row="8" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Margin="0,0,0,6" TextWrapping="Wrap" IsVisible="{Binding Formatting.IsPlainTextFallback}"
+    <TextBlock Grid.Row="8" Grid.ColumnSpan="3" Classes="subtle" FontSize="12" Margin="0,0,0,6" TextWrapping="Wrap" IsVisible="{Binding Formatting.IsPlainTextFallback}"
                Text="{l:T 'Formatierung nicht verfügbar (keine WebView-Laufzeit gefunden) – die Nachricht wird als reiner Text gesendet.'}" />
 
     <!-- Anhang-Erinnerung: the text announces an attachment, but nothing is attached (Einstellungen → Schreiben) -->
-    <Border Grid.Row="10" Grid.ColumnSpan="2" IsVisible="{Binding HasMissingAttachment}" Background="{DynamicResource WarnBackgroundBrush}"
+    <Border Grid.Row="10" Grid.ColumnSpan="3" IsVisible="{Binding HasMissingAttachment}" Background="{DynamicResource WarnBackgroundBrush}"
             CornerRadius="4" Padding="10,6" Margin="0,8,0,0">
       <DockPanel>
         <Button DockPanel.Dock="Right" Classes="command" Padding="6" VerticalAlignment="Center" Command="{Binding DismissAttachmentReminderCommand}"
@@ -311,6 +482,6 @@
       </DockPanel>
     </Border>
 
-    <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
+    <TextBlock Grid.Row="11" Grid.ColumnSpan="3" Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,8,0,0" />
   </Grid>
 </UserControl>

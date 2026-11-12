@@ -24,9 +24,29 @@ internal static class ChoiceDialog
             : Task.FromResult(choices[^1].Result);
     }
 
+    /// <summary>
+    /// Over the window in front, with a check box under the text (e.g. "Nicht mehr fragen"); with no window: the last
+    /// choice, not ticked.
+    /// </summary>
+    public static Task<(T Result, bool Checked)> ShowWithCheckInFrontAsync<T>(string title, string message, string checkText, params (string Text, T Result, bool IsDefault)[] choices)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
+        return (lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow) is { } owner
+            ? ShowCoreAsync(owner, title, message, checkText, choices)
+            : Task.FromResult((choices[^1].Result, false));
+    }
+
+    /// <summary>Over <paramref name="owner"/>, with a check box under the text.</summary>
+    public static Task<(T Result, bool Checked)> ShowWithCheckAsync<T>(Window owner, string title, string message, string checkText, params (string Text, T Result, bool IsDefault)[] choices) =>
+        ShowCoreAsync(owner, title, message, checkText, choices);
+
     /// <param name="choices">Button text, result, and whether it is the highlighted default (Enter).</param>
     /// <returns>The chosen result; the last choice (cancel) if the dialog is closed otherwise.</returns>
-    public static async Task<T> ShowAsync<T>(Window owner, string title, string message, params (string Text, T Result, bool IsDefault)[] choices)
+    public static async Task<T> ShowAsync<T>(Window owner, string title, string message, params (string Text, T Result, bool IsDefault)[] choices) =>
+        (await ShowCoreAsync(owner, title, message, null, choices)).Result;
+
+    private static async Task<(T Result, bool Checked)> ShowCoreAsync<T>(Window owner, string title, string message, string? checkText, (string Text, T Result, bool IsDefault)[] choices)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(choices);
@@ -69,12 +89,20 @@ internal static class ChoiceDialog
                 dialog.Close();
             }
         };
-        dialog.Content = new StackPanel
+        var content = new StackPanel
         {
             Margin = new Thickness(24, 20),
             Spacing = 20,
-            Children = { new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 392, HorizontalAlignment = HorizontalAlignment.Left }, buttons },
+            Children = { new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 392, HorizontalAlignment = HorizontalAlignment.Left } },
         };
+        var check = checkText is null ? null : new CheckBox { Content = checkText, Margin = new Thickness(0, -8, 0, 0) };
+        if (check is not null)
+        {
+            content.Children.Add(check);
+        }
+
+        content.Children.Add(buttons);
+        dialog.Content = content;
 
         Open = dialog;
         try
@@ -86,6 +114,6 @@ internal static class ChoiceDialog
             Open = null;
         }
 
-        return result;
+        return (result, check?.IsChecked == true);
     }
 }

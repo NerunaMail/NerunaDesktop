@@ -462,7 +462,8 @@ internal sealed class ContactItem(ContactEntry entry, string color)
 
     public bool ShowInitials => !HasPhoto && !IsGroup;
 
-    private static string Label(string? kind) => FieldKind.Find(FieldKind.PhoneKinds, kind).Label;
+    // No type: nothing (not "—") beside the number or address.
+    private static string Label(string? kind) => kind is null ? string.Empty : FieldKind.Find(FieldKind.PhoneKinds, kind).Label;
 }
 
 internal enum ContactFilter
@@ -515,6 +516,8 @@ internal static class ContactPhotoBitmap
 
 internal sealed record LabeledValue(string Value, string Label)
 {
+    public bool HasLabel => Label.Length > 0;
+
     /// <summary>A phone number as tel: link ("+41 31 555 88 10" → tel:+41315558810), for the program that makes calls.</summary>
     public Uri? TelUri
     {

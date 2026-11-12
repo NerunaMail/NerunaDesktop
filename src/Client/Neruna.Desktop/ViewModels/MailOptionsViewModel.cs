@@ -43,6 +43,17 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         set => ComposeInWindow = !value;
     }
 
+    /// <summary>New mails: their own window (default) or the reading pane.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ComposeNewInline))]
+    public partial bool ComposeNewInWindow { get; set; } = true;
+
+    public bool ComposeNewInline
+    {
+        get => !ComposeNewInWindow;
+        set => ComposeNewInWindow = !value;
+    }
+
     /// <summary>"Test-Benachrichtigung anzeigen": the shell shows one, to check it works on this computer.</summary>
     public event EventHandler? TestNotificationRequested;
 
@@ -277,6 +288,7 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
         try
         {
             ComposeInWindow = await _settings.GetBoolAsync(SettingKeys.ComposeInWindow);
+            ComposeNewInWindow = await _settings.GetBoolAsync(SettingKeys.ComposeNewInWindow, fallback: true);
             AttachmentReminder = await _attachmentReminder.GetEnabledAsync();
             AttachmentKeywords.Clear();
             foreach (var keyword in await _attachmentReminder.GetKeywordsAsync())
@@ -367,6 +379,8 @@ internal sealed partial class MailOptionsViewModel : ViewModelBase
     }
 
     partial void OnComposeInWindowChanged(bool value) => Save(SettingKeys.ComposeInWindow, value.ToString(CultureInfo.InvariantCulture));
+
+    partial void OnComposeNewInWindowChanged(bool value) => Save(SettingKeys.ComposeNewInWindow, value.ToString(CultureInfo.InvariantCulture));
 
     /// <summary>Einstellungen → Schreiben: "- " and "1. " become lists.</summary>
     [ObservableProperty]

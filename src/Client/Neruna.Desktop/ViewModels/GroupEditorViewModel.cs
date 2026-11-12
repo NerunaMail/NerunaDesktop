@@ -109,9 +109,6 @@ internal sealed partial class GroupEditorViewModel : ViewModelBase
     [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(DeleteCommand))]
     public partial bool IsBusy { get; set; }
 
-    [ObservableProperty]
-    public partial bool ConfirmDelete { get; set; }
-
     public string MemberCountText => Members.Count == 1 ? T("1 Mitglied") : F("{0} Mitglieder", Members.Count);
 
     partial void OnSearchTextChanged(string value) => UpdateAvailable();
@@ -205,9 +202,10 @@ internal sealed partial class GroupEditorViewModel : ViewModelBase
             return;
         }
 
-        if (!ConfirmDelete)
+        if (!await Infrastructure.DeleteConfirmation.AskAsync(Infrastructure.DeleteKind.Contact,
+                F("«{0}» löschen", string.IsNullOrWhiteSpace(Name) ? T("Gruppe") : Name.Trim()),
+                T("Die Gruppe wird auch auf dem Server gelöscht. Die Kontakte darin bleiben erhalten.")))
         {
-            ConfirmDelete = true;
             return;
         }
 
