@@ -2916,5 +2916,8 @@
  "Ohne Betreff senden?": "Envoyer sans objet ?",
  "Diese E-Mail hat keinen Betreff. Ein Betreff hilft den Empfängern, die Nachricht einzuordnen und wiederzufinden.": "Cet e-mail n'a pas d'objet. Un objet aide les destinataires à classer le message et à le retrouver.",
  "Ohne Betreff senden": "Envoyer sans objet",
- "Betreff eingeben": "Saisir un objet"
+ "Betreff eingeben": "Saisir un objet",
+ "Kalender hinzufügen, verwalten und importieren": "Ajouter, gérer et importer des calendriers",
+ "Kalender verwalten …": "Gérer les calendriers …",
+ "Termine importieren …": "Importer des rendez-vous …"
 }

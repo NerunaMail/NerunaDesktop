@@ -1237,6 +1237,23 @@ internal static class Snapshots
         reminderWindow.Show();
         await SaveAsync(reminderWindow, output, "reminder-window.png");
         reminderWindow.Close();
+        // The view switcher (1 Tag · Mo–Fr · Woche · Monat · Planung) and the «Kalender ▾» menu.
+        var calendarPage = vm.CalendarPage;
+        calendarPage.ViewMonth = true;
+        calendarPage.ViewPlanning = true;
+        Console.WriteLine($"Views: month → Planung shows week {calendarPage.IsFullWeek}, planning {calendarPage.ShowPlanning}, only Planung on {!calendarPage.ViewWeek && calendarPage.ViewPlanning}");
+        calendarPage.ViewDay = true;
+        Console.WriteLine($"Views: Planung → 1 Tag: planning {calendarPage.IsPlanning}, day {calendarPage.ViewDay}");
+        calendarPage.ViewWeek = true;
+        await Task.Delay(300);
+        if (window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Flyout is MenuFlyout calendarMenu && calendarMenu.Items.Count >= 5 && b.IsEffectivelyVisible) is { Flyout: MenuFlyout calendarFlyout } calendarButton)
+        {
+            calendarFlyout.ShowAt(calendarButton);
+            await Task.Delay(300);
+            await SaveAsync(window, output, "calendar-menu.png");
+            calendarFlyout.Hide();
+        }
+
         vm.CalendarPage.IsWorkWeek = true;
         await Task.Delay(300);
         await SaveAsync(window, output, "calendar-workweek.png");

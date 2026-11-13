@@ -18,6 +18,9 @@ internal sealed partial class App : Application
 
     public static AppOptions Options { get; set; } = AppOptions.FromArgs([]);
 
+    /// <summary>macOS, another Neruna already runs: only pass on what the system opens (a link, a file), then end.</summary>
+    public static bool RelayOnly { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -27,6 +30,42 @@ internal sealed partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // macOS hands mailto: links and files over as system events – also the one Neruna was started for, while
+            // the database still opens. Listened to from the start; kept until the window can open them.
+            var early = new List<string>();
+            Action<IReadOnlyList<string>>? open = null;
+            if (this.TryGetFeature<Avalonia.Controls.ApplicationLifetimes.IActivatableLifetime>() is { } activatable)
+            {
+                activatable.Activated += (_, e) =>
+                {
+                    IReadOnlyList<string> items = e switch
+                    {
+                        Avalonia.Controls.ApplicationLifetimes.ProtocolActivatedEventArgs protocol => [protocol.Uri.OriginalString],
+                        Avalonia.Controls.ApplicationLifetimes.FileActivatedEventArgs files => [.. files.Files.Select(f => f.TryGetLocalPath()).OfType<string>()],
+                        _ => [],
+                    };
+                    if (items.Count == 0)
+                    {
+                        return;
+                    }
+
+                    if (open is null)
+                    {
+                        early.AddRange(items);
+                    }
+                    else
+                    {
+                        open(items);
+                    }
+                };
+            }
+
+            if (RelayOnly)
+            {
+                Relay(desktop, early);
+                return;
+            }
+
             // Language: as last chosen (file next to the database), the system's at first; see Neruna.Core.Localization.
             Neruna.Core.Localization.Texts.Use(LanguageFile.Read(Options.DataDirectory));
             KeyNames.Use();
@@ -43,7 +82,7 @@ internal sealed partial class App : Application
                 }
 
                 Options = Options.WithProfile(chosen);
-                if (SingleInstance.TryHandOver(Options, [.. (desktop.Args ?? []).Where(SystemOpen.IsOpenable)]))
+                if (SingleInstance.TryHandOver(Options, [.. (desktop.Args ?? []).Where(SystemOpen.IsOpenable), .. early]))
                 {
                     desktop.Shutdown(); // already open: its window came to the front
                     return;
@@ -148,30 +187,16 @@ internal sealed partial class App : Application
                 var rest = Neruna.Storage.ProfileList.WithoutProfile(args);
                 Open(rest.Length == 0 ? [SystemOpen.Activate] : rest);
             }, Shutdown.Token);
-            if (this.TryGetFeature<Avalonia.Controls.ApplicationLifetimes.IActivatableLifetime>() is { } activatable)
-            {
-                activatable.Activated += (_, e) =>
-                {
-                    if (e is Avalonia.Controls.ApplicationLifetimes.ProtocolActivatedEventArgs protocol)
-                    {
-                        Open([protocol.Uri.OriginalString]);
-                    }
-                    else if (e is Avalonia.Controls.ApplicationLifetimes.FileActivatedEventArgs files)
-                    {
-                        Open([.. files.Files.Select(f => f.TryGetLocalPath()).OfType<string>()]);
-                    }
-                };
-            }
-
             desktop.ShutdownRequested += (_, _) => Shutdown.Cancel();
             Infrastructure.DefaultMailApp.Current?.Refresh();
             Infrastructure.LinkProtocol.Register();
 
             // A file or link the system started Neruna with opens at once, not only after the first sync of all accounts.
             var starting = viewModel.StartAsync();
-            Open(desktop.Args ?? []);
+            Open([.. desktop.Args ?? [], .. early]);
+            open = Open;
             // Installed from the page /connect: the link it copied (only on the very first start, only a connection link).
-            if (!(desktop.Args ?? []).Any(SystemOpen.IsConnectLink) && await viewModel.IsFirstStartAsync() && main.Clipboard is { } clipboard)
+            if (!(desktop.Args ?? []).Concat(early).Any(SystemOpen.IsConnectLink) && await viewModel.IsFirstStartAsync() && main.Clipboard is { } clipboard)
             {
                 try
                 {
@@ -209,5 +234,27 @@ internal sealed partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    // No window: what macOS hands over in the first moments goes to the running Neruna (or just brings it to the front).
+    private static void Relay(IClassicDesktopStyleApplicationLifetime desktop, List<string> received)
+    {
+        desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
+        var waited = 0;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        timer.Tick += (_, _) =>
+        {
+            waited += 100;
+            if (received.Count == 0 && waited < 3000)
+            {
+                return;
+            }
+
+            timer.Stop();
+            string[] items = received.Count > 0 ? [.. received] : [SystemOpen.Activate];
+            _ = SingleInstance.TryHandOver(Options, items) || SingleInstance.TryHandOverToOpenProfile(Options, items);
+            desktop.Shutdown();
+        };
+        timer.Start();
     }
 }

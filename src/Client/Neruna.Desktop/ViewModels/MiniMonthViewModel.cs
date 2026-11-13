@@ -32,7 +32,8 @@ internal sealed partial class MiniMonth : ObservableObject
     public IReadOnlyList<MiniWeek> Weeks { get; }
 
     /// <param name="chosen">Days picked by hand: marked each (no week highlighted); null shows the selected week.</param>
-    public void Show(DateTime month, bool isFirst, DateTime selectedWeekStart, IReadOnlySet<DateTime> daysWithEvents, IReadOnlySet<DateTime>? chosen = null)
+    /// <param name="picked">The chosen days were picked by hand (dragging, Ctrl+click): marked strongly, not just the month shown.</param>
+    public void Show(DateTime month, bool isFirst, DateTime selectedWeekStart, IReadOnlySet<DateTime> daysWithEvents, IReadOnlySet<DateTime>? chosen = null, bool picked = false)
     {
         var first = new DateTime(month.Year, month.Month, 1);
         Title = first.ToString("MMMM yyyy", Culture);
@@ -42,7 +43,7 @@ internal sealed partial class MiniMonth : ObservableObject
         for (var w = 0; w < 6; w++)
         {
             var weekStart = start.AddDays(7 * w);
-            Weeks[w].Show(weekStart, chosen is null && weekStart == selectedWeekStart, first.Month, daysWithEvents, chosen);
+            Weeks[w].Show(weekStart, chosen is null && weekStart == selectedWeekStart, first.Month, daysWithEvents, chosen, picked);
         }
     }
 }
@@ -59,7 +60,7 @@ internal sealed partial class MiniWeek : ObservableObject
 
     public DateTime Start => Days[0].Date;
 
-    public void Show(DateTime weekStart, bool isSelected, int month, IReadOnlySet<DateTime> daysWithEvents, IReadOnlySet<DateTime>? chosen = null)
+    public void Show(DateTime weekStart, bool isSelected, int month, IReadOnlySet<DateTime> daysWithEvents, IReadOnlySet<DateTime>? chosen = null, bool picked = false)
     {
         NumberText = ISOWeek.GetWeekOfYear(weekStart).ToString(CultureInfo.InvariantCulture);
         IsSelected = isSelected;
@@ -68,6 +69,7 @@ internal sealed partial class MiniWeek : ObservableObject
             var date = weekStart.AddDays(d);
             Days[d].Show(date, date.Month == month, date == DateTime.Today, daysWithEvents.Contains(date));
             Days[d].IsChosen = chosen?.Contains(date) == true;
+            Days[d].IsPicked = picked && Days[d].IsChosen;
         }
     }
 }
@@ -95,6 +97,10 @@ internal sealed partial class MiniDay : ObservableObject
     /// <summary>One of the days picked by hand (drag, Ctrl+click), shown on the right.</summary>
     [ObservableProperty]
     public partial bool IsChosen { get; set; }
+
+    /// <summary>Chosen by dragging or Ctrl+click (not only part of the month shown): marked strongly.</summary>
+    [ObservableProperty]
+    public partial bool IsPicked { get; set; }
 
     public bool IsOtherMonth => !IsCurrentMonth;
 

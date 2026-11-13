@@ -49,7 +49,13 @@ internal static class Program
         // profile first: done once it is chosen (App).
         if (!App.Options.AskForProfile)
         {
-            if (Infrastructure.SingleInstance.TryHandOver(App.Options, args) || Infrastructure.SingleInstance.TryHandOverToOpenProfile(App.Options, args))
+            // macOS hands the link to a second copy (another Neruna.app, or one started from a random path because it
+            // was opened from Downloads) as a system event after the start, not as an argument: wait for it there.
+            if (OperatingSystem.IsMacOS() && !args.Any(Infrastructure.SystemOpen.IsOpenable) && Infrastructure.SingleInstance.IsRunning(App.Options.DataDirectory))
+            {
+                App.RelayOnly = true;
+            }
+            else if (Infrastructure.SingleInstance.TryHandOver(App.Options, args) || Infrastructure.SingleInstance.TryHandOverToOpenProfile(App.Options, args))
             {
                 return;
             }

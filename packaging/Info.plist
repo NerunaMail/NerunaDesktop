@@ -21,6 +21,10 @@
       <key>CFBundleURLName</key><string>E-Mail</string>
       <key>CFBundleURLSchemes</key><array><string>mailto</string></array>
     </dict>
+    <dict>
+      <key>CFBundleURLName</key><string>Neruna</string>
+      <key>CFBundleURLSchemes</key><array><string>neruna</string></array>
+    </dict>
   </array>
   <key>CFBundleDocumentTypes</key>
   <array>

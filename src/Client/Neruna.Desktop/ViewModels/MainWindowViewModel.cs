@@ -651,6 +651,8 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     {
         foreach (var item in items)
         {
+            // Only the kind (no addresses in the log): shows whether a link from another program arrived at all.
+            _logger.LogInformation("Opened from the system: {Kind}", SystemOpen.IsMailto(item) ? "mailto link" : SystemOpen.IsEml(item) ? "email file" : SystemOpen.IsMapi(item) ? "MAPI" : item == SystemOpen.Activate ? "activate" : "other");
             if (SystemOpen.IsMailto(item))
             {
                 Overlay = Overlay is CrashReportViewModel ? Overlay : null;
@@ -1304,6 +1306,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
     {
         try
         {
+            CalendarPage.HasCloud = (await _cloudController.GetConnectionsAsync()).Count > 0;
             var (open, overdue) = await new Neruna.Core.Cloud.SchedulingPolls(_cloudController).SummaryAsync(DateTimeOffset.Now);
             CalendarPage.OpenPollCount = open;
             CalendarPage.OverduePollCount = overdue;

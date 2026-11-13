@@ -105,6 +105,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         nameof(PreviousTip), nameof(NextTip), nameof(ShowTimeGrid), nameof(ShowList), nameof(ShowMonth), nameof(ShowPlanning))]
     public partial int ShownDays { get; set; } = 7;
 
+    partial void OnShownDaysChanged(int value) => NotifyViews();
+
     /// <summary>The month as a grid of weeks (whole weeks from the Monday before the 1st); <see cref="WeekStart"/> is the 1st.</summary>
     public bool IsMonth
     {
@@ -263,6 +265,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         OnPropertyChanged(nameof(IsWorkWeek));
         OnPropertyChanged(nameof(IsSingleDay));
         OnPropertyChanged(nameof(IsMonth));
+        NotifyViews();
         OnPropertyChanged(nameof(PreviousTip));
         OnPropertyChanged(nameof(NextTip));
         OnPropertyChanged(nameof(ShowTimeGrid));
@@ -754,6 +757,10 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
 
     public bool HasOpenPolls => OpenPollCount > 0;
 
+    /// <summary>Connected to Neruna Cloud: "Terminumfragen" in the bar; without, it is in «Kalender ▾».</summary>
+    [ObservableProperty]
+    public partial bool HasCloud { get; set; }
+
     public bool HasOverduePolls => OverduePollCount > 0;
 
     public string PollsTip => OverduePollCount > 0
@@ -1214,7 +1221,8 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             MiniMonths[i].Show(NavigatorMonth.AddMonths(i), i == 0, StartOfWeek(WeekStart), _busyDays,
                 _previewDays ?? (_chosenDays is { } chosen ? chosen.ToHashSet()
                     : IsMonth ? Enumerable.Range(0, DateTime.DaysInMonth(WeekStart.Year, WeekStart.Month)).Select(d => FirstOfMonth(WeekStart).AddDays(d)).ToHashSet()
-                    : null));
+                    : null),
+                picked: _previewDays is not null || _chosenDays is not null);
         }
     }
 

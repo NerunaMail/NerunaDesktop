@@ -2916,5 +2916,8 @@
  "Ohne Betreff senden?": "Send without a subject?",
  "Diese E-Mail hat keinen Betreff. Ein Betreff hilft den Empfängern, die Nachricht einzuordnen und wiederzufinden.": "This email has no subject. A subject helps recipients to sort the message and find it again.",
  "Ohne Betreff senden": "Send without subject",
- "Betreff eingeben": "Enter a subject"
+ "Betreff eingeben": "Enter a subject",
+ "Kalender hinzufügen, verwalten und importieren": "Add, manage and import calendars",
+ "Kalender verwalten …": "Manage calendars …",
+ "Termine importieren …": "Import events …"
 }

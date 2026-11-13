@@ -27,6 +27,55 @@ internal sealed partial class CalendarViewModel
     [NotifyPropertyChangedFor(nameof(ShowTimeGrid), nameof(ShowList), nameof(ShowMonth), nameof(ShowPlanning))]
     public partial bool IsPlanning { get; set; }
 
+    // The view switcher (1 Tag · Mo–Fr · Woche · Monat · Planung): one of them is on. A span switches the planning off,
+    // "Planung" keeps the span (a month becomes its week, the month has no planning).
+    public bool ViewDay { get => IsSingleDay && !IsPlanning; set => ChooseView(value, 1); }
+
+    public bool ViewWorkWeek { get => IsWorkWeek && !IsPlanning; set => ChooseView(value, 5); }
+
+    public bool ViewWeek { get => IsFullWeek && !IsPlanning; set => ChooseView(value, 7); }
+
+    public bool ViewMonth { get => IsMonth && !IsPlanning; set => ChooseView(value, MonthDays); }
+
+    public bool ViewPlanning
+    {
+        get => ShowPlanning;
+        set
+        {
+            if (value && !ShowPlanning)
+            {
+                if (IsMonth || HasChosenDays)
+                {
+                    ShowSpan(7);
+                }
+
+                IsPlanning = true;
+            }
+
+            NotifyViews();
+        }
+    }
+
+    private void ChooseView(bool on, int days)
+    {
+        if (on)
+        {
+            IsPlanning = false;
+            ShowSpan(days);
+        }
+
+        NotifyViews(); // a toggle in the group cannot be switched off by clicking it again
+    }
+
+    private void NotifyViews()
+    {
+        OnPropertyChanged(nameof(ViewDay));
+        OnPropertyChanged(nameof(ViewWorkWeek));
+        OnPropertyChanged(nameof(ViewWeek));
+        OnPropertyChanged(nameof(ViewMonth));
+        OnPropertyChanged(nameof(ViewPlanning));
+    }
+
     /// <summary>The month has no planning view: "Planung" waits until a week or a day is shown again.</summary>
     public bool ShowPlanning => IsPlanning && !IsMonth;
 
@@ -136,6 +185,7 @@ internal sealed partial class CalendarViewModel
 
     partial void OnIsPlanningChanged(bool value)
     {
+        NotifyViews();
         if (!_loadingSettings)
         {
             _ = settings.SetBoolAsync(SettingKeys.CalendarPlanning, value);
