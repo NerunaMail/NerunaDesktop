@@ -186,6 +186,7 @@ internal sealed partial class MailFolderTreeViewModel(IAccountStore accounts, Ma
             foreach (var folder in node!.AllFolders())
             {
                 folder.UnreadCount = byId[folder.Folder.RemoteId].UnreadCount;
+                folder.TotalCount = byId[folder.Folder.RemoteId].TotalCount;
             }
         }
 

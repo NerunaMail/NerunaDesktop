@@ -1357,6 +1357,13 @@ internal sealed partial class MailViewModel(
     // but not while a draft is open inline (reloading would close it).
     private async Task RefreshDraftsAsync(Guid connectionId, bool folderMayBeNew)
     {
+        // The number after "Entwürfe": a saved (or sent, discarded) draft shows at once, also while one is open.
+        if (Accounts.SelectMany(a => a.AllFolders()).FirstOrDefault(f => f.Folder.ConnectionId == connectionId && f.Folder.Role == FolderRole.Drafts) is { } drafts
+            && (await mail.GetFoldersAsync(connectionId)).FirstOrDefault(f => f.RemoteId == drafts.Folder.RemoteId) is { } stored)
+        {
+            drafts.TotalCount = stored.TotalCount;
+        }
+
         if (Compose is not null)
         {
             return;
@@ -1679,6 +1686,7 @@ internal sealed partial class MailViewModel(
             {
                 var updated = (await mail.GetFoldersAsync(folder.Folder.ConnectionId)).FirstOrDefault(f => f.RemoteId == folder.Folder.RemoteId);
                 folder.UnreadCount = updated?.UnreadCount ?? folder.UnreadCount;
+                folder.TotalCount = updated?.TotalCount ?? folder.TotalCount;
                 await RefreshCurrentFolderAsync();
             }
         }
@@ -1715,6 +1723,7 @@ internal sealed partial class MailViewModel(
 
         var updated = (await mail.GetFoldersAsync(connectionId)).FirstOrDefault(f => f.RemoteId == folderRemoteId);
         node.UnreadCount = updated?.UnreadCount ?? node.UnreadCount;
+        node.TotalCount = updated?.TotalCount ?? node.TotalCount;
         if (CurrentFolder == node)
         {
             await RefreshCurrentFolderAsync();
@@ -2592,8 +2601,15 @@ internal sealed partial class MailFolderNode(MailFolder folder) : ObservableObje
 
     public bool HasUnread => UnreadCount > 0 && Folder.Role is not (FolderRole.Sent or FolderRole.Drafts);
 
-    /// <summary>" (3)" after the folder name, empty when nothing is unread.</summary>
-    public string UnreadText => HasUnread ? $" ({UnreadCount.ToString(CultureInfo.CurrentCulture)})" : string.Empty;
+    /// <summary>All messages of the folder: for "Entwürfe" the number of drafts (they are stored as read).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UnreadText))]
+    public partial int TotalCount { get; set; } = folder.TotalCount;
+
+    /// <summary>" (3)" after the folder name: unread messages, in "Entwürfe" the drafts; empty when there are none.</summary>
+    public string UnreadText => HasUnread ? $" ({UnreadCount.ToString(CultureInfo.CurrentCulture)})"
+        : Folder.Role == FolderRole.Drafts && TotalCount > 0 ? $" ({TotalCount.ToString(CultureInfo.CurrentCulture)})"
+        : string.Empty;
 
     public IEnumerable<MailFolderNode> SelfAndDescendants() => Children.SelectMany(c => c.SelfAndDescendants()).Prepend(this);
 }
