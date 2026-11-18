@@ -34,6 +34,8 @@ internal sealed partial class FolderPickNode : ObservableObject
     /// <summary>False for the folder the mail is already in (it stays in the tree for its subfolders).</summary>
     public bool IsEnabled { get; }
 
+    public bool IsDimmed => !IsEnabled;
+
     public FolderRole Role => Folder?.Folder.Role ?? FolderRole.None;
 
     public ObservableCollection<FolderPickNode> Children { get; } = [];
@@ -183,8 +185,19 @@ internal sealed partial class FolderPickerViewModel : ViewModelBase
     [RelayCommand]
     private void PickNode(FolderPickNode? node)
     {
-        if (node is null || !node.IsEnabled)
+        if (node is null)
         {
+            return;
+        }
+
+        // The folder the mail is already in: not a target, a click opens or closes its subfolders.
+        if (!node.IsEnabled)
+        {
+            if (node.Children.Count > 0)
+            {
+                node.IsExpanded = !node.IsExpanded;
+            }
+
             return;
         }
 

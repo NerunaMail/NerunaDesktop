@@ -302,30 +302,31 @@
       </ComboBox.SelectionBoxItemTemplate>
     </ComboBox>
 
-    <!-- An / Cc / Bcc: typing suggests contacts and groups from the address books; the button beside opens the picker -->
+    <!-- An / Cc / Bcc: typing suggests contacts and groups from the address books; the button beside opens the picker.
+         Tab goes from field to field (An → Cc/Bcc if shown → Betreff → text), not over the buttons beside them. -->
     <TextBlock Grid.Row="2" Classes="subtle fieldLabel" Text="{l:T 'An'}" />
     <ctl:RecipientBox x:Name="ToBox" Grid.Row="2" Grid.Column="1" Text="{Binding To}" Directory="{Binding Recipients}" Margin="0,3" PlaceholderText="{l:T 'Name oder Adresse eingeben, mehrere mit Komma trennen'}"
                       AutomationProperties.Name="{l:T 'An'}" />
     <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-      <Button x:Name="ToButton" Classes="pick" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «An» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «An» auswählen'}">
+      <Button x:Name="ToButton" Classes="pick" IsTabStop="False" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «An» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «An» auswählen'}">
         <PathIcon Data="{StaticResource IconPeople}" />
       </Button>
-      <Button Classes="field" Content="{l:T 'Cc'}" Command="{Binding ShowCcFieldCommand}" Click="OnShowField" Tag="CcBox" IsVisible="{Binding !ShowCc}"
+      <Button Classes="field" IsTabStop="False" Content="{l:T 'Cc'}" Command="{Binding ShowCcFieldCommand}" Click="OnShowField" Tag="CcBox" IsVisible="{Binding !ShowCc}"
               ToolTip.Tip="{l:T 'Kopie-Feld (Cc) einblenden'}" />
-      <Button Classes="field" Content="{l:T 'Bcc'}" Command="{Binding ShowBccFieldCommand}" Click="OnShowField" Tag="BccBox" IsVisible="{Binding !ShowBcc}"
+      <Button Classes="field" IsTabStop="False" Content="{l:T 'Bcc'}" Command="{Binding ShowBccFieldCommand}" Click="OnShowField" Tag="BccBox" IsVisible="{Binding !ShowBcc}"
               ToolTip.Tip="{l:T 'Blindkopie-Feld (Bcc) einblenden – Empfänger sehen diese Adressen nicht'}" />
     </StackPanel>
 
     <TextBlock Grid.Row="3" Classes="subtle fieldLabel" Text="{l:T 'Cc'}" IsVisible="{Binding ShowCc}" />
     <ctl:RecipientBox x:Name="CcBox" Grid.Row="3" Grid.Column="1" IsVisible="{Binding ShowCc}" Text="{Binding Cc}" Directory="{Binding Recipients}" Margin="0,3" AutomationProperties.Name="{l:T 'Cc'}" />
-    <Button x:Name="CcButton" Grid.Row="3" Grid.Column="2" Classes="pick" HorizontalAlignment="Left" IsVisible="{Binding ShowCc}" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «Cc» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «Cc» auswählen'}">
+    <Button x:Name="CcButton" Grid.Row="3" Grid.Column="2" Classes="pick" IsTabStop="False" HorizontalAlignment="Left" IsVisible="{Binding ShowCc}" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «Cc» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «Cc» auswählen'}">
       <PathIcon Data="{StaticResource IconPeople}" />
     </Button>
 
     <TextBlock Grid.Row="4" Classes="subtle fieldLabel" Text="{l:T 'Bcc'}" IsVisible="{Binding ShowBcc}" />
     <ctl:RecipientBox x:Name="BccBox" Grid.Row="4" Grid.Column="1" IsVisible="{Binding ShowBcc}" Text="{Binding Bcc}" Directory="{Binding Recipients}" Margin="0,3" PlaceholderText="{l:T 'Empfänger sehen diese Adressen nicht'}"
                         AutomationProperties.Name="{l:T 'Bcc'}" />
-    <Button x:Name="BccButton" Grid.Row="4" Grid.Column="2" Classes="pick" HorizontalAlignment="Left" IsVisible="{Binding ShowBcc}" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «Bcc» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «Bcc» auswählen'}">
+    <Button x:Name="BccButton" Grid.Row="4" Grid.Column="2" Classes="pick" IsTabStop="False" HorizontalAlignment="Left" IsVisible="{Binding ShowBcc}" Click="OnPickRecipients" ToolTip.Tip="{l:T 'Kontakte für «Bcc» auswählen'}" AutomationProperties.Name="{l:T 'Kontakte für «Bcc» auswählen'}">
       <PathIcon Data="{StaticResource IconPeople}" />
     </Button>
 

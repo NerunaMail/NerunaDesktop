@@ -441,6 +441,16 @@ internal static class Snapshots
         await SaveAsync(pickerWindow, output, "quick-action-folder-picker.png");
         Console.WriteLine($"Picker first time: open [{string.Join(", ", folderPicker.ExpandedKeys.Select(k => k[..Math.Min(k.Length, 12)]))}], current enabled: "
             + $"{folderPicker.Roots[0].Children.First(n => n.Folder == pickerInbox).IsEnabled}");
+        // The folder the mail is in: greyed out, not a target, but it opens to its subfolders.
+        var inboxPick = folderPicker.Roots[0].Children.First(n => n.Folder == pickerInbox);
+        var wasOpen = inboxPick.IsExpanded;
+        folderPicker.PickNodeCommand.Execute(inboxPick);
+        await Task.Delay(200);
+        var inboxItem = pickerWindow.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault(i => i.DataContext == inboxPick);
+        Console.WriteLine($"Picker current folder: children {inboxPick.Children.Count}, click toggles {wasOpen} → {inboxPick.IsExpanded}, item enabled {inboxItem?.IsEffectivelyEnabled}");
+        await SaveAsync(pickerWindow, output, "quick-action-folder-picker-current.png");
+        folderPicker.PickNodeCommand.Execute(inboxPick);
+
         // Closing an account and opening a folder: the next picker opens the same way.
         foreach (var root in folderPicker.Roots.Skip(1))
         {
@@ -866,6 +876,14 @@ internal static class Snapshots
         await sized.SendCommand.ExecuteAsync(null);
         await Task.Delay(300);
         Console.WriteLine($"No subject: asked, sending stopped, cursor in subject: {sizedView.FindControl<TextBox>("SubjectBox")!.IsFocused}");
+        // Tab from "An": the next stop is "Betreff" (the contacts, Cc and Bcc buttons are skipped).
+        var tabFrom = sizedView.FindControl<Neruna.Desktop.Controls.RecipientBox>("ToBox")!;
+        var tabInput = tabFrom.GetVisualDescendants().OfType<TextBox>().FirstOrDefault() ?? (InputElement)tabFrom;
+        tabInput.Focus();
+        tabInput.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Tab, Source = tabInput });
+        await Task.Delay(100);
+        var afterTab = host.FocusManager?.GetFocusedElement() as Control;
+        Console.WriteLine($"Tab from An: next = {afterTab?.Name ?? afterTab?.GetType().Name} in {afterTab?.GetVisualAncestors().OfType<Control>().FirstOrDefault(c => c.Name is { Length: > 0 })?.Name}");
         host.Close();
         vm.NavigateCommand.Execute(Section.Mail);
         await Task.Delay(300);

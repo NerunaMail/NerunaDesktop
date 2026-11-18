@@ -18,13 +18,14 @@
         <TreeView x:Name="Tree" ItemsSource="{Binding Roots}" IsVisible="{Binding !IsSearching}" KeyDown="OnTreeKeyDown">
           <TreeView.Styles>
             <Style Selector="TreeViewItem" x:DataType="vm:FolderPickNode">
+              <!-- Not disabled (that would also lock its arrow and subfolders): the folder the mail is in is greyed out
+                   and cannot be picked, but opens to its subfolders -->
               <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-              <Setter Property="IsEnabled" Value="{Binding IsEnabled}" />
             </Style>
           </TreeView.Styles>
           <TreeView.ItemTemplate>
             <TreeDataTemplate DataType="vm:FolderPickNode" ItemsSource="{Binding Children}">
-              <Grid ColumnDefinitions="Auto,*" Background="Transparent" Tapped="OnNodeTapped">
+              <Grid ColumnDefinitions="Auto,*" Background="Transparent" Tapped="OnNodeTapped" Opacity="{Binding IsDimmed, Converter={x:Static l:Converters.DimmedOpacity}}">
                 <PathIcon Data="{Binding Role, Converter={x:Static l:Converters.FolderIcon}}" Width="14" Height="14" Margin="0,0,8,0"
                           Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" IsVisible="{Binding !IsAccount}" />
                 <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
