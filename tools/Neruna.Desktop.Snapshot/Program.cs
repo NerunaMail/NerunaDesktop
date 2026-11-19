@@ -891,6 +891,32 @@ internal static class Snapshots
         sized.Encrypt = true;
         await Task.Delay(300);
         await SaveAsync(host, output, "compose-secure.png");
+        {
+            var send = sizedView.FindControl<StackPanel>("MainTools")!.Children[0];
+            Console.WriteLine($"Compose secure: level {sized.ToolbarLevel}, labels {sized.ShowToolLabels}, compact {sized.CompactBar}, bar {sizedView.FindControl<Grid>("ActionBar")!.Bounds}, send {send.Bounds} desired {send.DesiredSize}, main desired {sizedView.FindControl<StackPanel>("MainTools")!.DesiredSize}");
+        }
+        // Every width around the switch between labels and none: no button clipped or overlapping (dark, signed + encrypted).
+        Appearance.Apply(ThemeMode.Dark, ColorScheme.Blue);
+        for (var scanWidth = 640; scanWidth <= 900; scanWidth += 4)
+        {
+            host.Width = scanWidth + 40;
+            await Task.Delay(120);
+            var tools = sizedView.FindControl<StackPanel>("MainTools")!.GetVisualDescendants().OfType<Control>()
+                .Where(c => c is Button or Avalonia.Controls.Primitives.ToggleButton || c is Border b0 && b0.Classes.Contains("badge"))
+                .Where(c => c.IsEffectivelyVisible).ToList();
+            var problems = tools.Where(c => c.DesiredSize.Height > c.Bounds.Height + 0.5 || c.DesiredSize.Width > c.Bounds.Width + 0.5)
+                .Select(c => $"{c.GetType().Name}:{(c as Neruna.Desktop.Controls.ToolButton)?.Label} desired {c.DesiredSize.Width:0}×{c.DesiredSize.Height:0} got {c.Bounds.Width:0}×{c.Bounds.Height:0}").ToList();
+            var labels = tools.OfType<Neruna.Desktop.Controls.ToolButton>().Select(b => b.ShowLabel).Distinct().Count();
+            if (problems.Count > 0 || labels > 1)
+            {
+                Console.WriteLine($"Compose scan {scanWidth}: level {sized.ToolbarLevel}, mixed labels {labels > 1}: {string.Join("; ", problems.Take(4))}");
+                await SaveAsync(host, output, $"compose-scan-{scanWidth}.png");
+            }
+        }
+
+        Console.WriteLine("Compose scan done");
+        Appearance.Apply(ThemeMode.Light, ColorScheme.Blue);
+        host.Width = 760;
         sized.EncryptIncomplete = true;
         await Task.Delay(300);
         await SaveAsync(host, output, "compose-secure-incomplete.png");

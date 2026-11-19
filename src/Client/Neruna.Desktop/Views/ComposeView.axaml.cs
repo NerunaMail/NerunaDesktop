@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Neruna.Desktop.Editor;
@@ -112,8 +113,8 @@ internal sealed partial class ComposeView : UserControl
         for (var level = 0; level <= Last; level++)
         {
             vm.ToolbarLevel = level;
-            MainTools.Measure(Size.Infinity);
-            SideTools.Measure(Size.Infinity);
+            Remeasure(MainTools);
+            Remeasure(SideTools);
             if (MainTools.DesiredSize.Width + SideTools.DesiredSize.Width + 16 <= available)
             {
                 break;
@@ -128,6 +129,19 @@ internal sealed partial class ComposeView : UserControl
         {
             MoreButton.Focus();
         }
+    }
+
+    // A label hidden deep inside a button marks only itself as changed until the next layout pass; the row would still
+    // report its old width. Everything in it measured anew, so each level is measured as it really is.
+    private static void Remeasure(Layoutable row)
+    {
+        foreach (var child in Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(row).OfType<Layoutable>())
+        {
+            child.InvalidateMeasure();
+        }
+
+        row.InvalidateMeasure();
+        row.Measure(Size.Infinity);
     }
 
     // "Cc" / "Bcc" beside "An": the field appears (by the command) and gets the cursor.
