@@ -300,6 +300,14 @@ internal static class Snapshots
         await SaveAsync(window, output, "mail-pdf-zoom-200.png");
         zoomPreview.ResetZoomCommand.Execute(null);
         await Task.Delay(200);
+        // Ctrl + mouse wheel on the page: one step bigger (as the user does it, through the view).
+        var wheelImage = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(window).OfType<Avalonia.Controls.Image>().First(i => i.DataContext is PreviewPage);
+        wheelImage.RaiseEvent(new Avalonia.Input.PointerWheelEventArgs(wheelImage, new Avalonia.Input.Pointer(Avalonia.Input.Pointer.GetNextFreeId(), Avalonia.Input.PointerType.Mouse, true),
+            window, new Point(10, 10), 0, new Avalonia.Input.PointerPointProperties(), Avalonia.Input.KeyModifiers.Control, new Vector(0, 1)) { RoutedEvent = Avalonia.Input.InputElement.PointerWheelChangedEvent });
+        await Task.Delay(300);
+        Console.WriteLine($"Preview wheel: {zoomPreview.ZoomText}, {PageWidthNow():F0} px");
+        zoomPreview.ResetZoomCommand.Execute(null);
+        await Task.Delay(200);
 
         // Stamping the PDF: placed (shown on the page at once), then kept – with the person's name, not the login.
         await services.GetRequiredService<Neruna.Core.Mail.QuickActionService>().SetStampNameAsync("Anna Muster");

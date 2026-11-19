@@ -18,6 +18,12 @@ internal sealed partial class ReadingPaneView : UserControl
         ToLine.SizeChanged += (_, _) => PostRecipientsCheck();
         CcLine.SizeChanged += (_, _) => PostRecipientsCheck();
         ToLine.LayoutUpdated += (_, _) => PostRecipientsCheck();
+        PreviewToolbar.SizeChanged += (_, _) => ArrangePreviewToolbar();
+        PreviewButtons.SizeChanged += (_, _) => ArrangePreviewToolbar();
+        // Zoom of the preview: 100 % follows the pane's width; Ctrl + mouse wheel before the scroller scrolls.
+        PreviewScroller.SizeChanged += (_, _) => SetPreviewWidth();
+        PreviewScroller.DataContextChanged += (_, _) => SetPreviewWidth();
+        PreviewScroller.AddHandler(PointerWheelChangedEvent, OnPreviewWheel, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
 
     /// <summary>A page's width: at 100 % the pane's (less the margins), a smaller picture its own; times the zoom.</summary>
