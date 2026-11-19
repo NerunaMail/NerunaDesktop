@@ -268,6 +268,14 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             MailPage.ContactsChanged(); // a sender just saved as a contact loses its "+"
         });
         MailPage.AddContactRequested += (_, sender) => ContactsPage.NewContactFrom(sender);
+        MailPage.ShowContactRequested += async (_, address) =>
+        {
+            CurrentPage = ContactsPage;
+            if (!await ContactsPage.RevealAsync(null, address.Address))
+            {
+                StatusText = F("Kein Kontakt mit der Adresse {0} gefunden.", address.Address);
+            }
+        };
         MailPage.ManageTagsRequested += async (_, _) =>
         {
             Navigate(Section.Settings);

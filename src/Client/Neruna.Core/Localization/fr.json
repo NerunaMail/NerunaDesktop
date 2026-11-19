@@ -2919,5 +2919,16 @@
  "Betreff eingeben": "Saisir un objet",
  "Kalender hinzufügen, verwalten und importieren": "Ajouter, gérer et importer des calendriers",
  "Kalender verwalten …": "Gérer les calendriers …",
- "Termine importieren …": "Importer des rendez-vous …"
+ "Termine importieren …": "Importer des rendez-vous …",
+ "Vergrössern (Ctrl+Mausrad)": "Agrandir (Ctrl+molette)",
+ "Verkleinern (Ctrl+Mausrad)": "Réduire (Ctrl+molette)",
+ "Zoom": "Zoom",
+ "Zurück auf 100 %": "Revenir à 100 %",
+ "Schnellaktionen für diese Mail": "Actions rapides pour cet e-mail",
+ "Cc:": "Cc :",
+ "E-Mail-Adresse kopieren": "Copier l’adresse e-mail",
+ "Kontakt anzeigen": "Afficher le contact",
+ "Neue E-Mail an {0}": "Nouvel e-mail à {0}",
+ "Weniger": "Moins",
+ "Zu Kontakten hinzufügen": "Ajouter aux contacts"
 }

@@ -1043,8 +1043,20 @@ internal sealed partial class MailViewModel(
 
     // The "+" beside the sender shows when the sender is in no address book and is no own address; a contact's
     // picture replaces the initials.
+    /// <summary>"Kontakt anzeigen" for a recipient of the open mail: the contacts page with that contact.</summary>
+    public event EventHandler<MailAddress>? ShowContactRequested;
+
     private ReadingPaneViewModel OfferContact(ReadingPaneViewModel pane)
     {
+        // The recipients: new mail to them, their contact or a new one.
+        pane.MailTo = address => _ = StartComposeAsync(ComposeDraft.Empty with
+        {
+            To = address.Name is { Length: > 0 } name ? $"{name} <{address.Address}>" : address.Address,
+        }, ComposeKind.New);
+        pane.ShowContact = address => ShowContactRequested?.Invoke(this, address);
+        pane.AddContact = address => AddContactRequested?.Invoke(this, address);
+        _ = CheckRecipientsAsync(pane);
+
         if (pane.Sender is { } sender)
         {
             var own = Accounts.Any(a => a.Account.Owns(sender.Address));
@@ -1073,6 +1085,28 @@ internal sealed partial class MailViewModel(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogDebug(ex, "Contacts not readable for the sender check");
+        }
+    }
+
+    // Each recipient: in an address book ("Kontakt anzeigen", its name when the mail has none) or not ("hinzufügen").
+    private async Task CheckRecipientsAsync(ReadingPaneViewModel pane)
+    {
+        try
+        {
+            foreach (var recipient in pane.AllRecipients)
+            {
+                var contact = await recipients.FindContactAsync(recipient.Address);
+                recipient.IsContact = contact is not null;
+                recipient.CanAdd = contact is null && !Accounts.Any(a => a.Account.Owns(recipient.Address));
+                if (recipient.Name is null && contact?.DisplayName is { Length: > 0 } contactName)
+                {
+                    recipient.Name = contactName;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Contacts not readable for the recipients");
         }
     }
 
@@ -1230,7 +1264,7 @@ internal sealed partial class MailViewModel(
                 // The quick actions and the PDF stamps work here, for this mail (replies in their own window too).
                 var context = new QuickActionContext(pane, message, folder, InWindow: true, opened.Security.WasEncrypted, () => window.Pane == pane);
                 pane.AttachmentActions = AttachmentActionsFor(context);
-                window.QuickActions = await QuickActionsForWindowAsync(context);
+                window.QuickActions = pane.QuickActions = await QuickActionsForWindowAsync(context);
             }
 
             await ShowAsync(await ViewForAsync(message.Summary, opened, await IsRemoteContentAllowedAsync(message.Summary)));

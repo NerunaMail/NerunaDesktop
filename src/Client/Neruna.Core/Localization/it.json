@@ -2919,5 +2919,16 @@
  "Betreff eingeben": "Inserisci un oggetto",
  "Kalender hinzufügen, verwalten und importieren": "Aggiungi, gestisci e importa calendari",
  "Kalender verwalten …": "Gestisci calendari …",
- "Termine importieren …": "Importa appuntamenti …"
+ "Termine importieren …": "Importa appuntamenti …",
+ "Vergrössern (Ctrl+Mausrad)": "Ingrandisci (Ctrl+rotellina)",
+ "Verkleinern (Ctrl+Mausrad)": "Riduci (Ctrl+rotellina)",
+ "Zoom": "Zoom",
+ "Zurück auf 100 %": "Torna al 100 %",
+ "Schnellaktionen für diese Mail": "Azioni rapide per questa e-mail",
+ "Cc:": "Cc:",
+ "E-Mail-Adresse kopieren": "Copia indirizzo e-mail",
+ "Kontakt anzeigen": "Mostra contatto",
+ "Neue E-Mail an {0}": "Nuova e-mail a {0}",
+ "Weniger": "Meno",
+ "Zu Kontakten hinzufügen": "Aggiungi ai contatti"
 }

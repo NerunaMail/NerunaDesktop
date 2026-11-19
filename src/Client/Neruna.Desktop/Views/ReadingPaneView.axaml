@@ -7,8 +7,26 @@
              xmlns:views="using:Neruna.Desktop.Views"
              xmlns:core="using:Neruna.Core.Mail"
              xmlns:sys="using:System"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              x:Class="Neruna.Desktop.Views.ReadingPaneView"
              x:DataType="vm:ReadingPaneViewModel">
+  <UserControl.Resources>
+    <!-- A recipient in the header: name (address as tooltip); the same menu on click and right-click -->
+    <DataTemplate x:Key="RecipientTemplate" x:DataType="vm:RecipientItem">
+      <Button Classes="recipient" Content="{Binding Text}" ToolTip.Tip="{Binding Address}" Click="OnRecipientClick">
+        <Button.ContextFlyout>
+          <MenuFlyout Placement="BottomEdgeAlignedLeft">
+            <MenuItem Header="{l:T 'E-Mail-Adresse kopieren'}" Click="OnCopyRecipient" />
+            <MenuItem Header="{Binding MailToText}" Command="{Binding $parent[UserControl].((vm:ReadingPaneViewModel)DataContext).MailToRecipientCommand}" CommandParameter="{Binding}" />
+            <MenuItem Header="{l:T 'Kontakt anzeigen'}" IsVisible="{Binding IsContact}"
+                      Command="{Binding $parent[UserControl].((vm:ReadingPaneViewModel)DataContext).ShowRecipientContactCommand}" CommandParameter="{Binding}" />
+            <MenuItem Header="{l:T 'Zu Kontakten hinzufügen'}" IsVisible="{Binding CanAdd}"
+                      Command="{Binding $parent[UserControl].((vm:ReadingPaneViewModel)DataContext).AddRecipientContactCommand}" CommandParameter="{Binding}" />
+          </MenuFlyout>
+        </Button.ContextFlyout>
+      </Button>
+    </DataTemplate>
+  </UserControl.Resources>
   <!-- A message: header, security, attachments, body. Used in the mail page and in the message window. -->
   <Panel>
     <TextBlock IsVisible="{Binding IsInfo}" Text="{Binding InfoText}" Classes="subtle"
@@ -32,7 +50,7 @@
         <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Classes="subtle" FontSize="12" Text="{Binding ExportStatus}" TextWrapping="Wrap"
                    IsVisible="{Binding ExportStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </Grid>
-      <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="24,16,24,8">
+      <Grid Grid.Row="1" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="24,16,24,8">
         <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentTextBrush}" VerticalAlignment="Top" ClipToBounds="True">
           <Panel>
             <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
@@ -52,9 +70,44 @@
             </Button>
           </Grid>
           <!-- An/Cc: cut off after one line; when cut, a click shows every address (and another click one line again) -->
-          <StackPanel x:Name="RecipientLines" Background="Transparent" Spacing="2" Tapped="OnRecipientsTapped">
-            <TextBlock x:Name="ToLine" Classes="subtle" FontSize="12" Text="{Binding To, Converter={x:Static l:Fmt.Instance}, ConverterParameter='An: {0}'}" TextTrimming="CharacterEllipsis" />
-            <TextBlock x:Name="CcLine" Classes="subtle" FontSize="12" Text="{Binding Cc, Converter={x:Static l:Fmt.Instance}, ConverterParameter='Cc: {0}'}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCc}" />
+          <!-- Each recipient on its own: the address as tooltip, a click or right-click opens the menu (copy, new mail,
+               contact). One line each until expanded with «+N». -->
+          <StackPanel x:Name="RecipientLines" Spacing="2">
+            <StackPanel.Styles>
+              <Style Selector="Button.recipient">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}" />
+                <Setter Property="Cursor" Value="Hand" />
+              </Style>
+              <Style Selector="Button.recipient:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+              </Style>
+              <Style Selector="Button.more">
+                <Setter Property="Padding" Value="4,0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="VerticalAlignment" Value="Top" />
+              </Style>
+            </StackPanel.Styles>
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Left" Classes="subtle" FontSize="12" Text="{l:T 'An:'}" Margin="0,0,4,0" VerticalAlignment="Top" />
+              <Button x:Name="ToMore" DockPanel.Dock="Right" Classes="command more" IsVisible="False" Click="OnRecipientsMore" />
+              <ItemsControl x:Name="ToLine" ItemsSource="{Binding ToPeople}" ItemTemplate="{StaticResource RecipientTemplate}" ClipToBounds="True">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel ItemSpacing="5" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              </ItemsControl>
+            </DockPanel>
+            <DockPanel IsVisible="{Binding HasCc}">
+              <TextBlock DockPanel.Dock="Left" Classes="subtle" FontSize="12" Text="{l:T 'Cc:'}" Margin="0,0,4,0" VerticalAlignment="Top" />
+              <Button x:Name="CcMore" DockPanel.Dock="Right" Classes="command more" IsVisible="False" Click="OnRecipientsMore" />
+              <ItemsControl x:Name="CcLine" ItemsSource="{Binding CcPeople}" ItemTemplate="{StaticResource RecipientTemplate}" ClipToBounds="True">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel ItemSpacing="5" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              </ItemsControl>
+            </DockPanel>
           </StackPanel>
           <!-- Date and the security check in one line; where that is too narrow, the check goes below the date.
                (Beside the sender it took the width the name needs.) -->
@@ -70,6 +123,9 @@
             </Button>
           </WrapPanel>
         </StackPanel>
+        <!-- Schnellaktionen for this mail: under the header, above the attachments; only when one fits (up to two
+             lines, the rest behind «+N weitere») -->
+        <ctl:QuickActionBar Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" Actions="{Binding QuickActions}" IsVisible="{Binding HasQuickActions}" />
       </Grid>
 
       <StackPanel Grid.Row="2">
@@ -380,7 +436,7 @@
       <views:MessageBodyView Grid.Row="7" IsVisible="{Binding ShowsBody}" />
 
       <!-- Attachment preview in place of the message text -->
-      <Grid Grid.Row="7" RowDefinitions="Auto,Auto,*" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid Grid.Row="7" RowDefinitions="Auto,Auto,*,Auto" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}">
         <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,1" Padding="16,6">
           <!-- The buttons go onto a second line when the pane is too narrow for them beside the file name (code-behind) -->
           <Grid x:Name="PreviewToolbar" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel">
@@ -443,8 +499,8 @@
         </Border>
         <!-- An attached mail: as a message of its own (its view is made only when needed – it is this view again) -->
         <ContentControl Grid.Row="2" Content="{Binding Preview.Message}" IsVisible="{Binding Preview.Message, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
-        <ScrollViewer Grid.Row="2" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel"
-                      IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNull}, FallbackValue=True}">
+        <ScrollViewer x:Name="PreviewScroller" Grid.Row="2" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel"
+                      HorizontalScrollBarVisibility="Auto" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNull}, FallbackValue=True}">
           <StackPanel Margin="16" Spacing="12">
             <ItemsControl ItemsSource="{Binding Pages}">
               <ItemsControl.ItemsPanel>
@@ -457,7 +513,16 @@
                   <Border Background="White" BoxShadow="0 1 4 0 #33000000" HorizontalAlignment="Center">
                     <!-- While placing: the stamp (or text) itself follows the mouse, at its size on the page -->
                     <Panel PointerMoved="OnPreviewPageMoved" PointerExited="OnPreviewPageExited">
-                      <Image Source="{Binding Image}" Stretch="Uniform" StretchDirection="DownOnly" PointerPressed="OnPreviewPagePressed" />
+                      <!-- 100 %: the pane's width, a smaller picture at its own size; times the zoom -->
+                      <Image Source="{Binding Image}" Stretch="Uniform" PointerPressed="OnPreviewPagePressed">
+                        <Image.Width>
+                          <MultiBinding Converter="{x:Static views:ReadingPaneView.PageWidth}">
+                            <Binding Path="Image" />
+                            <Binding Path="$parent[ScrollViewer].((vm:AttachmentPreviewViewModel)DataContext).ViewWidth" FallbackValue="0" />
+                            <Binding Path="$parent[ScrollViewer].((vm:AttachmentPreviewViewModel)DataContext).Zoom" FallbackValue="1" />
+                          </MultiBinding>
+                        </Image.Width>
+                      </Image>
                       <Canvas IsHitTestVisible="False" ClipToBounds="True" />
                     </Panel>
                   </Border>
@@ -470,6 +535,21 @@
             <Button Content="{l:T 'Weitere Seiten anzeigen'}" Command="{Binding MorePagesCommand}" IsVisible="{Binding HasMorePages}" HorizontalAlignment="Center" />
           </StackPanel>
         </ScrollViewer>
+        <!-- Zoom: −, slider, +, the percentage (a click: back to 100 %); also Ctrl + mouse wheel -->
+        <Border Grid.Row="3" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0" Padding="16,3" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel"
+                IsVisible="{Binding ShowsZoom, FallbackValue=False}">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="4">
+            <Button Classes="command" Padding="6,4" Command="{Binding ZoomOutCommand}" ToolTip.Tip="{l:T 'Verkleinern (Ctrl+Mausrad)'}" AutomationProperties.Name="{l:T 'Verkleinern'}">
+              <PathIcon Data="{StaticResource IconRemove}" Width="12" Height="12" />
+            </Button>
+            <Slider Width="140" Minimum="-2" Maximum="2" Value="{Binding ZoomSlider}" VerticalAlignment="Center" Margin="0,-8"
+                    ToolTip.Tip="{l:T 'Zoom'}" AutomationProperties.Name="{l:T 'Zoom'}" />
+            <Button Classes="command" Padding="6,4" Command="{Binding ZoomInCommand}" ToolTip.Tip="{l:T 'Vergrössern (Ctrl+Mausrad)'}" AutomationProperties.Name="{l:T 'Vergrössern'}">
+              <PathIcon Data="{StaticResource IconAdd}" Width="12" Height="12" />
+            </Button>
+            <Button Classes="command" Padding="6,4" MinWidth="56" Content="{Binding ZoomText}" Command="{Binding ResetZoomCommand}" ToolTip.Tip="{l:T 'Zurück auf 100 %'}" />
+          </StackPanel>
+        </Border>
       </Grid>
     </Grid>
   </Panel>

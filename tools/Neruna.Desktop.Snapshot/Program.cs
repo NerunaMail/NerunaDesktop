@@ -151,12 +151,18 @@ internal static class Snapshots
         if (vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault(m => m.Summary.Subject.Contains("Teamausflug", StringComparison.Ordinal)) is { } teamMail)
         {
             vm.MailPage.SelectedEntry = teamMail;
-            await Task.Delay(300);
+            var fullWidth = window.Width;
+            window.Width = 1100;
+            await Task.Delay(500);
             await SaveAsync(window, output, "mail-cc-cut.png");
-            var lines = window.GetVisualDescendants().OfType<StackPanel>().First(p => p.Name == "RecipientLines");
-            Console.WriteLine($"Recipients clickable: {lines.Cursor != Avalonia.Input.Cursor.Default}");
-            lines.RaiseEvent(new Avalonia.Input.TappedEventArgs(Avalonia.Input.InputElement.TappedEvent, null!));
+            await Task.Delay(300);
+            var ccMore = window.GetVisualDescendants().OfType<Button>().First(b => b.Name == "CcMore");
+            Console.WriteLine($"Cc cut: «{ccMore.Content}» shown {ccMore.IsVisible}");
+            ccMore.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            await Task.Delay(300);
+            Console.WriteLine($"Cc expanded: «{ccMore.Content}»");
             await SaveAsync(window, output, "mail-cc-all.png");
+            window.Width = fullWidth;
             vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
             await Task.Delay(300);
         }
@@ -281,6 +287,20 @@ internal static class Snapshots
         }
 
         Console.WriteLine($"Attachment preview: {vm.MailPage.ReadingPane.Preview?.Pages.Count} page(s), {vm.MailPage.ReadingPane.Preview?.PageInfo}, problem={vm.MailPage.ReadingPane.Preview?.Problem}");
+        // Zoom: the bar below, 100 % as opened; 200 % twice as wide (scrolls sideways), then back.
+        var zoomPreview = vm.MailPage.ReadingPane.Preview!;
+        await Task.Delay(300);
+        double PageWidthNow() => Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(window).OfType<Avalonia.Controls.Image>()
+            .FirstOrDefault(i => i.DataContext is PreviewPage)?.Bounds.Width ?? 0;
+        var at100 = PageWidthNow();
+        await SaveAsync(window, output, "mail-pdf-zoom-100.png");
+        zoomPreview.Zoom = 2;
+        await Task.Delay(300);
+        Console.WriteLine($"Preview zoom: shows bar {zoomPreview.ShowsZoom}, 100 % = {at100:F0} px, {zoomPreview.ZoomText} = {PageWidthNow():F0} px, slider {zoomPreview.ZoomSlider:F2}");
+        await SaveAsync(window, output, "mail-pdf-zoom-200.png");
+        zoomPreview.ResetZoomCommand.Execute(null);
+        await Task.Delay(200);
+
         // Stamping the PDF: placed (shown on the page at once), then kept – with the person's name, not the login.
         await services.GetRequiredService<Neruna.Core.Mail.QuickActionService>().SetStampNameAsync("Anna Muster");
         var stampPreview = vm.MailPage.ReadingPane.Preview!;
@@ -344,6 +364,31 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "mail-quick-actions.png");
         Console.WriteLine($"Quick action buttons: {string.Join(", ", vm.MailPage.QuickActionButtons.Select(b => b.Label))}");
+        // Under the header, above the attachments; ten of them: two lines, the rest behind «+N weitere».
+        vm.MailPage.ReadingPane!.Preview?.CloseCommand.Execute(null);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-quick-actions-header.png");
+        // A recipient: the address as tooltip, the menu on click (copy, new mail, contact).
+        await Task.Delay(500);
+        if (window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Classes.Contains("recipient") && b.IsEffectivelyVisible) is { ContextFlyout: { } recipientMenu } recipientButton)
+        {
+            var who = (RecipientItem)recipientButton.DataContext!;
+            Console.WriteLine($"Recipient: '{recipientButton.Content}', tooltip '{ToolTip.GetTip(recipientButton)}', contact {who.IsContact}, can add {who.CanAdd}");
+            recipientMenu.ShowAt(recipientButton);
+            await Task.Delay(300);
+            await SaveAsync(window, output, "mail-recipient-menu.png");
+            recipientMenu.Hide();
+        }
+        var realButtons = vm.MailPage.ReadingPane.QuickActions;
+        string[] manyNames = ["Offerte genehmigen", "An Buchhaltung", "Projekt Alpha", "Ablegen Kunde", "Rechnung prüfen", "Weiter an Team", "Später", "Archiv 2026", "Lieferant", "Support-Fall"];
+        string[] manyColors = ["#0F6CBD", "#CA5010", "#107C10", "#8764B8", "#C239B3", "#038387", "#986F0B", "#4F6BED", "#D13438", "#498205"];
+        vm.MailPage.ReadingPane.QuickActions = [.. manyNames.Select((n, i) => new QuickActionButton(
+            new Neruna.Core.Mail.QuickAction(Guid.NewGuid(), n, manyColors[i], new Neruna.Core.Mail.QuickActionCondition(), []), realButtons[0].Command))];
+        await Task.Delay(300);
+        await SaveAsync(window, output, "mail-quick-actions-many.png");
+        var actionBar = window.GetVisualDescendants().OfType<Neruna.Desktop.Controls.QuickActionBar>().First(b => b.IsEffectivelyVisible);
+        Console.WriteLine($"Quick action bar: {actionBar.Bounds.Width:F0}×{actionBar.Bounds.Height:F0}, shown {actionBar.GetVisualDescendants().OfType<Button>().Count(b => b.Classes.Contains("quickAction") && b.IsVisible)} of 10, more: {actionBar.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => !b.Classes.Contains("quickAction") && b.IsVisible)?.Content}");
+        vm.MailPage.ReadingPane.QuickActions = realButtons;
         vm.NavigateCommand.Execute(Section.Settings);
         vm.SettingsPage.Section = SettingsSection.QuickActions;
         await vm.SettingsPage.QuickActions.ReloadAsync();

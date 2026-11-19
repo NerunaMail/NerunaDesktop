@@ -15,59 +15,104 @@ internal sealed partial class ReadingPaneView : UserControl
         InitializeComponent();
         // Another mail: one line again. A new width can cut the lines (or no longer): the hint follows.
         DataContextChanged += (_, _) => ShowRecipients(expanded: false);
-        RecipientLines.SizeChanged += (_, _) => UpdateRecipientsHint();
-        PreviewToolbar.SizeChanged += (_, _) => ArrangePreviewToolbar();
-        PreviewButtons.SizeChanged += (_, _) => ArrangePreviewToolbar();
-        ToLine.PropertyChanged += (_, e) =>
-        {
-            if (e.Property == TextBlock.TextProperty)
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(UpdateRecipientsHint, Avalonia.Threading.DispatcherPriority.Background);
-            }
-        };
+        ToLine.SizeChanged += (_, _) => PostRecipientsCheck();
+        CcLine.SizeChanged += (_, _) => PostRecipientsCheck();
+        ToLine.LayoutUpdated += (_, _) => PostRecipientsCheck();
     }
 
-    private void OnRecipientsTapped(object? sender, TappedEventArgs e)
+    /// <summary>A page's width: at 100 % the pane's (less the margins), a smaller picture its own; times the zoom.</summary>
+    public static Avalonia.Data.Converters.FuncMultiValueConverter<object?, double> PageWidth { get; } = new(values =>
     {
-        if (_recipientsExpanded || IsCut(ToLine) || IsCut(CcLine))
+        var list = values.ToList();
+        return list is [Avalonia.Media.Imaging.Bitmap image, double view, double zoom] && view > 32
+            ? Math.Max(1, Math.Min(view - 32, image.Size.Width) * zoom)
+            : double.NaN;
+    });
+
+    private void SetPreviewWidth()
+    {
+        if (PreviewScroller.DataContext is AttachmentPreviewViewModel preview && PreviewScroller.Bounds.Width > 0)
         {
-            ShowRecipients(!_recipientsExpanded);
-            e.Handled = true;
+            preview.ViewWidth = PreviewScroller.Bounds.Width;
         }
     }
+
+    private void OnPreviewWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Delta.Y != 0 && PreviewScroller.DataContext is AttachmentPreviewViewModel preview)
+        {
+            e.Handled = true;
+            if (e.Delta.Y > 0)
+            {
+                preview.ZoomInCommand.Execute(null);
+            }
+            else
+            {
+                preview.ZoomOutCommand.Execute(null);
+            }
+        }
+    }
+
+    // ── Recipients: one line per kind (the rest behind «+N»), expanded all; each name has its menu. ──
+
+    private const double RecipientLineHeight = 18;
+    private bool _recipientsCheckPosted;
+
+    private void OnRecipientsMore(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ShowRecipients(!_recipientsExpanded);
 
     private void ShowRecipients(bool expanded)
     {
         _recipientsExpanded = expanded;
-        foreach (var line in new[] { ToLine, CcLine })
-        {
-            line.TextWrapping = expanded ? Avalonia.Media.TextWrapping.Wrap : Avalonia.Media.TextWrapping.NoWrap;
-            line.TextTrimming = expanded ? Avalonia.Media.TextTrimming.None : Avalonia.Media.TextTrimming.CharacterEllipsis;
-        }
-
-        UpdateRecipientsHint();
+        ToLine.MaxHeight = CcLine.MaxHeight = expanded ? double.PositiveInfinity : RecipientLineHeight;
+        PostRecipientsCheck();
     }
 
-    private void UpdateRecipientsHint()
+    private void PostRecipientsCheck()
     {
-        var clickable = _recipientsExpanded || IsCut(ToLine) || IsCut(CcLine);
-        RecipientLines.Cursor = clickable ? new Cursor(StandardCursorType.Hand) : Cursor.Default;
-        ToolTip.SetTip(RecipientLines, !clickable ? null
-            : _recipientsExpanded ? Neruna.Core.Localization.Texts.T("Klicken für eine Zeile")
-            : Neruna.Core.Localization.Texts.T("Klicken für alle Empfänger"));
-    }
-
-    /// <summary>The line shows less than its text (cut off with "…").</summary>
-    private static bool IsCut(TextBlock line)
-    {
-        if (!line.IsVisible || string.IsNullOrEmpty(line.Text) || line.Bounds.Width <= 0 || line.TextWrapping != Avalonia.Media.TextWrapping.NoWrap)
+        if (_recipientsCheckPosted)
         {
-            return false;
+            return;
         }
 
-        using var full = new Avalonia.Media.TextFormatting.TextLayout(line.Text, new Avalonia.Media.Typeface(line.FontFamily, line.FontStyle, line.FontWeight),
-            line.FontSize, null);
-        return full.WidthIncludingTrailingWhitespace > line.Bounds.Width + 0.5;
+        _recipientsCheckPosted = true;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _recipientsCheckPosted = false;
+            UpdateMore(ToLine, ToMore);
+            UpdateMore(CcLine, CcMore);
+        }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    // «+N» when names are on lines below the first (hidden), «Weniger» when expanded and there is more than one line.
+    private void UpdateMore(ItemsControl line, Button more)
+    {
+        var items = line.GetRealizedContainers().Where(c => c.IsVisible).ToList();
+        var below = items.Count(c => c.Bounds.Top > RecipientLineHeight / 2);
+        more.IsVisible = below > 0;
+        var text = _recipientsExpanded ? Neruna.Core.Localization.Texts.T("Weniger") : Neruna.Core.Localization.Texts.F("+{0} weitere", below);
+        if (!Equals(more.Content, text))
+        {
+            more.Content = text;
+        }
+
+        ToolTip.SetTip(more, _recipientsExpanded ? Neruna.Core.Localization.Texts.T("Klicken für eine Zeile") : Neruna.Core.Localization.Texts.T("Klicken für alle Empfänger"));
+    }
+
+    // A click on a name: the same menu as a right-click.
+    private void OnRecipientClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Button { ContextFlyout: { } menu } button)
+        {
+            menu.ShowAt(button);
+        }
+    }
+
+    private async void OnCopyRecipient(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is MenuItem { DataContext: RecipientItem recipient } && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            await clipboard.SetTextAsync(recipient.Address);
+        }
     }
 
     private async void OnCopyHeaders(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

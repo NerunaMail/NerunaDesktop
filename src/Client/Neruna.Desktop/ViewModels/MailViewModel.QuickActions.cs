@@ -58,6 +58,11 @@ internal sealed partial class MailViewModel
         QuickActionButtons.Clear();
         if (pane?.Message is null || OpenFolder is not { } folder)
         {
+            if (pane is not null)
+            {
+                pane.QuickActions = [];
+            }
+
             return;
         }
 
@@ -80,6 +85,8 @@ internal sealed partial class MailViewModel
         {
             QuickActionButtons.Add(new QuickActionButton(action, RunQuickActionCommand));
         }
+
+        pane.QuickActions = [.. QuickActionButtons];
     }
 
     private IEnumerable<QuickAction> MatchingQuickActions(ReadingPaneViewModel pane, MailFolderNode folder)

@@ -24,20 +24,6 @@
         <!-- The active section; "Neruna" is already in the window title -->
         <StackPanel Orientation="Horizontal" Spacing="16">
           <TextBlock Text="{Binding SectionTitle}" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <!-- Schnellaktionen whose conditions the open mail meets, each in its own colour -->
-          <ItemsControl ItemsSource="{Binding MailPage.QuickActionButtons}" IsVisible="{Binding IsMail}" VerticalAlignment="Center">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="6" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:QuickActionButton">
-                <Button Classes="quickAction" Content="{Binding Label}" Command="{Binding Command}" CommandParameter="{Binding Action}"
-                        Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" ToolTip.Tip="{Binding Hint}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
           <!-- Out-of-office replies: from every page; switch and period per account, the full dialog behind "Weitere Optionen" -->

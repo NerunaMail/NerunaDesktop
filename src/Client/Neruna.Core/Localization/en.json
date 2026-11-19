@@ -2919,5 +2919,16 @@
  "Betreff eingeben": "Enter a subject",
  "Kalender hinzufügen, verwalten und importieren": "Add, manage and import calendars",
  "Kalender verwalten …": "Manage calendars …",
- "Termine importieren …": "Import events …"
+ "Termine importieren …": "Import events …",
+ "Vergrössern (Ctrl+Mausrad)": "Zoom in (Ctrl+mouse wheel)",
+ "Verkleinern (Ctrl+Mausrad)": "Zoom out (Ctrl+mouse wheel)",
+ "Zoom": "Zoom",
+ "Zurück auf 100 %": "Back to 100 %",
+ "Schnellaktionen für diese Mail": "Quick actions for this mail",
+ "Cc:": "Cc:",
+ "E-Mail-Adresse kopieren": "Copy email address",
+ "Kontakt anzeigen": "Show contact",
+ "Neue E-Mail an {0}": "New email to {0}",
+ "Weniger": "Less",
+ "Zu Kontakten hinzufügen": "Add to contacts"
 }

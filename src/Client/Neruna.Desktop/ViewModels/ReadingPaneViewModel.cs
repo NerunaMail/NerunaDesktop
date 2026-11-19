@@ -73,6 +73,13 @@ internal sealed record CheckedLinkItem(LinkCheck Check)
 /// </summary>
 internal sealed partial class ReadingPaneViewModel : ViewModelBase
 {
+    /// <summary>The quick actions whose conditions this mail meets: coloured buttons under the header (set by the mail page or the window).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasQuickActions))]
+    public partial IReadOnlyList<QuickActionButton> QuickActions { get; set; } = [];
+
+    public bool HasQuickActions => QuickActions.Count > 0;
+
     /// <summary>The bar for an invitation, answer or cancellation in this mail (set once it is checked against the calendar).</summary>
     [CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
     public partial InvitationBannerViewModel? Invitation { get; set; }
@@ -129,6 +136,48 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     public string Cc { get; }
 
     public bool HasCc => Cc.Length > 0;
+
+    /// <summary>The recipients one by one (An, Cc): the name shown, the address as tooltip, a menu on each.</summary>
+    public IReadOnlyList<RecipientItem> ToPeople { get; init; } = [];
+
+    public IReadOnlyList<RecipientItem> CcPeople { get; init; } = [];
+
+    public IEnumerable<RecipientItem> AllRecipients => ToPeople.Concat(CcPeople);
+
+    /// <summary>"Neue E-Mail an …", "Kontakt anzeigen", "Zu Kontakten hinzufügen" (set by the mail page).</summary>
+    public Action<Neruna.Core.Mail.MailAddress>? MailTo { get; set; }
+
+    public Action<Neruna.Core.Mail.MailAddress>? ShowContact { get; set; }
+
+    public Action<Neruna.Core.Mail.MailAddress>? AddContact { get; set; }
+
+    [RelayCommand]
+    private void MailToRecipient(RecipientItem? recipient)
+    {
+        if (recipient is not null)
+        {
+            MailTo?.Invoke(recipient.Mail);
+        }
+    }
+
+    [RelayCommand]
+    private void ShowRecipientContact(RecipientItem? recipient)
+    {
+        if (recipient is not null)
+        {
+            ShowContact?.Invoke(recipient.Mail);
+        }
+    }
+
+    [RelayCommand]
+    private void AddRecipientContact(RecipientItem? recipient)
+    {
+        if (recipient is not null)
+        {
+            recipient.CanAdd = false;
+            AddContact?.Invoke(recipient.Mail);
+        }
+    }
 
     public string Date { get; }
 
@@ -650,6 +699,8 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             Sender = message.From.Mailboxes.FirstOrDefault() is { } sender ? new Neruna.Core.Mail.MailAddress(string.IsNullOrWhiteSpace(sender.Name) ? null : sender.Name, sender.Address) : null,
             IsSpamNoteShown = !view.Privacy.HideSpamNote,
             ExportFiles = files,
+            ToPeople = RecipientItem.From(message.To.Mailboxes),
+            CcPeople = RecipientItem.From(message.Cc.Mailboxes),
         };
     }
 
@@ -856,4 +907,36 @@ internal sealed partial class AttachmentViewModel(MimeEntity entity, IFileServic
         MessagePart { Message: { } message } => message.WriteToAsync(target),
         _ => entity.WriteToAsync(target),
     };
+}
+
+/// <summary>One recipient in the header of a read mail: the name (or the address) shown, the address in the tooltip.</summary>
+internal sealed partial class RecipientItem(string? name, string address, bool isLast) : ObservableObject
+{
+    public string Address { get; } = address;
+
+    public Neruna.Core.Mail.MailAddress Mail => new(Name, Address);
+
+    /// <summary>The name from the mail, or of the contact when the mail has none.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Text), nameof(MailToText))]
+    public partial string? Name { get; set; } = string.IsNullOrWhiteSpace(name) ? null : name;
+
+    /// <summary>The name, else the address; with ";" before the next one.</summary>
+    public string Text => (Name ?? Address) + (isLast ? string.Empty : ";");
+
+    public string MailToText => F("Neue E-Mail an {0}", Name ?? Address);
+
+    /// <summary>In an address book: "Kontakt anzeigen".</summary>
+    [ObservableProperty]
+    public partial bool IsContact { get; set; }
+
+    /// <summary>In no address book and no own address: "Zu Kontakten hinzufügen".</summary>
+    [ObservableProperty]
+    public partial bool CanAdd { get; set; }
+
+    public static IReadOnlyList<RecipientItem> From(IEnumerable<MailboxAddress> addresses)
+    {
+        var list = addresses.Where(m => !string.IsNullOrWhiteSpace(m.Address)).ToList();
+        return [.. list.Select((m, i) => new RecipientItem(m.Name, m.Address, i == list.Count - 1))];
+    }
 }

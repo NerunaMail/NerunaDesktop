@@ -58,6 +58,7 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
         _actions = actions;
         _data = content;
         IsStamped = content is not null;
+        Pages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ShowsZoom));
     }
 
     public AttachmentViewModel Attachment { get; }
@@ -66,9 +67,52 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
 
     /// <summary>An attached mail (.eml), shown as a message – its attachments open the same way.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsZoom))]
     public partial ReadingPaneViewModel? Message { get; set; }
 
     public ObservableCollection<PreviewPage> Pages { get; } = [];
+
+    // ── Zoom: 100 % is the page as it opens (fitted to the pane, a small picture at its own size); not remembered. ──
+
+    private static readonly double[] ZoomSteps = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4];
+
+    /// <summary>Pages or a picture are shown (not an attached mail): the zoom bar below.</summary>
+    public bool ShowsZoom => Message is null && Pages.Count > 0;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ZoomText), nameof(ZoomSlider))]
+    public partial double Zoom { get; set; } = 1;
+
+    partial void OnZoomChanged(double value)
+    {
+        var clamped = Math.Clamp(value, ZoomSteps[0], ZoomSteps[^1]);
+        if (Math.Abs(clamped - value) > 0.0001)
+        {
+            Zoom = clamped;
+        }
+    }
+
+    public string ZoomText => $"{Math.Round(Zoom * 100).ToString(System.Globalization.CultureInfo.CurrentCulture)} %";
+
+    /// <summary>The slider: −2 … 2 for 25 % … 400 %, 100 % in the middle.</summary>
+    public double ZoomSlider
+    {
+        get => Math.Log2(Zoom);
+        set => Zoom = Math.Round(Math.Pow(2, value), 2);
+    }
+
+    /// <summary>The width the pages have at 100 % (set by the view from the pane's width).</summary>
+    [ObservableProperty]
+    public partial double ViewWidth { get; set; }
+
+    [RelayCommand]
+    private void ZoomIn() => Zoom = ZoomSteps.FirstOrDefault(s => s > Zoom + 0.001, ZoomSteps[^1]);
+
+    [RelayCommand]
+    private void ZoomOut() => Zoom = ZoomSteps.LastOrDefault(s => s < Zoom - 0.001, ZoomSteps[0]);
+
+    [RelayCommand]
+    private void ResetZoom() => Zoom = 1;
 
     // ── Stamping: a click on a page writes the stamp into a copy of the PDF and shows that page anew (as it will be
     //    saved); "Übernehmen" keeps it, another click moves it. ──
