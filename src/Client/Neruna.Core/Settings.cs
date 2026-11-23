@@ -27,6 +27,15 @@ public static class SettingKeys
     /// <summary>Cipher of S/MIME encryption: "aes256" (default), "aes192" or "aes128" (see SecureMimeAlgorithms).</summary>
     public const string SmimeCipher = "smime.cipher";
 
+    /// <summary>"pgp": sign and encrypt with PGP where both methods would do; else (default) S/MIME.</summary>
+    public const string PreferredSecureMethod = "secure.preferredMethod";
+
+    /// <summary>"false": no Autocrypt header with the own PGP key in sent mail (default: sent when an own key exists).</summary>
+    public const string Autocrypt = "pgp.autocrypt";
+
+    /// <summary>"false": recipients' PGP keys are not looked up online (WKD, keys.openpgp.org) (default: looked up).</summary>
+    public const string PgpKeyLookup = "pgp.keyLookup";
+
     /// <summary>"true": replies and forwards open in their own window instead of the reading pane (default: pane).</summary>
     public const string ComposeInWindow = "compose.openInWindow";
 
@@ -44,6 +53,9 @@ public static class SettingKeys
 
     /// <summary>Fingerprints of the certificates an organisation delivered to this device (JSON list; per connection).</summary>
     public const string CloudCertificates = "cloud.certificates";
+
+    /// <summary>Fingerprints of the PGP keys an organisation gave this device (own keys and its directory), JSON list.</summary>
+    public const string CloudPgpKeys = "cloud.pgpKeys";
 
     /// <summary>Payload fingerprint per account of an organisation as last set up (JSON; per connection).</summary>
     public const string CloudAccountsState = "cloud.accounts";

@@ -128,6 +128,33 @@
     </ItemsControl>
     <Button Content="{l:T 'Zertifikat hinzufügen …'}" Command="{Binding AddCertificateCommand}" HorizontalAlignment="Left" IsVisible="{Binding !IsReadOnly}" Margin="0,2,0,0" />
 
+    <!-- PGP: the contact's public keys (to send encrypted mail); stored in the contact itself -->
+    <TextBlock Classes="label" Text="{l:T 'PGP-Schlüssel'}" />
+    <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding NoPgpKeys}"
+               Text="{l:T 'Keiner hinterlegt. Ein Schlüssel, dessen Fingerabdruck unter Einstellungen → Zertifikate bestätigt wird, kommt hierher.'}" />
+    <ItemsControl ItemsSource="{Binding PgpKeys}" IsVisible="{Binding HasPgpKeys}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ContactPgpKeyRow">
+          <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Data="{StaticResource IconLock}" Width="14" Height="14" Margin="0,0,10,0" VerticalAlignment="Center"
+                        Foreground="{DynamicResource AccentTextBrush}" />
+              <StackPanel Grid.Column="1">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Details}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+                <SelectableTextBlock Text="{Binding Fingerprint}" Classes="subtle" FontSize="10" FontFamily="Consolas, Cascadia Mono, monospace" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource ErrorBrush}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
+              </StackPanel>
+              <Button Grid.Column="2" Content="{l:T 'Entfernen'}" VerticalAlignment="Center"
+                      IsVisible="{Binding !$parent[UserControl].((vm:ContactEditorViewModel)DataContext).IsReadOnly}"
+                      Command="{Binding $parent[UserControl].((vm:ContactEditorViewModel)DataContext).RemovePgpKeyCommand}" CommandParameter="{Binding}" />
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <Button Content="{l:T 'PGP-Schlüssel hinzufügen …'}" Command="{Binding AddPgpKeyCommand}" HorizontalAlignment="Left" IsVisible="{Binding !IsReadOnly}" Margin="0,2,0,0" />
+
     <TextBlock Classes="label" Text="{l:T 'Adressbuch'}" />
     <ComboBox ItemsSource="{Binding AddressBooks}" SelectedItem="{Binding SelectedAddressBook}" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}" />
 

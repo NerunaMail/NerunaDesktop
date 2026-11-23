@@ -71,6 +71,8 @@ internal sealed class TestEnvironment : IAsyncDisposable
         services.AddSingleton<AccountSetupService>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<Neruna.Core.Security.CertificateManager>();
+        services.AddSingleton<Neruna.Core.Security.PgpKeyManager>();
+        services.AddSingleton(_ => new Neruna.Core.Security.PgpKeyLookup(new HttpClient(env!.Http), NullLogger<Neruna.Core.Security.PgpKeyLookup>.Instance));
         services.AddSingleton<Neruna.Core.Security.SecureMimeService>();
         services.AddSingleton<SignatureService>();
         configure?.Invoke(services);

@@ -10,7 +10,7 @@ public enum MessageSecurityLevel
     Bad,
 }
 
-/// <summary>The S/MIME status of an opened message in words – the same on the desktop and on the phone.</summary>
+/// <summary>The S/MIME or PGP status of an opened message in words – the same on the desktop and on the phone.</summary>
 public static class MessageSecurityText
 {
     public static (MessageSecurityLevel Level, string Text, string? Detail) Describe(MessageSecurityInfo security)
@@ -23,10 +23,26 @@ public static class MessageSecurityText
         var encrypted = security.WasEncrypted ? T(" · Verschlüsselt") : string.Empty;
         if (security.Signatures.FirstOrDefault() is not { } signature)
         {
-            return security.WasEncrypted ? (MessageSecurityLevel.Good, T("Verschlüsselt (S/MIME)"), null) : (MessageSecurityLevel.None, string.Empty, null);
+            return security.WasEncrypted ? (MessageSecurityLevel.Good, security.IsPgp ? T("Verschlüsselt (PGP)") : T("Verschlüsselt (S/MIME)"), null) : (MessageSecurityLevel.None, string.Empty, null);
         }
 
         var signer = signature.SignerEmails.Count > 0 ? $"{signature.SignerName} <{signature.SignerEmails[0]}>" : signature.SignerName;
+        if (signature.IsPgp)
+        {
+            return signature.Status switch
+            {
+                SignatureStatus.Valid when signature.EmailMatchesSender =>
+                    (MessageSecurityLevel.Good, F("Digital signiert von {0} · Signatur gültig (PGP){1}", signer, encrypted), F("PGP-Schlüssel {0}", signature.IssuerName)),
+                SignatureStatus.Valid or SignatureStatus.ValidUntrusted when !signature.EmailMatchesSender =>
+                    (MessageSecurityLevel.Warning, F("Signatur gültig, aber der PGP-Schlüssel ({0}) gehört nicht zur Absenderadresse{1}", signer, encrypted), signature.Detail),
+                SignatureStatus.ValidUntrusted =>
+                    (MessageSecurityLevel.Warning, F("Signiert von {0} · PGP-Schlüssel nicht bestätigt{1}", signer, encrypted), signature.Detail),
+                SignatureStatus.Unverifiable =>
+                    (MessageSecurityLevel.Warning, F("Mit PGP signiert · Schlüssel des Absenders unbekannt{0}", encrypted), signature.Detail),
+                _ => (MessageSecurityLevel.Bad, T("Ungültige Signatur – die Nachricht wurde nach dem Signieren verändert oder die Signatur ist beschädigt"), signature.Detail),
+            };
+        }
+
         return signature.Status switch
         {
             SignatureStatus.Valid when signature.EmailMatchesSender =>

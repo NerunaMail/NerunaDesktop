@@ -10,9 +10,11 @@ using static Neruna.Core.Localization.Texts;
 
 namespace Neruna.Desktop.ViewModels;
 
-/// <summary>S/MIME certificate overview: own certificates, contacts' certificates, trusted authorities.</summary>
-internal sealed partial class CertificatesViewModel(CertificateManager manager, ISettingsStore settings, IFileService files, TimeProvider clock) : ViewModelBase
+/// <summary>S/MIME certificate overview (own certificates, contacts' certificates, trusted authorities) and the PGP keys.</summary>
+internal sealed partial class CertificatesViewModel(CertificateManager manager, ISettingsStore settings, IFileService files, TimeProvider clock, PgpKeysViewModel pgp) : ViewModelBase
 {
+    public PgpKeysViewModel Pgp { get; } = pgp;
+
     private bool _loading;
     private (string FileName, byte[] Data)? _pendingImport;
 
@@ -102,6 +104,7 @@ internal sealed partial class CertificatesViewModel(CertificateManager manager, 
         OnPropertyChanged(nameof(OwnHeader));
         OnPropertyChanged(nameof(ContactsHeader));
         OnPropertyChanged(nameof(AuthoritiesHeader));
+        await Pgp.ReloadAsync();
     }
 
     partial void OnDigestChanged(AlgorithmChoice value)

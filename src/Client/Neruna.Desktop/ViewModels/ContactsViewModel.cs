@@ -260,7 +260,7 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
         EditorRequested?.Invoke(this, entry.Card.IsGroup
             ? new GroupEditorViewModel(contacts, Writable(), _all, GroupDraft.FromVCard(stored.VCardData), (entry.AddressBook, entry.RemoteId))
             : new ContactEditorViewModel(contacts, files, Writable(),
-                ContactDraft.FromVCard(stored.VCardData) with { Certificates = ContactCertificates.Read(stored.VCardData) }, (entry.AddressBook, entry.RemoteId)));
+                ContactDraft.FromVCard(stored.VCardData) with { Certificates = ContactCertificates.Read(stored.VCardData), PgpKeys = ContactPgpKeys.Read(stored.VCardData) }, (entry.AddressBook, entry.RemoteId)));
     }
 
     [RelayCommand(CanExecute = nameof(CanWriteMail))]

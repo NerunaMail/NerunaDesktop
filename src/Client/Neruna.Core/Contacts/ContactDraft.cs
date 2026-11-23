@@ -37,6 +37,9 @@ public sealed record ContactDraft(
     /// </summary>
     public IReadOnlyList<byte[]>? Certificates { get; init; }
 
+    /// <summary>Public PGP keys to keep in the card as KEY; null leaves the card's keys as they are.</summary>
+    public IReadOnlyList<byte[]>? PgpKeys { get; init; }
+
     public string DisplayName
     {
         get
@@ -149,7 +152,8 @@ public sealed record ContactDraft(
             VCardWriter.Fold(result, line);
         }
 
-        return Certificates is null ? result.ToString() : ContactCertificates.WithAll(result.ToString(), Certificates);
+        var vcard = Certificates is null ? result.ToString() : ContactCertificates.WithAll(result.ToString(), Certificates);
+        return PgpKeys is null ? vcard : ContactPgpKeys.WithAll(vcard, PgpKeys);
     }
 
     private static string TypeParameter(string? kind) => string.IsNullOrWhiteSpace(kind) ? string.Empty : ";TYPE=" + kind.ToUpperInvariant();

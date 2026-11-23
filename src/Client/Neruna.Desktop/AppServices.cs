@@ -174,6 +174,7 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Notes.NoteController>();
         // Other people's S/MIME certificates go to their contacts (CardDAV, Exchange, Microsoft 365) where there is one.
         services.AddSingleton<Neruna.Core.Security.IContactCertificates>(sp => sp.GetRequiredService<ContactController>());
+        services.AddSingleton<Neruna.Core.Security.IContactPgpKeys>(sp => sp.GetRequiredService<ContactController>());
         services.AddSingleton<AccountSetupService>();
         services.AddSingleton<AccountDiscovery>();
         services.AddSingleton<Neruna.Core.Cloud.CloudController>();
@@ -209,6 +210,8 @@ internal static class AppServices
         services.AddSingleton<ReminderScheduler>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<CertificateManager>();
+        services.AddSingleton<PgpKeyManager>();
+        services.AddSingleton<PgpKeyLookup>();
         services.AddSingleton<SecureMimeService>();
 
         services.AddSingleton<MailViewModel>();
@@ -219,6 +222,7 @@ internal static class AppServices
         services.AddSingleton<ChatViewModel>();
         services.AddSingleton<AccountsViewModel>();
         services.AddSingleton<FileBackupViewModel>();
+        services.AddSingleton<PgpKeysViewModel>();
         services.AddSingleton<CertificatesViewModel>();
         services.AddSingleton<MailOptionsViewModel>();
         services.AddSingleton<PrivacyOptionsViewModel>();

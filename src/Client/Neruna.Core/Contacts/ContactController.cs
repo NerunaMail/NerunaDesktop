@@ -38,16 +38,18 @@ public sealed class ContactController(
     ProviderRegistry providers,
     ISettingsStore settings,
     ILogger<ContactController> logger,
-    SyncActivity? activity = null) : Security.IContactCertificates
+    SyncActivity? activity = null) : Security.IContactCertificates, Security.IContactPgpKeys
 {
     // The contacts' certificates: asked for with every signed or encrypted mail, read again only after contacts changed.
     private IReadOnlyList<(byte[] Der, IReadOnlyList<string> Emails)>? _certificates;
+    private IReadOnlyList<(byte[] Key, IReadOnlyList<string> Emails)>? _pgpKeys;
     private int _contactsVersion;
 
     private void ContactsChanged()
     {
         Interlocked.Increment(ref _contactsVersion);
         _certificates = null;
+        _pgpKeys = null;
     }
 
     public Task<SyncReport> SyncAllAsync(CancellationToken cancellationToken = default) =>
@@ -333,6 +335,52 @@ public sealed class ContactController(
             return cached;
         }
 
+        var (keys, current) = await KeysAsync(ContactCertificates.Read, cancellationToken);
+        if (current)
+        {
+            _certificates = keys;
+        }
+
+        return keys;
+    }
+
+    /// <summary>
+    /// Adds the certificate to every contact (in a writable address book) with one of <paramref name="emails"/>. A
+    /// contact that cannot be saved right now is skipped; if none could take it, the certificate stays on this device.
+    /// </summary>
+    public Task<bool> AddAsync(byte[] der, IReadOnlyCollection<string> emails, CancellationToken cancellationToken = default) =>
+        AddKeyAsync(der, emails, ContactCertificates.Read, ContactCertificates.Add, cancellationToken);
+
+    /// <summary>Takes the certificate out of every contact that has it.</summary>
+    public Task RemoveAsync(byte[] der, CancellationToken cancellationToken = default) =>
+        RemoveKeyAsync(der, ContactCertificates.Read, ContactCertificates.Remove, cancellationToken);
+
+    /// <summary>The public PGP keys kept with contacts (vCard KEY), with the contact's addresses.</summary>
+    async Task<IReadOnlyList<(byte[] Key, IReadOnlyList<string> Emails)>> Security.IContactPgpKeys.GetAllAsync(CancellationToken cancellationToken)
+    {
+        if (_pgpKeys is { } cached)
+        {
+            return cached;
+        }
+
+        var (keys, current) = await KeysAsync(ContactPgpKeys.Read, cancellationToken);
+        if (current)
+        {
+            _pgpKeys = keys;
+        }
+
+        return keys;
+    }
+
+    Task<bool> Security.IContactPgpKeys.AddAsync(byte[] key, IReadOnlyCollection<string> emails, CancellationToken cancellationToken) =>
+        AddKeyAsync(key, emails, ContactPgpKeys.Read, ContactPgpKeys.Add, cancellationToken);
+
+    Task Security.IContactPgpKeys.RemoveAsync(byte[] key, CancellationToken cancellationToken) =>
+        RemoveKeyAsync(key, ContactPgpKeys.Read, ContactPgpKeys.Remove, cancellationToken);
+
+    // The keys of one kind in all contacts; Current: no contact changed while reading (only then may it be kept).
+    private async Task<(IReadOnlyList<(byte[] Key, IReadOnlyList<string> Emails)> Keys, bool Current)> KeysAsync(Func<string, IReadOnlyList<byte[]>> read, CancellationToken cancellationToken)
+    {
         var version = Volatile.Read(ref _contactsVersion);
         var result = new List<(byte[], IReadOnlyList<string>)>();
         foreach (var book in await store.GetAddressBooksAsync(null, cancellationToken))
@@ -341,31 +389,22 @@ public sealed class ContactController(
             foreach (var contact in (await store.GetContactsAsync(book.ConnectionId, book.RemoteId, cancellationToken))
                          .Where(c => c.VCardData.Contains("KEY", StringComparison.OrdinalIgnoreCase)))
             {
-                var certificates = ContactCertificates.Read(contact.VCardData);
-                if (certificates.Count > 0)
+                var keys = read(contact.VCardData);
+                if (keys.Count > 0)
                 {
                     var emails = VCardReader.Read(contact.VCardData).EmailAddresses;
-                    result.AddRange(certificates.Select(c => (c, emails)));
+                    result.AddRange(keys.Select(k => (k, emails)));
                 }
             }
         }
 
-        // Kept unless contacts changed while reading (then the next call reads again).
-        if (version == Volatile.Read(ref _contactsVersion))
-        {
-            _certificates = result;
-        }
-
-        return result;
+        return (result, version == Volatile.Read(ref _contactsVersion));
     }
 
-    /// <summary>
-    /// Adds the certificate to every contact (in a writable address book) with one of <paramref name="emails"/>. A
-    /// contact that cannot be saved right now is skipped; if none could take it, the certificate stays on this device.
-    /// </summary>
-    public async Task<bool> AddAsync(byte[] der, IReadOnlyCollection<string> emails, CancellationToken cancellationToken = default)
+    private async Task<bool> AddKeyAsync(byte[] key, IReadOnlyCollection<string> emails, Func<string, IReadOnlyList<byte[]>> read, Func<string, byte[], string> add,
+        CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(der);
+        ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(emails);
         var stored = false;
         foreach (var entry in (await SearchAsync(null, cancellationToken))
@@ -374,36 +413,35 @@ public sealed class ContactController(
             try
             {
                 var current = await GetContactAsync(entry.AddressBook, entry.RemoteId, cancellationToken);
-                if (current is not null && ContactCertificates.Read(current.VCardData).Any(c => c.AsSpan().SequenceEqual(der)))
+                if (current is not null && read(current.VCardData).Any(c => c.AsSpan().SequenceEqual(key)))
                 {
                     stored = true;
                     continue;
                 }
 
-                var saved = await SaveCardAsync(entry.AddressBook, v => ContactCertificates.Add(v ?? string.Empty, der), (entry.AddressBook, entry.RemoteId), cancellationToken);
+                var saved = await SaveCardAsync(entry.AddressBook, v => add(v ?? string.Empty, key), (entry.AddressBook, entry.RemoteId), cancellationToken);
 
-                // Only if the server kept it (a provider that cannot store certificates drops the KEY).
-                stored |= ContactCertificates.Read(saved.VCardData).Any(c => c.AsSpan().SequenceEqual(der));
+                // Only if the server kept it (a provider that cannot store keys drops the KEY).
+                stored |= read(saved.VCardData).Any(c => c.AsSpan().SequenceEqual(key));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                logger.LogInformation(ex, "Could not add a certificate to contact {Contact}", entry.RemoteId);
+                logger.LogInformation(ex, "Could not add a key to contact {Contact}", entry.RemoteId);
             }
         }
 
         return stored;
     }
 
-    /// <summary>Takes the certificate out of every contact that has it.</summary>
-    public async Task RemoveAsync(byte[] der, CancellationToken cancellationToken = default)
+    private async Task RemoveKeyAsync(byte[] key, Func<string, IReadOnlyList<byte[]>> read, Func<string, byte[], string> remove, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(der);
+        ArgumentNullException.ThrowIfNull(key);
         foreach (var book in (await store.GetAddressBooksAsync(null, cancellationToken)).Where(b => !b.IsReadOnly))
         {
             foreach (var contact in (await store.GetContactsAsync(book.ConnectionId, book.RemoteId, cancellationToken))
-                         .Where(c => ContactCertificates.Read(c.VCardData).Any(k => k.AsSpan().SequenceEqual(der))))
+                         .Where(c => read(c.VCardData).Any(k => k.AsSpan().SequenceEqual(key))))
             {
-                await SaveCardAsync(book, v => ContactCertificates.Remove(v ?? string.Empty, der), (book, contact.RemoteId), cancellationToken);
+                await SaveCardAsync(book, v => remove(v ?? string.Empty, key), (book, contact.RemoteId), cancellationToken);
             }
         }
     }

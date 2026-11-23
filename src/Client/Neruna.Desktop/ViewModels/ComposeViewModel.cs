@@ -37,6 +37,8 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     private IHtmlEditor? _editor;
     private bool _autoEncrypt;
     private bool _encryptChosen;
+    private SecureMethod? _methodChoice;
+    private readonly HashSet<string> _keysLookedUp = new(StringComparer.OrdinalIgnoreCase);
     private bool _settingEncrypt;
     private bool _initialized;
     private int _recipientVersion;
@@ -189,6 +191,42 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// <summary>"Mehr → Verschlüsseln".</summary>
     [RelayCommand]
     private void ToggleEncrypt() => Encrypt = !Encrypt;
+
+    /// <summary>"Mehr → Verfahren": "auto", "smime" or "pgp".</summary>
+    [RelayCommand]
+    private async Task ChooseMethodAsync(string? choice)
+    {
+        _methodChoice = choice switch
+        {
+            "smime" => SecureMethod.SMime,
+            "pgp" => SecureMethod.Pgp,
+            _ => null,
+        };
+        OnPropertyChanged(nameof(MethodIsAuto));
+        OnPropertyChanged(nameof(MethodIsSmime));
+        OnPropertyChanged(nameof(MethodIsPgp));
+        await RefreshSignAsync();
+        ScheduleEncryptionCheck();
+    }
+
+    public bool MethodIsAuto => _methodChoice is null;
+
+    public bool MethodIsSmime => _methodChoice == SecureMethod.SMime;
+
+    public bool MethodIsPgp => _methodChoice == SecureMethod.Pgp;
+
+    /// <summary>The sender has both an S/MIME certificate and a PGP key: «Mehr» offers to choose the method.</summary>
+    [ObservableProperty]
+    public partial bool HasBothMethods { get; set; }
+
+    /// <summary>The method signing and encryption use now (chosen, or the one that suits sender and recipients).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SignHint), nameof(SignBadgeHint))]
+    public partial SecureMethod Method { get; set; }
+
+    private string MethodName => Method == SecureMethod.Pgp ? "PGP" : "S/MIME";
+
+    private string ByMethod(string smime, string pgp) => Method == SecureMethod.Pgp ? pgp : smime;
 
     /// <summary>"Mehr → Rechtschreibsprache: Deutsch (Schweiz)": the language of this mail's spell check at a glance.</summary>
     public string SpellLanguageHeader => F("Rechtschreibsprache: {0}", Formatting.SpellLanguage.Name);
@@ -439,7 +477,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
     private async Task RefreshSignAsync()
     {
-        CanSign = (await _secureMime.GetCapabilitiesAsync(From.Email, [])).CanSign;
+        CanSign = (await SignCapabilitiesAsync()).CanSign;
         if (!CanSign)
         {
             Sign = false;
@@ -540,7 +578,22 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     [ObservableProperty]
     public partial string EncryptHint { get; set; } = T("Mit S/MIME verschlüsseln (Zertifikate aller Empfänger nötig)");
 
-    public string SignHint => CanSign ? T("Digital signieren (S/MIME)") : T("Kein eigenes S/MIME-Zertifikat für diese Adresse (Einstellungen → Zertifikate)");
+    public string SignHint => CanSign
+        ? F("Digital signieren ({0})", MethodName)
+        : T("Kein eigenes Zertifikat und kein PGP-Schlüssel für diese Adresse (Einstellungen → Zertifikate)");
+
+    public string SignBadgeHint => F("Wird digital signiert ({0}) – unter «Mehr» abschaltbar", MethodName);
+
+    // What the sender can sign with (the method chosen, or both checked to see whether there is a choice).
+    private async Task<SecureMimeCapabilities> SignCapabilitiesAsync()
+    {
+        var smime = await _secureMime.GetCapabilitiesAsync(From.Email, [], SecureMethod.SMime);
+        var pgp = await _secureMime.GetCapabilitiesAsync(From.Email, [], SecureMethod.Pgp);
+        HasBothMethods = smime.CanSign && pgp is { CanSign: true, Method: SecureMethod.Pgp };
+        var chosen = _methodChoice is null ? await _secureMime.GetCapabilitiesAsync(From.Email, []) : _methodChoice == SecureMethod.Pgp ? pgp : smime;
+        Method = chosen.Method;
+        return chosen;
+    }
 
     /// <summary>The formatting toolbar, connected to the editor in <see cref="AttachEditorAsync"/>.</summary>
     public FormattingViewModel Formatting { get; }
@@ -684,17 +737,18 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
         // The sender is always encrypted to as well (readable copy in "Gesendet").
         var sender = From.Email;
-        var capabilities = await _secureMime.GetCapabilitiesAsync(sender, recipients.Append(sender));
+        var capabilities = await _secureMime.GetCapabilitiesAsync(sender, recipients.Append(sender), _methodChoice);
         if (version != _recipientVersion || _encryptChosen)
         {
             return;
         }
 
+        Method = capabilities.Method;
         var missing = capabilities.RecipientsWithoutCertificate;
         SetEncryptAutomatically(missing.Count == 0);
         EncryptHint = missing.Count == 0
-            ? T("Automatisch verschlüsselt: Zertifikate aller Empfänger sind bekannt")
-            : T("Nicht automatisch verschlüsselt – kein Zertifikat für: ") + string.Join(", ", missing);
+            ? ByMethod(T("Automatisch verschlüsselt: Zertifikate aller Empfänger sind bekannt"), T("Automatisch verschlüsselt (PGP): Schlüssel aller Empfänger sind bekannt"))
+            : ByMethod(T("Nicht automatisch verschlüsselt – kein Zertifikat für: "), T("Nicht automatisch verschlüsselt – kein PGP-Schlüssel für: ")) + string.Join(", ", missing);
     }
 
     private async Task UpdateChosenEncryptionHintAsync(int version)
@@ -702,17 +756,43 @@ internal sealed partial class ComposeViewModel : ViewModelBase
         if (!Encrypt)
         {
             EncryptIncomplete = false;
-            EncryptHint = T("Mit S/MIME verschlüsseln (Zertifikate aller Empfänger nötig)");
+            EncryptHint = ByMethod(T("Mit S/MIME verschlüsseln (Zertifikate aller Empfänger nötig)"), T("Mit PGP verschlüsseln (Schlüssel aller Empfänger nötig)"));
             return;
         }
 
+        // Switched on by hand: the keys still missing are looked up online, once per address.
         var missing = await MissingCertificatesAsync();
+        if (version == _recipientVersion && Encrypt && await LookUpKeysAsync(missing))
+        {
+            missing = await MissingCertificatesAsync();
+        }
+
         if (version == _recipientVersion && Encrypt)
         {
             EncryptIncomplete = missing.Count > 0;
             EncryptHint = missing.Count == 0
-                ? T("Verschlüsselt: Zertifikate aller Empfänger sind bekannt")
-                : T("Kein Zertifikat für: ") + string.Join(", ", missing) + T(" – beim Senden wird nachgefragt");
+                ? ByMethod(T("Verschlüsselt: Zertifikate aller Empfänger sind bekannt"), T("Verschlüsselt (PGP): Schlüssel aller Empfänger sind bekannt"))
+                : ByMethod(T("Kein Zertifikat für: "), T("Kein PGP-Schlüssel für: ")) + string.Join(", ", missing) + T(" – beim Senden wird nachgefragt");
+        }
+    }
+
+    // Looks up the PGP keys of these recipients online (each address once per mail); true if one was found.
+    private async Task<bool> LookUpKeysAsync(IReadOnlyList<string> missing)
+    {
+        var ask = missing.Where(_keysLookedUp.Add).ToList();
+        if (ask.Count == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            return (await _secureMime.FindPgpKeysAsync(ask)).Count > 0;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Notice?.Invoke(this, ex.Message);
+            return false;
         }
     }
 
@@ -725,7 +805,9 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             return [];
         }
 
-        return (await _secureMime.GetCapabilitiesAsync(From.Email, recipients.Append(From.Email))).RecipientsWithoutCertificate;
+        var capabilities = await _secureMime.GetCapabilitiesAsync(From.Email, recipients.Append(From.Email), _methodChoice);
+        Method = capabilities.Method;
+        return capabilities.RecipientsWithoutCertificate;
     }
 
     /// <summary>
@@ -768,7 +850,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
     /// </summary>
     public async Task InitializeAsync(bool? sign = null, bool? encrypt = null)
     {
-        CanSign = (await _secureMime.GetCapabilitiesAsync(From.Email, [])).CanSign;
+        CanSign = (await SignCapabilitiesAsync()).CanSign;
         Sign = CanSign && (sign ?? await _settings.GetBoolAsync(SettingKeys.AutoSign, fallback: true));
 
         // Replies to encrypted mail stay encrypted; otherwise the recipients decide.
@@ -1159,9 +1241,12 @@ internal sealed partial class ComposeViewModel : ViewModelBase
             return;
         }
 
-        if (Encrypt && await MissingCertificatesAsync() is { Count: > 0 } missing)
+        if (Encrypt && await MissingCertificatesAsync() is { Count: > 0 } lacking && (!await LookUpKeysAsync(lacking) || await MissingCertificatesAsync() is { Count: > 0 }))
         {
-            UnencryptedQuestion = F("Für {0} ist kein Zertifikat bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.", string.Join(", ", missing));
+            var missing = await MissingCertificatesAsync();
+            UnencryptedQuestion = ByMethod(
+                F("Für {0} ist kein Zertifikat bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.", string.Join(", ", missing)),
+                F("Für {0} ist kein PGP-Schlüssel bekannt – verschlüsselt kann diese E-Mail so nicht gesendet werden.", string.Join(", ", missing)));
             IsAskingUnencrypted = true;
             return;
         }
@@ -1177,7 +1262,7 @@ internal sealed partial class ComposeViewModel : ViewModelBase
 
             var message = MessageComposer.Build(SenderAddress, await SnapshotAsync(), []);
             Receipts.Request(message, RequestDeliveryReceipt, RequestReadReceipt);
-            await _secureMime.ProtectAsync(message, Sign, Encrypt);
+            await _secureMime.ProtectAsync(message, Sign, Encrypt, _methodChoice);
             await _mail.SendAsync(_connection, message);
             Sent?.Invoke(this, message);
             await RememberSignatureAsync();

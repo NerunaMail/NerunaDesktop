@@ -22,7 +22,8 @@ public sealed record BackupContent(
     IReadOnlyList<Signature> Signatures,
     IReadOnlyList<TextTemplate> TextTemplates,
     IReadOnlyList<BackupCertificate> Certificates,
-    IReadOnlyDictionary<string, string>? CloudPasswords = null);
+    IReadOnlyDictionary<string, string>? CloudPasswords = null,
+    IReadOnlyList<BackupPgpKey>? PgpKeys = null);
 
 public sealed record BackupAccount(Guid Id, string DisplayName, string? EmailAddress, string? Label, IReadOnlyList<BackupConnection> Connections, IReadOnlyList<MailIdentity>? Aliases = null)
 {
@@ -32,6 +33,9 @@ public sealed record BackupAccount(Guid Id, string DisplayName, string? EmailAdd
 public sealed record BackupConnection(Guid Id, ServiceKind Kind, string ProviderId, IReadOnlyDictionary<string, string> Settings, string? Secret);
 
 public sealed record BackupCertificate(string Thumbprint, byte[] Der, byte[]? Pkcs12, CertificateSource Source, DateTimeOffset AddedAt, string? Password);
+
+/// <summary>A PGP key in a backup: the key rings as kept on the device, and the passphrase of an own key.</summary>
+public sealed record BackupPgpKey(string Fingerprint, byte[] PublicKeyRing, byte[]? SecretKeyRing, PgpKeySource Source, bool Verified, DateTimeOffset AddedAt, string? Passphrase);
 
 /// <summary>The file inside the encrypted envelope.</summary>
 internal sealed record BackupDocument(int Format, DateTimeOffset CreatedAt, BackupContent Content);
@@ -93,7 +97,8 @@ public sealed class SettingsBackupService(
     ITextTemplateStore textTemplates,
     CertificateManager certificates,
     TimeProvider clock,
-    ILogger<SettingsBackupService> logger)
+    ILogger<SettingsBackupService> logger,
+    PgpKeyManager? pgp = null)
 {
     /// <summary>Where this device keeps the first connection's vault data key (system keychain): "vaultId:Base64"; see <see cref="CloudConnection.VaultKeyId"/>.</summary>
     public static readonly Guid VaultKeyId = new("6e657275-6e61-436c-6f75-640000000003");
@@ -397,6 +402,13 @@ public sealed class SettingsBackupService(
         await certificates.ReplacePersonalAsync(
             [.. content.Certificates.Select(c => (new StoredCertificate(c.Thumbprint, c.Der, c.Pkcs12, c.Source, c.AddedAt), c.Password))], cancellationToken);
 
+        // A backup made before PGP keys were kept in it leaves the keys here as they are.
+        if (pgp is not null && content.PgpKeys is { } pgpKeys)
+        {
+            await pgp.ReplacePersonalAsync(
+                [.. pgpKeys.Select(k => (new StoredPgpKey(k.Fingerprint, k.PublicKeyRing, k.SecretKeyRing, k.Source, k.Verified, k.AddedAt), k.Passphrase))], cancellationToken);
+        }
+
         // Now equal to the backup: no reminder until something changes again (only with a vault in the cloud; a backup
         // file is restored without one).
         try
@@ -535,6 +547,11 @@ public sealed class SettingsBackupService(
             Add("certificate:" + certificate.Thumbprint, T("Zertifikate"), CertificateName(certificate), certificate);
         }
 
+        foreach (var key in content.PgpKeys ?? [])
+        {
+            Add("pgpkey:" + key.Fingerprint, T("PGP-Schlüssel"), PgpKeyName(key), key);
+        }
+
         foreach (var (id, password) in content.CloudPasswords ?? new Dictionary<string, string>())
         {
             Add("cloudpassword:" + id, T("Konten"), T("Passwort eines Kontos der Organisation"), password);
@@ -601,7 +618,8 @@ public sealed class SettingsBackupService(
             [.. (await signatures.GetAllAsync(cancellationToken)).Where(s => !s.IsFromCloud).OrderBy(s => s.Id)],
             [.. (await textTemplates.GetAllAsync(cancellationToken)).Where(t => !t.IsFromCloud).OrderBy(t => t.Id)],
             [.. (await certificates.GetPersonalAsync(cancellationToken)).Select(c => new BackupCertificate(c.Certificate.Thumbprint, c.Certificate.Der, c.Certificate.Pkcs12, c.Certificate.Source, c.Certificate.AddedAt, c.Password))],
-            cloudPasswords.Count > 0 ? cloudPasswords : null);
+            cloudPasswords.Count > 0 ? cloudPasswords : null,
+            pgp is null ? null : [.. (await pgp.GetPersonalAsync(cancellationToken)).Select(k => new BackupPgpKey(k.Key.Fingerprint, k.Key.PublicKeyRing, k.Key.SecretKeyRing, k.Key.Source, k.Key.Verified, k.Key.AddedAt, k.Passphrase))]);
     }
 
     /// <summary>What restoring <paramref name="backup"/> changes compared with <paramref name="current"/>.</summary>
@@ -615,6 +633,11 @@ public sealed class SettingsBackupService(
         Diff(changes, T("Textvorlagen"), current.TextTemplates, backup.TextTemplates, t => t.Id.ToString(), t => t.Name,
             (a, b) => a.Name == b.Name && a.Html == b.Html && a.Shortcut == b.Shortcut);
         Diff(changes, T("Zertifikate"), current.Certificates, backup.Certificates, c => c.Thumbprint, CertificateName, (a, b) => a.Password == b.Password && a.Source == b.Source);
+        if (backup.PgpKeys is { } backupKeys)
+        {
+            Diff(changes, T("PGP-Schlüssel"), current.PgpKeys ?? [], backupKeys, k => k.Fingerprint, PgpKeyName,
+                (a, b) => a.Passphrase == b.Passphrase && a.Verified == b.Verified && (a.SecretKeyRing is null) == (b.SecretKeyRing is null));
+        }
 
         var currentPasswords = current.CloudPasswords ?? new Dictionary<string, string>();
         var changedPasswords = (backup.CloudPasswords ?? new Dictionary<string, string>()).Count(p => currentPasswords.GetValueOrDefault(p.Key) != p.Value);
@@ -675,6 +698,19 @@ public sealed class SettingsBackupService(
         }
     }
 
+    private static string PgpKeyName(BackupPgpKey key)
+    {
+        try
+        {
+            var info = PgpKeyParser.Describe(new Org.BouncyCastle.Bcpg.OpenPgp.PgpPublicKeyRing(key.PublicKeyRing), key.SecretKeyRing is not null, key.Source, key.Verified, key.AddedAt);
+            return info.EmailAddresses.Count > 0 ? string.Join(", ", info.EmailAddresses) : info.Name;
+        }
+        catch (Exception ex) when (ex is IOException or Org.BouncyCastle.Bcpg.OpenPgp.PgpException or ArgumentException)
+        {
+            return key.Fingerprint;
+        }
+    }
+
     private static string Fingerprint(UnlockedVault vault, BackupContent content) =>
         vault.Fingerprint(JsonSerializer.SerializeToUtf8Bytes(Comparable(content), NerunaJson.Options));
 
@@ -692,6 +728,7 @@ public sealed class SettingsBackupService(
             Connections = [.. a.Connections.Select(c => c.ProviderId.StartsWith(ProviderIds.Graph, StringComparison.Ordinal) || c.ProviderId.StartsWith(ProviderIds.Google, StringComparison.Ordinal) ? c with { Secret = null } : c)],
         })],
         Certificates = [.. content.Certificates.Where(c => c.Source is not (CertificateSource.CollectedFromMail or CertificateSource.CollectedVerified))],
+        PgpKeys = content.PgpKeys is null ? null : [.. content.PgpKeys.Where(k => k.Verified || k.Source is not (PgpKeySource.Autocrypt or PgpKeySource.KeyServer))],
     };
 
     private static List<WrappedKey> Keys(CloudVault info) =>

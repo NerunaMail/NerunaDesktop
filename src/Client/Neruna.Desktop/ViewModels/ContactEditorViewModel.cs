@@ -75,6 +75,37 @@ internal sealed record ContactCertificateRow(byte[] Der, string Name, string Det
     }
 }
 
+/// <summary>A public PGP key kept with the contact: whose, its fingerprint, until when, and whether it can encrypt.</summary>
+internal sealed record ContactPgpKeyRow(byte[] Key, string Name, string Details, string Fingerprint, string? Warning)
+{
+    public bool HasWarning => Warning is not null;
+
+    public static ContactPgpKeyRow? From(byte[] key, IReadOnlyCollection<string> contactEmails)
+    {
+        Neruna.Core.Security.PgpKeyInfo info;
+        try
+        {
+            info = Neruna.Core.Security.PgpKeyParser.Describe(new Org.BouncyCastle.Bcpg.OpenPgp.PgpPublicKeyRing(key), false, Neruna.Core.Security.PgpKeySource.Contact, true, DateTimeOffset.Now);
+        }
+        catch (Exception ex) when (ex is IOException or Org.BouncyCastle.Bcpg.OpenPgp.PgpException or ArgumentException)
+        {
+            return null;
+        }
+
+        var now = DateTimeOffset.Now;
+        var validity = info.IsRevoked ? T("widerrufen")
+            : info.Expires is not { } end ? T("unbegrenzt gültig")
+            : string.Format(Neruna.Core.Localization.Texts.Culture, info.StatusAt(now) == Neruna.Core.Security.CertificateStatus.Expired ? T("abgelaufen am {0}") : T("gültig bis {0}"),
+                end.LocalDateTime.ToString("d", Neruna.Core.Localization.Texts.Culture));
+        var details = string.Join(" · ", new[] { string.Join(", ", info.EmailAddresses), info.Algorithm, validity }.Where(p => p.Length > 0));
+        var warning = !info.CanEncrypt || !info.IsUsableAt(now) ? T("Nicht zum Verschlüsseln geeignet.")
+            : contactEmails.Count > 0 && !info.EmailAddresses.Any(a => contactEmails.Contains(a, StringComparer.OrdinalIgnoreCase))
+                ? T("Gilt für keine Adresse dieses Kontakts.")
+                : null;
+        return new ContactPgpKeyRow(key, info.Name, details, info.FingerprintText, warning);
+    }
+}
+
 /// <summary>Create/edit/delete one contact. Properties the form does not show are preserved (see <see cref="ContactDraft"/>).</summary>
 internal sealed partial class ContactEditorViewModel : ViewModelBase
 {
@@ -84,6 +115,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
     private ContactPhoto? _photo;
     private bool _photoChanged;
     private bool _certificatesChanged;
+    private bool _pgpKeysChanged;
 
     public ContactEditorViewModel(
         ContactController contacts,
@@ -123,6 +155,69 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
 
         _certificateDers = [.. draft.Certificates ?? []];
         ShowCertificates();
+        _pgpKeyData = [.. draft.PgpKeys ?? []];
+        ShowPgpKeys();
+    }
+
+    private List<byte[]> _pgpKeyData;
+
+    /// <summary>Public PGP keys kept with the contact (vCard KEY): they count as confirmed for this person.</summary>
+    public ObservableCollection<ContactPgpKeyRow> PgpKeys { get; } = [];
+
+    public bool HasPgpKeys => PgpKeys.Count > 0;
+
+    public bool NoPgpKeys => !HasPgpKeys;
+
+    [RelayCommand]
+    private async Task AddPgpKeyAsync()
+    {
+        Error = null;
+        foreach (var path in await _files.PickFilesAsync(T("PGP-Schlüssel des Kontakts wählen (.asc, .gpg, .pgp, .key)")))
+        {
+            IReadOnlyList<Org.BouncyCastle.Bcpg.OpenPgp.PgpPublicKeyRing> found;
+            try
+            {
+                var (rings, secret) = Neruna.Core.Security.PgpKeyParser.Read(await File.ReadAllBytesAsync(path));
+                found = [.. rings, .. secret.Select(Neruna.Core.Security.PgpKeyParser.PublicOf)];
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
+            {
+                Error = F("«{0}» enthält keinen PGP-Schlüssel.", Path.GetFileName(path));
+                continue;
+            }
+
+            // Only the public part goes to the contact, even from a file that also holds a private key.
+            foreach (var key in found.Select(r => r.GetEncoded()).Where(k => !_pgpKeyData.Any(d => d.AsSpan().SequenceEqual(k))))
+            {
+                _pgpKeyData.Add(key);
+                _pgpKeysChanged = true;
+            }
+        }
+
+        ShowPgpKeys();
+    }
+
+    [RelayCommand]
+    private void RemovePgpKey(ContactPgpKeyRow? row)
+    {
+        if (row is not null && _pgpKeyData.RemoveAll(d => d.AsSpan().SequenceEqual(row.Key)) > 0)
+        {
+            _pgpKeysChanged = true;
+            ShowPgpKeys();
+        }
+    }
+
+    private void ShowPgpKeys()
+    {
+        var emails = Emails.Select(e => e.Value.Trim()).Where(e => e.Length > 0).ToList();
+        PgpKeys.Clear();
+        foreach (var row in _pgpKeyData.Select(d => ContactPgpKeyRow.From(d, emails)).OfType<ContactPgpKeyRow>())
+        {
+            PgpKeys.Add(row);
+        }
+
+        OnPropertyChanged(nameof(HasPgpKeys));
+        OnPropertyChanged(nameof(NoPgpKeys));
     }
 
     private List<byte[]> _certificateDers;
@@ -318,6 +413,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
             ReplacePhoto = _photoChanged,
             Birthday = birthday,
             Certificates = _certificatesChanged ? _certificateDers : null,
+            PgpKeys = _pgpKeysChanged ? _pgpKeyData : null,
         };
 
         if (draft.DisplayName.Length == 0)

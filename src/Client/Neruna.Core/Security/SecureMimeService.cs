@@ -20,6 +20,9 @@ public enum SignatureStatus
 
     /// <summary>The content was changed after signing, or the signature cannot be checked at all.</summary>
     Invalid,
+
+    /// <summary>PGP: the signer's public key is not known here, so the signature could not be checked.</summary>
+    Unverifiable,
 }
 
 public sealed record SignatureInfo(
@@ -29,7 +32,8 @@ public sealed record SignatureInfo(
     SignatureStatus Status,
     bool EmailMatchesSender,
     DateTimeOffset? SignedAt,
-    string? Detail);
+    string? Detail,
+    bool IsPgp = false);
 
 /// <summary>
 /// The result of checking a clear-signed mail, kept so it need not be checked again (only signed ones; the content of
@@ -48,7 +52,8 @@ public interface ISignatureCheckStore
 }
 
 /// <param name="DecryptionError">Set if the message was encrypted and could not be decrypted (e.g. no matching private key).</param>
-public sealed record MessageSecurityInfo(bool WasEncrypted, string? DecryptionError, IReadOnlyList<SignatureInfo> Signatures)
+/// <param name="IsPgp">Encrypted with OpenPGP rather than S/MIME.</param>
+public sealed record MessageSecurityInfo(bool WasEncrypted, string? DecryptionError, IReadOnlyList<SignatureInfo> Signatures, bool IsPgp = false)
 {
     public static MessageSecurityInfo None { get; } = new(false, null, []);
 
@@ -58,8 +63,17 @@ public sealed record MessageSecurityInfo(bool WasEncrypted, string? DecryptionEr
 /// <summary>A message with S/MIME layers removed, plus what was found on the way.</summary>
 public sealed record OpenedMessage(MimeMessage Readable, MessageSecurityInfo Security);
 
+/// <summary>How a mail is signed and encrypted.</summary>
+public enum SecureMethod
+{
+    SMime,
+    Pgp,
+}
+
 /// <summary>What the compose window may offer for a given sender and recipients.</summary>
-public sealed record SecureMimeCapabilities(bool CanSign, IReadOnlyList<string> RecipientsWithoutCertificate);
+/// <param name="Method">The method these apply to (chosen automatically unless asked for one).</param>
+/// <param name="RecipientsWithoutCertificate">Recipients without a certificate or PGP key for <paramref name="Method"/>.</param>
+public sealed record SecureMimeCapabilities(bool CanSign, IReadOnlyList<string> RecipientsWithoutCertificate, SecureMethod Method = SecureMethod.SMime);
 
 public sealed class SecureMimeException(string message, Exception? inner = null) : Exception(message, inner);
 
@@ -96,8 +110,10 @@ public static class SecureMimeAlgorithms
 
 /// <param name="http">Fetches intermediate certificates a signature leaves out (null: none are fetched).</param>
 /// <param name="checks">Keeps the results of signature checks (null: every signed mail is checked each time it opens).</param>
-public sealed class SecureMimeService(CertificateManager certificates, ISettingsStore settings, TimeProvider clock, ILogger<SecureMimeService> logger, HttpClient? http = null,
-    ISignatureCheckStore? checks = null)
+/// <param name="pgp">The PGP keys (null: PGP signatures are not checked, PGP-encrypted mails not opened).</param>
+/// <param name="lookup">Finds recipients' PGP keys online (null: not looked up).</param>
+public sealed partial class SecureMimeService(CertificateManager certificates, ISettingsStore settings, TimeProvider clock, ILogger<SecureMimeService> logger, HttpClient? http = null,
+    ISignatureCheckStore? checks = null, PgpKeyManager? pgp = null, PgpKeyLookup? lookup = null)
 {
     /// <summary>A kept check counts this long; then the mail is checked again (e.g. a root the system no longer trusts).</summary>
     public static readonly TimeSpan SignatureCheckLifetime = TimeSpan.FromDays(3);
@@ -107,35 +123,109 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
     /// <summary>Own certificates or keys changed: what was opened with the ones before may read differently now.</summary>
     public event EventHandler? CertificatesChanged
     {
-        add => certificates.Changed += value;
-        remove => certificates.Changed -= value;
+        add
+        {
+            certificates.Changed += value;
+            if (pgp is not null)
+            {
+                pgp.Changed += value;
+            }
+        }
+
+        remove
+        {
+            certificates.Changed -= value;
+            if (pgp is not null)
+            {
+                pgp.Changed -= value;
+            }
+        }
     }
 
     private readonly IssuerDownloader? _issuers = http is null ? null : new IssuerDownloader(http);
 
-    public async Task<SecureMimeCapabilities> GetCapabilitiesAsync(string fromAddress, IEnumerable<string> recipients, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Whether the sender can sign and which recipients lack a certificate/key – for <paramref name="method"/>, or (null)
+    /// for the method that suits best: the one all recipients can be encrypted with, then the one the sender can sign
+    /// with, then the one fewer recipients lack, then the preferred one (Einstellungen → Zertifikate).
+    /// </summary>
+    public Task<SecureMimeCapabilities> GetCapabilitiesAsync(string fromAddress, IEnumerable<string> recipients, CancellationToken cancellationToken = default) =>
+        GetCapabilitiesAsync(fromAddress, recipients, null, cancellationToken);
+
+    /// <inheritdoc cref="GetCapabilitiesAsync(string, IEnumerable{string}, CancellationToken)"/>
+    public async Task<SecureMimeCapabilities> GetCapabilitiesAsync(string fromAddress, IEnumerable<string> recipients, SecureMethod? method,
+        CancellationToken cancellationToken = default)
     {
+        var addresses = recipients.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var infos = await certificates.GetAllAsync(cancellationToken);
         var now = clock.GetUtcNow();
-        var canSign = infos.Any(c => c.HasPrivateKey && c.CanSign && c.IsUsableAt(now) && c.Covers(fromAddress));
-        var missing = recipients
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(r => !infos.Any(c => c.CanEncrypt && c.IsUsableAt(now) && c.Covers(r)))
-            .ToList();
-        return new SecureMimeCapabilities(canSign, missing);
+        var smime = new SecureMimeCapabilities(
+            infos.Any(c => c.HasPrivateKey && c.CanSign && c.IsUsableAt(now) && c.Covers(fromAddress)),
+            addresses.Where(r => !infos.Any(c => c.CanEncrypt && c.IsUsableAt(now) && c.Covers(r))).ToList());
+        if (pgp is null || method == SecureMethod.SMime)
+        {
+            return smime;
+        }
+
+        using var context = await CreatePgpContextAsync(cancellationToken);
+        var openPgp = new SecureMimeCapabilities(context.SigningKey(fromAddress) is not null, addresses.Where(r => context.EncryptionKey(r) is null).ToList(), SecureMethod.Pgp);
+        return method == SecureMethod.Pgp ? openPgp : Choose(smime, openPgp, addresses.Count > 0, await PreferredMethodAsync(cancellationToken));
     }
 
-    /// <summary>Signs (clear-signed, readable everywhere) and/or encrypts the message in place.</summary>
-    /// <exception cref="SecureMimeException">No own certificate, or certificates of some recipients are missing.</exception>
-    public async Task ProtectAsync(MimeMessage message, bool sign, bool encrypt, CancellationToken cancellationToken = default)
+    internal static SecureMimeCapabilities Choose(SecureMimeCapabilities smime, SecureMimeCapabilities openPgp, bool hasRecipients, SecureMethod preferred)
+    {
+        var smimeComplete = smime.RecipientsWithoutCertificate.Count == 0;
+        var pgpComplete = openPgp.RecipientsWithoutCertificate.Count == 0;
+        if (hasRecipients && smimeComplete != pgpComplete)
+        {
+            return smimeComplete ? smime : openPgp;
+        }
+
+        if (smime.CanSign != openPgp.CanSign)
+        {
+            return smime.CanSign ? smime : openPgp;
+        }
+
+        if (hasRecipients && smime.RecipientsWithoutCertificate.Count != openPgp.RecipientsWithoutCertificate.Count)
+        {
+            return smime.RecipientsWithoutCertificate.Count < openPgp.RecipientsWithoutCertificate.Count ? smime : openPgp;
+        }
+
+        return preferred == SecureMethod.Pgp ? openPgp : smime;
+    }
+
+    private async Task<SecureMethod> PreferredMethodAsync(CancellationToken cancellationToken) =>
+        await settings.GetAsync(SettingKeys.PreferredSecureMethod, cancellationToken) == "pgp" ? SecureMethod.Pgp : SecureMethod.SMime;
+
+    /// <summary>
+    /// Signs (clear-signed, readable everywhere) and/or encrypts the message in place, with <paramref name="method"/> or
+    /// (null) the method that suits sender and recipients best; adds the Autocrypt header with the own PGP key.
+    /// </summary>
+    /// <exception cref="SecureMimeException">No own certificate/key, or those of some recipients are missing.</exception>
+    public Task ProtectAsync(MimeMessage message, bool sign, bool encrypt, CancellationToken cancellationToken = default) =>
+        ProtectAsync(message, sign, encrypt, null, cancellationToken);
+
+    /// <inheritdoc cref="ProtectAsync(MimeMessage, bool, bool, CancellationToken)"/>
+    public async Task ProtectAsync(MimeMessage message, bool sign, bool encrypt, SecureMethod? method, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
+        await AddAutocryptAsync(message, cancellationToken);
         if (!sign && !encrypt)
         {
             return;
         }
 
         var from = message.From.Mailboxes.FirstOrDefault() ?? throw new SecureMimeException(T("Die Nachricht hat keinen Absender."));
+        if (pgp is not null)
+        {
+            var recipients = encrypt ? AllRecipients(message).Select(m => m.Address) : [];
+            if ((await GetCapabilitiesAsync(from.Address, recipients, method, cancellationToken)).Method == SecureMethod.Pgp)
+            {
+                await ProtectPgpAsync(message, from, sign, encrypt, cancellationToken);
+                return;
+            }
+        }
+
         using var context = await CreateContextAsync(cancellationToken);
         var body = message.Body ?? throw new SecureMimeException(T("Die Nachricht hat keinen Inhalt."));
 
@@ -149,11 +239,7 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
 
         if (encrypt)
         {
-            // The sender is always a recipient too, otherwise the copy in "Sent" could not be read.
-            var addresses = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).Append(from)
-                .Select(m => m.Address)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var addresses = AllRecipients(message).Select(m => m.Address).ToList();
             var recipients = new CmsRecipientCollection();
             var missing = new List<string>();
             foreach (var address in addresses)
@@ -179,6 +265,12 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         message.Body = body;
     }
 
+    // Everyone the mail is encrypted to: the sender too, otherwise the copy in "Sent" could not be read.
+    private static List<MailboxAddress> AllRecipients(MimeMessage message) =>
+        message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).Concat(message.From.Mailboxes)
+            .DistinctBy(m => m.Address, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     /// <summary>
     /// BouncyCastle writes the enveloped data as BER (open lengths, the encrypted content as one primitive [0]) – valid,
     /// but GnuPG's libksba (gpg4win/GpgOL, Kleopatra) stops with "Encoding problem". DER is read by everyone.
@@ -199,12 +291,14 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
     public async Task<OpenedMessage> OpenAsync(MimeMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
+        await RememberAutocryptAsync(message, cancellationToken);
         if (!IsSecure(message.Body))
         {
             return new OpenedMessage(message, MessageSecurityInfo.None);
         }
 
-        if (checks is null || message.Body is not MultipartSigned { Count: > 0 } signed || IsSecure(signed[0]))
+        // Kept checks are for S/MIME only (they depend on the certificates); a PGP signature is quick to check again.
+        if (checks is null || message.Body is not MultipartSigned { Count: > 0 } signed || !IsSecureMimeSigned(signed) || IsSecure(signed[0]))
         {
             return await OpenCoreAsync(message, cancellationToken);
         }
@@ -258,7 +352,9 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
 
         var watch = System.Diagnostics.Stopwatch.StartNew();
         using var context = await CreateContextAsync(cancellationToken);
+        using var pgpContext = pgp is null ? null : await CreatePgpContextAsync(cancellationToken);
         var material = watch.ElapsedMilliseconds;
+        var isPgp = false;
         var entity = message.Body;
         var signatures = new List<SignatureInfo>();
         var encrypted = false;
@@ -269,9 +365,41 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
 
         for (var depth = 0; depth < 5 && entity is not null; depth++)
         {
-            if (entity is MultipartSigned { Count: > 0 } pgp && !IsSecureMimeSigned(pgp))
+            if (entity is MultipartSigned { Count: > 0 } pgpSigned && !IsSecureMimeSigned(pgpSigned))
             {
-                entity = pgp[0];
+                if (pgpContext is not null && IsPgpSigned(pgpSigned))
+                {
+                    signatures.AddRange(await VerifyPgpAsync(pgpSigned, pgpContext, sender, cancellationToken));
+                }
+
+                entity = pgpSigned[0];
+            }
+            else if (entity is MultipartEncrypted pgpEncrypted)
+            {
+                encrypted = isPgp = true;
+                if (pgpContext is null)
+                {
+                    decryptionError = T("Mit PGP verschlüsselte Nachrichten können hier nicht geöffnet werden.");
+                    break;
+                }
+
+                try
+                {
+                    entity = pgpEncrypted.Decrypt(pgpContext, out var inner, cancellationToken);
+                    if (inner is not null)
+                    {
+                        signatures.AddRange(await EvaluatePgpAsync(inner, pgpContext, sender, cancellationToken));
+                    }
+                }
+                catch (Exception ex) when (ex is PrivateKeyNotFoundException or Org.BouncyCastle.Bcpg.OpenPgp.PgpException or FormatException or ArgumentException or InvalidCastException
+                    or InvalidOperationException or IOException)
+                {
+                    logger.LogInformation(ex, "Could not decrypt PGP message");
+                    decryptionError = ex is PrivateKeyNotFoundException
+                        ? T("Kein passender privater PGP-Schlüssel vorhanden. Bitte den eigenen Schlüssel unter Einstellungen → Zertifikate importieren.")
+                        : T("Die Nachricht konnte nicht entschlüsselt werden: ") + ex.Message;
+                    break;
+                }
             }
             else if (entity is MultipartSigned signed)
             {
@@ -321,15 +449,26 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
             }
         }
 
+        if (decryptionError is null && entity is not null && pgpContext is not null && InlinePgp.Contains(entity))
+        {
+            var inline = await OpenInlinePgpAsync(entity, pgpContext, sender, signatures, cancellationToken);
+            entity = inline.Entity;
+            encrypted |= inline.Encrypted;
+            isPgp |= inline.Encrypted;
+            decryptionError = inline.Error;
+        }
+
         var readable = decryptionError is null && entity is not null ? WithBody(message, entity) : message;
         logger.LogInformation("S/MIME opened in {Total} ms (certificates {Material} ms, {Signatures} signature(s), encrypted: {Encrypted})",
             watch.ElapsedMilliseconds, material, signatures.Count, encrypted);
-        return new OpenedMessage(readable, new MessageSecurityInfo(encrypted, decryptionError, signatures));
+        return new OpenedMessage(readable, new MessageSecurityInfo(encrypted, decryptionError, signatures, isPgp));
     }
 
-    private static bool IsSecure(MimeEntity? body) => body is MultipartSigned signed && IsSecureMimeSigned(signed) || body is ApplicationPkcs7Mime;
+    private bool IsSecure(MimeEntity? body) =>
+        body is MultipartSigned signed && (IsSecureMimeSigned(signed) || (pgp is not null && IsPgpSigned(signed))) || body is ApplicationPkcs7Mime or MultipartEncrypted
+        || (pgp is not null && InlinePgp.Contains(body));
 
-    // S/MIME signatures only; a PGP/MIME one (application/pgp-signature) is not checked: its content is shown as it is.
+    // S/MIME signatures; a PGP/MIME one (application/pgp-signature) is checked separately (or, without PGP keys, shown as it is).
     private static bool IsSecureMimeSigned(MultipartSigned signed) =>
         signed.ContentType.Parameters["protocol"]?.Trim().ToLowerInvariant() is "application/pkcs7-signature" or "application/x-pkcs7-signature";
 

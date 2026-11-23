@@ -489,6 +489,22 @@ Modi ausser «nie» als gelesen. Die Ordnerliste zeigt ungelesene Nachrichten al
 - Noch nicht: Online-Sperrprüfung (CRL/OCSP), Auswahl bei mehreren eigenen Zertifikaten pro Adresse (heute: das am
   längsten gültige), LDAP-Zertifikatsuche, Speichern privater Schlüssel im OS-Schlüsselbund.
 
+### PGP (OpenPGP)
+
+- `PgpKeyManager` (BouncyCastle, Speicher `PgpKeys` in SQLite): eigene Schlüssel mit geheimem Teil (bleibt mit seiner
+  Passphrase geschützt, die Passphrase im Credential-Store), öffentliche Schlüssel anderer. Neu erstellte Schlüssel:
+  Ed25519 zum Signieren, Curve25519 zum Verschlüsseln, drei Jahre gültig, Version 4.
+- Herkunft und Vertrauen: eigene, erstellte, aus der Cloud (eigene und Verzeichnis der Organisation), beim Kontakt
+  gespeicherte (vCard `KEY`, 4.0 `data:application/pgp-keys`, 3.0 `TYPE=PGP`) und von Hand bestätigte gelten als
+  bestätigt; per Autocrypt-Header oder online (WKD beim Mailserver des Empfängers, dann keys.openpgp.org) gefundene nur
+  als bekannt. Bestätigen = Fingerabdruck vergleichen, danach wandert der Schlüssel zum Kontakt.
+- Online gesucht wird nur beim Verschlüsseln, nie beim Lesen (sonst wüsste der Absender, dass die Mail geöffnet wurde).
+- `SecureMimeService`: PGP/MIME signieren und verschlüsseln (AES-256, immer auch an den Absender), PGP/MIME und Inline-PGP
+  lesen. Gesendete Mails tragen den eigenen öffentlichen Schlüssel im Autocrypt-Header (abschaltbar).
+- Verfahren beim Senden: das, für das alle Empfänger Zertifikate bzw. Schlüssel haben; sonst das, mit dem der Absender
+  signieren kann; bei beidem die Voreinstellung (nur sichtbar, wenn für eine Adresse beides vorhanden ist). Im
+  Verfassen-Fenster unter «Mehr → Verfahren» wählbar.
+
 ### Schema-Updates
 
 EF-Core-Migrations in `Neruna.Storage/Migrations`; beim Start bringt `InitializeNerunaStorageAsync` die Datenbank auf
@@ -654,6 +670,12 @@ Gerät: eigener ECDH-Schlüssel (privat im Schlüsselbund), vom Admin per Org-Si
   erhalten Zertifikate erst nach Freigabe im Portal. Entfernen wirkt nur für die Zukunft (bei Austritt widerrufen).
 - Grenze: Die Portalseite selbst kommt vom Server – ein kompromittierter Server könnte veränderten Code ausliefern.
 - Vertragstest: Die Fixtures erzeugt das Browser-Modul (Node), die App muss sie öffnen.
+- PGP-Schlüssel gleich wie Zertifikate (gleiche Umschläge und Kontexte): payload = {geheimer Schlüssel, im Browser mit
+  OpenPGP.js entsperrt und mit einer zufälligen Passphrase neu geschützt, diese Passphrase}. Dazu signiert die
+  Organisation den öffentlichen Schlüssel (`neruna-pgp-public-v1|id|publicKey`): `GET /api/v1/pgp-keys` liefert die
+  eigenen Schlüssel und das Verzeichnis aller öffentlichen Schlüssel der Organisation; die App übernimmt nur Signiertes,
+  als bestätigt (`CloudCertificateSync`). Nicht mehr zugeordnet: der geheime Teil geht, der öffentliche bleibt, solange
+  er im Verzeichnis steht.
 
 ## 6c. E-Mail-Konten aus dem Portal (Zero-Knowledge)
 

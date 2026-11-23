@@ -440,6 +440,32 @@ namespace Neruna.Storage.Migrations
                     b.ToTable("Notes");
                 });
 
+            modelBuilder.Entity("Neruna.Storage.PgpKeyEntity", b =>
+                {
+                    b.Property<string>("Fingerprint")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("AddedUnixMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("PublicKeyRing")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<byte[]>("SecretKeyRing")
+                        .HasColumnType("BLOB");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Verified")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Fingerprint");
+
+                    b.ToTable("PgpKeys");
+                });
+
             modelBuilder.Entity("Neruna.Storage.ReminderStateEntity", b =>
                 {
                     b.Property<string>("Key")

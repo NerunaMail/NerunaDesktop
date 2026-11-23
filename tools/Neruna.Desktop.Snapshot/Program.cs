@@ -1654,8 +1654,11 @@ internal static class Snapshots
                 System.Security.Cryptography.X509Certificates.X509KeyUsageFlags.DigitalSignature | System.Security.Cryptography.X509Certificates.X509KeyUsageFlags.KeyEncipherment, false));
             using var made = request.CreateSelfSigned(DateTimeOffset.Now.AddDays(-30), DateTimeOffset.Now.AddYears(2));
             var withCertificate = Neruna.Core.Contacts.ContactCertificates.Add(personData, made.RawData);
+            // And a PGP key, as other address books keep it.
+            var pgpKey = Neruna.Core.Security.PgpKeyParser.PublicOf(Neruna.Core.Security.PgpKeyGenerator.Generate(person.Card.DisplayName, person.Card.EmailAddresses[0], "x", DateTime.UtcNow.AddDays(-30)));
+            withCertificate = Neruna.Core.Contacts.ContactPgpKeys.Add(withCertificate, pgpKey.GetEncoded());
             vm.Overlay = new ContactEditorViewModel(contactController, services.GetRequiredService<Neruna.Desktop.Infrastructure.IFileService>(), writable,
-                Neruna.Core.Contacts.ContactDraft.FromVCard(withCertificate) with { Certificates = Neruna.Core.Contacts.ContactCertificates.Read(withCertificate) },
+                Neruna.Core.Contacts.ContactDraft.FromVCard(withCertificate) with { Certificates = Neruna.Core.Contacts.ContactCertificates.Read(withCertificate), PgpKeys = Neruna.Core.Contacts.ContactPgpKeys.Read(withCertificate) },
                 (person.AddressBook with { IsReadOnly = false }, person.RemoteId));
             await SaveAsync(window, output, "contacts-editor-certificate.png");
             vm.Overlay = null;
@@ -1758,6 +1761,32 @@ internal static class Snapshots
         await vm.SettingsPage.MailOptions.ReloadAsync();
         vm.SettingsPage.Section = SettingsSection.Compose;
         await SaveAsync(window, output, "settings-compose.png");
+
+        // Einstellungen → Zertifikate und PGP: an own key made here, a colleague's confirmed key, one known from a mail.
+        var pgpKeys = services.GetRequiredService<Neruna.Core.Security.PgpKeyManager>();
+        var ownIdentity = (await services.GetRequiredService<Neruna.Core.IAccountStore>().GetAccountsAsync()).SelectMany(a => a.Identities).First();
+        await pgpKeys.GenerateAsync(ownIdentity.DisplayName, ownIdentity.Email);
+        var colleague = await pgpKeys.RememberAsync(Neruna.Core.Security.PgpKeyParser.PublicOf(Neruna.Core.Security.PgpKeyGenerator.Generate("Marco Bernasconi", "marco@example.ch", "x", DateTime.UtcNow.AddDays(-200))), Neruna.Core.Security.PgpKeySource.KeyServer);
+        await pgpKeys.SetVerifiedAsync(colleague!.Fingerprint, true);
+        await pgpKeys.RememberAsync(Neruna.Core.Security.PgpKeyParser.PublicOf(Neruna.Core.Security.PgpKeyGenerator.Generate("Sofia Rossi", "sofia@example.it", "x", DateTime.UtcNow.AddDays(-20))), Neruna.Core.Security.PgpKeySource.Autocrypt);
+        await vm.SettingsPage.Certificates.ReloadAsync();
+        vm.SettingsPage.Section = SettingsSection.Certificates;
+        await Task.Delay(300);
+        await SaveAsync(window, output, "settings-certificates.png");
+        if (window.GetVisualDescendants().OfType<Neruna.Desktop.Views.CertificatesView>().FirstOrDefault()?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault() is { } certificateScroll)
+        {
+            certificateScroll.Offset = new Avalonia.Vector(0, 520);
+            await Task.Delay(300);
+            await SaveAsync(window, output, "settings-certificates-pgp.png");
+            if (window.GetVisualDescendants().OfType<Neruna.Desktop.Views.CertificatesView>().First().GetVisualDescendants().OfType<TabControl>().LastOrDefault() is { } pgpTabs)
+            {
+                pgpTabs.SelectedIndex = 1;
+                await Task.Delay(300);
+                await SaveAsync(window, output, "settings-certificates-pgp-others.png");
+            }
+        }
+
+        Console.WriteLine($"PGP keys: own={vm.SettingsPage.Certificates.Pgp.Own.Count}, others={vm.SettingsPage.Certificates.Pgp.Others.Count}");
 
         // Datenschutz with a few trusted senders, and with many (the list scrolls in its own box).
         var privacy = services.GetRequiredService<Neruna.Desktop.Infrastructure.PrivacyService>();

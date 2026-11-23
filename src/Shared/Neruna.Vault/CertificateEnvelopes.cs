@@ -86,6 +86,25 @@ public static class CertificateEnvelopes
         return (Convert.FromBase64String(content.pkcs12), content.password);
     }
 
+    /// <summary>A PGP key from the organisation (stored like a certificate): its secret key (locked) and passphrase.</summary>
+    public static (byte[] SecretKey, string Passphrase) DecryptPgp(string keyId, string payload, byte[] key)
+    {
+        var plain = OpenPayload(payload, key, "neruna-cert-payload-v1|" + keyId);
+        var content = JsonSerializer.Deserialize<PgpContent>(plain);
+        if (content?.pgp is null || content.passphrase is null)
+        {
+            throw new CryptographicException("Not a PGP key.");
+        }
+
+        return (Convert.FromBase64String(content.pgp), content.passphrase);
+    }
+
+    /// <summary>
+    /// The organisation vouches for this public key (its directory): only then is it taken as one of its people's.
+    /// </summary>
+    public static bool VerifyPgpPublicKey(string keyId, string publicKey, string signature, string signingPublicKey) =>
+        VerifySigned($"neruna-pgp-public-v1|{keyId}|{publicKey}", signature, signingPublicKey);
+
     /// <summary>
     /// The organisation signed exactly this payload for exactly this certificate. Without that, a certificate is never
     /// taken – a server could otherwise slip in a key of its own (others would then encrypt to it).
@@ -133,5 +152,7 @@ public static class CertificateEnvelopes
     private sealed record Sealed(int v, string? epk, string iv, string ct);
 
     private sealed record Content(string pkcs12, string password);
+
+    private sealed record PgpContent(string? pgp, string? passphrase);
 #pragma warning restore SA1300, IDE1006
 }

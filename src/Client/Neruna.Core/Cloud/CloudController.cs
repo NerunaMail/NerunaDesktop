@@ -315,6 +315,13 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     public async Task<CertificatesResponse> GetCertificatesAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
         await AuthorizedAsync<CertificatesResponse>(connection, "api/v1/certificates", cancellationToken);
 
+    /// <summary>The PGP keys of this person and the organisation's directory; null when the server has none yet (older version: 404).</summary>
+    public async Task<PgpKeysResponse?> GetPgpKeysAsync(CloudConnection connection, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAuthorizedAsync(connection, HttpMethod.Get, "api/v1/pgp-keys", cancellationToken);
+        return response.StatusCode == HttpStatusCode.NotFound ? null : await ReadAsync<PgpKeysResponse>(response, cancellationToken);
+    }
+
     /// <summary>The mail accounts the organisation set up for this person, encrypted for this device.</summary>
     public Task<MailAccountsResponse> GetMailAccountsAsync(CloudConnection connection, CancellationToken cancellationToken = default) =>
         GetMailAccountsAsync(connection, null, cancellationToken);

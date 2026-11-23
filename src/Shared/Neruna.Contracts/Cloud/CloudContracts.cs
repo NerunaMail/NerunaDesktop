@@ -148,6 +148,43 @@ public sealed record CloudCertificate(
     string PayloadSignature,
     string? Envelope);
 
+/// <summary>
+/// Response of <c>GET /api/v1/pgp-keys</c> (newer servers; older ones answer 404): the PGP keys assigned to the
+/// connected person – encrypted like certificates – and the organisation's directory of public keys.
+/// </summary>
+/// <param name="Directory">The public keys of the organisation's PGP keys in use, each signed by the organisation.</param>
+public sealed record PgpKeysResponse(
+    bool Available,
+    CloudOrganizationKey? OrganizationKey,
+    CloudCertificateDevice Device,
+    IReadOnlyList<CloudPgpKey> Keys,
+    IReadOnlyList<CloudPgpDirectoryEntry> Directory);
+
+/// <param name="Fingerprint">The key's fingerprint (version 4: SHA-1), lower-case hex.</param>
+/// <param name="Payload">JSON {v, iv, ct}: the secret key (locked) and its passphrase, AES-256-GCM.</param>
+/// <param name="PayloadSignature">Base64 ECDSA P-256 (IEEE P1363) of "neruna-cert-v1|id|payload".</param>
+/// <param name="Envelope">The key for this device (JSON {v, epk, iv, ct}); null while it waits for approval.</param>
+public sealed record CloudPgpKey(
+    string Id,
+    string Name,
+    IReadOnlyList<string> EmailAddresses,
+    DateTimeOffset? NotAfter,
+    string Fingerprint,
+    string Payload,
+    string PayloadSignature,
+    string? Envelope);
+
+/// <param name="PublicKey">The public key (binary, base64).</param>
+/// <param name="PublicSignature">Base64 ECDSA P-256 (IEEE P1363) of "neruna-pgp-public-v1|id|publicKey".</param>
+public sealed record CloudPgpDirectoryEntry(
+    string Id,
+    string Name,
+    IReadOnlyList<string> EmailAddresses,
+    DateTimeOffset? NotAfter,
+    string Fingerprint,
+    string PublicKey,
+    string PublicSignature);
+
 /// <summary>Body of <c>PUT /api/v1/device/encryption-key</c>.</summary>
 public sealed record DeviceEncryptionKeyRequest(string PublicKey, string? PairingProof = null);
 

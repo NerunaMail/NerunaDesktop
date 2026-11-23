@@ -339,7 +339,7 @@ public class SecureMimeTests
     }
 
     [Fact]
-    public async Task A_pgp_signed_mail_opens_with_its_content_and_no_signature_claimed()
+    public async Task A_pgp_signed_mail_opens_with_its_content_and_no_valid_signature_claimed()
     {
         await using var env = await TestEnvironment.CreateAsync();
         var ct = TestContext.Current.CancellationToken;
@@ -374,7 +374,8 @@ public class SecureMimeTests
 
         var opened = await env.Get<SecureMimeService>().OpenAsync(message, ct);
 
-        Assert.Empty(opened.Security.Signatures);
+        // The key is not known here (and the signature is made up): never claimed valid.
+        Assert.DoesNotContain(opened.Security.Signatures, s => s.Status is SignatureStatus.Valid or SignatureStatus.ValidUntrusted);
         Assert.Null(opened.Security.DecryptionError);
         Assert.Contains("Hallo Bob", Neruna.Core.Mail.MessageContent.From(opened.Readable).PlainText, StringComparison.Ordinal);
     }

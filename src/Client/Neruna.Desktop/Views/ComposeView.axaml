@@ -135,7 +135,7 @@
         </Border>
         <!-- What is switched on for sending: signed and/or encrypted, or encryption not possible for everyone -->
         <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="4,0,0,0">
-          <Border Classes="badge" IsVisible="{Binding Sign}" ToolTip.Tip="{l:T 'Wird digital signiert (S/MIME) – unter «Mehr» abschaltbar'}"
+          <Border Classes="badge" IsVisible="{Binding Sign}" ToolTip.Tip="{Binding SignBadgeHint}"
                   AutomationProperties.Name="{l:T 'Signiert'}">
             <StackPanel Orientation="Horizontal" Spacing="4">
               <PathIcon Data="{StaticResource IconCertificate}" Width="12" Height="12" />
@@ -246,11 +246,21 @@
                   </MultiBinding>
                 </Separator.IsVisible>
               </Separator>
-              <!-- S/MIME: only with an own certificate; Verschlüsseln only together with Signieren (see ShowEncrypt) -->
+              <!-- S/MIME or PGP: only with an own certificate or key; Verschlüsseln only together with Signieren (see ShowEncrypt) -->
               <MenuItem Header="{l:T 'Signieren'}" ToggleType="CheckBox" IsChecked="{Binding Sign, Mode=OneWay}" Command="{Binding ToggleSignCommand}" IsVisible="{Binding CanSign}"
                         ToolTip.Tip="{Binding SignHint}" />
               <MenuItem Header="{l:T 'Verschlüsseln'}" ToggleType="CheckBox" IsChecked="{Binding Encrypt, Mode=OneWay}" Command="{Binding ToggleEncryptCommand}" IsVisible="{Binding ShowEncrypt}"
                         ToolTip.Tip="{Binding EncryptHint}" />
+              <!-- S/MIME or PGP: only offered when the sender has both -->
+              <MenuItem Header="{l:T 'Verfahren'}" IsVisible="{Binding HasBothMethods}">
+                <MenuItem Header="{l:T 'Automatisch'}" ToggleType="Radio" GroupName="SecureMethod" IsChecked="{Binding MethodIsAuto, Mode=OneWay}"
+                          Command="{Binding ChooseMethodCommand}" CommandParameter="auto"
+                          ToolTip.Tip="{l:T 'Das Verfahren, für das alle Empfänger Zertifikate oder Schlüssel haben'}" />
+                <MenuItem Header="S/MIME" ToggleType="Radio" GroupName="SecureMethod" IsChecked="{Binding MethodIsSmime, Mode=OneWay}"
+                          Command="{Binding ChooseMethodCommand}" CommandParameter="smime" />
+                <MenuItem Header="PGP" ToggleType="Radio" GroupName="SecureMethod" IsChecked="{Binding MethodIsPgp, Mode=OneWay}"
+                          Command="{Binding ChooseMethodCommand}" CommandParameter="pgp" />
+              </MenuItem>
               <Separator IsVisible="{Binding CanSign}" />
               <MenuItem Header="{l:T 'Übermittlungsbestätigung anfordern'}" ToggleType="CheckBox" IsChecked="{Binding RequestDeliveryReceipt, Mode=OneWay}" Command="{Binding ToggleDeliveryReceiptCommand}"
                         ToolTip.Tip="{l:T 'Der Mailserver meldet, wenn die Nachricht zugestellt wurde – sofern er das unterstützt.'}" />

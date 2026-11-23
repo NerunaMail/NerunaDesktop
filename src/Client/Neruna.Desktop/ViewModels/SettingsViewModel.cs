@@ -145,7 +145,7 @@ internal sealed partial class SettingsViewModel(AccountsViewModel accounts, Mail
         new(SettingsSection.Appearance, T("Darstellung"), "IconPalette"),
         SettingsNavItem.Heading(T("Sicherheit")),
         new(SettingsSection.Privacy, T("Datenschutz"), "IconShield"),
-        new(SettingsSection.Certificates, T("Zertifikate (S/MIME)"), "IconCertificate"),
+        new(SettingsSection.Certificates, T("Zertifikate und PGP"), "IconCertificate"),
         new(SettingsSection.Pdf, "PDF", "IconLock"),
         SettingsNavItem.Gap,
         new(SettingsSection.Data, T("Daten"), "IconArchive"),

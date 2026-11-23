@@ -33,6 +33,8 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
 
     internal DbSet<CertificateEntity> Certificates => Set<CertificateEntity>();
 
+    internal DbSet<PgpKeyEntity> PgpKeys => Set<PgpKeyEntity>();
+
     internal DbSet<SettingEntity> Settings => Set<SettingEntity>();
 
     internal DbSet<SignatureEntity> Signatures => Set<SignatureEntity>();
@@ -97,6 +99,7 @@ public sealed class NerunaDbContext(DbContextOptions<NerunaDbContext> options) :
         });
 
         modelBuilder.Entity<CertificateEntity>(e => e.HasKey(c => c.Thumbprint));
+        modelBuilder.Entity<PgpKeyEntity>(e => e.HasKey(k => k.Fingerprint));
         modelBuilder.Entity<SettingEntity>(e => e.HasKey(s => s.Key));
         modelBuilder.Entity<ReminderStateEntity>(e => e.HasKey(r => r.Key));
 
@@ -292,6 +295,22 @@ internal sealed class ContactEntity
     public string? ETag { get; set; }
 
     public required string Data { get; set; }
+}
+
+internal sealed class PgpKeyEntity
+{
+    public required string Fingerprint { get; set; }
+
+    public required byte[] PublicKeyRing { get; set; }
+
+    /// <summary>Own keys: the secret key ring, still protected by its passphrase (kept in the system's key store).</summary>
+    public byte[]? SecretKeyRing { get; set; }
+
+    public PgpKeySource Source { get; set; }
+
+    public bool Verified { get; set; }
+
+    public long AddedUnixMs { get; set; }
 }
 
 internal sealed class CertificateEntity
