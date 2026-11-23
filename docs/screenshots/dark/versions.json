@@ -1,606 +1,910 @@
 {
+  "account-edit-advanced.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
   "account-edit.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "account-setup-address.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "account-setup-dav.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "account-setup-exchange.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "account-setup-google.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "account-setup-kind.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "account-setup-nextcloud.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "account-setup-proton.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "account-setup.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "account-transfer.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "auto-reply-accounts.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "auto-reply-notice.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "auto-reply-series-back.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "auto-reply-time.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "auto-reply.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "backup-changes.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-2-months.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-drag-new.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-event-menu.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-holidays.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-import.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-manage.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-menu.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-month.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-planning.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-print-list.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-print-month.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-print.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-search.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-selection-colors.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-solo.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-subscribe-file.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-tasks.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-timegrid-15.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-timegrid.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-window-dialog.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-window-main.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "calendar-window.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar-workweek.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "calendar.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "chat-not-connected.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "chat-status.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "chat-tabs.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "chat-talk.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "close-question.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "collection-menu.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-1024-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-1024.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-360-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-360.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-480-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-480.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-720-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-720.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "compose-ai-confirm.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "compose-ai.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-attachment-reminder.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "compose-autocomplete.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-discard.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-format-menu.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "compose-icons-only.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-more-menu.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-narrow.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-narrower.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-no-subject.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "compose-pdf-password.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "compose-pdf-protect.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "compose-pdf-protected.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-recipient-boxes.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-recipient-marked.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-secure-incomplete.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "compose-secure.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "compose.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-addressbooks.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-cards-groups.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-cards.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-duplicates.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-editor-certificate.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-group-editor-edit.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-group-editor-search.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-group-editor.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-group.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts-manage-button.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "contacts.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "crash-report-details.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "crash-report.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "delete-question.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "event-attendees.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "event-categories-open.png": {
     "Version": "0.25.4",
     "Date": "2026-11-04"
   },
   "event-categories.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "event-meeting-choice.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "event-meeting.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "event-occurrence.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "event-zoom-choice.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "event-zoom.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "folder-picker-reopened.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "font-list.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "forward.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "image-question.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "image-viewer.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "invitation.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-account-color.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-account-setting-up.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-add-sender.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-agenda.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-ai-check.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-ai-summary-confirm.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-ai-summary.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-attached-message.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-attachment-preview.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-cc-all.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-cc-cut.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-headers.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-icons-only.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-ics-imported.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-ics-preview.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-pane-below.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-pane-none.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-pdf-narrow.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-pdf-stamp-ghost.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-pdf-stamp.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-pdf-stamped.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-pdf-text.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-pdf-zoom-100.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-pdf-zoom-200.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-pgp-confirm-question.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-pgp-confirm.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-quick-actions-header.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-quick-actions-many.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-quick-actions.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-quickaction-suggestion.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "mail-recipient-menu.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-security-check.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-sender-photo.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-sent.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-table-by-sender.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-table-sent.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-table.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-tags-menu.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-tags.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-unread-only.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail-window.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "mail.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "nav-collapsed.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "nav-expanded-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "nav-expanded.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "notes.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "notification-window.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "poll-editor.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "polls-no-cloud.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "polls.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "profile-chooser.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "quick-action-folder-picker-current.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "quick-action-folder-picker-search.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "quick-action-folder-picker.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "recipient-picker.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "reminder-window.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "reply-all.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "reply.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "search.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-about-diagnosis.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-about.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-accounts-color.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-accounts-menu.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-accounts-signin-failed.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-accounts-signin.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-accounts-signing-in.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-accounts.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-ai-connected.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-ai.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-calendar-categories.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-calendar.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-certificates-authorities.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-certificates-contacts.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-certificates-pgp-others.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-certificates-pgp.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-certificates.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-cloud.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-compose.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-data.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-design-navigation.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-design-no-add-account.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-design.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-file-backup.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-integration.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-mail-tags-color.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-mail-tags.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-mail.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-meetings.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-account-menu.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-accounts-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-accounts.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-calendar-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-calendar.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-search-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-search-hit-dark.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-search-hit.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-new-search.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-news.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-pdf.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-privacy-many.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-privacy-phishing.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-privacy.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-profiles-workspaces.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-profiles.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-quick-action-ask.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-quick-action-edit.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-quick-action-folders.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "settings-quick-action-new.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-quick-actions.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-server-rules.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-signatures.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-text-templates.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "settings-workspaces.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "special-calendar-birthdays.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "special-calendar-holidays.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "splash.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "sync-status.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
+  },
+  "tasks-editor-links.png": {
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "tasks-editor.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "tasks-solo.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "tasks.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "theme-dark-red.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "theme-light-green.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "workspace-business.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   },
   "workspace-tabs.png": {
-    "Version": "0.25.4",
-    "Date": "2026-11-04"
+    "Version": "0.33.1",
+    "Date": "2026-11-23"
   }
 }

@@ -152,7 +152,7 @@ internal static class Snapshots
             var pane = vm.MailPage.ReadingPane!;
             var shown = pane.Security;
             var sender = pane.Sender?.Address ?? "anna@example.com";
-            pane.ShowSecurity(new Neruna.Core.Security.MessageSecurityInfo(false, null, [new Neruna.Core.Security.SignatureInfo("Anna Muster", [sender],
+            pane.ShowSecurity(new Neruna.Core.Security.MessageSecurityInfo(false, null, [new Neruna.Core.Security.SignatureInfo(pane.Sender?.Name ?? "Anna Muster", [sender],
                 "0A1B 2C3D 4E5F 6071 8293 A4B5 C6D7 E8F9 0A1B 2C3D", Neruna.Core.Security.SignatureStatus.ValidUntrusted, true, DateTimeOffset.Now,
                 "Die Nachricht ist unverändert. Um dem Schlüssel zu vertrauen, den Fingerabdruck 0A1B 2C3D 4E5F 6071 8293 A4B5 C6D7 E8F9 0A1B 2C3D mit dem Absender vergleichen (z. B. am Telefon) und bestätigen.", IsPgp: true)]));
             Console.WriteLine($"PGP key can be confirmed in the mail: {pane.CanConfirmPgpKey}");
@@ -1207,6 +1207,14 @@ internal static class Snapshots
                         ?? Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(eventButton)?.GetVisualDescendants().OfType<ContextMenu>().FirstOrDefault();
             var occurrence = ((TimedEventItem)eventButton.DataContext!).Item.Occurrence;
             Console.WriteLine($"Event menu for '{occurrence.Summary}': {await vm.CalendarPage.EventMenuAsync(occurrence)}, open={shown is not null}: {string.Join(" | ", (shown?.Items.OfType<MenuItem>() ?? []).Select(m => $"{m.Header}{(m.IsEnabled ? "" : " (off)")}"))}");
+            // Closed again, or it stays on top of every later picture.
+            foreach (var openMenu in window.GetVisualDescendants().OfType<Control>().Select(c => c.ContextMenu).OfType<ContextMenu>().Where(m => m.IsOpen).ToList())
+            {
+                openMenu.Close();
+            }
+
+            shown?.Close();
+            Dispatcher.UIThread.RunJobs();
         }
 
         vm.CalendarPage.IsPlanning = true;
