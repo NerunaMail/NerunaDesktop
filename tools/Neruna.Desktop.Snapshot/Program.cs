@@ -1426,6 +1426,18 @@ internal static class Snapshots
         firstTask.EditCommand.Execute(null);
         await Task.Delay(300);
         await SaveAsync(window, output, "tasks-editor.png");
+        // Web addresses in the notes: clickable below the field (the notes stay a text to edit).
+        if (vm.Overlay is TaskEditorViewModel taskEditor)
+        {
+            var notesBefore = taskEditor.Notes;
+            taskEditor.Notes = "Offerte prüfen: https://example.com/offerte/2026-11.pdf, Infos auf www.example.org.";
+            await Task.Delay(300);
+            var links = window.GetVisualDescendants().OfType<HyperlinkButton>().Where(b => b.IsEffectivelyVisible).Select(b => b.NavigateUri?.ToString()).ToList();
+            Console.WriteLine($"Task links: {string.Join(" | ", links)}");
+            await SaveAsync(window, output, "tasks-editor-links.png");
+            taskEditor.Notes = notesBefore;
+        }
+
         vm.Overlay = null;
         var demoTasks = vm.TasksPage.ListGroups.SelectMany(g => g.Lists).First(l => l.Info.RemoteId == "tasks");
         demoTasks.ShowTasks = true;

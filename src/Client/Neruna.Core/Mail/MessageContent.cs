@@ -773,6 +773,30 @@ public sealed partial class MessageContent
                || trimmed.StartsWith("data:text/html", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The web addresses in a plain text (notes of a task or an event), as in plain-text mails: http(s) and "www."
+    /// (opened as https), each once, in order.
+    /// </summary>
+    public static IReadOnlyList<Uri> FindLinks(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        var links = new List<Uri>();
+        foreach (Match match in PlainUrl().Matches(text))
+        {
+            var value = match.Value.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? "https://" + match.Value : match.Value;
+            if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && !links.Contains(uri))
+            {
+                links.Add(uri);
+            }
+        }
+
+        return links;
+    }
+
     // Trailing punctuation belongs to the sentence, not the link ("siehe https://example.com.").
     [GeneratedRegex(@"(?:https?://|www\.)[^\s<>""]*[^\s<>"".,;:!?)\]']", RegexOptions.IgnoreCase)]
     private static partial Regex PlainUrl();

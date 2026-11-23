@@ -401,4 +401,13 @@ public class MailPreviewTests
         Assert.True(FileLinks.IsExecutable(@"C:\Tools\setup.EXE"));
         Assert.False(FileLinks.IsExecutable("offerte.pdf"));
     }
+
+    [Fact]
+    public void Links_in_notes_are_found_without_trailing_punctuation_and_www_as_https()
+    {
+        var links = MessageContent.FindLinks("Siehe https://example.com/a?b=1. Und www.example.org, nochmals https://example.com/a?b=1 – ftp://x.example nicht.");
+        Assert.Equal(["https://example.com/a?b=1", "https://www.example.org/"], links.Select(l => l.ToString()));
+        Assert.Empty(MessageContent.FindLinks(null));
+        Assert.Empty(MessageContent.FindLinks("kein Link hier"));
+    }
 }

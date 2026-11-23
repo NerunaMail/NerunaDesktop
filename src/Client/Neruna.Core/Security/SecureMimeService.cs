@@ -269,7 +269,11 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
 
         for (var depth = 0; depth < 5 && entity is not null; depth++)
         {
-            if (entity is MultipartSigned signed)
+            if (entity is MultipartSigned { Count: > 0 } pgp && !IsSecureMimeSigned(pgp))
+            {
+                entity = pgp[0];
+            }
+            else if (entity is MultipartSigned signed)
             {
                 var collection = await signed.VerifyAsync(context, cancellationToken);
                 if (await AddMissingIssuersAsync(collection, context, trusted, cancellationToken))
@@ -323,7 +327,11 @@ public sealed class SecureMimeService(CertificateManager certificates, ISettings
         return new OpenedMessage(readable, new MessageSecurityInfo(encrypted, decryptionError, signatures));
     }
 
-    private static bool IsSecure(MimeEntity? body) => body is MultipartSigned or ApplicationPkcs7Mime;
+    private static bool IsSecure(MimeEntity? body) => body is MultipartSigned signed && IsSecureMimeSigned(signed) || body is ApplicationPkcs7Mime;
+
+    // S/MIME signatures only; a PGP/MIME one (application/pgp-signature) is not checked: its content is shown as it is.
+    private static bool IsSecureMimeSigned(MultipartSigned signed) =>
+        signed.ContentType.Parameters["protocol"]?.Trim().ToLowerInvariant() is "application/pkcs7-signature" or "application/x-pkcs7-signature";
 
     private static MimeMessage WithBody(MimeMessage original, MimeEntity body)
     {

@@ -338,6 +338,47 @@ public class SecureMimeTests
         }
     }
 
+    [Fact]
+    public async Task A_pgp_signed_mail_opens_with_its_content_and_no_signature_claimed()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var ct = TestContext.Current.CancellationToken;
+        // As Thunderbird/Betterbird sends it: PGP/MIME, the content readable, the signature in its own part.
+        const string raw = """
+            From: Anna Muster <anna@example.com>
+            To: Bob Brunner <bob@example.com>
+            Subject: PGP signiert
+            MIME-Version: 1.0
+            Content-Type: multipart/signed; micalg="pgp-sha256"; protocol="application/pgp-signature"; boundary="b1"
+
+            --b1
+            Content-Type: multipart/mixed; boundary="b2"
+
+            --b2
+            Content-Type: text/plain; charset=UTF-8
+
+            Hallo Bob
+            --b2--
+
+            --b1
+            Content-Type: application/pgp-signature; name="OpenPGP_signature.asc"
+            Content-Disposition: attachment; filename="OpenPGP_signature.asc"
+
+            -----BEGIN PGP SIGNATURE-----
+
+            wnsEABYIACMWIQQAAAAAAAAAAAAAAAAAAAAAAAAAAAUCZ0AAAAAFAwAAAAAACgkQAAAAAAAAAAAA
+            -----END PGP SIGNATURE-----
+            --b1--
+            """;
+        var message = MimeMessage.Load(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(raw.ReplaceLineEndings("\r\n"))), ct);
+
+        var opened = await env.Get<SecureMimeService>().OpenAsync(message, ct);
+
+        Assert.Empty(opened.Security.Signatures);
+        Assert.Null(opened.Security.DecryptionError);
+        Assert.Contains("Hallo Bob", Neruna.Core.Mail.MessageContent.From(opened.Readable).PlainText, StringComparison.Ordinal);
+    }
+
     private static MimeMessage Message(string subject, string text)
     {
         var message = new MimeMessage { Subject = subject, Body = new TextPart("plain") { Text = text } };
