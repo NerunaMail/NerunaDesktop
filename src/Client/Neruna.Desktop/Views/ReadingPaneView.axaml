@@ -500,7 +500,7 @@
         <!-- An attached mail: as a message of its own (its view is made only when needed – it is this view again) -->
         <ContentControl Grid.Row="2" Content="{Binding Preview.Message}" IsVisible="{Binding Preview.Message, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
         <ScrollViewer x:Name="PreviewScroller" Grid.Row="2" Background="{DynamicResource DividerBrush}" DataContext="{Binding Preview}" x:DataType="vm:AttachmentPreviewViewModel"
-                      HorizontalScrollBarVisibility="Auto" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNull}, FallbackValue=True}">
+                      HorizontalScrollBarVisibility="{Binding HorizontalScroll}" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNull}, FallbackValue=True}">
           <StackPanel Margin="16" Spacing="12">
             <ItemsControl ItemsSource="{Binding Pages}">
               <ItemsControl.ItemsPanel>
@@ -529,6 +529,57 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- An .ics: its events as cards, and "In Kalender importieren" (the mail's account's default calendar suggested) -->
+            <StackPanel Spacing="10" IsVisible="{Binding ShowsEvents}" MaxWidth="720" HorizontalAlignment="Stretch">
+              <Border Background="{DynamicResource PaneBackgroundBrush}" CornerRadius="6" Padding="14,10" IsVisible="{Binding CanImportEvents}">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="{Binding EventsTitle}" FontWeight="SemiBold" />
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Text="{l:T 'In Kalender'}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox ItemsSource="{Binding ImportCalendars}" SelectedItem="{Binding ImportCalendar}" HorizontalAlignment="Stretch">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="cal:CalendarInfo">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse Width="10" Height="10" Fill="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Name}" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </DockPanel>
+                  <Button Classes="accent" Command="{Binding ImportEventsCommand}" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <PathIcon Data="{StaticResource IconCalendar}" Width="14" Height="14" />
+                      <TextBlock Text="{l:T 'In Kalender importieren'}" />
+                    </StackPanel>
+                  </Button>
+                  <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsImporting}" Height="4" />
+                  <TextBlock Text="{Binding ImportStatus}" TextWrapping="Wrap" Classes.error="{Binding ImportFailed}"
+                             IsVisible="{Binding ImportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+              </Border>
+              <ItemsControl ItemsSource="{Binding Events}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="8" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CalendarPreviewItem">
+                    <Border Background="{DynamicResource PaneBackgroundBrush}" CornerRadius="6" Padding="14,10" BorderThickness="4,0,0,0" BorderBrush="{DynamicResource AccentButtonBackground}">
+                      <StackPanel Spacing="3">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding When}" TextWrapping="Wrap" />
+                        <TextBlock Classes="subtle" Text="{Binding Location}" TextWrapping="Wrap" IsVisible="{Binding HasLocation}" />
+                        <TextBlock Classes="subtle" Text="{Binding Repeats}" IsVisible="{Binding HasRepeats}" />
+                        <SelectableTextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12" IsVisible="{Binding HasDescription}" />
+                        <ctl:TextLinks Text="{Binding Description}" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
             <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="120" HorizontalAlignment="Center" />
             <TextBlock Text="{Binding Problem}" TextWrapping="Wrap" HorizontalAlignment="Center"
                        IsVisible="{Binding Problem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />

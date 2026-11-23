@@ -263,6 +263,7 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
 
     /// <summary>Creates (no <paramref name="remoteId"/>) or updates a resource; returns its id, ETag and stored data.</summary>
     /// <exception cref="RemoteConflictException">ETag mismatch or the resource already exists.</exception>
+    /// <exception cref="UidConflictException">New, but its UID is already in the collection (no-uid-conflict).</exception>
     public async Task<DavItem> PutAsync(Uri collection, string? remoteId, string? etag, string data, string uid, CancellationToken cancellationToken)
     {
         var create = string.IsNullOrEmpty(remoteId);
@@ -272,6 +273,13 @@ internal sealed class DavCollectionService(DavClient client, Uri startUrl, DavFl
         if (response.Status == HttpStatusCode.PreconditionFailed)
         {
             throw new RemoteConflictException();
+        }
+
+        // A new one whose UID the collection already has – perhaps deleted and kept in the server's trash bin.
+        if (create && response.Status is HttpStatusCode.Conflict or HttpStatusCode.Forbidden
+            && response.Body.Contains("no-uid-conflict", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UidConflictException();
         }
 
         if ((int)response.Status is < 200 or >= 300)

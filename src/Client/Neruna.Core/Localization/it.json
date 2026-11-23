@@ -2931,5 +2931,16 @@
  "Neue E-Mail an {0}": "Nuova e-mail a {0}",
  "Weniger": "Meno",
  "Zu Kontakten hinzufügen": "Aggiungi ai contatti",
- "Links in diesem Text": "Link in questo testo"
+ "Links in diesem Text": "Link in questo testo",
+ "Ein Eintrag mit derselben Kennung ist schon auf dem Server (evtl. im Papierkorb).": "Una voce con lo stesso identificativo è già sul server (forse nel cestino).",
+ "Die Kalender konnten nicht gelesen werden: ": "Non è stato possibile leggere i calendari: ",
+ "Im Kalender «{0}».": "Nel calendario «{0}».",
+ "In Kalender importieren": "Importa nel calendario",
+ "Kein Kalender vorhanden, in den Termine gespeichert werden können.": "Nessun calendario in cui salvare gli appuntamenti.",
+ "Wiederholt sich": "Si ripete",
+ "Wiederholt sich jährlich": "Si ripete ogni anno",
+ "Wiederholt sich monatlich": "Si ripete ogni mese",
+ "Wiederholt sich täglich": "Si ripete ogni giorno",
+ "Wiederholt sich wöchentlich": "Si ripete ogni settimana",
+ "{0} Termin(e)": "{0} appuntamento/i"
 }

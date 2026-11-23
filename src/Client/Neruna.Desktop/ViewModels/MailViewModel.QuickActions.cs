@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.Input;
 using MimeKit;
 using Neruna.Core;
+using Neruna.Core.Accounts;
+using Neruna.Core.Calendar;
 using Neruna.Core.Mail;
 using static Neruna.Core.Localization.Texts;
 
@@ -102,6 +104,10 @@ internal sealed partial class MailViewModel
 
         public Task<string?> GetStampNameAsync() => ((IAttachmentActions)mail).GetStampNameAsync();
 
+        public Task<IReadOnlyList<CalendarInfo>> ImportCalendarsAsync() => mail.ImportCalendarsForAsync(context.Folder.Account.Account);
+
+        public Task<ImportResult> ImportEventsAsync(CalendarInfo target, IReadOnlyList<ImportedEvent> events) => mail.ImportAttachedEventsAsync(target, events);
+
         public async Task RespondWithAsync(AttachmentViewModel attachment, byte[] content, QuickActionStepKind kind)
         {
             if (context.Pane.Message is { } message)
@@ -119,6 +125,35 @@ internal sealed partial class MailViewModel
         _quickActionList ??= await quickActions.GetActionsAsync();
         var command = new AsyncRelayCommand<QuickAction?>(action => action is null ? Task.CompletedTask : RunQuickActionAsync(action, context));
         return [.. MatchingQuickActions(context.Pane, context.Folder).Select(a => new QuickActionButton(a, command))];
+    }
+
+    Task<IReadOnlyList<CalendarInfo>> IAttachmentActions.ImportCalendarsAsync() => ImportCalendarsForAsync(OpenFolder?.Account.Account);
+
+    Task<ImportResult> IAttachmentActions.ImportEventsAsync(CalendarInfo target, IReadOnlyList<ImportedEvent> events) => ImportAttachedEventsAsync(target, events);
+
+    // The writable calendars, the default of the mail's account first (as for its invitations: "Kalender verwalten",
+    // then the general default if it is this account's, then the server's default); without an account the general one.
+    private async Task<IReadOnlyList<CalendarInfo>> ImportCalendarsForAsync(Account? account)
+    {
+        var preferred = await settings.GetAsync(SettingKeys.CalendarDefaultCalendar);
+        if (account is not null)
+        {
+            return await invitations.TargetCalendarsAsync(account, preferred: preferred);
+        }
+
+        var writable = (await calendar.GetCalendarsAsync()).Where(c => !c.IsReadOnly && c.HasEvents).ToList();
+        return [.. writable.OrderBy(c => CalendarController.CalendarKey(c) == preferred ? 0 : c.IsDefault ? 1 : 2)];
+    }
+
+    private async Task<ImportResult> ImportAttachedEventsAsync(CalendarInfo target, IReadOnlyList<ImportedEvent> events)
+    {
+        var result = await Task.Run(() => calendar.ImportAsync(target, events));
+        if (result.Added + result.Updated > 0)
+        {
+            CalendarChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        return result;
     }
 
     /// <summary>The PDF preview: answer or forward with the stamped PDF.</summary>

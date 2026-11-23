@@ -19,6 +19,22 @@ internal interface IAttachmentActions
 
     /// <summary>Answer or forward the open mail with the (stamped) attachment.</summary>
     Task RespondWithAsync(AttachmentViewModel attachment, byte[] content, QuickActionStepKind kind);
+
+    /// <summary>Writable calendars for the events of an .ics attachment; the default calendar of the mail's account first.</summary>
+    Task<IReadOnlyList<Neruna.Core.Calendar.CalendarInfo>> ImportCalendarsAsync();
+
+    /// <summary>The events of an .ics attachment into a calendar (as "Termine importieren").</summary>
+    Task<Neruna.Core.Calendar.ImportResult> ImportEventsAsync(Neruna.Core.Calendar.CalendarInfo target, IReadOnlyList<Neruna.Core.Calendar.ImportedEvent> events);
+}
+
+/// <summary>One event of an .ics attachment in the preview: what, when, where.</summary>
+internal sealed record CalendarPreviewItem(string Title, string When, string? Location, string? Repeats, string? Description)
+{
+    public bool HasLocation => !string.IsNullOrWhiteSpace(Location);
+
+    public bool HasRepeats => Repeats is not null;
+
+    public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
 }
 
 /// <summary>One shown page (or the image); the picture changes while a stamp is being placed.</summary>
@@ -429,6 +445,10 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
             {
                 Problem = T("Der Anhang ist zu gross für die Vorschau. Bitte öffnen oder speichern.");
             }
+            else if (Attachment.PreviewKind == AttachmentPreviewKind.Calendar)
+            {
+                await ShowEventsAsync(_data);
+            }
             else if (Attachment.PreviewKind == AttachmentPreviewKind.Image)
             {
                 var data = _data;
@@ -460,6 +480,150 @@ internal sealed partial class AttachmentPreviewViewModel : ObservableObject
             OnPropertyChanged(nameof(CanStamp));
         }
     }
+
+    // ── .ics: the events listed, importable into a calendar (the mail's account's default one suggested) ──
+
+    private IReadOnlyList<Neruna.Core.Calendar.ImportedEvent> _events = [];
+
+    public ObservableCollection<CalendarPreviewItem> Events { get; } = [];
+
+    public bool ShowsEvents => Events.Count > 0;
+
+    /// <summary>Sideways for zoomed pages; events wrap to the pane's width.</summary>
+    public Avalonia.Controls.Primitives.ScrollBarVisibility HorizontalScroll =>
+        ShowsEvents ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+
+    /// <summary>"3 Termine" above the list.</summary>
+    [ObservableProperty]
+    public partial string? EventsTitle { get; set; }
+
+    [ObservableProperty]
+    public partial IReadOnlyList<Neruna.Core.Calendar.CalendarInfo> ImportCalendars { get; set; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ImportEventsCommand))]
+    public partial Neruna.Core.Calendar.CalendarInfo? ImportCalendar { get; set; }
+
+    public bool CanImportEvents => _actions is not null;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ImportEventsCommand))]
+    public partial bool IsImporting { get; set; }
+
+    /// <summary>"1 Termin(e) importiert." or what went wrong.</summary>
+    [ObservableProperty]
+    public partial string? ImportStatus { get; set; }
+
+    [ObservableProperty]
+    public partial bool ImportFailed { get; set; }
+
+    private async Task ShowEventsAsync(byte[] data)
+    {
+        try
+        {
+            var text = System.Text.Encoding.UTF8.GetString(data);
+            (_events, var items) = await Task.Run(() =>
+            {
+                var events = Neruna.Core.Calendar.CalendarImport.Read(text);
+                return (events, events.Select(Describe).ToList());
+            });
+            foreach (var item in items)
+            {
+                Events.Add(item);
+            }
+
+            EventsTitle = F("{0} Termin(e)", Events.Count);
+            OnPropertyChanged(nameof(ShowsEvents));
+            OnPropertyChanged(nameof(HorizontalScroll));
+        }
+        catch (FormatException)
+        {
+            Problem = T("Die Datei enthält keine Termine im iCalendar-Format (.ics).");
+            return;
+        }
+
+        if (_actions is not null)
+        {
+            try
+            {
+                ImportCalendars = await _actions.ImportCalendarsAsync();
+                ImportCalendar = ImportCalendars.FirstOrDefault();
+                if (ImportCalendars.Count == 0)
+                {
+                    ImportStatus = T("Kein Kalender vorhanden, in den Termine gespeichert werden können.");
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                ImportStatus = T("Die Kalender konnten nicht gelesen werden: ") + ex.Message;
+                ImportFailed = true;
+            }
+        }
+    }
+
+    private static CalendarPreviewItem Describe(Neruna.Core.Calendar.ImportedEvent imported)
+    {
+        try
+        {
+            var draft = Neruna.Core.Calendar.EventDraft.FromICalendar(imported.ICalendarData);
+            var repeats = draft.Recurrence switch
+            {
+                Neruna.Core.Calendar.RecurrenceKind.None => null,
+                Neruna.Core.Calendar.RecurrenceKind.Daily => T("Wiederholt sich täglich"),
+                Neruna.Core.Calendar.RecurrenceKind.Weekly => T("Wiederholt sich wöchentlich"),
+                Neruna.Core.Calendar.RecurrenceKind.Monthly => T("Wiederholt sich monatlich"),
+                Neruna.Core.Calendar.RecurrenceKind.Yearly => T("Wiederholt sich jährlich"),
+                _ => T("Wiederholt sich"),
+            };
+            var description = draft.Description?.Trim();
+            if (description is { Length: > 400 })
+            {
+                description = description[..399] + "…";
+            }
+
+            return new CalendarPreviewItem(draft.Summary.Length > 0 ? draft.Summary : T("(ohne Titel)"), Neruna.Core.Calendar.EventSummaryText.When(draft),
+                draft.Location?.Trim(), repeats, description);
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentException or InvalidOperationException)
+        {
+            return new CalendarPreviewItem(imported.Summary.Length > 0 ? imported.Summary : T("(ohne Titel)"), string.Empty, null, null, null);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanImport))]
+    private async Task ImportEventsAsync()
+    {
+        if (_actions is null || ImportCalendar is not { } target)
+        {
+            return;
+        }
+
+        IsImporting = true;
+        ImportFailed = false;
+        ImportStatus = null;
+        try
+        {
+            var result = await _actions.ImportEventsAsync(target, _events);
+            var message = result.Updated > 0
+                ? F("{0} Termin(e) importiert, {1} aktualisiert.", result.Added, result.Updated)
+                : F("{0} Termin(e) importiert.", result.Added);
+            ImportFailed = result.Failed > 0;
+            ImportStatus = result.Failed > 0
+                ? message + " " + F("{0} konnten nicht gespeichert werden: {1}", result.Failed, result.FirstError ?? string.Empty)
+                : message + " " + F("Im Kalender «{0}».", target.Name);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ImportFailed = true;
+            ImportStatus = T("Import fehlgeschlagen: ") + ex.Message;
+        }
+        finally
+        {
+            IsImporting = false;
+        }
+    }
+
+    private bool CanImport() => !IsImporting && ImportCalendar is not null && _events.Count > 0;
 
     [RelayCommand(CanExecute = nameof(HasMorePages))]
     private async Task MorePagesAsync()

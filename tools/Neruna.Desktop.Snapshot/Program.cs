@@ -163,6 +163,7 @@ internal static class Snapshots
             Console.WriteLine($"Cc expanded: «{ccMore.Content}»");
             await SaveAsync(window, output, "mail-cc-all.png");
             window.Width = fullWidth;
+
             vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
             await Task.Delay(300);
         }
@@ -1476,6 +1477,43 @@ internal static class Snapshots
             File.Delete(timetable);
         }
 
+        // The attached .ics in a mail: its event listed, "In Kalender importieren" with the account's default calendar.
+        vm.Overlay = null;
+        vm.NavigateCommand.Execute(Section.Mail);
+        await Task.Delay(300);
+        if (vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault(m => m.Summary.Subject.Contains("Teamausflug", StringComparison.Ordinal)) is { } rigiMail)
+        {
+            vm.MailPage.SelectedEntry = rigiMail;
+            await Task.Delay(500);
+
+            // The attached .ics: its event listed, "In Kalender importieren" with the account's default calendar.
+            if (vm.MailPage.ReadingPane!.Attachments.FirstOrDefault(a => a.PreviewKind == Neruna.Core.Mail.AttachmentPreviewKind.Calendar) is { } icsAttachment)
+            {
+                await icsAttachment.ActivateCommand.ExecuteAsync(null);
+                await Task.Delay(500);
+                Console.WriteLine($"ICS preview (demo, read-only calendars): {vm.MailPage.ReadingPane.Preview!.ImportStatus}");
+
+                // The demo calendars are read-only: two writable ones of the account, its default suggested.
+                var icsPreview = new AttachmentPreviewViewModel(icsAttachment, () => { }, new IcsActions());
+                vm.MailPage.ReadingPane.Preview = icsPreview;
+                await icsPreview.LoadAsync();
+                await Task.Delay(300);
+                Console.WriteLine($"ICS preview: {icsPreview.EventsTitle}, {string.Join(" | ", icsPreview.Events.Select(e => $"{e.Title} / {e.When} / {e.Location}"))}, calendars {string.Join(", ", icsPreview.ImportCalendars.Select(c => c.Name))}, suggested {icsPreview.ImportCalendar?.Name}, problem {icsPreview.Problem}");
+                await SaveAsync(window, output, "mail-ics-preview.png");
+                await icsPreview.ImportEventsCommand.ExecuteAsync(null);
+                Console.WriteLine($"ICS import: {icsPreview.ImportStatus}");
+                await SaveAsync(window, output, "mail-ics-imported.png");
+                icsPreview.CloseCommand.Execute(null);
+                await Task.Delay(200);
+            }
+
+            vm.MailPage.SelectedEntry = vm.MailPage.Entries.OfType<MessageItemViewModel>().First();
+            await Task.Delay(300);
+        }
+
+        vm.NavigateCommand.Execute(Section.Calendar);
+        await Task.Delay(300);
+
         // The navigator: drag over three days of next week, then Ctrl+click a day after – only those days on the right
         // (real mouse input on the day buttons). Then as list and planning; a click on a day brings the week back.
         Point? DayButton(DateTime date) =>
@@ -2513,4 +2551,25 @@ internal static class Snapshots
 
         return data;
     }
+}
+
+/// <summary>Writable calendars for the .ics preview in the snapshot (the demo's are read-only).</summary>
+internal sealed class IcsActions : IAttachmentActions
+{
+    private static readonly Guid Connection = Guid.NewGuid();
+
+    public Task<IReadOnlyList<Neruna.Core.Mail.PdfStamp>> GetStampsAsync() => Task.FromResult<IReadOnlyList<Neruna.Core.Mail.PdfStamp>>([]);
+
+    public Task<string?> GetStampNameAsync() => Task.FromResult<string?>(null);
+
+    public Task RespondWithAsync(AttachmentViewModel attachment, byte[] content, Neruna.Core.Mail.QuickActionStepKind kind) => Task.CompletedTask;
+
+    public Task<IReadOnlyList<Neruna.Core.Calendar.CalendarInfo>> ImportCalendarsAsync() => Task.FromResult<IReadOnlyList<Neruna.Core.Calendar.CalendarInfo>>(
+    [
+        new(Connection, "/anna/personal/", "Persönlich", "#0F6CBD", false, IsDefault: true),
+        new(Connection, "/anna/team/", "Team", "#C239B3", false),
+    ]);
+
+    public Task<Neruna.Core.Calendar.ImportResult> ImportEventsAsync(Neruna.Core.Calendar.CalendarInfo target, IReadOnlyList<Neruna.Core.Calendar.ImportedEvent> events) =>
+        Task.FromResult(new Neruna.Core.Calendar.ImportResult(events.Count, 0, 0, null));
 }

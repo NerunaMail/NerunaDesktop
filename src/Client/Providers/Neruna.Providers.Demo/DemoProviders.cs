@@ -174,6 +174,22 @@ internal sealed class DemoMailProvider(Guid connectionId) : IMailProvider, IAuto
             }
         }
 
+        // The outing as a plain .ics file (no invitation): previewed in the reading pane and imported into a calendar.
+        if (m.Subject == "Re: Teamausflug auf die Rigi")
+        {
+            var day = DateTime.Today.AddDays(10);
+            var ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Demo//DE\r\nBEGIN:VEVENT\r\nUID:rigi-ausflug@demo\r\nDTSTAMP:20261101T000000Z\r\n"
+                      + $"DTSTART:{day:yyyyMMdd}T081500\r\nDTEND:{day:yyyyMMdd}T170000\r\nSUMMARY:Teamausflug Rigi\r\nLOCATION:Vitznau, Talstation Rigi Bahnen\r\n"
+                      + "DESCRIPTION:Treffpunkt beim Bahnhof Vitznau. Zahnradbahn um 08:30\\, Wanderung Rigi Kaltbad – Rigi Kulm. Infos: https://www.rigi.ch\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+            var calendarFile = new MimePart("text", "calendar")
+            {
+                FileName = "Teamausflug Rigi.ics",
+                Content = new MimeContent(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(ics))),
+                ContentTransferEncoding = ContentEncoding.Base64,
+            };
+            message.Body = new Multipart("mixed") { message.Body, calendarFile };
+        }
+
         return Task.FromResult(message);
     }
 

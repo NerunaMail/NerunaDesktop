@@ -10,6 +10,9 @@ public enum AttachmentPreviewKind
 
     /// <summary>A mail (.eml, message/rfc822): shown like a message, with its own attachments.</summary>
     Message,
+
+    /// <summary>Events (.ics, text/calendar): listed, and importable into a calendar.</summary>
+    Calendar,
 }
 
 /// <summary>Which attachments the reading pane can show itself (instead of opening them in another program).</summary>
@@ -20,6 +23,7 @@ public static class AttachmentPreview
 
     // What the image decoder of the UI reads (Skia): no HEIC, no TIFF, no SVG (SVG can carry scripts and links).
     private static readonly HashSet<string> ImageTypes = new(StringComparer.OrdinalIgnoreCase) { "png", "jpeg", "jpg", "pjpeg", "gif", "bmp", "webp" };
+    private static readonly HashSet<string> CalendarExtensions = new(StringComparer.OrdinalIgnoreCase) { ".ics", ".ical", ".icalendar", ".ifb", ".vcs" };
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".jpe", ".gif", ".bmp", ".webp" };
 
     /// <summary>
@@ -45,6 +49,11 @@ public static class AttachmentPreview
             return AttachmentPreviewKind.Message;
         }
 
+        if (CalendarExtensions.Contains(extension))
+        {
+            return AttachmentPreviewKind.Calendar;
+        }
+
         if (extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
         {
             return AttachmentPreviewKind.Pdf;
@@ -61,6 +70,7 @@ public static class AttachmentPreview
     private static AttachmentPreviewKind KindOfType(ContentType type) =>
         type.IsMimeType("application", "pdf") ? AttachmentPreviewKind.Pdf
         : type.IsMimeType("message", "rfc822") ? AttachmentPreviewKind.Message
+        : type.IsMimeType("text", "calendar") || type.IsMimeType("application", "ics") ? AttachmentPreviewKind.Calendar
         : type.MediaType.Equals("image", StringComparison.OrdinalIgnoreCase) && ImageTypes.Contains(type.MediaSubtype) ? AttachmentPreviewKind.Image
         : AttachmentPreviewKind.None;
 }

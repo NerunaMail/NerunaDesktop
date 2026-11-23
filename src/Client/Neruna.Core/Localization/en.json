@@ -2931,5 +2931,16 @@
  "Neue E-Mail an {0}": "New email to {0}",
  "Weniger": "Less",
  "Zu Kontakten hinzufügen": "Add to contacts",
- "Links in diesem Text": "Links in this text"
+ "Links in diesem Text": "Links in this text",
+ "Ein Eintrag mit derselben Kennung ist schon auf dem Server (evtl. im Papierkorb).": "An entry with the same identifier is already on the server (perhaps in the trash).",
+ "Die Kalender konnten nicht gelesen werden: ": "The calendars could not be read: ",
+ "Im Kalender «{0}».": "In the calendar “{0}”.",
+ "In Kalender importieren": "Import into calendar",
+ "Kein Kalender vorhanden, in den Termine gespeichert werden können.": "There is no calendar that events can be saved to.",
+ "Wiederholt sich": "Repeats",
+ "Wiederholt sich jährlich": "Repeats yearly",
+ "Wiederholt sich monatlich": "Repeats monthly",
+ "Wiederholt sich täglich": "Repeats daily",
+ "Wiederholt sich wöchentlich": "Repeats weekly",
+ "{0} Termin(e)": "{0} event(s)"
 }

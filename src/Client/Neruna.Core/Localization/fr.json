@@ -2931,5 +2931,16 @@
  "Neue E-Mail an {0}": "Nouvel e-mail à {0}",
  "Weniger": "Moins",
  "Zu Kontakten hinzufügen": "Ajouter aux contacts",
- "Links in diesem Text": "Liens dans ce texte"
+ "Links in diesem Text": "Liens dans ce texte",
+ "Ein Eintrag mit derselben Kennung ist schon auf dem Server (evtl. im Papierkorb).": "Une entrée avec le même identifiant existe déjà sur le serveur (peut-être dans la corbeille).",
+ "Die Kalender konnten nicht gelesen werden: ": "Les calendriers n’ont pas pu être lus : ",
+ "Im Kalender «{0}».": "Dans le calendrier « {0} ».",
+ "In Kalender importieren": "Importer dans le calendrier",
+ "Kein Kalender vorhanden, in den Termine gespeichert werden können.": "Aucun calendrier dans lequel des rendez-vous peuvent être enregistrés.",
+ "Wiederholt sich": "Se répète",
+ "Wiederholt sich jährlich": "Se répète chaque année",
+ "Wiederholt sich monatlich": "Se répète chaque mois",
+ "Wiederholt sich täglich": "Se répète chaque jour",
+ "Wiederholt sich wöchentlich": "Se répète chaque semaine",
+ "{0} Termin(e)": "{0} rendez-vous"
 }

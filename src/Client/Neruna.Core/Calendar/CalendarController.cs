@@ -367,6 +367,7 @@ public sealed class CalendarController(
         }
 
         int added = 0, updated = 0, failed = 0, done = 0;
+        var synced = false;
         string? firstError = null;
         await using (var provider = providers.CreateCalendar(await ConnectionAsync(target.ConnectionId, cancellationToken)))
         {
@@ -377,9 +378,39 @@ public sealed class CalendarController(
                 {
                     var known = here.GetValueOrDefault(imported.Uid);
                     var toSave = known is null && elsewhere.Contains(imported.Uid) ? CalendarImport.WithNewUid(imported) : imported;
-                    var saved = await provider.SaveAsync(target, known is null
-                        ? new CalendarObject(string.Empty, null, toSave.ICalendarData)
-                        : known with { ICalendarData = toSave.ICalendarData }, cancellationToken);
+                    CalendarObject saved;
+                    try
+                    {
+                        saved = await provider.SaveAsync(target, known is null
+                            ? new CalendarObject(string.Empty, null, toSave.ICalendarData)
+                            : known with { ICalendarData = toSave.ICalendarData }, cancellationToken);
+                    }
+                    catch (UidConflictException) when (known is null)
+                    {
+                        // The UID is on the server but not here. Synced: the same event put there meanwhile (another
+                        // device, someone sharing the calendar) is updated as on a repeated import. Still missing: it was
+                        // deleted and lies in the server's trash bin (Nextcloud) – saved as a copy under a new UID.
+                        if (!synced)
+                        {
+                            synced = true;
+                            var versions = await store.GetObjectVersionsAsync(target.ConnectionId, target.RemoteId, cancellationToken);
+                            await store.ApplySyncResultAsync(target, await provider.SyncCalendarAsync(target, versions, cancellationToken), cancellationToken);
+                            foreach (var item in await store.GetObjectsAsync(target.ConnectionId, target.RemoteId, cancellationToken))
+                            {
+                                if (EventDraft.UidOf(item.ICalendarData) is { } uid)
+                                {
+                                    here.TryAdd(uid, item);
+                                }
+                            }
+                        }
+
+                        known = here.GetValueOrDefault(imported.Uid);
+                        logger.LogInformation("UID of an imported event already on the server: {Action}", known is null ? "saved under a new UID" : "updated");
+                        saved = await provider.SaveAsync(target, known is null
+                            ? new CalendarObject(string.Empty, null, CalendarImport.WithNewUid(toSave).ICalendarData)
+                            : known with { ICalendarData = toSave.ICalendarData }, cancellationToken);
+                    }
+
                     await store.UpsertObjectAsync(target, saved, cancellationToken);
                     if (known is null)
                     {
