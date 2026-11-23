@@ -1055,6 +1055,15 @@ internal sealed partial class MailViewModel(
         }, ComposeKind.New);
         pane.ShowContact = address => ShowContactRequested?.Invoke(this, address);
         pane.AddContact = address => AddContactRequested?.Invoke(this, address);
+        pane.ConfirmPgpKeyAction = async fingerprint =>
+        {
+            await secureMime.ConfirmPgpKeyAsync(fingerprint);
+            // Shown again (pictures, original layout) with the key confirmed.
+            if (_opened is { } opened && ReferenceEquals(opened.Readable, pane.Message))
+            {
+                _opened = opened with { Security = opened.Security.WithPgpKeyConfirmed(fingerprint) };
+            }
+        };
         _ = CheckRecipientsAsync(pane);
 
         if (pane.Sender is { } sender)

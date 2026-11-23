@@ -623,11 +623,75 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         await open(check.Opens);
     }
 
-    public SecurityLevel SecurityLevel { get; }
+    public SecurityLevel SecurityLevel { get; private set; }
 
-    public string SecurityText { get; }
+    public string SecurityText { get; private set; }
 
-    public string? SecurityDetail { get; }
+    public string? SecurityDetail { get; private set; }
+
+    /// <summary>The S/MIME or PGP check of this mail (none for info panes and attached mails before their check).</summary>
+    public MessageSecurityInfo Security { get; private set; } = MessageSecurityInfo.None;
+
+    /// <summary>Confirms a PGP key (the fingerprint) for the mail page; null: no confirming here.</summary>
+    public Func<string, Task>? ConfirmPgpKeyAction
+    {
+        get;
+        set
+        {
+            field = value;
+            OnPropertyChanged(nameof(CanConfirmPgpKey));
+        }
+    }
+
+    /// <summary>"Schlüssel bestätigen" under the PGP status: the signature is intact, only the user's word is missing.</summary>
+    public bool CanConfirmPgpKey => ConfirmPgpKeyAction is not null && Security.PgpKeyToConfirm is not null;
+
+    /// <summary>The fingerprint to compare, in groups of four.</summary>
+    public string? PgpFingerprintText => Security.PgpKeyToConfirm is { } fingerprint ? PgpKeyParser.Grouped(fingerprint) : null;
+
+    /// <summary>The question after "Schlüssel bestätigen": does the fingerprint match?</summary>
+    [ObservableProperty]
+    public partial bool IsConfirmingPgpKey { get; set; }
+
+    [RelayCommand]
+    private void StartConfirmPgpKey() => IsConfirmingPgpKey = true;
+
+    [RelayCommand]
+    private void CancelConfirmPgpKey() => IsConfirmingPgpKey = false;
+
+    [RelayCommand]
+    private async Task ConfirmPgpKeyAsync()
+    {
+        IsConfirmingPgpKey = false;
+        if (ConfirmPgpKeyAction is not { } confirm || Security.PgpKeyToConfirm is not { } fingerprint)
+        {
+            return;
+        }
+
+        try
+        {
+            await confirm(fingerprint);
+            ShowSecurity(Security.WithPgpKeyConfirmed(fingerprint));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SecurityDetail = T("Schlüssel konnte nicht bestätigt werden") + ": " + ex.Message;
+            OnPropertyChanged(nameof(SecurityDetail));
+            OnPropertyChanged(nameof(HasSecurityDetail));
+        }
+    }
+
+    /// <summary>Shows the check of the mail (again, e.g. after a key was confirmed).</summary>
+    public void ShowSecurity(MessageSecurityInfo security)
+    {
+        Security = security;
+        (SecurityLevel, SecurityText, SecurityDetail) = Describe(security);
+        foreach (var name in new[] { nameof(Security), nameof(SecurityLevel), nameof(SecurityText), nameof(SecurityDetail), nameof(HasSecurity), nameof(HasSecurityDetail),
+            nameof(IsSecurityGood), nameof(IsSecurityWarning), nameof(IsSecurityBad), nameof(CanConfirmPgpKey), nameof(PgpFingerprintText) })
+        {
+            OnPropertyChanged(name);
+        }
+    }
 
     public bool HasSecurity => SecurityLevel != SecurityLevel.None;
 
@@ -692,6 +756,7 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
             () => reshow(view with { AllowRemoteContent = true }),
             view.AllowRemoteContent)
         {
+            Security = opened.Security,
             View = view,
             Reshow = reshow,
             Trust = trust,

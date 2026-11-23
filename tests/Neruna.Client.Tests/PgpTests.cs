@@ -77,6 +77,31 @@ public class PgpTests
     }
 
     [Fact]
+    public async Task The_key_of_a_signed_mail_is_confirmed_right_from_the_mail()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var manager = env.Get<PgpKeyManager>();
+        var service = env.Get<SecureMimeService>();
+        var key = Assert.Single(await manager.ImportAsync(PublicArmored(Anna.Value), null, cancellationToken: Ct));
+        var message = await SignedByAnnaAsync("Hallo Bob");
+
+        var security = (await service.OpenAsync(message, Ct)).Security;
+        Assert.Equal(key.Fingerprint, security.PgpKeyToConfirm);
+
+        await service.ConfirmPgpKeyAsync(security.PgpKeyToConfirm!, Ct);
+        var confirmed = security.WithPgpKeyConfirmed(key.Fingerprint);
+        Assert.Null(confirmed.PgpKeyToConfirm);
+        Assert.Equal(MessageSecurityLevel.Good, MessageSecurityText.Describe(confirmed).Level);
+        Assert.True(Assert.Single(await manager.GetAllAsync(Ct)).IsTrusted);
+        Assert.Equal(SignatureStatus.Valid, Assert.Single((await service.OpenAsync(message, Ct)).Security.Signatures).Status);
+
+        // Nothing to confirm when the key is not the sender's or the mail was changed.
+        var other = security with { Signatures = [security.Signatures[0] with { EmailMatchesSender = false }] };
+        Assert.Null(other.PgpKeyToConfirm);
+        Assert.Null((security with { Signatures = [security.Signatures[0] with { Status = SignatureStatus.Invalid }] }).PgpKeyToConfirm);
+    }
+
+    [Fact]
     public async Task A_changed_signed_mail_is_invalid_and_one_without_a_known_key_cannot_be_checked()
     {
         await using var env = await TestEnvironment.CreateAsync();

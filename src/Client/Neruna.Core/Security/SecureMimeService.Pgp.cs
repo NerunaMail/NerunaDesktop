@@ -67,7 +67,7 @@ public sealed partial class SecureMimeService
         {
             var otherTrusted = sender is not null && context.Keyring.Public.Any(p => p.Info.Covers(sender) && p.Info.IsTrusted && p.Info.Fingerprint != info.Fingerprint);
             detail = (otherTrusted ? T("Achtung: Für diese Adresse ist ein anderer, bestätigter Schlüssel bekannt. ") : string.Empty)
-                + F("Die Nachricht ist unverändert. Um dem Schlüssel zu vertrauen, den Fingerabdruck {0} mit dem Absender vergleichen und unter Einstellungen → Zertifikate bestätigen.", info.FingerprintText);
+                + F("Die Nachricht ist unverändert. Um dem Schlüssel zu vertrauen, den Fingerabdruck {0} mit dem Absender vergleichen (z. B. am Telefon) und bestätigen.", info.FingerprintText);
         }
 
         logger.LogInformation("PGP signature by key {Fingerprint}: {Status}", info.Fingerprint, status);
@@ -232,6 +232,13 @@ public sealed partial class SecureMimeService
 
         message.Headers.Add(Autocrypt.HeaderName, Autocrypt.Format(from.Address, PgpKeyParser.PublicOf(ring), preferEncrypt: true));
     }
+
+    /// <summary>
+    /// The user compared the fingerprint of a key that signed a mail: it counts as confirmed from now on (and goes to
+    /// the sender's contact, as from Einstellungen → Zertifikate).
+    /// </summary>
+    public Task ConfirmPgpKeyAsync(string fingerprint, CancellationToken cancellationToken = default) =>
+        pgp is null ? throw new InvalidOperationException("PGP is not set up") : pgp.ConfirmAsync(fingerprint, cancellationToken);
 
     /// <summary>
     /// Looks up the PGP keys of recipients that have none here (WKD, keys.openpgp.org) and keeps those found as known.

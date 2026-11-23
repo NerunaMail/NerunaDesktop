@@ -58,6 +58,22 @@ public sealed record MessageSecurityInfo(bool WasEncrypted, string? DecryptionEr
     public static MessageSecurityInfo None { get; } = new(false, null, []);
 
     public bool IsSigned => Signatures.Count > 0;
+
+    /// <summary>
+    /// The fingerprint of the PGP key that signed the mail when all that is missing is the user's word (the signature is
+    /// intact and the key is the sender's): it can be confirmed right from the mail. Null otherwise.
+    /// </summary>
+    public string? PgpKeyToConfirm =>
+        Signatures.FirstOrDefault() is { IsPgp: true, Status: SignatureStatus.ValidUntrusted, EmailMatchesSender: true, IssuerName: { Length: > 0 } fingerprint }
+            ? fingerprint.Replace(" ", string.Empty, StringComparison.Ordinal)
+            : null;
+
+    /// <summary>The same check after the user confirmed the key: its signatures count as valid.</summary>
+    public MessageSecurityInfo WithPgpKeyConfirmed(string fingerprint) => this with
+    {
+        Signatures = [.. Signatures.Select(s => s is { IsPgp: true, Status: SignatureStatus.ValidUntrusted }
+            && s.IssuerName?.Replace(" ", string.Empty, StringComparison.Ordinal) == fingerprint ? s with { Status = SignatureStatus.Valid } : s)],
+    };
 }
 
 /// <summary>A message with S/MIME layers removed, plus what was found on the way.</summary>

@@ -299,6 +299,19 @@
           <StackPanel Grid.Column="1">
             <TextBlock Text="{Binding SecurityText}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" />
             <TextBlock Text="{Binding SecurityDetail}" TextWrapping="Wrap" FontSize="11" Classes="subtle" IsVisible="{Binding HasSecurityDetail}" />
+            <!-- PGP key of the sender not confirmed yet: confirm it right here -->
+            <StackPanel IsVisible="{Binding CanConfirmPgpKey}" Margin="0,6,0,0" Spacing="6">
+              <Button Content="{l:T 'Schlüssel bestätigen'}" Command="{Binding StartConfirmPgpKeyCommand}" IsVisible="{Binding !IsConfirmingPgpKey}"
+                      HorizontalAlignment="Left" Padding="10,3" FontSize="12" />
+              <StackPanel IsVisible="{Binding IsConfirmingPgpKey}" Spacing="6">
+                <TextBlock Text="{l:T 'Stimmt der Fingerabdruck mit dem überein, den der Absender genannt hat?'}" TextWrapping="Wrap" FontSize="12" />
+                <SelectableTextBlock Text="{Binding PgpFingerprintText}" FontFamily="Consolas, Cascadia Mono, monospace" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="{l:T 'Ja, bestätigen'}" Command="{Binding ConfirmPgpKeyCommand}" Classes="accent" Padding="10,3" FontSize="12" />
+                  <Button Content="{l:T 'Abbrechen'}" Command="{Binding CancelConfirmPgpKeyCommand}" Padding="10,3" FontSize="12" />
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
           </StackPanel>
         </Grid>
       </Border>

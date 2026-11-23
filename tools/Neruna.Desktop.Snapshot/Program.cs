@@ -147,6 +147,24 @@ internal static class Snapshots
         await Task.Delay(300);
         await SaveAsync(window, output, "mail.png");
 
+        // A mail signed with a PGP key that is known but not confirmed: confirm it right in the mail.
+        {
+            var pane = vm.MailPage.ReadingPane!;
+            var shown = pane.Security;
+            var sender = pane.Sender?.Address ?? "anna@example.com";
+            pane.ShowSecurity(new Neruna.Core.Security.MessageSecurityInfo(false, null, [new Neruna.Core.Security.SignatureInfo("Anna Muster", [sender],
+                "0A1B 2C3D 4E5F 6071 8293 A4B5 C6D7 E8F9 0A1B 2C3D", Neruna.Core.Security.SignatureStatus.ValidUntrusted, true, DateTimeOffset.Now,
+                "Die Nachricht ist unverändert. Um dem Schlüssel zu vertrauen, den Fingerabdruck 0A1B 2C3D 4E5F 6071 8293 A4B5 C6D7 E8F9 0A1B 2C3D mit dem Absender vergleichen (z. B. am Telefon) und bestätigen.", IsPgp: true)]));
+            Console.WriteLine($"PGP key can be confirmed in the mail: {pane.CanConfirmPgpKey}");
+            await Task.Delay(200);
+            await SaveAsync(window, output, "mail-pgp-confirm.png");
+            pane.StartConfirmPgpKeyCommand.Execute(null);
+            await Task.Delay(200);
+            await SaveAsync(window, output, "mail-pgp-confirm-question.png");
+            pane.CancelConfirmPgpKeyCommand.Execute(null);
+            pane.ShowSecurity(shown);
+        }
+
         // Many Cc: one line cut off; a click shows every address.
         if (vm.MailPage.Entries.OfType<MessageItemViewModel>().FirstOrDefault(m => m.Summary.Subject.Contains("Teamausflug", StringComparison.Ordinal)) is { } teamMail)
         {
