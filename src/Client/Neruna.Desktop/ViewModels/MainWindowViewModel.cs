@@ -247,6 +247,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         CalendarPage.PollsRequested += async (_, _) => await ShowPollsAsync();
         CalendarPage.RemoveRequested += async (_, info) => await RemoveCalendarAccountAsync(info);
         CalendarPage.EditorRequested += (_, editor) => ShowEditor(editor, CalendarChangedAsync);
+        CalendarPage.DetailsRequested += (_, details) => ShowEditor(details, CalendarChangedAsync);
         CalendarPage.StatusMessage += (_, message) => StatusText = message;
         CalendarPage.TaskListsChanged += async (_, _) => await TasksPage.ReloadAsync();
         CalendarPage.TaskOpenRequested += async (_, occurrence) =>
@@ -1499,6 +1500,9 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
                 break;
             case TaskEditorViewModel taskEditor:
                 taskEditor.Finished += OnFinished;
+                break;
+            case EventDetailsViewModel details:
+                details.Finished += OnFinished;
                 break;
         }
 

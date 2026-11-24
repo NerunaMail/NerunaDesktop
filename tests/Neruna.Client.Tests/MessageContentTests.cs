@@ -410,4 +410,13 @@ public class MailPreviewTests
         Assert.Empty(MessageContent.FindLinks(null));
         Assert.Empty(MessageContent.FindLinks("kein Link hier"));
     }
+
+    [Fact]
+    public void Links_are_found_where_they_stand_so_the_text_can_show_them_in_place()
+    {
+        const string text = "Siehe https://example.com/a. Und www.example.org!";
+        var ranges = MessageContent.FindLinkRanges(text);
+        Assert.Equal(["https://example.com/a", "www.example.org"], ranges.Select(r => text.Substring(r.Start, r.Length)));
+        Assert.Equal("https://www.example.org/", ranges[1].Uri.ToString());
+    }
 }

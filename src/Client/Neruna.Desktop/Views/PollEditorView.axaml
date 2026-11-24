@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:core="using:Neruna.Core.Cloud"
              x:Class="Neruna.Desktop.Views.PollEditorView"
@@ -39,11 +40,11 @@
         <DataTemplate x:DataType="vm:PollOptionRow">
           <Grid ColumnDefinitions="*,8,Auto,4,Auto,4,Auto,12,Auto,4,Auto,4,Auto" Margin="0,0,0,6">
             <CalendarDatePicker SelectedDate="{Binding Day}" HorizontalAlignment="Stretch" MinWidth="150" />
-            <TimePicker Grid.Column="2" SelectedTime="{Binding Start}" ClockIdentifier="24HourClock" MinuteIncrement="5" IsVisible="{Binding HasTime}"
-                        MinWidth="0" Width="112" ToolTip.Tip="{l:T 'Beginn'}" />
+            <ctl:TimeBox Grid.Column="2" SelectedTime="{Binding Start}" MinuteIncrement="5" IsVisible="{Binding HasTime}"
+                        Width="112" ToolTip.Tip="{l:T 'Beginn'}" />
             <TextBlock Grid.Column="4" Text="–" VerticalAlignment="Center" IsVisible="{Binding HasTime}" />
-            <TimePicker Grid.Column="6" SelectedTime="{Binding End}" ClockIdentifier="24HourClock" MinuteIncrement="5" IsVisible="{Binding HasTime}"
-                        MinWidth="0" Width="112" ToolTip.Tip="{l:T 'Ende'}" />
+            <ctl:TimeBox Grid.Column="6" SelectedTime="{Binding End}" MinuteIncrement="5" IsVisible="{Binding HasTime}"
+                        Width="112" ToolTip.Tip="{l:T 'Ende'}" />
             <CheckBox Grid.Column="8" Content="{l:T 'Ganztägig'}" IsChecked="{Binding IsAllDay}" VerticalAlignment="Center" />
             <Button Grid.Column="10" Classes="command" ToolTip.Tip="{l:T 'Weitere Zeit am selben Tag'}" IsVisible="{Binding HasTime}"
                     Command="{Binding $parent[UserControl].((vm:PollEditorViewModel)DataContext).AddTimeCommand}" CommandParameter="{Binding}">

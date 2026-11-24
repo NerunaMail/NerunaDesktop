@@ -19,7 +19,7 @@
       <CheckBox Content="{l:T 'Fällig am'}" IsChecked="{Binding HasDue}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Center" Margin="0,0,8,0" />
       <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding DueDate}" IsEnabled="{Binding HasDue}" HorizontalAlignment="Stretch" />
       <CheckBox Grid.Column="3" Content="{l:T 'um'}" IsChecked="{Binding HasTime}" IsEnabled="{Binding HasDue}" VerticalAlignment="Center" Margin="0,0,8,0" />
-      <TimePicker Grid.Column="4" SelectedTime="{Binding DueTime}" ClockIdentifier="24HourClock" MinuteIncrement="5" IsEnabled="{Binding HasTime}" HorizontalAlignment="Stretch" />
+      <ctl:TimeBox Grid.Column="4" SelectedTime="{Binding DueTime}" MinuteIncrement="5" IsEnabled="{Binding HasTime}" HorizontalAlignment="Stretch" />
     </Grid>
 
     <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
@@ -41,8 +41,7 @@
 
     <TextBlock Classes="label" Text="{l:T 'Notizen'}" />
     <TextBox Text="{Binding Notes}" AcceptsReturn="True" TextWrapping="Wrap" Height="110" IsReadOnly="{Binding !CanEdit}" />
-    <!-- Web addresses in the notes: clickable below the field -->
-    <ctl:TextLinks Text="{Binding Notes}" Margin="0,6,0,0" />
+    <TextBlock Classes="subtle" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" Text="{l:T 'Web-Adressen werden in der Leseansicht anklickbar angezeigt.'}" />
 
     <CheckBox Content="{l:T 'Erledigt'}" IsChecked="{Binding IsCompleted}" IsEnabled="{Binding CanEdit}" Margin="0,12,0,0" />
 

@@ -119,6 +119,8 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         Title = draft.Summary;
         Location = draft.Location ?? string.Empty;
         Description = draft.Description ?? string.Empty;
+        Url = draft.Url ?? string.Empty;
+        LinksText = string.Join("\n", (draft.Links ?? []).Select(l => l.OriginalString));
         IsAllDay = draft.IsAllDay;
         StartDate = draft.Start.Date;
         StartTime = draft.Start.TimeOfDay;
@@ -128,6 +130,9 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         EndDate = (end < draft.Start ? draft.Start : end).Date;
         EndTime = draft.End.TimeOfDay;
         Recurrence = RecurrenceOption.All.First(o => o.Kind == draft.Recurrence);
+        _readUntil = draft.RecurrenceUntil;
+        HasRecurrenceEnd = draft.RecurrenceUntil is not null;
+        RecurrenceEndDate = draft.RecurrenceUntil ?? draft.Start.Date.AddMonths(3);
         IsSeries = draft.Recurrence != RecurrenceKind.None;
         ReminderOptions = ReminderOption.For(draft.ReminderMinutes);
         Reminder = ReminderOptions.First(o => o.Minutes == draft.ReminderMinutes);
@@ -428,6 +433,14 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     [ObservableProperty]
     public partial string Description { get; set; }
 
+    /// <summary>The event's web page (iCalendar URL).</summary>
+    [ObservableProperty]
+    public partial string Url { get; set; }
+
+    /// <summary>Attachments as web addresses, one per line (iCalendar ATTACH; other programs show them as attachments).</summary>
+    [ObservableProperty]
+    public partial string LinksText { get; set; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowTimes))]
     public partial bool IsAllDay { get; set; }
@@ -447,7 +460,20 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     public partial TimeSpan? EndTime { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanEndSeries))]
     public partial RecurrenceOption Recurrence { get; set; }
+
+    // The end as read: a rule Neruna cannot edit ("Benutzerdefiniert") keeps it.
+    private DateTime? _readUntil;
+
+    /// <summary>The series ends on a day ("endet am"); a rule Neruna cannot edit keeps its own end.</summary>
+    public bool CanEndSeries => Recurrence.Kind is not (RecurrenceKind.None or RecurrenceKind.Custom);
+
+    [ObservableProperty]
+    public partial bool HasRecurrenceEnd { get; set; }
+
+    [ObservableProperty]
+    public partial DateTime? RecurrenceEndDate { get; set; }
 
     [ObservableProperty]
     public partial string? Error { get; set; }
@@ -568,6 +594,36 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             return;
         }
 
+        var url = Url.Trim();
+        var links = new List<Uri>();
+        foreach (var line in LinksText.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0))
+        {
+            if (!Uri.TryCreate(line.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? "https://" + line : line, UriKind.Absolute, out var link))
+            {
+                Error = F("«{0}» ist keine gültige Web-Adresse.", line);
+                return;
+            }
+
+            links.Add(link);
+        }
+
+        if (url.Length > 0 && !Uri.TryCreate(url.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? "https://" + url : url, UriKind.Absolute, out _))
+        {
+            Error = F("«{0}» ist keine gültige Web-Adresse.", url);
+            return;
+        }
+
+        if (url.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+        {
+            url = "https://" + url;
+        }
+
+        if (CanEndSeries && HasRecurrenceEnd && RecurrenceEndDate is { } last && last.Date < start.Date)
+        {
+            Error = T("Die Serie kann nicht vor dem ersten Termin enden.");
+            return;
+        }
+
         var target = SelectedCalendar;
         var me = _ownAddress(target);
         var draft = new EventDraft(Title.Trim(), Location.Trim(), Description.Trim(), start, end, IsAllDay, Recurrence.Kind,
@@ -577,6 +633,10 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             Meeting = Meeting,
             // Without a list (no settings loaded) the event keeps its categories.
             Categories = CategoryChoices.Count > 0 ? [.. SelectedCategories.Select(c => c.Name)] : null,
+            Url = url,
+            Links = links,
+            RecurrenceUntil = Recurrence.Kind == RecurrenceKind.Custom ? _readUntil
+                : CanEndSeries && HasRecurrenceEnd && RecurrenceEndDate is { } until ? until.Date : null,
         };
         await RunAsync(async () =>
         {

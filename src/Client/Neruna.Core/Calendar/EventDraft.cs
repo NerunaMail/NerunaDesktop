@@ -117,6 +117,25 @@ public sealed record EventDraft(
     /// <summary>Categories (iCalendar CATEGORIES) by name, also those Neruna does not know; null leaves them as they are.</summary>
     public IReadOnlyList<string>? Categories { get; init; }
 
+    /// <summary>The last day a series takes place (iCalendar UNTIL); null: without end.</summary>
+    public DateTime? RecurrenceUntil { get; init; }
+
+    /// <summary>The event's web page (iCalendar URL); empty removes it, null leaves it as it is.</summary>
+    public string? Url { get; init; }
+
+    /// <summary>
+    /// Attachments given as web addresses (iCalendar ATTACH with a URI, as other calendar programs add them); null leaves
+    /// them as they are. Files embedded in the event are never touched.
+    /// </summary>
+    public IReadOnlyList<Uri>? Links { get; init; }
+
+    /// <summary>The attachments of an event that are web addresses (embedded files left out), each once.</summary>
+    public static IReadOnlyList<Uri> LinksOf(CalendarEvent evt)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+        return [.. evt.Attachments.Where(a => a.Uri is { IsAbsoluteUri: true }).Select(a => a.Uri!).Distinct()];
+    }
+
     /// <summary>The categories of an event, each once (a CATEGORIES line may hold several, separated by commas).</summary>
     public static IReadOnlyList<string> CategoriesOf(CalendarEvent evt)
     {
@@ -206,6 +225,9 @@ public sealed record EventDraft(
             ShowAs = ShowAsOf(master),
             Meeting = Meetings.OnlineMeeting.Of(master),
             Categories = CategoriesOf(master),
+            RecurrenceUntil = UntilOf(master.RecurrenceRule),
+            Url = master.Url is { IsAbsoluteUri: true } url ? url.OriginalString : null,
+            Links = LinksOf(master),
         };
     }
 
@@ -452,6 +474,19 @@ public sealed record EventDraft(
             };
         }
 
+        // The end of the series; a rule that counts its occurrences (COUNT) keeps that instead.
+        if (series && master.RecurrenceRule is { Count: null } rule && UntilOf(rule) != RecurrenceUntil?.Date)
+        {
+            rule.Until = RecurrenceUntil is not { } last
+                ? null
+                : IsAllDay
+                    ? new CalDateTime(DateOnly.FromDateTime(last))
+                    // Timed: UNTIL in UTC (RFC 5545 with a TZID start), the occurrence on the last day included.
+                    : new CalDateTime(new DateTimeOffset(DateTime.SpecifyKind(last.Date + Start.TimeOfDay, DateTimeKind.Unspecified),
+                        TimeZoneInfo.Local.GetUtcOffset(last.Date + Start.TimeOfDay)).UtcDateTime, "UTC");
+            master.RecurrenceRule = rule;
+        }
+
         ApplyReminder(master);
         ApplyAttendees(master);
         ApplyShowAs(master, ShowAs);
@@ -459,6 +494,24 @@ public sealed record EventDraft(
         if (Categories is not null && !CategoriesOf(master).SequenceEqual(Categories))
         {
             master.Categories = [.. Categories];
+        }
+
+        if (Url is not null)
+        {
+            master.Url = Uri.TryCreate(Url.Trim(), UriKind.Absolute, out var url) ? url : null;
+        }
+
+        if (Links is not null && !LinksOf(master).SequenceEqual(Links))
+        {
+            foreach (var link in master.Attachments.Where(a => a.Uri is not null).ToList())
+            {
+                master.Attachments.Remove(link);
+            }
+
+            foreach (var link in Links.Distinct())
+            {
+                master.Attachments.Add(new Attachment { Uri = link });
+            }
         }
 
         // Other clients only pick up changes reliably when SEQUENCE and DTSTAMP move forward.
@@ -573,6 +626,11 @@ public sealed record EventDraft(
         return DateTime.SpecifyKind(value.AsUtc, DateTimeKind.Utc).ToLocalTime();
     }
 
+    /// <summary>The last day of a series (local), from UNTIL; null without one.</summary>
+    private static DateTime? UntilOf(RecurrenceRule? rule) => rule?.Until is not { } until
+        ? null
+        : until.HasTime ? until.AsUtc.ToLocalTime().Date : until.Value.Date;
+
     private static RecurrenceKind KindOf(RecurrenceRule? rule)
     {
         if (rule is null)
@@ -580,7 +638,8 @@ public sealed record EventDraft(
             return RecurrenceKind.None;
         }
 
-        var simple = rule.Interval <= 1 && rule.Count is null && rule.Until is null && rule.ByDay.Count == 0
+        // An end date (UNTIL) is set apart (RecurrenceUntil): the rule stays a simple one.
+        var simple = rule.Interval <= 1 && rule.Count is null && rule.ByDay.Count == 0
                      && rule.ByMonthDay.Count == 0 && rule.ByMonth.Count == 0 && rule.BySetPosition.Count == 0;
         if (!simple)
         {

@@ -143,4 +143,13 @@ public class NoteTests
     private static Task AppendAsync(TestEnvironment env, ServiceConnection connection, string folder, Note note) =>
         env.Providers.CreateMail(connection).AppendAsync(new MailFolder(connection.Id, folder, folder, null, FolderRole.None),
             NoteMime.ToMime(note, "anna@example.com"), MessageFlags.Seen, note.Modified, Token);
+
+    [Fact]
+    public void Open_points_of_checklists_are_counted()
+    {
+        const string html = "<h2>Einkauf</h2><ul class=\"neruna-checklist\"><li data-checked=\"true\">Brot</li><li data-checked=\"false\">Milch</li>"
+            + "<li data-checked='false' style=\"x\">Käse</li></ul><ul><li>keine Checkliste</li></ul>";
+        Assert.Equal(2, NoteText.OpenChecklistItems(html));
+        Assert.Equal(0, NoteText.OpenChecklistItems("<p>Nichts offen</p>"));
+    }
 }

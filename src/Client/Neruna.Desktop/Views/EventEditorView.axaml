@@ -66,12 +66,12 @@
     <Grid ColumnDefinitions="60,*,8,Auto" RowDefinitions="Auto,Auto" Margin="0,6,0,0">
       <TextBlock Text="{l:T 'Beginn'}" VerticalAlignment="Center" />
       <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding StartDate}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}" />
-      <TimePicker Grid.Column="3" SelectedTime="{Binding StartTime}" ClockIdentifier="24HourClock" MinuteIncrement="5"
+      <ctl:TimeBox Grid.Column="3" SelectedTime="{Binding StartTime}" MinuteIncrement="15"
                   IsVisible="{Binding ShowTimes}" IsEnabled="{Binding CanEdit}" />
 
       <TextBlock Grid.Row="1" Text="{l:T 'Ende'}" VerticalAlignment="Center" />
       <CalendarDatePicker Grid.Row="1" Grid.Column="1" SelectedDate="{Binding EndDate}" HorizontalAlignment="Stretch" Margin="0,6,0,0" IsEnabled="{Binding CanEdit}" />
-      <TimePicker Grid.Row="1" Grid.Column="3" SelectedTime="{Binding EndTime}" ClockIdentifier="24HourClock" MinuteIncrement="5" Margin="0,6,0,0"
+      <ctl:TimeBox Grid.Row="1" Grid.Column="3" SelectedTime="{Binding EndTime}" MinuteIncrement="15" Margin="0,6,0,0"
                   IsVisible="{Binding ShowTimes}" IsEnabled="{Binding CanEdit}" />
     </Grid>
 
@@ -86,6 +86,11 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
+        <Grid ColumnDefinitions="Auto,*" Margin="0,6,0,0" IsVisible="{Binding CanEndSeries}">
+          <CheckBox Content="{l:T 'endet am'}" IsChecked="{Binding HasRecurrenceEnd}" IsEnabled="{Binding CanChangeSeries}" VerticalAlignment="Center" Margin="0,0,8,0" />
+          <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding RecurrenceEndDate}" HorizontalAlignment="Stretch"
+                              IsEnabled="{Binding HasRecurrenceEnd}" />
+        </Grid>
       </StackPanel>
       <StackPanel Grid.Column="2">
         <TextBlock Classes="label" Text="{l:T 'Kalender'}" />
@@ -196,8 +201,12 @@
 
     <TextBlock Classes="label" Text="{l:T 'Beschreibung'}" />
     <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" Height="90" IsReadOnly="{Binding IsReadOnly}" />
-    <!-- Web addresses in the description: clickable below the field -->
-    <ctl:TextLinks Text="{Binding Description}" Margin="0,6,0,0" />
+    <TextBlock Classes="subtle" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" Text="{l:T 'Web-Adressen werden in der Leseansicht anklickbar angezeigt.'}" />
+
+    <TextBlock Classes="label" Text="{l:T 'Link (Webseite des Termins)'}" />
+    <TextBox Text="{Binding Url}" PlaceholderText="https://…" IsReadOnly="{Binding IsReadOnly}" />
+    <TextBlock Classes="label" Text="{l:T 'Anhänge als Links (einer pro Zeile)'}" />
+    <TextBox Text="{Binding LinksText}" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="34" MaxHeight="90" PlaceholderText="https://…" IsReadOnly="{Binding IsReadOnly}" />
 
     <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0"
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />

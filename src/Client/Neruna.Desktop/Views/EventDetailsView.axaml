@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
+             x:Class="Neruna.Desktop.Views.EventDetailsView"
+             x:DataType="vm:EventDetailsViewModel">
+
+  <StackPanel>
+    <Grid ColumnDefinitions="Auto,*">
+      <Border Width="6" CornerRadius="3" Background="{Binding Brush}" Margin="0,2,12,2" />
+      <StackPanel Grid.Column="1" Spacing="2">
+        <SelectableTextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <SelectableTextBlock Text="{Binding When}" TextWrapping="Wrap" />
+        <TextBlock Classes="subtle" Text="{Binding Repeats}" IsVisible="{Binding HasRepeats}" />
+      </StackPanel>
+    </Grid>
+
+    <ScrollViewer MaxHeight="440" Margin="0,8,0,0">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="label" Text="{l:T 'Ort'}" IsVisible="{Binding HasLocation}" />
+        <ctl:LinkedText Linked="{Binding Location}" IsVisible="{Binding HasLocation}" />
+
+        <StackPanel IsVisible="{Binding HasMeeting}">
+          <TextBlock Classes="label" Text="{Binding MeetingName}" />
+          <HyperlinkButton NavigateUri="{Binding MeetingUrl}" Padding="0" Content="{l:T 'Teilnehmen'}" />
+        </StackPanel>
+
+        <TextBlock Classes="label" Text="{l:T 'Organisator'}" IsVisible="{Binding HasOrganizer}" />
+        <SelectableTextBlock Text="{Binding Organizer}" IsVisible="{Binding HasOrganizer}" />
+
+        <TextBlock Classes="label" Text="{l:T 'Teilnehmer'}" IsVisible="{Binding HasAttendees}" />
+        <ItemsControl ItemsSource="{Binding Attendees}" IsVisible="{Binding HasAttendees}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:EventDetailsAttendee">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <SelectableTextBlock Text="{Binding Name}" />
+                <TextBlock Classes="subtle" Text="{Binding Status}" IsVisible="{Binding Status, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Classes="label" Text="{l:T 'Beschreibung'}" IsVisible="{Binding HasDescription}" />
+        <ctl:LinkedText Linked="{Binding Description}" IsVisible="{Binding HasDescription}" />
+
+        <TextBlock Classes="label" Text="{l:T 'Link'}" IsVisible="{Binding HasUrl}" />
+        <ctl:LinkedText Linked="{Binding Url}" IsVisible="{Binding HasUrl}" />
+
+        <TextBlock Classes="label" Text="{l:T 'Anhänge'}" IsVisible="{Binding HasLinks}" />
+        <ctl:LinkedText Linked="{Binding Links}" IsVisible="{Binding HasLinks}" />
+
+        <TextBlock Classes="label" Text="{l:T 'Kategorien'}" IsVisible="{Binding HasCategories}" />
+        <TextBlock Text="{Binding Categories}" TextWrapping="Wrap" IsVisible="{Binding HasCategories}" />
+
+        <TextBlock Classes="label" Text="{l:T 'Kalender'}" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Border Width="10" Height="10" CornerRadius="5" Background="{Binding Brush}" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding CalendarName}" />
+          <TextBlock Classes="subtle" Text="{l:T 'schreibgeschützt'}" IsVisible="{Binding IsReadOnly}" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,20,0,0">
+      <Button Content="{l:T 'Schliessen'}" Command="{Binding CloseCommand}" IsCancel="True" />
+      <Button Content="{l:T 'Nur diesen Termin bearbeiten'}" Command="{Binding EditOccurrenceCommand}" IsVisible="{Binding IsSeries}" />
+      <Button Classes="accent" Content="{l:T 'Serie bearbeiten'}" Command="{Binding EditSeriesCommand}" IsVisible="{Binding IsSeries}" />
+      <Button Classes="accent" Content="{l:T 'Bearbeiten'}" Command="{Binding EditCommand}" IsVisible="{Binding IsSingle}" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

@@ -70,7 +70,8 @@ public sealed partial class SecureMimeService
                 + F("Die Nachricht ist unverändert. Um dem Schlüssel zu vertrauen, den Fingerabdruck {0} mit dem Absender vergleichen (z. B. am Telefon) und bestätigen.", info.FingerprintText);
         }
 
-        logger.LogInformation("PGP signature by key {Fingerprint}: {Status}", info.Fingerprint, status);
+        // Who signed and how far the key is trusted stay out of the log: the reading pane shows both.
+        logger.LogDebug("PGP signature checked");
         return new SignatureInfo(info.Name, info.EmailAddresses, info.FingerprintText, status, matches, signedAt, detail, IsPgp: true);
     }
 

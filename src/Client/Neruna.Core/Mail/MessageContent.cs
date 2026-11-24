@@ -785,16 +785,39 @@ public sealed partial class MessageContent
         }
 
         var links = new List<Uri>();
-        foreach (Match match in PlainUrl().Matches(text))
+        foreach (var (_, _, uri) in FindLinkRanges(text))
         {
-            var value = match.Value.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? "https://" + match.Value : match.Value;
-            if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && !links.Contains(uri))
+            if (!links.Contains(uri))
             {
                 links.Add(uri);
             }
         }
 
         return links;
+    }
+
+    /// <summary>
+    /// Where the web addresses are in a plain text (to show them clickable in it): position, length and address, in
+    /// order, each place where one stands.
+    /// </summary>
+    public static IReadOnlyList<(int Start, int Length, Uri Uri)> FindLinkRanges(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        var ranges = new List<(int, int, Uri)>();
+        foreach (Match match in PlainUrl().Matches(text))
+        {
+            var value = match.Value.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? "https://" + match.Value : match.Value;
+            if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+            {
+                ranges.Add((match.Index, match.Length, uri));
+            }
+        }
+
+        return ranges;
     }
 
     // Trailing punctuation belongs to the sentence, not the link ("siehe https://example.com.").

@@ -936,7 +936,10 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     [RelayCommand]
     private Task EditEventAsync(CalendarEventItem item) => OpenOccurrenceAsync(item.Occurrence);
 
-    /// <summary>Opens the event of an occurrence in the editor (also from a reminder).</summary>
+    /// <summary>
+    /// Shows an event to read first (also from a reminder, the agenda or the search): its links clickable, and
+    /// "Bearbeiten" – for an occurrence of a series "Nur diesen Termin" or "Serie" – to change it.
+    /// </summary>
     public async Task OpenOccurrenceAsync(CalendarOccurrence occurrence)
     {
         ArgumentNullException.ThrowIfNull(occurrence);
@@ -952,16 +955,48 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
             return;
         }
 
+        var series = EventDraft.FromICalendar(stored.ICalendarData);
+        var shown = occurrence.RecurrenceId is { } at ? EventDraft.FromOccurrence(stored.ICalendarData, at) : series;
+        var color = Calendars.FirstOrDefault(c => c.Key == CalendarController.CalendarKey(occurrence.Calendar))?.Color ?? Palette[0];
+        var details = new EventDetailsViewModel(occurrence, shown, series.Recurrence, series.RecurrenceUntil, color, onlyThis => EditOccurrenceAsync(occurrence, onlyThis));
+        DetailsRequested?.Invoke(this, details);
+    }
+
+    /// <summary>An event to read (<see cref="OpenOccurrenceAsync"/>): the shell shows it over the page.</summary>
+    public event EventHandler<EventDetailsViewModel>? DetailsRequested;
+
+    /// <summary>Opens the event of an occurrence in the editor.</summary>
+    /// <param name="onlyThis">For an occurrence of a series: only it (true) or the whole series (false); null asks.</param>
+    private async Task EditOccurrenceAsync(CalendarOccurrence occurrence, bool? onlyThis = null)
+    {
+        var stored = await calendar.GetObjectAsync(occurrence.Calendar, occurrence.ObjectRemoteId);
+        if (stored is null)
+        {
+            return;
+        }
+
+        if (occurrence.RecurrenceId is { } chosen && !occurrence.Calendar.IsReadOnly && onlyThis is not null)
+        {
+            if (onlyThis == true)
+            {
+                await ShowEditorAsync(EventDraft.FromOccurrence(stored.ICalendarData, chosen), (occurrence.Calendar, occurrence.ObjectRemoteId), occurrence: chosen);
+                return;
+            }
+
+            await ShowEditorAsync(EventDraft.FromICalendar(stored.ICalendarData), (occurrence.Calendar, occurrence.ObjectRemoteId));
+            return;
+        }
+
         // Of a series: this occurrence alone, or the whole series (a read-only one is only shown, as a series).
         if (occurrence.RecurrenceId is { } at && !occurrence.Calendar.IsReadOnly)
         {
-            var onlyThis = await AskSeriesAsync(F("«{0}» bearbeiten", string.IsNullOrWhiteSpace(occurrence.Summary) ? T("Termin") : occurrence.Summary), null);
-            if (onlyThis is null)
+            var asked = await AskSeriesAsync(F("«{0}» bearbeiten", string.IsNullOrWhiteSpace(occurrence.Summary) ? T("Termin") : occurrence.Summary), null);
+            if (asked is null)
             {
                 return;
             }
 
-            if (onlyThis == true)
+            if (asked == true)
             {
                 await ShowEditorAsync(EventDraft.FromOccurrence(stored.ICalendarData, at), (occurrence.Calendar, occurrence.ObjectRemoteId), occurrence: at);
                 return;

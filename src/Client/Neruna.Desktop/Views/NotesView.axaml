@@ -80,6 +80,13 @@
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock Classes="subtle" FontSize="11" Text="{Binding PlaceName}" TextTrimming="CharacterEllipsis" MaxWidth="160" />
                     <TextBlock FontSize="11" Foreground="{DynamicResource ErrorTextBrush}" Text="{l:T 'Konfliktkopie'}" IsVisible="{Binding IsConflict}" />
+                    <Border Classes="openItems" IsVisible="{Binding HasOpenItems}" CornerRadius="8" Padding="6,0" VerticalAlignment="Center"
+                            Background="{DynamicResource SystemControlHighlightListAccentLowBrush}" ToolTip.Tip="{l:T 'Offene Punkte in den Checklisten dieser Notiz'}">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <TextBlock FontSize="11" Text="☐" VerticalAlignment="Center" />
+                        <TextBlock FontSize="11" Text="{Binding OpenItemsText}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Border>
                     <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>

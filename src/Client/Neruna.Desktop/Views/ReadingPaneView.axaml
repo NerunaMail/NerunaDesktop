@@ -585,8 +585,7 @@
                         <TextBlock Text="{Binding When}" TextWrapping="Wrap" />
                         <TextBlock Classes="subtle" Text="{Binding Location}" TextWrapping="Wrap" IsVisible="{Binding HasLocation}" />
                         <TextBlock Classes="subtle" Text="{Binding Repeats}" IsVisible="{Binding HasRepeats}" />
-                        <SelectableTextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12" IsVisible="{Binding HasDescription}" />
-                        <ctl:TextLinks Text="{Binding Description}" />
+                        <ctl:LinkedText Linked="{Binding Description}" Margin="0,4,0,0" FontSize="12" IsVisible="{Binding HasDescription}" />
                       </StackPanel>
                     </Border>
                   </DataTemplate>

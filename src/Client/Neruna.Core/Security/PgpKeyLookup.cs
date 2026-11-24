@@ -87,8 +87,8 @@ public sealed class PgpKeyLookup(HttpClient http, ILogger<PgpKeyLookup> logger)
                 throw;
             }
 
-            // The host only: the address being looked for stays out of the log.
-            logger.LogDebug("No PGP key from {Host}: {Error}", url.Host, ex.GetType().Name);
+            // Neither address nor host (the host is the address's domain): only that the lookup failed and why.
+            logger.LogDebug("No PGP key from a key directory: {Error}", ex.GetType().Name);
             return [];
         }
     }

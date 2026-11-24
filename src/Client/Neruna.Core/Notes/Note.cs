@@ -47,6 +47,9 @@ public sealed record Note(
     /// <summary>The text after the title, shortened, for the list.</summary>
     public string Preview => NoteText.Preview(Html);
 
+    /// <summary>Points of its checklists not ticked yet.</summary>
+    public int OpenChecklistItems => NoteText.OpenChecklistItems(Html);
+
     /// <summary>A new, empty note.</summary>
     public static Note New(Guid? connectionId, string notebook, string html = "", DateTimeOffset? now = null)
     {

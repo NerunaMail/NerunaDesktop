@@ -8,6 +8,15 @@
              x:Class="Neruna.Desktop.Views.TasksView"
              x:DataType="vm:TasksViewModel">
 
+  <UserControl.Styles>
+    <Style Selector="Border.taskrow">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.taskrow.selected">
+      <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}" />
+    </Style>
+  </UserControl.Styles>
+
   <Grid RowDefinitions="Auto,*">
 
     <!-- Command bar: new task, quick add, filter, search -->
@@ -33,7 +42,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="1" ColumnDefinitions="260,6,*">
+    <Grid Grid.Row="1" ColumnDefinitions="260,6,*,6,*">
 
       <!-- Task lists per account: each one shown or hidden on its own -->
       <Border Classes="pane" Padding="12,10">
@@ -105,11 +114,12 @@
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:TaskRow">
-                          <Border Classes="taskrow" Padding="4,5" Background="Transparent">
+                          <Border Classes="taskrow" Classes.selected="{Binding IsSelected}" Padding="4,5" CornerRadius="4">
                             <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                               <CheckBox IsChecked="{Binding IsCompleted}" MinWidth="0" Padding="0" Margin="0,0,8,0" VerticalAlignment="Center"
                                         ToolTip.Tip="{l:T 'Erledigt'}" />
-                              <Button Grid.Column="1" Classes="command" Command="{Binding EditCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="2,0">
+                              <Button Grid.Column="1" Classes="command" Command="{Binding SelectCommand}" DoubleTapped="OnRowDoubleTapped" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="2,0"
+                                      ToolTip.Tip="{l:T 'Doppelklick: bearbeiten'}">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                   <TextBlock Text="!" Foreground="#C42B1C" FontWeight="Bold" IsVisible="{Binding IsHigh}" ToolTip.Tip="{l:T 'Hohe Priorität'}" />
                                   <TextBlock Text="{Binding Title}" TextDecorations="{Binding Decorations}" TextTrimming="CharacterEllipsis" />
@@ -130,6 +140,47 @@
             </ItemsControl>
           </ScrollViewer>
         </Grid>
+      </Border>
+
+      <!-- The chosen task to read: notes with clickable links, edit and done -->
+      <Border Grid.Column="4" Classes="pane" Padding="20,14">
+        <Panel>
+          <TextBlock Classes="subtle" Text="{l:T 'Aufgabe auswählen, um sie hier zu lesen.'}" IsVisible="{Binding !HasSelection}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" />
+          <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding HasSelection}">
+            <StackPanel Spacing="4">
+              <SelectableTextBlock Text="{Binding SelectedTask.Title, FallbackValue=''}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"
+                                   TextDecorations="{Binding SelectedTask.Decorations, FallbackValue={x:Null}}" />
+              <TextBlock Classes="subtle" Text="{Binding SelectedTask.CompletedText, FallbackValue=''}" IsVisible="{Binding SelectedTask.IsCompleted, FallbackValue=False}" />
+            </StackPanel>
+            <ScrollViewer Grid.Row="1" Margin="0,8,0,0">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="label" Text="{l:T 'Fällig am'}" IsVisible="{Binding SelectedTask.HasDue, FallbackValue=False}" />
+                <TextBlock Text="{Binding SelectedTask.DueLongText, FallbackValue=''}" Classes.error="{Binding SelectedTask.IsOverdue, FallbackValue=False}"
+                           IsVisible="{Binding SelectedTask.HasDue, FallbackValue=False}" />
+                <TextBlock Classes="label" Text="{l:T 'Priorität'}" IsVisible="{Binding SelectedTask.HasPriority, FallbackValue=False}" />
+                <TextBlock Text="{Binding SelectedTask.PriorityText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasPriority, FallbackValue=False}" />
+                <TextBlock Classes="label" Text="{l:T 'Liste'}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Border Width="10" Height="10" CornerRadius="5" Background="{Binding SelectedTask.Brush, FallbackValue={x:Null}}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding SelectedTask.ListName, FallbackValue=''}" />
+                  <TextBlock Classes="subtle" Text="{l:T 'schreibgeschützt'}" IsVisible="{Binding SelectedTask.IsReadOnly, FallbackValue=False}" />
+                </StackPanel>
+                <TextBlock Classes="label" Text="{l:T 'Notizen'}" IsVisible="{Binding SelectedTask.HasNotes, FallbackValue=False}" />
+                <ctl:LinkedText Linked="{Binding SelectedTask.Notes, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasNotes, FallbackValue=False}" />
+              </StackPanel>
+            </ScrollViewer>
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,12,0,0" IsVisible="{Binding SelectedTask.CanEdit, FallbackValue=False}">
+              <Button Content="{Binding SelectedTask.ToggleText, FallbackValue=''}" Command="{Binding SelectedTask.ToggleCommand, FallbackValue={x:Null}}" />
+              <Button Classes="accent" Command="{Binding SelectedTask.EditCommand, FallbackValue={x:Null}}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" />
+                  <TextBlock Text="{l:T 'Bearbeiten'}" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </Grid>
+        </Panel>
       </Border>
     </Grid>
   </Grid>

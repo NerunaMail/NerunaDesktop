@@ -42,6 +42,26 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
 
     public bool IsEmpty => HasLists && Groups.Count == 0;
 
+    /// <summary>The task in the reading pane (a click in the list; a double click opens the editor).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelection))]
+    public partial TaskRow? SelectedTask { get; set; }
+
+    public bool HasSelection => SelectedTask is not null;
+
+    partial void OnSelectedTaskChanged(TaskRow? oldValue, TaskRow? newValue)
+    {
+        if (oldValue is not null)
+        {
+            oldValue.IsSelected = false;
+        }
+
+        if (newValue is not null)
+        {
+            newValue.IsSelected = true;
+        }
+    }
+
     public IReadOnlyList<string> Filters { get; } = [T("Offen"), T("Fällig: heute und überfällig"), T("Erledigt"), T("Alle")];
 
     [ObservableProperty]
@@ -173,7 +193,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
             })
             .Where(t => query.Length == 0 || t.Summary.Contains(query, StringComparison.CurrentCultureIgnoreCase)
                                           || (t.Notes?.Contains(query, StringComparison.CurrentCultureIgnoreCase) ?? false))
-            .Select(t => new TaskRow(t, colors.GetValueOrDefault((t.List.ConnectionId, t.List.RemoteId)) ?? CalendarViewModel.Palette[0], now, ToggleAsync, EditAsync))
+            .Select(t => NewRow(t, colors.GetValueOrDefault((t.List.ConnectionId, t.List.RemoteId)) ?? CalendarViewModel.Palette[0], now))
             .ToList();
 
         Groups.Clear();
@@ -196,6 +216,13 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
         Add(T("Ohne Datum"), open.Where(r => Day(r) is null));
         Add(T("Erledigt"), shown.Where(r => r.Item.IsCompleted).OrderByDescending(r => r.Item.CompletedAt ?? DateTimeOffset.MinValue).Take(300));
 
+        // The task read before stays in the pane (as it is now), also when the filter no longer lists it.
+        if (SelectedTask is { } selected)
+        {
+            SelectedTask = shown.FirstOrDefault(r => SameTask(r.Item, selected.Item))
+                ?? (_all.FirstOrDefault(t => SameTask(t, selected.Item)) is { } still ? NewRow(still, selected.Color, now) : null);
+        }
+
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(Summary));
         foreach (var list in ListGroups.SelectMany(g => g.Lists))
@@ -203,6 +230,11 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
             list.OpenCount = _all.Count(t => !t.IsCompleted && Same(t.List, list.Info));
         }
     }
+
+    private TaskRow NewRow(TaskItem task, string color, DateTimeOffset now) =>
+        new(task, color, now, ToggleAsync, EditAsync, row => SelectedTask = row);
+
+    private static bool SameTask(TaskItem a, TaskItem b) => Same(a.List, b.List) && a.ObjectRemoteId == b.ObjectRemoteId;
 
     private async Task ToggleAsync(TaskRow row, bool completed)
     {
@@ -237,7 +269,8 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
 
         if (_all.FirstOrDefault(t => Same(t.List, list) && t.ObjectRemoteId == objectRemoteId) is { } task)
         {
-            ShowEditor(TaskDraft.FromItem(task), task);
+            var color = ListGroups.SelectMany(g => g.Lists).FirstOrDefault(l => Same(l.Info, list))?.Color ?? CalendarViewModel.Palette[0];
+            SelectedTask = Groups.SelectMany(g => g.Rows).FirstOrDefault(r => SameTask(r.Item, task)) ?? NewRow(task, color, DateTimeOffset.Now);
         }
     }
 
@@ -345,11 +378,14 @@ internal sealed partial class TaskRow : ObservableObject
 {
     private readonly Func<TaskRow, bool, Task> _toggle;
     private readonly Func<TaskRow, Task> _edit;
+    private readonly Action<TaskRow> _select;
     private bool _ready;
 
-    public TaskRow(TaskItem item, string color, DateTimeOffset now, Func<TaskRow, bool, Task> toggle, Func<TaskRow, Task> edit)
+    public TaskRow(TaskItem item, string color, DateTimeOffset now, Func<TaskRow, bool, Task> toggle, Func<TaskRow, Task> edit, Action<TaskRow> select)
     {
         Item = item;
+        Color = color;
+        _select = select;
         Brush = Avalonia.Media.Brush.Parse(color);
         IsOverdue = item.IsOverdue(now);
         _toggle = toggle;
@@ -360,6 +396,47 @@ internal sealed partial class TaskRow : ObservableObject
 
     public TaskItem Item { get; }
 
+    public string Color { get; }
+
+    [ObservableProperty]
+    public partial bool IsSelected { get; set; }
+
+    // ---- The reading pane ----
+
+    public string? Notes => string.IsNullOrWhiteSpace(Item.Notes) ? null : Item.Notes.Trim();
+
+    public string? DueLongText => Item.Due is { } due
+        ? Item.DueHasTime ? due.LocalDateTime.ToString("dddd, d. MMMM yyyy, HH:mm", Culture) : due.LocalDateTime.ToString("dddd, d. MMMM yyyy", Culture)
+        : null;
+
+    public bool HasDue => Item.Due is not null;
+
+    public string? PriorityText => Item.Priority switch
+    {
+        TaskPriority.High => T("Hoch"),
+        TaskPriority.Normal => T("Normal"),
+        TaskPriority.Low => T("Niedrig"),
+        _ => null,
+    };
+
+    public bool HasPriority => PriorityText is not null;
+
+    public string? CompletedText => Item.IsCompleted
+        ? Item.CompletedAt is { } at ? F("Erledigt am {0}", at.LocalDateTime.ToString("d. MMMM yyyy", Culture)) : T("Erledigt")
+        : null;
+
+    public bool IsReadOnly => Item.List.IsReadOnly;
+
+    public bool CanEdit => !IsReadOnly;
+
+    public string ToggleText => IsCompleted ? T("Wieder öffnen") : T("Als erledigt markieren");
+
+    [RelayCommand]
+    private void Select() => _select(this);
+
+    [RelayCommand]
+    private void Toggle() => IsCompleted = !IsCompleted;
+
     public IBrush Brush { get; }
 
     public string Title => Item.Summary.Length > 0 ? Item.Summary : T("(ohne Titel)");
@@ -368,7 +445,7 @@ internal sealed partial class TaskRow : ObservableObject
 
     public bool IsHigh => Item.Priority == TaskPriority.High;
 
-    public bool HasNotes => Item.Notes is not null;
+    public bool HasNotes => Notes is not null;
 
     public string ListName => Item.List.Name;
 
@@ -379,7 +456,7 @@ internal sealed partial class TaskRow : ObservableObject
     public TextDecorationCollection? Decorations => IsCompleted ? TextDecorations.Strikethrough : null;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Decorations))]
+    [NotifyPropertyChangedFor(nameof(Decorations), nameof(ToggleText))]
     public partial bool IsCompleted { get; set; }
 
     partial void OnIsCompletedChanged(bool value)

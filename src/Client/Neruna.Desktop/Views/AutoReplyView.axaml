@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:l="using:Neruna.Desktop"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="using:Neruna.Desktop.Controls"
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:core="using:Neruna.Core.Mail"
              x:Class="Neruna.Desktop.Views.AutoReplyView"
@@ -49,9 +50,9 @@
             <TextBlock Grid.Column="3" Text="{l:T 'bis und mit'}" VerticalAlignment="Center" Margin="0,0,8,0" IsVisible="{Binding !WithTime}" />
             <TextBlock Grid.Column="3" Text="{l:T 'zurück am'}" VerticalAlignment="Center" Margin="0,0,8,0" IsVisible="{Binding WithTime}" />
             <CalendarDatePicker Grid.Column="4" SelectedDate="{Binding LastDay}" HorizontalAlignment="Stretch" />
-            <TimePicker Grid.Row="1" Grid.Column="1" SelectedTime="{Binding FirstTime}" ClockIdentifier="24HourClock" MinuteIncrement="15" MinWidth="0"
+            <ctl:TimeBox Grid.Row="1" Grid.Column="1" SelectedTime="{Binding FirstTime}" MinuteIncrement="15"
                         HorizontalAlignment="Stretch" IsVisible="{Binding WithTime}" />
-            <TimePicker Grid.Row="1" Grid.Column="4" SelectedTime="{Binding LastTime}" ClockIdentifier="24HourClock" MinuteIncrement="15" MinWidth="0"
+            <ctl:TimeBox Grid.Row="1" Grid.Column="4" SelectedTime="{Binding LastTime}" MinuteIncrement="15"
                         HorizontalAlignment="Stretch" IsVisible="{Binding WithTime}" />
             <CheckBox Grid.Row="2" Grid.ColumnSpan="5" Content="{l:T 'Mit Uhrzeit'}" IsChecked="{Binding WithTime}" />
           </Grid>

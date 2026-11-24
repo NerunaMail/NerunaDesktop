@@ -62,7 +62,7 @@ internal sealed class NoteSourceItem(NoteSourceKind kind, string label, Guid? co
 internal sealed partial class NoteItem(Note note, string placeName, IReadOnlyList<MailTag> tags) : ObservableObject
 {
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Title), nameof(Preview), nameof(DateText), nameof(IsPinned), nameof(IsWaiting), nameof(IsConflict))]
+    [NotifyPropertyChangedFor(nameof(Title), nameof(Preview), nameof(DateText), nameof(IsPinned), nameof(IsWaiting), nameof(IsConflict), nameof(OpenItems), nameof(HasOpenItems), nameof(OpenItemsText))]
     public partial Note Note { get; set; } = note;
 
     public string PlaceName { get; } = placeName;
@@ -70,6 +70,13 @@ internal sealed partial class NoteItem(Note note, string placeName, IReadOnlyLis
     public string Title => Note.Title.Length > 0 ? Note.Title : T("Neue Notiz");
 
     public string Preview => Note.Preview;
+
+    /// <summary>Checklist points not ticked yet ("3 offen" in the list).</summary>
+    public int OpenItems => Note.OpenChecklistItems;
+
+    public bool HasOpenItems => OpenItems > 0;
+
+    public string OpenItemsText => OpenItems == 1 ? T("1 Punkt offen") : F("{0} Punkte offen", OpenItems);
 
     public bool IsPinned => Note.Pinned;
 

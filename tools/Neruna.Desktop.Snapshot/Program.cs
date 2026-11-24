@@ -1203,6 +1203,11 @@ internal static class Snapshots
             await Task.Delay(500);
             Dispatcher.UIThread.RunJobs();
             await SaveAsync(window, output, "calendar-event-menu.png");
+            // Opening an event shows it to read first: links clickable, "Bearbeiten" (a series: only this one or all).
+            await vm.CalendarPage.OpenOccurrenceAsync(((TimedEventItem)eventButton.DataContext!).Item.Occurrence);
+            await Task.Delay(300);
+            await SaveAsync(window, output, "calendar-event-details.png");
+            vm.Overlay = null;
             var shown = TopLevel.GetTopLevel(eventButton)!.GetVisualDescendants().OfType<ContextMenu>().FirstOrDefault()
                         ?? Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(eventButton)?.GetVisualDescendants().OfType<ContextMenu>().FirstOrDefault();
             var occurrence = ((TimedEventItem)eventButton.DataContext!).Item.Occurrence;
@@ -1270,6 +1275,18 @@ internal static class Snapshots
         vm.Overlay = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal], meeting,
             (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com");
         await SaveAsync(window, output, "event-attendees.png");
+        // A weekly series with an end, its web page and links as attachments; times are typed.
+        vm.Overlay = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal],
+            meeting with
+            {
+                Attendees = [],
+                Recurrence = Neruna.Core.Calendar.RecurrenceKind.Weekly,
+                RecurrenceUntil = meeting.Start.Date.AddMonths(2),
+                Url = "https://messe.example.com/2026",
+                Links = [new Uri("https://example.com/hallenplan.pdf")],
+            },
+            (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com");
+        await SaveAsync(window, output, "event-series-end.png");
         // Categories chosen in the editor, the list open.
         var categoryEditor = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal],
             meeting with { Categories = ["Besprechung", "Projekt"] }, (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com")
@@ -1450,20 +1467,21 @@ internal static class Snapshots
         await SaveAsync(window, output, "tasks-solo.png");
         vm.TasksPage.ToggleSoloCommand.Execute(mixedList);
         var firstTask = vm.TasksPage.Groups.First().Rows.First();
+        // A click shows the task in the reading pane beside the list; a double click (or "Bearbeiten") edits it.
+        firstTask.SelectCommand.Execute(null);
+        await Task.Delay(300);
+        await SaveAsync(window, output, "tasks-reading.png");
+        var withNotes = vm.TasksPage.Groups.SelectMany(g => g.Rows).FirstOrDefault(r => r.HasNotes);
+        if (withNotes is not null)
+        {
+            withNotes.SelectCommand.Execute(null);
+            await Task.Delay(300);
+            await SaveAsync(window, output, "tasks-reading-notes.png");
+        }
+
         firstTask.EditCommand.Execute(null);
         await Task.Delay(300);
         await SaveAsync(window, output, "tasks-editor.png");
-        // Web addresses in the notes: clickable below the field (the notes stay a text to edit).
-        if (vm.Overlay is TaskEditorViewModel taskEditor)
-        {
-            var notesBefore = taskEditor.Notes;
-            taskEditor.Notes = "Offerte prüfen: https://example.com/offerte/2026-11.pdf, Infos auf www.example.org.";
-            await Task.Delay(300);
-            var links = window.GetVisualDescendants().OfType<HyperlinkButton>().Where(b => b.IsEffectivelyVisible).Select(b => b.NavigateUri?.ToString()).ToList();
-            Console.WriteLine($"Task links: {string.Join(" | ", links)}");
-            await SaveAsync(window, output, "tasks-editor-links.png");
-            taskEditor.Notes = notesBefore;
-        }
 
         vm.Overlay = null;
         var demoTasks = vm.TasksPage.ListGroups.SelectMany(g => g.Lists).First(l => l.Info.RemoteId == "tasks");

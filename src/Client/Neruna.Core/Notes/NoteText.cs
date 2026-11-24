@@ -15,6 +15,13 @@ public static partial class NoteText
     /// <summary>The first line with text (as in the notes apps of phones and Nextcloud); empty for an empty note.</summary>
     public static string Title(string html) => Shorten(Lines(PlainText(html)).FirstOrDefault() ?? string.Empty, TitleLength);
 
+    /// <summary>How many points of the note's checklists are still open (not ticked).</summary>
+    public static int OpenChecklistItems(string html) =>
+        string.IsNullOrEmpty(html) ? 0 : OpenChecklistItem().Count(html);
+
+    [GeneratedRegex(@"<li\b[^>]*\bdata-checked\s*=\s*[""']false[""']", RegexOptions.IgnoreCase)]
+    private static partial Regex OpenChecklistItem();
+
     /// <summary>The lines after the title, joined.</summary>
     public static string Preview(string html) => Shorten(string.Join(" ", Lines(PlainText(html)).Skip(1)), PreviewLength);
 
