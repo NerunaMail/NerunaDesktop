@@ -3091,5 +3091,8 @@
  "ohne Ende": "no end",
  "vierten": "fourth",
  "zweiten": "second",
- "{0} Mal": "{0} times"
+ "{0} Mal": "{0} times",
+ "Gespeichert, aber das Original in «{0}» konnte nicht gelöscht werden ({1}). Bitte dort von Hand löschen.": "Saved, but the original in “{0}” could not be deleted ({1}). Please delete it there by hand.",
+ "«{0}» gelöscht": "“{0}” deleted",
+ "Aufgabe konnte nicht gelöscht werden: {0}": "The task could not be deleted: {0}"
 }

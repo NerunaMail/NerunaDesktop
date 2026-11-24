@@ -3091,5 +3091,8 @@
  "ohne Ende": "sans fin",
  "vierten": "quatrième",
  "zweiten": "deuxième",
- "{0} Mal": "{0} fois"
+ "{0} Mal": "{0} fois",
+ "Gespeichert, aber das Original in «{0}» konnte nicht gelöscht werden ({1}). Bitte dort von Hand löschen.": "Enregistré, mais l’original dans « {0} » n’a pas pu être supprimé ({1}). Supprime-le là-bas manuellement.",
+ "«{0}» gelöscht": "« {0} » supprimée",
+ "Aufgabe konnte nicht gelöscht werden: {0}": "La tâche n’a pas pu être supprimée : {0}"
 }

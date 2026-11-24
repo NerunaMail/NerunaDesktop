@@ -279,11 +279,28 @@
       // In a list: Tab moves the point one level in, Shift+Tab back out; elsewhere Tab stays a tab.
       e.preventDefault();
       exec(e.shiftKey ? "outdent" : "indent");
+    } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey && e.shiftKey && !indentedBlock()) {
+      // Shift+Tab outside a list or indented paragraph: back to the field before the text (the subject).
+      e.preventDefault();
+      editor.blur(); // let the web view give up the keyboard
+      post({ type: "focusBack" });
     } else if (e.key === "Tab" && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       exec(e.shiftKey ? "outdent" : "insertText", e.shiftKey ? undefined : "    ");
     }
   });
+
+  /** An indented paragraph the caret is in (made with "Einzug vergrössern"; not a quoted mail), or null. */
+  function indentedBlock() {
+    var selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+    var node = selection.getRangeAt(0).startContainer;
+    for (; node && node !== editor; node = node.parentNode) {
+      if (node.nodeType === 1 && node.tagName === "BLOCKQUOTE" && node.getAttribute("type") !== "cite"
+          && /margin/i.test(node.getAttribute("style") || "")) return node;
+    }
+    return null;
+  }
 
   /** The list item the caret is in, or null. */
   function currentListItem() {

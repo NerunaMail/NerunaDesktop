@@ -192,6 +192,9 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
 
     public event EventHandler? SaveRequested;
 
+    /// <summary>Shift+Tab outside a list (or indented paragraph): the field before the text should take the focus.</summary>
+    public event EventHandler? FocusBackRequested;
+
     public event EventHandler? ContentChanged;
 
     public event EventHandler<string>? ImagePasted;
@@ -780,6 +783,9 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 break;
             case "save":
                 SaveRequested?.Invoke(this, EventArgs.Empty);
+                break;
+            case "focusBack":
+                FocusBackRequested?.Invoke(this, EventArgs.Empty);
                 break;
             case "changed":
                 ContentChanged?.Invoke(this, EventArgs.Empty);

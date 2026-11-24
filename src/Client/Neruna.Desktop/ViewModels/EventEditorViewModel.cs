@@ -327,7 +327,11 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     public (CalendarInfo Calendar, string RemoteId, EventDraft Draft)? Saved { get; private set; }
 
     /// <summary>"Gespeichert – Einladung an 2 Personen gesendet" for the status bar.</summary>
-    public string? ResultMessage { get; private set; }
+    public string? ResultMessage
+    {
+        get => _moveWarning ?? field;
+        private set;
+    }
 
     public IReadOnlyList<ReminderOption> ReminderOptions { get; }
 
@@ -638,7 +642,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             var previous = _existing is { } e ? (await _calendar.GetObjectAsync(e.Calendar, e.RemoteId))?.ICalendarData : null;
             var saved = Occurrence is { } at && _existing is { } series
                 ? await _calendar.SaveOccurrenceAsync(series.Calendar, series.RemoteId, at, draft)
-                : await _calendar.SaveEventAsync(target, draft, _existing);
+                : await SaveMovingAsync(target, draft);
             Saved = (target, saved.RemoteId, draft);
             if (!IsOrganizer)
             {
@@ -656,6 +660,22 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             }
         });
     }
+
+    // Moved, but the original stayed: saved all the same – the dialog closes and the status bar says what is left to do.
+    private async Task<CalendarObject> SaveMovingAsync(CalendarInfo target, EventDraft draft)
+    {
+        try
+        {
+            return await _calendar.SaveEventAsync(target, draft, _existing);
+        }
+        catch (MoveIncompleteException ex)
+        {
+            _moveWarning = ex.Message;
+            return ex.Saved;
+        }
+    }
+
+    private string? _moveWarning;
 
     // Keeps the known answers of people already invited; new people have not answered yet.
     private bool TryParseAttendees(out List<EventAttendee> attendees)

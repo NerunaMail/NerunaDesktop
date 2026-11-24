@@ -161,6 +161,9 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
 
     public event EventHandler<bool>? Finished;
 
+    /// <summary>For the status bar after saving, when something is left to do (the original of a move).</summary>
+    public string? ResultMessage { get; private set; }
+
     public string Title => _existing is null ? T("Neue Aufgabe") : T("Aufgabe bearbeiten");
 
     public bool IsExisting => _existing is not null;
@@ -277,7 +280,16 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
         };
         await RunAsync(async () =>
         {
-            await _tasks.SaveAsync(SelectedList!, draft, _existing);
+            try
+            {
+                await _tasks.SaveAsync(SelectedList!, draft, _existing);
+            }
+            catch (MoveIncompleteException ex)
+            {
+                // Saved in the new list: closing is right (saving again would add another copy).
+                ResultMessage = ex.Message;
+            }
+
             // New tasks go where the last one went.
             await _settings.SetAsync(SettingKeys.TasksDefaultList, CalendarController.CalendarKey(SelectedList!));
         });

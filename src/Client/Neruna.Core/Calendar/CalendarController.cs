@@ -284,10 +284,25 @@ public sealed class CalendarController(
 
         if (moving && current is not null)
         {
-            await DeleteEventAsync(existing!.Value.Calendar, current.RemoteId, cancellationToken);
+            await RemoveMovedAsync(existing!.Value.Calendar, current.RemoteId, saved, cancellationToken);
         }
 
         return saved;
+    }
+
+    /// <summary>The original after a move; failing, it says so (<see cref="MoveIncompleteException"/>) – the copy is saved.</summary>
+    /// <exception cref="MoveIncompleteException">The original is still there.</exception>
+    internal async Task RemoveMovedAsync(CalendarInfo source, string remoteId, CalendarObject saved, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await DeleteEventAsync(source, remoteId, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Moved {RemoteId}, but the original could not be deleted", remoteId);
+            throw new MoveIncompleteException(saved, source, ex);
+        }
     }
 
     /// <summary>

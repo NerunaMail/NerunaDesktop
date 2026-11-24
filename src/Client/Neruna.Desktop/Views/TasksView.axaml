@@ -11,6 +11,10 @@
   <UserControl.Styles>
     <Style Selector="Border.taskrow">
       <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.taskrow:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
     </Style>
     <Style Selector="Border.taskrow.selected">
       <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}" />
@@ -42,7 +46,8 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="1" ColumnDefinitions="260,6,*,6,*">
+    <!-- The task list keeps its width (draggable, as with mails); the reading pane takes the rest -->
+    <Grid Grid.Row="1" ColumnDefinitions="260,6,480,6,*">
 
       <!-- Task lists per account: each one shown or hidden on its own -->
       <Border Classes="pane" Padding="12,10">
@@ -114,20 +119,26 @@
                     <ItemsControl ItemsSource="{Binding Rows}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:TaskRow">
-                          <Border Classes="taskrow" Classes.selected="{Binding IsSelected}" Padding="4,5" CornerRadius="4">
-                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
-                              <CheckBox IsChecked="{Binding IsCompleted}" MinWidth="0" Padding="0" Margin="0,0,8,0" VerticalAlignment="Center"
-                                        ToolTip.Tip="{l:T 'Erledigt'}" />
-                              <Button Grid.Column="1" Classes="command" Command="{Binding SelectCommand}" DoubleTapped="OnRowDoubleTapped" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="2,0"
-                                      ToolTip.Tip="{l:T 'Doppelklick: bearbeiten'}">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                  <TextBlock Text="!" Foreground="#C42B1C" FontWeight="Bold" IsVisible="{Binding IsHigh}" ToolTip.Tip="{l:T 'Hohe Priorität'}" />
-                                  <TextBlock Text="{Binding Title}" TextDecorations="{Binding Decorations}" TextTrimming="CharacterEllipsis" />
-                                  <TextBlock Classes="subtle" Text="✎" FontSize="11" IsVisible="{Binding HasNotes}" ToolTip.Tip="{l:T 'Mit Notiz'}" VerticalAlignment="Center" />
-                                  <TextBlock Classes="subtle" Text="↻" FontSize="12" IsVisible="{Binding HasRepeats}" ToolTip.Tip="{Binding RepeatsText}" VerticalAlignment="Center" />
-                                  <PathIcon Data="{StaticResource IconClock}" Width="11" Height="11" Opacity="0.6" IsVisible="{Binding HasReminder}" ToolTip.Tip="{Binding ReminderText}" VerticalAlignment="Center" />
-                                </StackPanel>
-                              </Button>
+                          <!-- The whole row reacts: a click shows the task, a double click edits it -->
+                          <Border Classes="taskrow" Classes.selected="{Binding IsSelected}" Padding="6,6" CornerRadius="4"
+                                  Tapped="OnRowTapped" DoubleTapped="OnRowDoubleTapped" ToolTip.Tip="{l:T 'Doppelklick: bearbeiten'}">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+                              <CheckBox Grid.RowSpan="2" IsChecked="{Binding IsCompleted}" MinWidth="0" MinHeight="0" Padding="0" Margin="0,1,10,0"
+                                        VerticalAlignment="Top" ToolTip.Tip="{l:T 'Erledigt'}">
+                                <CheckBox.RenderTransform>
+                                  <ScaleTransform ScaleX="0.85" ScaleY="0.85" />
+                                </CheckBox.RenderTransform>
+                              </CheckBox>
+                              <!-- The title takes what is left and is cut with "…" -->
+                              <DockPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock DockPanel.Dock="Left" Text="!" Foreground="#C42B1C" FontWeight="Bold" Margin="0,0,6,0" IsVisible="{Binding IsHigh}" ToolTip.Tip="{l:T 'Hohe Priorität'}" />
+                                <PathIcon DockPanel.Dock="Right" Data="{StaticResource IconClock}" Width="11" Height="11" Opacity="0.6" Margin="6,0,0,0"
+                                          IsVisible="{Binding HasReminder}" ToolTip.Tip="{Binding ReminderText}" VerticalAlignment="Center" />
+                                <TextBlock DockPanel.Dock="Right" Classes="subtle" Text="↻" FontSize="12" Margin="6,0,0,0" IsVisible="{Binding HasRepeats}" ToolTip.Tip="{Binding RepeatsText}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Title}" TextDecorations="{Binding Decorations}" TextTrimming="CharacterEllipsis" />
+                              </DockPanel>
+                              <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="4" Classes="subtle" FontSize="12" Text="{Binding NotePreview}"
+                                         IsVisible="{Binding HasNotes}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                               <TextBlock Grid.Column="2" Text="{Binding DueText}" Classes="subtle" Classes.error="{Binding IsOverdue}" FontSize="12" VerticalAlignment="Center" Margin="12,0" />
                               <Border Grid.Column="3" Width="8" Height="8" CornerRadius="4" Background="{Binding Brush}" VerticalAlignment="Center" Margin="0,0,6,0" />
                               <TextBlock Grid.Column="4" Classes="subtle" FontSize="12" Text="{Binding ListName}" VerticalAlignment="Center" MaxWidth="160" TextTrimming="CharacterEllipsis" />
@@ -144,13 +155,32 @@
         </Grid>
       </Border>
 
+      <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" />
+      <GridSplitter Grid.Column="3" Background="Transparent" ResizeDirection="Columns" />
+
       <!-- The chosen task to read: notes with clickable links, edit and done -->
       <Border Grid.Column="4" Classes="pane" Padding="20,14">
         <Panel>
           <TextBlock Classes="subtle" Text="{l:T 'Aufgabe auswählen, um sie hier zu lesen.'}" IsVisible="{Binding !HasSelection}"
                      HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" />
-          <Grid RowDefinitions="Auto,*,Auto" IsVisible="{Binding HasSelection}">
+          <Grid RowDefinitions="Auto,*" IsVisible="{Binding HasSelection}">
             <StackPanel Spacing="4">
+              <!-- Edit, done and delete above the title, where the eye is -->
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8" IsVisible="{Binding SelectedTask.CanEdit, FallbackValue=False}">
+                <Button Classes="accent" Command="{Binding SelectedTask.EditCommand, FallbackValue={x:Null}}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" />
+                    <TextBlock Text="{l:T 'Bearbeiten'}" />
+                  </StackPanel>
+                </Button>
+                <Button Content="{Binding SelectedTask.ToggleText, FallbackValue=''}" Command="{Binding SelectedTask.ToggleCommand, FallbackValue={x:Null}}" />
+                <Button Command="{Binding SelectedTask.DeleteCommand, FallbackValue={x:Null}}" ToolTip.Tip="{l:T 'Löschen'}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" />
+                    <TextBlock Text="{l:T 'Löschen'}" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
               <SelectableTextBlock Text="{Binding SelectedTask.Title, FallbackValue=''}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"
                                    TextDecorations="{Binding SelectedTask.Decorations, FallbackValue={x:Null}}" />
               <TextBlock Classes="subtle" Text="{Binding SelectedTask.CompletedText, FallbackValue=''}" IsVisible="{Binding SelectedTask.IsCompleted, FallbackValue=False}" />
@@ -194,15 +224,6 @@
                 <ctl:LinkedText Linked="{Binding SelectedTask.Notes, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasNotes, FallbackValue=False}" />
               </StackPanel>
             </ScrollViewer>
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,12,0,0" IsVisible="{Binding SelectedTask.CanEdit, FallbackValue=False}">
-              <Button Content="{Binding SelectedTask.ToggleText, FallbackValue=''}" Command="{Binding SelectedTask.ToggleCommand, FallbackValue={x:Null}}" />
-              <Button Classes="accent" Command="{Binding SelectedTask.EditCommand, FallbackValue={x:Null}}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" />
-                  <TextBlock Text="{l:T 'Bearbeiten'}" />
-                </StackPanel>
-              </Button>
-            </StackPanel>
           </Grid>
         </Panel>
       </Border>

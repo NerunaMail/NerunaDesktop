@@ -3091,5 +3091,8 @@
  "ohne Ende": "senza fine",
  "vierten": "quarto",
  "zweiten": "secondo",
- "{0} Mal": "{0} volte"
+ "{0} Mal": "{0} volte",
+ "Gespeichert, aber das Original in «{0}» konnte nicht gelöscht werden ({1}). Bitte dort von Hand löschen.": "Salvato, ma l’originale in «{0}» non è stato eliminato ({1}). Eliminalo lì manualmente.",
+ "«{0}» gelöscht": "«{0}» eliminata",
+ "Aufgabe konnte nicht gelöscht werden: {0}": "Impossibile eliminare l’attività: {0}"
 }

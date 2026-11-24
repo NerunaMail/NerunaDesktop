@@ -233,7 +233,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
     }
 
     private TaskRow NewRow(TaskItem task, string color, DateTimeOffset now) =>
-        new(task, color, now, ToggleAsync, EditAsync, row => SelectedTask = row);
+        new(task, color, now, ToggleAsync, EditAsync, row => SelectedTask = row, DeleteAsync);
 
     private static bool SameTask(TaskItem a, TaskItem b) => Same(a.List, b.List) && a.ObjectRemoteId == b.ObjectRemoteId;
 
@@ -249,6 +249,33 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
         {
             logger.LogError(ex, "Task {Uid} could not be saved", row.Item.Uid);
             StatusMessage?.Invoke(this, F("Aufgabe konnte nicht gespeichert werden: {0}", ex.Message));
+            await ReloadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(TaskRow row)
+    {
+        if (!await Infrastructure.DeleteConfirmation.AskAsync(Infrastructure.DeleteKind.Task, F("«{0}» löschen", row.Title),
+                T("Die Aufgabe wird auch auf dem Server gelöscht und lässt sich nicht wiederherstellen.")))
+        {
+            return;
+        }
+
+        try
+        {
+            await tasks.DeleteAsync(row.Item);
+            if (SelectedTask == row)
+            {
+                SelectedTask = null;
+            }
+
+            await ReloadAsync();
+            StatusMessage?.Invoke(this, F("«{0}» gelöscht", row.Title));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Task {Uid} could not be deleted", row.Item.Uid);
+            StatusMessage?.Invoke(this, F("Aufgabe konnte nicht gelöscht werden: {0}", ex.Message));
             await ReloadAsync();
         }
     }
@@ -380,10 +407,12 @@ internal sealed partial class TaskRow : ObservableObject
     private readonly Func<TaskRow, bool, Task> _toggle;
     private readonly Func<TaskRow, Task> _edit;
     private readonly Action<TaskRow> _select;
+    private readonly Func<TaskRow, Task> _delete;
     private bool _ready;
 
-    public TaskRow(TaskItem item, string color, DateTimeOffset now, Func<TaskRow, bool, Task> toggle, Func<TaskRow, Task> edit, Action<TaskRow> select)
+    public TaskRow(TaskItem item, string color, DateTimeOffset now, Func<TaskRow, bool, Task> toggle, Func<TaskRow, Task> edit, Action<TaskRow> select, Func<TaskRow, Task> delete)
     {
+        _delete = delete;
         Item = item;
         Color = color;
         _select = select;
@@ -502,6 +531,9 @@ internal sealed partial class TaskRow : ObservableObject
 
     public bool HasNotes => Notes is not null;
 
+    /// <summary>The first line of the notes, under the title (as the preview of a mail).</summary>
+    public string? NotePreview => Notes?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+
     public string ListName => Item.List.Name;
 
     public string? DueText => Item.Due is { } due
@@ -524,4 +556,7 @@ internal sealed partial class TaskRow : ObservableObject
 
     [RelayCommand]
     private Task EditAsync() => _edit(this);
+
+    [RelayCommand]
+    private Task DeleteAsync() => _delete(this);
 }

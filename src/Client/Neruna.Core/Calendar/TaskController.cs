@@ -112,6 +112,7 @@ public sealed class TaskController(CalendarController calendars, ICalendarStore 
 
     /// <summary>Creates a task in <paramref name="target"/> or updates <paramref name="existing"/> (moving it if the list changed).</summary>
     /// <exception cref="RemoteConflictException">Someone changed the task on the server; sync and retry.</exception>
+    /// <exception cref="MoveIncompleteException">Moved, but the original is still in its old list.</exception>
     public async Task<CalendarObject> SaveAsync(CalendarInfo target, TaskDraft draft, TaskItem? existing = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -122,7 +123,7 @@ public sealed class TaskController(CalendarController calendars, ICalendarStore 
         var saved = await calendars.SaveDataAsync(target, data, moving ? null : current, cancellationToken);
         if (moving && current is not null)
         {
-            await calendars.DeleteEventAsync(existing!.List, current.RemoteId, cancellationToken);
+            await calendars.RemoveMovedAsync(existing!.List, current.RemoteId, saved, cancellationToken);
         }
 
         return saved;

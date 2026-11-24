@@ -1480,7 +1480,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             if (changed)
             {
                 _ = reload();
-                StatusText = (sender as EventEditorViewModel)?.ResultMessage ?? F("Gespeichert um {0:t}", DateTime.Now);
+                StatusText = (sender as EventEditorViewModel)?.ResultMessage ?? (sender as TaskEditorViewModel)?.ResultMessage ?? F("Gespeichert um {0:t}", DateTime.Now);
             }
         }
 

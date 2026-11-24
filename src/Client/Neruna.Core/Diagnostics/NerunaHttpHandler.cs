@@ -26,7 +26,7 @@ public sealed partial class NerunaHttpHandler(string userAgent, ILogger? logger 
         }
 
         var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (logger is not null && response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable)
+        if (logger is not null && (response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500))
         {
             await LogAsync(logger, request, response, cancellationToken).ConfigureAwait(false);
         }

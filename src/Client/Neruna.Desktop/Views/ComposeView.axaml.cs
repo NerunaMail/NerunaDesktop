@@ -31,7 +31,14 @@ internal sealed partial class ComposeView : UserControl
     {
         InitializeComponent();
         var editor = this.FindControl<HtmlEditor>("Editor")!;
-        this.FindControl<TextBox>("SubjectBox")!.AddHandler(KeyDownEvent, (_, e) => editor.TabIntoFromPreviousField(e), RoutingStrategies.Tunnel);
+        var subject = this.FindControl<TextBox>("SubjectBox")!;
+        subject.AddHandler(KeyDownEvent, (_, e) => editor.TabIntoFromPreviousField(e), RoutingStrategies.Tunnel);
+        // Shift+Tab in the text (not in a list): back to the subject, caret at its end.
+        editor.FocusBackRequested += (_, _) =>
+        {
+            subject.Focus(NavigationMethod.Tab);
+            subject.CaretIndex = subject.Text?.Length ?? 0;
+        };
 
         // Files dragged into the mail: attach; with Ctrl a link; with the right mouse button ask. Into the text
         // (the WebView) the editor reports them; anywhere else in the window (fields, attachments, plain-text box) here.
