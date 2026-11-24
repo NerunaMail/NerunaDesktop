@@ -1,3 +1,4 @@
+using static Neruna.Core.Localization.Texts;
 using Ical.Net;
 using Ical.Net.CalendarComponents;
 using Ical.Net.DataTypes;
@@ -138,6 +139,30 @@ public sealed class ReminderService(ICalendarStore calendars, IReminderStore sta
             {
                 yield return (shown, alarmAt);
             }
+        }
+
+        // Tasks: one reminder at a fixed time (or relative to start/due), while the task is open. It stays until
+        // dismissed or done; a repeating task moved to its next day brings a new one.
+        foreach (var todo in ical.Todos.Where(t => t.RecurrenceIdentifier is null && t.Alarms.Count > 0))
+        {
+            if (string.Equals(todo.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) || todo.Completed is not null
+                || string.Equals(todo.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase)
+                || TaskDetails.Of(todo).ReminderAt is not { } at)
+            {
+                continue;
+            }
+
+            var alarmAt = new DateTimeOffset(DateTime.SpecifyKind(at, DateTimeKind.Local));
+            if (alarmAt > to)
+            {
+                continue;
+            }
+
+            var title = string.IsNullOrWhiteSpace(todo.Summary) ? T("(ohne Titel)") : todo.Summary.Trim();
+            yield return (new CalendarOccurrence(calendar, item.RemoteId, todo.Uid ?? item.RemoteId, "☐ " + title, null, alarmAt, alarmAt.AddDays(7), false, false)
+            {
+                IsTask = true,
+            }, alarmAt);
         }
     }
 }

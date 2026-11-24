@@ -958,7 +958,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var series = EventDraft.FromICalendar(stored.ICalendarData);
         var shown = occurrence.RecurrenceId is { } at ? EventDraft.FromOccurrence(stored.ICalendarData, at) : series;
         var color = Calendars.FirstOrDefault(c => c.Key == CalendarController.CalendarKey(occurrence.Calendar))?.Color ?? Palette[0];
-        var details = new EventDetailsViewModel(occurrence, shown, series.Recurrence, series.RecurrenceUntil, color, onlyThis => EditOccurrenceAsync(occurrence, onlyThis));
+        var details = new EventDetailsViewModel(occurrence, shown, series, color, onlyThis => EditOccurrenceAsync(occurrence, onlyThis));
         DetailsRequested?.Invoke(this, details);
     }
 
@@ -1371,7 +1371,11 @@ internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string co
 {
     public CalendarOccurrence Occurrence { get; } = occurrence;
 
-    public string Title => Occurrence.Summary;
+    /// <summary>The title as the views show it: called-off events say so.</summary>
+    // Exchange already puts "Abgesagt:" before cancelled meetings it received; not twice.
+    public string Title => (Occurrence.IsCancelled && !Occurrence.Summary.StartsWith(T("Abgesagt: ").TrimEnd(), StringComparison.CurrentCultureIgnoreCase)
+                               ? T("Abgesagt: ") : string.Empty)
+                           + Occurrence.Summary;
 
     public bool IsRecurring => Occurrence.IsRecurring;
 

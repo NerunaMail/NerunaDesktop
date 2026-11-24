@@ -41,7 +41,8 @@ public class EventDraftTests
     {
         var draft = EventDraft.FromICalendar(Meeting);
         Assert.Equal("Jour fixe", draft.Summary);
-        Assert.Equal(RecurrenceKind.Custom, draft.Recurrence);
+        Assert.Equal(RecurrenceKind.Weekly, draft.Recurrence);
+        Assert.Equal([DayOfWeek.Monday, DayOfWeek.Wednesday], draft.Repeat!.Weekdays);
 
         var updated = (draft with { Summary = "Jour fixe Team", Location = "Pilatus" }).ToICalendar(Meeting);
 

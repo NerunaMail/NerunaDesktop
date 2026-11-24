@@ -81,6 +81,16 @@ internal static class GraphTasks
             Line(text, "DUE;VALUE=DATE", due.ToString("yyyyMMdd", CultureInfo.InvariantCulture));
         }
 
+        if (DateOf(t.Obj("startDateTime")) is { } start)
+        {
+            Line(text, "DTSTART;VALUE=DATE", start.ToString("yyyyMMdd", CultureInfo.InvariantCulture));
+        }
+
+        if (t.Arr("categories").Select(c => c.GetString()).Where(c => !string.IsNullOrWhiteSpace(c)).ToList() is { Count: > 0 } categories)
+        {
+            Line(text, "CATEGORIES", string.Join(',', categories.Select(c => Escape(c!))));
+        }
+
         var completed = t.Str("status") == "completed";
         Line(text, "STATUS", completed ? "COMPLETED" : t.Str("status") == "inProgress" ? "IN-PROCESS" : "NEEDS-ACTION");
         if (completed && Utc(t.Obj("completedDateTime").Str("dateTime")) is { } done)
@@ -94,6 +104,14 @@ internal static class GraphTasks
             Line(text, "RRULE", rule);
         }
 
+        if (t.Bool("isReminderOn") && UtcOf(t.Obj("reminderDateTime")) is { } reminder)
+        {
+            text.Append("BEGIN:VALARM\r\nACTION:DISPLAY\r\n");
+            Line(text, "DESCRIPTION", Escape(t.Str("title") ?? string.Empty));
+            Line(text, "TRIGGER;VALUE=DATE-TIME", reminder.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture));
+            text.Append("END:VALARM\r\n");
+        }
+
         text.Append("END:VTODO\r\nEND:VCALENDAR\r\n");
         return text.ToString();
     }
@@ -103,14 +121,26 @@ internal static class GraphTasks
     {
         var todo = TaskDraft.TodoOf(iCalendarData) ?? throw new FormatException("The data contains no task.");
         var completed = string.Equals(todo.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) || todo.Completed is not null;
+        var details = TaskDetails.Of(todo);
+        static object Day(DateTime day) => new { dateTime = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T00:00:00", timeZone = "UTC" };
         return new Dictionary<string, object?>
         {
+            ["startDateTime"] = details.Start is { } start ? Day(start) : null,
+            ["isReminderOn"] = details.ReminderAt is not null,
+            ["reminderDateTime"] = details.ReminderAt is { } at
+                ? new { dateTime = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(at, DateTimeKind.Unspecified), TimeZoneInfo.Local).ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture), timeZone = "UTC" }
+                : null,
+            ["categories"] = details.Categories,
+            // To Do repeats only tasks with a due day.
+            ["recurrence"] = todo.RecurrenceRule is { } rule && todo.Due is { } first
+                ? GraphCalendarProvider.GraphRecurrence(rule, DateOnly.FromDateTime(first.Value))
+                : null,
             ["title"] = todo.Summary ?? string.Empty,
             ["body"] = new { content = todo.Description ?? string.Empty, contentType = "text" },
             ["dueDateTime"] = todo.Due is { } due
                 ? new { dateTime = due.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T00:00:00", timeZone = "UTC" }
                 : null,
-            ["status"] = completed ? "completed" : "notStarted",
+            ["status"] = completed ? "completed" : details.State == TaskState.InProgress ? "inProgress" : "notStarted",
             ["importance"] = TaskDraft.PriorityOf(todo.Priority) switch { TaskPriority.High => "high", TaskPriority.Low => "low", _ => "normal" },
         };
     }
@@ -120,6 +150,25 @@ internal static class GraphTasks
         dateTime.Str("dateTime") is { Length: >= 10 } value && DateOnly.TryParseExact(value[..10], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
             ? date
             : null;
+
+    // A Graph dateTimeTimeZone as UTC.
+    private static DateTime? UtcOf(JsonElement value)
+    {
+        if (value.Str("dateTime") is not { } text || !DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
+        {
+            return null;
+        }
+
+        var zone = value.Str("timeZone") ?? "UTC";
+        if (zone is "UTC" or "Etc/UTC")
+        {
+            return DateTime.SpecifyKind(local, DateTimeKind.Utc);
+        }
+
+        return TimeZoneInfo.TryFindSystemTimeZoneById(zone, out var tz)
+            ? TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), tz)
+            : DateTime.SpecifyKind(local, DateTimeKind.Utc);
+    }
 
     private static string? Utc(string? value) =>
         DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)

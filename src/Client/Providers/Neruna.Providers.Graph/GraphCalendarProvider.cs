@@ -17,8 +17,13 @@ namespace Neruna.Providers.Graph;
 /// what it sees from CalDAV. The version of an event is Graph's change key. The server delivers invitations itself.
 /// Not (yet) mapped: changed single occurrences of a series.
 /// </summary>
-internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy, ICalendarOnlineMeetings, ICalendarOccurrences
+internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClient graph) : ICalendarProvider, ICalendarScheduling, ICalendarFreeBusy, ICalendarOnlineMeetings, ICalendarOccurrences, ICalendarTaskFields
 {
+    /// <summary>Microsoft To Do: start, reminder, repetition, categories and "in Bearbeitung"; no place, privacy or links.</summary>
+    public TaskFields TaskFieldsOf(CalendarInfo list) => GraphTasks.IsTaskList(list)
+        ? TaskFields.Start | TaskFields.Reminder | TaskFields.Recurrence | TaskFields.Categories | TaskFields.InProgress
+        : TaskFields.All;
+
     /// <summary>
     /// Free/busy of people in the organisation (getSchedule) – also without their calendar being shared; subject and
     /// place only where they allow it. In batches of 20 addresses, times in UTC.
@@ -65,7 +70,7 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
         return new Availability(email, slots);
     }
 
-    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs,isOnlineMeeting,onlineMeetingProvider,onlineMeeting,categories,type";
+    private const string EventFields = "id,changeKey,iCalUId,subject,body,start,end,isAllDay,location,attendees,organizer,recurrence,isReminderOn,reminderMinutesBeforeStart,showAs,isOnlineMeeting,onlineMeetingProvider,onlineMeeting,categories,type,sensitivity,isCancelled";
 
     /// <summary>
     /// Teams, where the organisation has it for this calendar (work or school accounts): Exchange then creates the
@@ -302,6 +307,17 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
             Location = e.Obj("location").Str("displayName") is { Length: > 0 } location ? location : null,
             Description = e.Obj("body").Str("content") is { Length: > 0 } text ? text.Trim() : null,
         };
+        evt.Class = EventDraft.ClassOf(e.Str("sensitivity") switch
+        {
+            "private" or "personal" => EventPrivacy.Private,
+            "confidential" => EventPrivacy.Confidential,
+            _ => EventPrivacy.Public,
+        });
+        if (e.Bool("isCancelled"))
+        {
+            evt.Status = "CANCELLED";
+        }
+
         EventDraft.ApplyShowAs(evt, e.Str("showAs") switch
         {
             "free" => ShowAs.Free,
@@ -392,6 +408,12 @@ internal sealed partial class GraphCalendarProvider(Guid connectionId, GraphClie
             ["body"] = new { contentType = "text", content = draft.Description ?? string.Empty },
             ["location"] = new { displayName = draft.Location ?? string.Empty },
             ["isAllDay"] = draft.IsAllDay,
+            ["sensitivity"] = draft.Privacy switch
+            {
+                EventPrivacy.Private => "private",
+                EventPrivacy.Confidential => "confidential",
+                _ => "normal",
+            },
             ["showAs"] = draft.ShowAs switch
             {
                 ShowAs.Free => "free",

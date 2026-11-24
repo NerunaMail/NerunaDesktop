@@ -22,7 +22,8 @@ internal enum TaskFilter
 /// "Aufgaben": the tasks (VTODO) of all task lists – CalDAV calendars that hold tasks and Microsoft To Do. Each list can
 /// be shown or hidden on its own (hidden lists are also left out of the calendar); grouped by due date.
 /// </summary>
-internal sealed partial class TasksViewModel(CalendarController calendar, TaskController tasks, ISettingsStore settings, Neruna.Core.Workspaces.WorkspaceService workspaces, ILogger<TasksViewModel> logger) : ViewModelBase, ICollectionListHost
+internal sealed partial class TasksViewModel(CalendarController calendar, TaskController tasks, ISettingsStore settings, Neruna.Core.Workspaces.WorkspaceService workspaces,
+    CalendarCategoryService categories, ILogger<TasksViewModel> logger) : ViewModelBase, ICollectionListHost
 {
     private IReadOnlyList<TaskItem> _all = [];
 
@@ -339,7 +340,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
             return;
         }
 
-        var editor = new TaskEditorViewModel(tasks, settings, lists, draft, existing, target);
+        var editor = new TaskEditorViewModel(tasks, calendar, settings, lists, draft, existing, target, await categories.GetAllAsync());
         EditorRequested?.Invoke(this, editor);
     }
 }
@@ -420,6 +421,60 @@ internal sealed partial class TaskRow : ObservableObject
     };
 
     public bool HasPriority => PriorityText is not null;
+
+    private TaskDetails Details => Item.Details;
+
+    public string? StartText => Details.Start?.ToString("dddd, d. MMMM yyyy", Culture);
+
+    public bool HasStart => StartText is not null;
+
+    public string? ReminderText => Details.ReminderAt?.ToString("dddd, d. MMMM yyyy, HH:mm", Culture);
+
+    public bool HasReminder => ReminderText is not null;
+
+    /// <summary>"Wöchentlich am Mo bis …"; for a rule Neruna cannot show in detail: "Wiederholt sich".</summary>
+    public string? RepeatsText => Details.Recurrence == RecurrenceKind.None
+        ? null
+        : Details.Repeat is { } spec && Details.Recurrence != RecurrenceKind.Custom
+            ? spec.Describe(TaskDetails.SeriesStart(Details.Start, Item.Due?.LocalDateTime), Details.RecurrenceUntil)
+            : T("Wiederholt sich");
+
+    public bool HasRepeats => RepeatsText is not null;
+
+    /// <summary>"In Bearbeitung" or "Abgebrochen"; nothing for open and done tasks.</summary>
+    public string? StateText => Item.IsCompleted ? null : Details.State switch
+    {
+        TaskState.InProgress => T("In Bearbeitung"),
+        TaskState.Cancelled => T("Abgebrochen"),
+        _ => null,
+    };
+
+    public bool HasState => StateText is not null;
+
+    public string? Location => Details.Location;
+
+    public bool HasLocation => Location is not null;
+
+    public string? PrivacyText => Details.Privacy switch
+    {
+        EventPrivacy.Private => T("Privat"),
+        EventPrivacy.Confidential => T("Vertraulich"),
+        _ => null,
+    };
+
+    public bool HasPrivacy => PrivacyText is not null;
+
+    public string? Url => Details.Url;
+
+    public bool HasUrl => Url is not null;
+
+    public string? Links => Details.Links.Count > 0 ? string.Join("\n", Details.Links.Select(l => l.OriginalString)) : null;
+
+    public bool HasLinks => Links is not null;
+
+    public string? CategoriesText => Details.Categories.Count > 0 ? string.Join(", ", Details.Categories) : null;
+
+    public bool HasCategories => CategoriesText is not null;
 
     public string? CompletedText => Item.IsCompleted
         ? Item.CompletedAt is { } at ? F("Erledigt am {0}", at.LocalDateTime.ToString("d. MMMM yyyy", Culture)) : T("Erledigt")

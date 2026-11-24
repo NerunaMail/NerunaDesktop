@@ -66,6 +66,29 @@ public interface ICalendarOnlineMeetings
     Task<IReadOnlyList<string>> GetOnlineMeetingKindsAsync(CalendarInfo calendar, CancellationToken cancellationToken = default);
 }
 
+/// <summary>The task fields beyond title, notes, due date, priority and done that a task list can keep.</summary>
+[Flags]
+public enum TaskFields
+{
+    None = 0,
+    Start = 1,
+    Reminder = 2,
+    Recurrence = 4,
+    Categories = 8,
+    InProgress = 16,
+    Location = 32,
+    Privacy = 64,
+    Links = 128,
+    Cancelled = 256,
+    All = Start | Reminder | Recurrence | Categories | InProgress | Location | Privacy | Links | Cancelled,
+}
+
+/// <summary>Optional, for task services with fewer fields than iCalendar (without it: <see cref="TaskFields.All"/>).</summary>
+public interface ICalendarTaskFields
+{
+    TaskFields TaskFieldsOf(CalendarInfo list);
+}
+
 /// <summary>Optional: whether the server itself delivers invitations and replies (RFC 6638), or the client must e-mail them.</summary>
 public interface ICalendarScheduling
 {

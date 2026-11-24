@@ -4,6 +4,7 @@
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:cal="using:Neruna.Core.Calendar"
              xmlns:ctl="using:Neruna.Desktop.Controls"
+             xmlns:v="using:Neruna.Desktop.Views"
              x:Class="Neruna.Desktop.Views.TaskEditorView"
              x:DataType="vm:TaskEditorViewModel">
 
@@ -12,14 +13,29 @@
     <TextBlock Classes="subtle" FontSize="12" Margin="0,4,0,0" IsVisible="{Binding !CanEdit}"
                Text="{l:T 'Diese Liste ist schreibgeschützt.'}" />
 
+    <TextBlock Classes="subtle" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap" IsVisible="{Binding HasFewFields}"
+               Text="{l:T 'Diese Liste kennt nicht alle Felder; angezeigt wird nur, was ihr Dienst speichert.'}" />
+
     <TextBlock Classes="label" Text="{l:T 'Titel'}" />
     <TextBox x:Name="SummaryBox" Text="{Binding Summary}" PlaceholderText="{l:T 'Was ist zu tun?'}" IsReadOnly="{Binding !CanEdit}" />
 
-    <Grid ColumnDefinitions="Auto,*,12,Auto,*" Margin="0,12,0,0">
-      <CheckBox Content="{l:T 'Fällig am'}" IsChecked="{Binding HasDue}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Center" Margin="0,0,8,0" />
+    <Grid ColumnDefinitions="Auto,*,12,Auto,*" Margin="0,12,0,0" IsVisible="{Binding ShowStart}">
+      <CheckBox Content="{l:T 'Beginnt am'}" IsChecked="{Binding HasStart}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Center" Margin="0,0,8,0" MinWidth="110" />
+      <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding StartDate}" IsEnabled="{Binding HasStart}" HorizontalAlignment="Stretch" />
+    </Grid>
+
+    <Grid ColumnDefinitions="Auto,*,12,Auto,*" Margin="0,8,0,0">
+      <CheckBox MinWidth="110" Content="{l:T 'Fällig am'}" IsChecked="{Binding HasDue}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Center" Margin="0,0,8,0" />
       <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding DueDate}" IsEnabled="{Binding HasDue}" HorizontalAlignment="Stretch" />
       <CheckBox Grid.Column="3" Content="{l:T 'um'}" IsChecked="{Binding HasTime}" IsEnabled="{Binding HasDue}" VerticalAlignment="Center" Margin="0,0,8,0" />
       <ctl:TimeBox Grid.Column="4" SelectedTime="{Binding DueTime}" MinuteIncrement="5" IsEnabled="{Binding HasTime}" HorizontalAlignment="Stretch" />
+    </Grid>
+
+    <Grid ColumnDefinitions="Auto,*,12,Auto,*" Margin="0,8,0,0" IsVisible="{Binding ShowReminder}">
+      <CheckBox MinWidth="110" Content="{l:T 'Erinnerung'}" IsChecked="{Binding HasReminder}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding ReminderDate}" IsEnabled="{Binding HasReminder}" HorizontalAlignment="Stretch" />
+      <TextBlock Grid.Column="3" Text="{l:T 'um'}" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <ctl:TimeBox Grid.Column="4" SelectedTime="{Binding ReminderTime}" MinuteIncrement="5" IsEnabled="{Binding HasReminder}" HorizontalAlignment="Stretch" />
     </Grid>
 
     <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
@@ -27,6 +43,16 @@
         <TextBlock Classes="label" Text="{l:T 'Priorität'}" />
         <ComboBox ItemsSource="{Binding Priorities}" SelectedIndex="{Binding PriorityIndex}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}" />
       </StackPanel>
+      <StackPanel Grid.Column="2">
+        <TextBlock Classes="label" Text="{l:T 'Status'}" />
+        <ComboBox ItemsSource="{Binding States}" SelectedIndex="{Binding StateChoice}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}" />
+      </StackPanel>
+    </Grid>
+
+    <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
+      <Border IsEnabled="{Binding CanEdit}" IsVisible="{Binding ShowRecurrence}">
+        <v:RecurrenceEditorView DataContext="{Binding Repeat}" />
+      </Border>
       <StackPanel Grid.Column="2">
         <TextBlock Classes="label" Text="{l:T 'Liste'}" />
         <ComboBox ItemsSource="{Binding Lists}" SelectedItem="{Binding SelectedList}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}">
@@ -39,11 +65,70 @@
       </StackPanel>
     </Grid>
 
+    <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
+      <StackPanel IsVisible="{Binding ShowLocation}">
+        <TextBlock Classes="label" Text="{l:T 'Ort'}" />
+        <TextBox Text="{Binding Location}" IsReadOnly="{Binding !CanEdit}" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" IsVisible="{Binding ShowPrivacy}">
+        <TextBlock Classes="label" Text="{l:T 'Vertraulichkeit'}" />
+        <ComboBox ItemsSource="{x:Static vm:PrivacyOption.All}" SelectedItem="{Binding Privacy}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}"
+                  ToolTip.Tip="{l:T 'Privat und vertraulich: Wer die Liste mit Ihnen teilt, sieht die Einzelheiten nicht.'}" />
+      </StackPanel>
+    </Grid>
+
+    <StackPanel IsVisible="{Binding ShowCategories}">
+      <TextBlock Classes="label" Text="{l:T 'Kategorien'}" />
+      <DropDownButton HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" IsEnabled="{Binding CanEdit}">
+        <Panel>
+          <TextBlock Classes="subtle" Text="{l:T 'Keine'}" IsVisible="{Binding !SelectedCategories.Count}" />
+          <ItemsControl ItemsSource="{Binding SelectedCategories}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:CategoryChoice">
+                <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,0,12,0">
+                  <Border Width="10" Height="10" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Name}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Panel>
+        <DropDownButton.Flyout>
+          <Flyout Placement="BottomEdgeAlignedLeft">
+            <ScrollViewer MaxHeight="320">
+              <ItemsControl ItemsSource="{Binding CategoryChoices}" MinWidth="220">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CategoryChoice">
+                    <CheckBox IsChecked="{Binding IsSelected}">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Width="12" Height="12" CornerRadius="2" Background="{Binding Brush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </CheckBox>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Flyout>
+        </DropDownButton.Flyout>
+      </DropDownButton>
+    </StackPanel>
+
     <TextBlock Classes="label" Text="{l:T 'Notizen'}" />
-    <TextBox Text="{Binding Notes}" AcceptsReturn="True" TextWrapping="Wrap" Height="110" IsReadOnly="{Binding !CanEdit}" />
+    <TextBox Text="{Binding Notes}" AcceptsReturn="True" TextWrapping="Wrap" Height="90" IsReadOnly="{Binding !CanEdit}" />
     <TextBlock Classes="subtle" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap" Text="{l:T 'Web-Adressen werden in der Leseansicht anklickbar angezeigt.'}" />
 
-    <CheckBox Content="{l:T 'Erledigt'}" IsChecked="{Binding IsCompleted}" IsEnabled="{Binding CanEdit}" Margin="0,12,0,0" />
+    <StackPanel IsVisible="{Binding ShowLinks}">
+      <TextBlock Classes="label" Text="{l:T 'Link (Webseite der Aufgabe)'}" />
+      <TextBox Text="{Binding Url}" PlaceholderText="https://…" IsReadOnly="{Binding !CanEdit}" />
+      <TextBlock Classes="label" Text="{l:T 'Anhänge als Links (einer pro Zeile)'}" />
+      <TextBox Text="{Binding LinksText}" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="34" MaxHeight="90" PlaceholderText="https://…" IsReadOnly="{Binding !CanEdit}" />
+    </StackPanel>
 
     <TextBlock Classes="error" Text="{Binding Error}" Margin="0,10,0,0" TextWrapping="Wrap"
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />

@@ -34,6 +34,12 @@ public sealed record CalendarOccurrence(
     /// single event. Identifies it for <see cref="CalendarController.SaveOccurrenceAsync"/>.
     /// </summary>
     public DateTimeOffset? RecurrenceId { get; init; }
+
+    /// <summary>Private or confidential (iCalendar CLASS): others see only that the time is taken.</summary>
+    public EventPrivacy Privacy { get; init; }
+
+    /// <summary>Called off (STATUS:CANCELLED), still shown.</summary>
+    public bool IsCancelled { get; init; }
 }
 
 /// <summary>A calendar offered by the server, for choosing which ones to show (Thunderbird only offers this at setup).</summary>
@@ -512,6 +518,21 @@ public sealed class CalendarController(
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _schedulesItself = new(StringComparer.Ordinal);
 
+    /// <summary>Which task fields <paramref name="list"/> keeps (Microsoft To Do and Google fewer than CalDAV).</summary>
+    public async Task<TaskFields> TaskFieldsOfAsync(CalendarInfo list, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        try
+        {
+            await using var provider = providers.CreateCalendar(await ConnectionAsync(list.ConnectionId, cancellationToken));
+            return provider is ICalendarTaskFields fields ? fields.TaskFieldsOf(list) : TaskFields.All;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return TaskFields.All;
+        }
+    }
+
     /// <summary>
     /// True if the calendar's server delivers invitations and replies itself (SOGo, Nextcloud …); then Neruna must not
     /// e-mail them as well. Asked once per calendar; if the server cannot be asked, Neruna sends them itself.
@@ -859,6 +880,8 @@ public sealed class CalendarController(
         {
             ShowAs = EventDraft.ShowAsOf(evt),
             Categories = EventDraft.CategoriesOf(evt),
+            Privacy = EventDraft.PrivacyOf(evt.Class),
+            IsCancelled = string.Equals(evt.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase),
             RecurrenceId = evt.RecurrenceIdentifier is { } id ? ToDateTimeOffset(id.StartTime)
                 : evt.RecurrenceRule is not null || evt.RecurrenceDates.GetAllDates().Any() ? start : null,
         };

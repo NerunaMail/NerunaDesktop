@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:l="using:Neruna.Desktop"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Neruna.Desktop.ViewModels"
+             x:Class="Neruna.Desktop.Views.RecurrenceEditorView"
+             x:DataType="vm:RecurrenceEditorViewModel">
+  <!-- "Wiederholung" of events and tasks: kind, every n, weekdays, day of the month, end -->
+  <StackPanel Spacing="6">
+    <TextBlock Classes="label" Text="{l:T 'Wiederholung'}" />
+    <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" HorizontalAlignment="Stretch">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:RecurrenceOption">
+          <TextBlock Text="{Binding Label}" />
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+
+    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasDetails}">
+      <TextBlock Text="{l:T 'alle'}" VerticalAlignment="Center" />
+      <NumericUpDown Value="{Binding Interval}" Minimum="1" Maximum="999" Increment="1" FormatString="0" Width="110" />
+      <TextBlock Text="{Binding UnitText}" VerticalAlignment="Center" />
+    </StackPanel>
+
+    <ItemsControl ItemsSource="{Binding Weekdays}" IsVisible="{Binding IsWeekly}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <WrapPanel />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:WeekdayChoice">
+          <ToggleButton Content="{Binding Label}" IsChecked="{Binding IsChecked}" ToolTip.Tip="{Binding Name}" MinWidth="34" Margin="0,0,3,4" Padding="4,3"
+                        HorizontalContentAlignment="Center" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <ComboBox ItemsSource="{Binding MonthlyChoices}" SelectedItem="{Binding Monthly}" HorizontalAlignment="Stretch" IsVisible="{Binding HasMonthly}">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:MonthlyChoice">
+          <TextBlock Text="{Binding Label}" />
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+
+    <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding HasEnd}">
+      <ComboBox ItemsSource="{Binding EndModes}" SelectedIndex="{Binding EndMode}" MinWidth="120" />
+      <CalendarDatePicker Grid.Column="2" SelectedDate="{Binding EndDate}" HorizontalAlignment="Stretch" IsVisible="{Binding EndsOnDate}" />
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding EndsAfterCount}">
+        <NumericUpDown Value="{Binding Count}" Minimum="1" Maximum="999" Increment="1" FormatString="0" Width="110" />
+        <TextBlock Text="{l:T 'Mal'}" VerticalAlignment="Center" />
+      </StackPanel>
+    </Grid>
+  </StackPanel>
+</UserControl>

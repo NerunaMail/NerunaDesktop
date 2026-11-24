@@ -129,10 +129,9 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         var end = draft.IsAllDay ? draft.End.AddDays(-1) : draft.End;
         EndDate = (end < draft.Start ? draft.Start : end).Date;
         EndTime = draft.End.TimeOfDay;
-        Recurrence = RecurrenceOption.All.First(o => o.Kind == draft.Recurrence);
-        _readUntil = draft.RecurrenceUntil;
-        HasRecurrenceEnd = draft.RecurrenceUntil is not null;
-        RecurrenceEndDate = draft.RecurrenceUntil ?? draft.Start.Date.AddMonths(3);
+        Repeat = new RecurrenceEditorViewModel(draft.Recurrence, draft.Repeat, draft.RecurrenceUntil, () => StartDate ?? draft.Start.Date);
+        Privacy = PrivacyOption.Of(draft.Privacy);
+        IsCancelled = draft.IsCancelled;
         IsSeries = draft.Recurrence != RecurrenceKind.None;
         ReminderOptions = ReminderOption.For(draft.ReminderMinutes);
         Reminder = ReminderOptions.First(o => o.Minutes == draft.ReminderMinutes);
@@ -405,8 +404,6 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
 
     public IReadOnlyList<CalendarInfo> Calendars { get; }
 
-    public static IReadOnlyList<RecurrenceOption> RecurrenceOptions => RecurrenceOption.All;
-
     public bool IsNew => _existing is null;
 
     public bool IsExisting => !IsNew;
@@ -459,21 +456,15 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
     [ObservableProperty]
     public partial TimeSpan? EndTime { get; set; }
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanEndSeries))]
-    public partial RecurrenceOption Recurrence { get; set; }
-
-    // The end as read: a rule Neruna cannot edit ("Benutzerdefiniert") keeps it.
-    private DateTime? _readUntil;
-
-    /// <summary>The series ends on a day ("endet am"); a rule Neruna cannot edit keeps its own end.</summary>
-    public bool CanEndSeries => Recurrence.Kind is not (RecurrenceKind.None or RecurrenceKind.Custom);
+    /// <summary>"Wiederholung": how often, on which days, until when.</summary>
+    public RecurrenceEditorViewModel Repeat { get; }
 
     [ObservableProperty]
-    public partial bool HasRecurrenceEnd { get; set; }
+    public partial PrivacyOption Privacy { get; set; }
 
+    /// <summary>Called off: stays in the calendar, struck through.</summary>
     [ObservableProperty]
-    public partial DateTime? RecurrenceEndDate { get; set; }
+    public partial bool IsCancelled { get; set; }
 
     [ObservableProperty]
     public partial string? Error { get; set; }
@@ -490,6 +481,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             EndDate = end + (current - old);
         }
 
+        Repeat?.StartChanged();
         CheckConflictsLater();
     }
 
@@ -618,15 +610,16 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             url = "https://" + url;
         }
 
-        if (CanEndSeries && HasRecurrenceEnd && RecurrenceEndDate is { } last && last.Date < start.Date)
+        var repeat = Repeat.Build();
+        if (repeat.Error is not null)
         {
-            Error = T("Die Serie kann nicht vor dem ersten Termin enden.");
+            Error = repeat.Error;
             return;
         }
 
         var target = SelectedCalendar;
         var me = _ownAddress(target);
-        var draft = new EventDraft(Title.Trim(), Location.Trim(), Description.Trim(), start, end, IsAllDay, Recurrence.Kind,
+        var draft = new EventDraft(Title.Trim(), Location.Trim(), Description.Trim(), start, end, IsAllDay, repeat.Kind,
             Reminder.Minutes, IsOrganizer ? attendees : null, me)
         {
             ShowAs = (ShowAs ?? ShowAsOption.Of(Neruna.Core.Calendar.ShowAs.Busy)).Value,
@@ -635,8 +628,10 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
             Categories = CategoryChoices.Count > 0 ? [.. SelectedCategories.Select(c => c.Name)] : null,
             Url = url,
             Links = links,
-            RecurrenceUntil = Recurrence.Kind == RecurrenceKind.Custom ? _readUntil
-                : CanEndSeries && HasRecurrenceEnd && RecurrenceEndDate is { } until ? until.Date : null,
+            RecurrenceUntil = repeat.Until,
+            Repeat = repeat.Spec,
+            Privacy = (Privacy ?? PrivacyOption.Of(EventPrivacy.Public)).Value,
+            IsCancelled = IsCancelled,
         };
         await RunAsync(async () =>
         {
@@ -696,7 +691,7 @@ internal sealed partial class EventEditorViewModel : ViewModelBase
         }
 
         var hasAttendees = _attendees.Any(a => !string.Equals(a.Email, Organizer, StringComparison.OrdinalIgnoreCase));
-        if (!await AskDeleteAsync(Title, IsOrganizer, hasAttendees, wholeSeries: Occurrence is null && Recurrence.Kind != RecurrenceKind.None))
+        if (!await AskDeleteAsync(Title, IsOrganizer, hasAttendees, wholeSeries: Occurrence is null && Repeat.Kind != RecurrenceKind.None))
         {
             return;
         }

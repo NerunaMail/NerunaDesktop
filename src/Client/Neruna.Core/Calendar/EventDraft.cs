@@ -19,6 +19,19 @@ public enum RecurrenceKind
     Custom,
 }
 
+/// <summary>Who may see an event's or task's details in a shared calendar (iCalendar CLASS).</summary>
+public enum EventPrivacy
+{
+    /// <summary>Everyone the calendar is shared with (the default).</summary>
+    Public,
+
+    /// <summary>Others see only that the time is taken.</summary>
+    Private,
+
+    /// <summary>Others see only that the time is taken; for the server, more restricted than private.</summary>
+    Confidential,
+}
+
 /// <summary>How an attendee answered an invitation (iCalendar PARTSTAT).</summary>
 public enum Participation
 {
@@ -120,6 +133,48 @@ public sealed record EventDraft(
     /// <summary>The last day a series takes place (iCalendar UNTIL); null: without end.</summary>
     public DateTime? RecurrenceUntil { get; init; }
 
+    /// <summary>
+    /// How the series repeats in detail (interval, weekdays, n-th weekday, count); null: as <see cref="Recurrence"/>
+    /// alone says (every day, week …). Ignored for <see cref="RecurrenceKind.None"/> and <see cref="RecurrenceKind.Custom"/>.
+    /// </summary>
+    public RecurrenceSpec? Repeat { get; init; }
+
+    /// <summary>Who may see the details in a shared calendar (iCalendar CLASS).</summary>
+    public EventPrivacy Privacy { get; init; }
+
+    /// <summary>The event is called off (iCalendar STATUS:CANCELLED); it stays in the calendar, struck through.</summary>
+    public bool IsCancelled { get; init; }
+
+    /// <summary>
+    /// The rule to store for a series (also for tasks): none, the existing one when it is a rule the editor cannot
+    /// show (only its end changed, unless it counts), or the wanted one – the existing rule object when nothing changed,
+    /// so other programs' details stay.
+    /// </summary>
+    public static RecurrenceRule? RecurrenceRuleFor(RecurrenceRule? current, RecurrenceKind kind, RecurrenceSpec? repeat, DateTime? until, DateTime start, bool allDay)
+    {
+        if (kind == RecurrenceKind.None)
+        {
+            return null;
+        }
+
+        if (kind == RecurrenceKind.Custom)
+        {
+            if (current is { Count: null } kept && RecurrenceSpec.UntilOf(kept) != until?.Date)
+            {
+                kept.Until = until is { } last ? RecurrenceSpec.UntilValue(last, start, allDay) : null;
+            }
+
+            return current;
+        }
+
+        var frequency = RecurrenceSpec.FrequencyOf(kind)!.Value;
+        var wanted = repeat is { } given && given.Frequency == frequency ? given : new RecurrenceSpec(frequency);
+        var end = wanted.Count is null ? until?.Date : null;
+        return current is not null && wanted.SameAs(RecurrenceSpec.Of(current, start)) && RecurrenceSpec.UntilOf(current) == end
+            ? current
+            : wanted.ToRule(start, allDay, end);
+    }
+
     /// <summary>The event's web page (iCalendar URL); empty removes it, null leaves it as it is.</summary>
     public string? Url { get; init; }
 
@@ -217,7 +272,7 @@ public sealed record EventDraft(
             start,
             end,
             master.IsAllDay,
-            KindOf(master.RecurrenceRule),
+            KindOf(master.RecurrenceRule, start),
             ReminderOf(master),
             AttendeesOf(master),
             AddressOf(master.Organizer?.Value))
@@ -225,7 +280,10 @@ public sealed record EventDraft(
             ShowAs = ShowAsOf(master),
             Meeting = Meetings.OnlineMeeting.Of(master),
             Categories = CategoriesOf(master),
-            RecurrenceUntil = UntilOf(master.RecurrenceRule),
+            RecurrenceUntil = RecurrenceSpec.UntilOf(master.RecurrenceRule),
+            Repeat = RecurrenceSpec.Of(master.RecurrenceRule, start),
+            Privacy = PrivacyOf(master.Class),
+            IsCancelled = string.Equals(master.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase),
             Url = master.Url is { IsAbsoluteUri: true } url ? url.OriginalString : null,
             Links = LinksOf(master),
         };
@@ -461,30 +519,20 @@ public sealed record EventDraft(
             master.DtEnd = new CalDateTime(DateTime.SpecifyKind(End > Start ? End : Start.AddMinutes(30), DateTimeKind.Unspecified), tzId);
         }
 
-        if (series && Recurrence != KindOf(master.RecurrenceRule))
+        if (series)
         {
-            master.RecurrenceRule = Recurrence switch
-            {
-                RecurrenceKind.Daily => new RecurrenceRule(FrequencyType.Daily),
-                RecurrenceKind.Weekly => new RecurrenceRule(FrequencyType.Weekly),
-                RecurrenceKind.Monthly => new RecurrenceRule(FrequencyType.Monthly),
-                RecurrenceKind.Yearly => new RecurrenceRule(FrequencyType.Yearly),
-                RecurrenceKind.Custom => master.RecurrenceRule,
-                _ => null,
-            };
+            master.RecurrenceRule = RecurrenceRuleFor(master.RecurrenceRule, Recurrence, Repeat, RecurrenceUntil, Start, IsAllDay);
         }
 
-        // The end of the series; a rule that counts its occurrences (COUNT) keeps that instead.
-        if (series && master.RecurrenceRule is { Count: null } rule && UntilOf(rule) != RecurrenceUntil?.Date)
+        if (PrivacyOf(master.Class) != Privacy)
         {
-            rule.Until = RecurrenceUntil is not { } last
-                ? null
-                : IsAllDay
-                    ? new CalDateTime(DateOnly.FromDateTime(last))
-                    // Timed: UNTIL in UTC (RFC 5545 with a TZID start), the occurrence on the last day included.
-                    : new CalDateTime(new DateTimeOffset(DateTime.SpecifyKind(last.Date + Start.TimeOfDay, DateTimeKind.Unspecified),
-                        TimeZoneInfo.Local.GetUtcOffset(last.Date + Start.TimeOfDay)).UtcDateTime, "UTC");
-            master.RecurrenceRule = rule;
+            master.Class = ClassOf(Privacy);
+        }
+
+        var cancelled = string.Equals(master.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase);
+        if (cancelled != IsCancelled)
+        {
+            master.Status = IsCancelled ? "CANCELLED" : "CONFIRMED";
         }
 
         ApplyReminder(master);
@@ -626,33 +674,22 @@ public sealed record EventDraft(
         return DateTime.SpecifyKind(value.AsUtc, DateTimeKind.Utc).ToLocalTime();
     }
 
-    /// <summary>The last day of a series (local), from UNTIL; null without one.</summary>
-    private static DateTime? UntilOf(RecurrenceRule? rule) => rule?.Until is not { } until
-        ? null
-        : until.HasTime ? until.AsUtc.ToLocalTime().Date : until.Value.Date;
+    private static RecurrenceKind KindOf(RecurrenceRule? rule, DateTime start) =>
+        rule is null ? RecurrenceKind.None : RecurrenceSpec.Of(rule, start)?.Kind ?? RecurrenceKind.Custom;
 
-    private static RecurrenceKind KindOf(RecurrenceRule? rule)
+    /// <summary>iCalendar CLASS as <see cref="EventPrivacy"/> (unknown values count as private: shown to nobody else).</summary>
+    public static EventPrivacy PrivacyOf(string? value) => value?.ToUpperInvariant() switch
     {
-        if (rule is null)
-        {
-            return RecurrenceKind.None;
-        }
+        null or "" or "PUBLIC" => EventPrivacy.Public,
+        "CONFIDENTIAL" => EventPrivacy.Confidential,
+        _ => EventPrivacy.Private,
+    };
 
-        // An end date (UNTIL) is set apart (RecurrenceUntil): the rule stays a simple one.
-        var simple = rule.Interval <= 1 && rule.Count is null && rule.ByDay.Count == 0
-                     && rule.ByMonthDay.Count == 0 && rule.ByMonth.Count == 0 && rule.BySetPosition.Count == 0;
-        if (!simple)
-        {
-            return RecurrenceKind.Custom;
-        }
-
-        return rule.Frequency switch
-        {
-            FrequencyType.Daily => RecurrenceKind.Daily,
-            FrequencyType.Weekly => RecurrenceKind.Weekly,
-            FrequencyType.Monthly => RecurrenceKind.Monthly,
-            FrequencyType.Yearly => RecurrenceKind.Yearly,
-            _ => RecurrenceKind.Custom,
-        };
-    }
+    /// <summary>CLASS for <paramref name="privacy"/>; null for public (the default, so the line goes).</summary>
+    public static string? ClassOf(EventPrivacy privacy) => privacy switch
+    {
+        EventPrivacy.Private => "PRIVATE",
+        EventPrivacy.Confidential => "CONFIDENTIAL",
+        _ => null,
+    };
 }

@@ -148,8 +148,8 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
         {
             Title = picker.Title,
             Icon = owner?.Icon,
-            Width = 440,
-            Height = 560,
+            Width = 600,
+            Height = 600,
             MinWidth = 340,
             MinHeight = 320,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,

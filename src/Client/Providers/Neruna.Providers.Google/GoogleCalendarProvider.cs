@@ -8,8 +8,11 @@ namespace Neruna.Providers.Google;
 /// connection, so the account has one calendar entry. Calendars and tasks each only where the sign-in includes them.
 /// </summary>
 internal sealed class GoogleCalendarProvider(Guid connectionId, ICalendarProvider dav, GoogleTasks tasks, Func<string, CancellationToken, Task<bool>> grants)
-    : ICalendarProvider, ICalendarScheduling, ICalendarColors
+    : ICalendarProvider, ICalendarScheduling, ICalendarColors, ICalendarTaskFields
 {
+    /// <summary>Google Tasks keeps only title, notes, the due day and done; Google's CalDAV calendars keep everything.</summary>
+    public TaskFields TaskFieldsOf(CalendarInfo list) => GoogleTasks.IsTaskList(list) ? TaskFields.None : TaskFields.All;
+
     /// <summary>Google keeps the colour per user (calendar list): changing it never changes it for others.</summary>
     public Task SetCalendarColorAsync(CalendarInfo calendar, string color, CancellationToken cancellationToken = default) =>
         !GoogleTasks.IsTaskList(calendar) && dav is ICalendarColors colors

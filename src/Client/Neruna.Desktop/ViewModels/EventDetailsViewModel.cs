@@ -19,13 +19,13 @@ internal sealed partial class EventDetailsViewModel : ViewModelBase
     private readonly Func<bool?, Task> _edit;
 
     /// <param name="draft">The event (for an occurrence of a series: that occurrence).</param>
-    /// <param name="recurrence">How the series repeats (the occurrence itself has none of its own).</param>
-    /// <param name="until">The last day of the series; null: without end.</param>
+    /// <param name="series">The whole series: how it repeats (the occurrence itself has no rule of its own).</param>
     /// <param name="edit">Opens the editor: null for an event alone, true "Nur diesen Termin", false "Ganze Serie".</param>
-    public EventDetailsViewModel(CalendarOccurrence occurrence, EventDraft draft, RecurrenceKind recurrence, DateTime? until, string color, Func<bool?, Task> edit)
+    public EventDetailsViewModel(CalendarOccurrence occurrence, EventDraft draft, EventDraft series, string color, Func<bool?, Task> edit)
     {
         ArgumentNullException.ThrowIfNull(occurrence);
         ArgumentNullException.ThrowIfNull(draft);
+        ArgumentNullException.ThrowIfNull(series);
         Occurrence = occurrence;
         _edit = edit;
         Title = string.IsNullOrWhiteSpace(draft.Summary) ? T("(ohne Titel)") : draft.Summary;
@@ -35,8 +35,17 @@ internal sealed partial class EventDetailsViewModel : ViewModelBase
         Brush = Avalonia.Media.Brush.Parse(color);
         When = WhenText(occurrence);
         Repeats = occurrence.IsRecurring
-            ? RecurrenceText(recurrence) + (until is { } last ? " " + F("bis {0}", last.ToString("d. MMMM yyyy", Culture)) : string.Empty)
+            ? series.Repeat is { } spec && series.Recurrence != RecurrenceKind.Custom
+                ? F("Serie: {0}", spec.Describe(series.Start, series.RecurrenceUntil))
+                : T("Teil einer Serie") + (series.RecurrenceUntil is { } last ? " " + F("bis {0}", last.ToString("d. MMMM yyyy", Culture)) : string.Empty)
             : null;
+        IsCancelled = draft.IsCancelled;
+        PrivacyText = draft.Privacy switch
+        {
+            EventPrivacy.Private => T("Privat"),
+            EventPrivacy.Confidential => T("Vertraulich"),
+            _ => null,
+        };
         Organizer = string.IsNullOrWhiteSpace(draft.Organizer) ? null : draft.Organizer;
         Attendees = [.. (draft.Attendees ?? []).Select(a => new EventDetailsAttendee(
             string.IsNullOrWhiteSpace(a.Name) ? a.Email : $"{a.Name} <{a.Email}>",
@@ -68,6 +77,16 @@ internal sealed partial class EventDetailsViewModel : ViewModelBase
     public string? Repeats { get; }
 
     public bool HasRepeats => Repeats is not null;
+
+    /// <summary>Called off (STATUS:CANCELLED): the title is struck through.</summary>
+    public bool IsCancelled { get; }
+
+    public Avalonia.Media.TextDecorationCollection? Decorations => IsCancelled ? Avalonia.Media.TextDecorations.Strikethrough : null;
+
+    /// <summary>"Privat" or "Vertraulich" (shown with a lock); null for normal events.</summary>
+    public string? PrivacyText { get; }
+
+    public bool HasPrivacy => PrivacyText is not null;
 
     public string? Location { get; }
 
@@ -144,13 +163,4 @@ internal sealed partial class EventDetailsViewModel : ViewModelBase
             ? start.ToString("dddd, d. MMMM yyyy", Culture) + " · " + start.ToString("t", Culture) + " – " + end.ToString("t", Culture)
             : start.ToString("ddd d. MMMM yyyy, t", Culture) + " – " + end.ToString("ddd d. MMMM yyyy, t", Culture);
     }
-
-    private static string? RecurrenceText(RecurrenceKind kind) => kind switch
-    {
-        RecurrenceKind.Daily => T("Wiederholt sich täglich"),
-        RecurrenceKind.Weekly => T("Wiederholt sich wöchentlich"),
-        RecurrenceKind.Monthly => T("Wiederholt sich monatlich"),
-        RecurrenceKind.Yearly => T("Wiederholt sich jährlich"),
-        _ => T("Teil einer Serie"),
-    };
 }

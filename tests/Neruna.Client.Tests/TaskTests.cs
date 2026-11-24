@@ -27,6 +27,62 @@ public class TaskTests
         """;
 
     [Fact]
+    public void Task_details_round_trip_and_a_done_repeating_task_comes_back_on_its_next_day()
+    {
+        var list = new CalendarInfo(Guid.NewGuid(), "list", "Aufgaben", null, false, Content: CalendarContent.Tasks);
+        var details = new TaskDetails
+        {
+            Start = new DateTime(2026, 11, 2),
+            ReminderAt = new DateTime(2026, 11, 2, 8, 30, 0),
+            Recurrence = RecurrenceKind.Weekly,
+            Repeat = new RecurrenceSpec(RecurrenceFrequency.Weekly, 2) { Weekdays = [DayOfWeek.Monday] },
+            Location = "Büro",
+            Privacy = EventPrivacy.Private,
+            Url = "https://example.com/aufgabe",
+            Links = [new Uri("https://example.com/datei.pdf")],
+            Categories = ["Projekt X"],
+            State = TaskState.InProgress,
+        };
+        var data = (new TaskDraft("Rapport", null, new DateTime(2026, 11, 4), false, TaskPriority.None, false) { Details = details }).ToICalendar(null);
+        Assert.Contains("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO", data, StringComparison.Ordinal);
+        Assert.Contains("STATUS:IN-PROCESS", data, StringComparison.Ordinal);
+        Assert.Contains("CLASS:PRIVATE", data, StringComparison.Ordinal);
+
+        var item = TaskDraft.ToItem(list, new CalendarObject("r1", null, data))!;
+        var read = item.Details;
+        Assert.Equal((details.Start, details.ReminderAt, RecurrenceKind.Weekly, "Büro", EventPrivacy.Private, "https://example.com/aufgabe", TaskState.InProgress),
+            (read.Start, read.ReminderAt, read.Recurrence, read.Location, read.Privacy, read.Url, read.State));
+        Assert.True(details.Repeat.SameAs(read.Repeat));
+        Assert.Equal(details.Links, read.Links);
+        Assert.Equal(details.Categories, read.Categories);
+
+        // Ticked done: two weeks later, open again, reminder moved along.
+        var done = (TaskDraft.FromItem(item) with { IsCompleted = true }).ToICalendar(data);
+        var next = TaskDraft.ToItem(list, new CalendarObject("r1", null, done))!;
+        Assert.False(next.IsCompleted);
+        Assert.Equal(new DateTime(2026, 11, 16), next.Details.Start);
+        Assert.Equal(new DateTime(2026, 11, 18), next.Due!.Value.LocalDateTime);
+        Assert.Equal(new DateTime(2026, 11, 16, 8, 30, 0), next.Details.ReminderAt);
+
+        // The last one of a counted series is simply done.
+        var last = (TaskDraft.FromItem(item) with { Details = details with { Repeat = details.Repeat with { Count = 1 } } }).ToICalendar(data);
+        var finished = TaskDraft.ToItem(list, new CalendarObject("r1", null, (TaskDraft.FromItem(TaskDraft.ToItem(list, new CalendarObject("r1", null, last))!) with { IsCompleted = true }).ToICalendar(last)))!;
+        Assert.True(finished.IsCompleted);
+    }
+
+    [Fact]
+    public void Ticking_done_without_details_keeps_what_the_editor_does_not_show()
+    {
+        var list = new CalendarInfo(Guid.NewGuid(), "list", "Aufgaben", null, false, Content: CalendarContent.Tasks);
+        var foreign = ForeignTodo.Replace("STATUS:NEEDS-ACTION", "STATUS:NEEDS-ACTION\nRRULE:FREQ=MONTHLY;BYMONTHDAY=1,15\nBEGIN:VALARM\nACTION:EMAIL\nTRIGGER:-PT1H\nEND:VALARM", StringComparison.Ordinal);
+        var item = TaskDraft.ToItem(list, new CalendarObject("r1", null, foreign))!;
+        Assert.Equal(RecurrenceKind.Custom, item.Details.Recurrence);
+        var saved = (TaskDraft.FromItem(item) with { Notes = "Neu" }).ToICalendar(foreign);
+        Assert.Contains("BYMONTHDAY=1,15", saved, StringComparison.Ordinal);
+        Assert.Contains("ACTION:EMAIL", saved, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Tasks_are_read_and_edited_without_losing_foreign_fields()
     {
         var list = new CalendarInfo(Guid.NewGuid(), "list", "Aufgaben", null, false, Content: CalendarContent.Tasks);

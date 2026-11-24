@@ -169,7 +169,8 @@ public class GraphProviderTests
         var draft = EventDraft.FromICalendar(ical);
         Assert.Equal(("Wochenrapport", "Sitzungszimmer", "Traktanden folgen", 10), (draft.Summary, draft.Location, draft.Description, draft.ReminderMinutes));
         Assert.Equal(TimeSpan.FromMinutes(30), draft.End - draft.Start);
-        Assert.Equal(RecurrenceKind.Custom, draft.Recurrence);
+        Assert.Equal(RecurrenceKind.Weekly, draft.Recurrence);
+        Assert.Equal(new DateTime(2026, 12, 31), draft.RecurrenceUntil);
         Assert.Contains("BYDAY=MO,WE", ical, StringComparison.Ordinal);
         Assert.Contains("UNTIL=20261231", ical, StringComparison.Ordinal);
         Assert.Equal(("lea@example.com", Participation.Accepted), (draft.Attendees![0].Email, draft.Attendees[0].Status));

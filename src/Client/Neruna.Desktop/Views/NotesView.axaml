@@ -77,16 +77,13 @@
                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                   </DockPanel>
                   <TextBlock Classes="subtle" FontSize="12" Text="{Binding Preview}" TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap" />
+                  <Border IsVisible="{Binding HasOpenItems}" CornerRadius="8" Padding="7,1" HorizontalAlignment="Left" Margin="0,1,0,1"
+                          Background="{DynamicResource AccentButtonBackground}" ToolTip.Tip="{l:T 'Offene Punkte in den Checklisten dieser Notiz'}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource AccentButtonForeground}" Text="{Binding OpenItemsText, StringFormat='☐ {0}'}" />
+                  </Border>
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock Classes="subtle" FontSize="11" Text="{Binding PlaceName}" TextTrimming="CharacterEllipsis" MaxWidth="160" />
                     <TextBlock FontSize="11" Foreground="{DynamicResource ErrorTextBrush}" Text="{l:T 'Konfliktkopie'}" IsVisible="{Binding IsConflict}" />
-                    <Border Classes="openItems" IsVisible="{Binding HasOpenItems}" CornerRadius="8" Padding="6,0" VerticalAlignment="Center"
-                            Background="{DynamicResource SystemControlHighlightListAccentLowBrush}" ToolTip.Tip="{l:T 'Offene Punkte in den Checklisten dieser Notiz'}">
-                      <StackPanel Orientation="Horizontal" Spacing="3">
-                        <TextBlock FontSize="11" Text="☐" VerticalAlignment="Center" />
-                        <TextBlock FontSize="11" Text="{Binding OpenItemsText}" VerticalAlignment="Center" />
-                      </StackPanel>
-                    </Border>
                     <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>

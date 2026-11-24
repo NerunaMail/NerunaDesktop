@@ -115,6 +115,11 @@ internal static class EwsCalendarConverter
             evt.Class = item.Val("Sensitivity")!.ToUpperInvariant();
         }
 
+        if (item.Bool("IsCancelled"))
+        {
+            evt.Status = "CANCELLED";
+        }
+
         var attendees = Attendees(item, "RequiredAttendees", "REQ-PARTICIPANT").Concat(Attendees(item, "OptionalAttendees", "OPT-PARTICIPANT")).ToList();
         var organizer = item.Get("Organizer")?.Get("Mailbox");
         if (attendees.Count > 0 && EwsMailProvider.AddressOf(organizer) is { } from)
@@ -344,6 +349,13 @@ internal static class EwsCalendarConverter
         return
         [
             ("item:Subject", X.Typ("Subject", draft.Summary)),
+            // In the schema's order: after the subject, before the body.
+            ("item:Sensitivity", X.Typ("Sensitivity", draft.Privacy switch
+            {
+                EventPrivacy.Private => "Private",
+                EventPrivacy.Confidential => "Confidential",
+                _ => "Normal",
+            })),
             ("item:Body", X.Typ("Body", new XAttribute("BodyType", "Text"), draft.Description ?? string.Empty)),
             // In the schema's order: after the body, before the reminder.
             ("item:Categories", draft.Categories is { Count: > 0 } categories ? X.Typ("Categories", categories.Select(c => X.Typ("String", c))) : null),

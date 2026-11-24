@@ -10,7 +10,15 @@
     <Grid ColumnDefinitions="Auto,*">
       <Border Width="6" CornerRadius="3" Background="{Binding Brush}" Margin="0,2,12,2" />
       <StackPanel Grid.Column="1" Spacing="2">
-        <SelectableTextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <SelectableTextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"
+                             TextDecorations="{Binding Decorations}" />
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="{l:T 'Abgesagt'}" FontWeight="SemiBold" Foreground="{DynamicResource ErrorTextBrush}" IsVisible="{Binding IsCancelled}" />
+          <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasPrivacy}">
+            <PathIcon Data="{StaticResource IconLock}" Width="12" Height="12" Opacity="0.7" VerticalAlignment="Center" />
+            <TextBlock Classes="subtle" Text="{Binding PrivacyText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </StackPanel>
         <SelectableTextBlock Text="{Binding When}" TextWrapping="Wrap" />
         <TextBlock Classes="subtle" Text="{Binding Repeats}" IsVisible="{Binding HasRepeats}" />
       </StackPanel>

@@ -4,6 +4,7 @@
              xmlns:vm="using:Neruna.Desktop.ViewModels"
              xmlns:cal="using:Neruna.Core.Calendar"
              xmlns:ctl="using:Neruna.Desktop.Controls"
+             xmlns:v="using:Neruna.Desktop.Views"
              xmlns:meet="using:Neruna.Core.Meetings"
              x:Class="Neruna.Desktop.Views.EventEditorView"
              x:DataType="vm:EventEditorViewModel">
@@ -77,20 +78,9 @@
 
     <Grid ColumnDefinitions="*,12,*">
       <StackPanel>
-        <TextBlock Classes="label" Text="{l:T 'Wiederholung'}" />
-        <ComboBox ItemsSource="{x:Static vm:EventEditorViewModel.RecurrenceOptions}" SelectedItem="{Binding Recurrence}"
-                  HorizontalAlignment="Stretch" IsEnabled="{Binding CanChangeSeries}">
-          <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:RecurrenceOption">
-              <TextBlock Text="{Binding Label}" />
-            </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
-        <Grid ColumnDefinitions="Auto,*" Margin="0,6,0,0" IsVisible="{Binding CanEndSeries}">
-          <CheckBox Content="{l:T 'endet am'}" IsChecked="{Binding HasRecurrenceEnd}" IsEnabled="{Binding CanChangeSeries}" VerticalAlignment="Center" Margin="0,0,8,0" />
-          <CalendarDatePicker Grid.Column="1" SelectedDate="{Binding RecurrenceEndDate}" HorizontalAlignment="Stretch"
-                              IsEnabled="{Binding HasRecurrenceEnd}" />
-        </Grid>
+        <Border IsEnabled="{Binding CanChangeSeries}">
+          <v:RecurrenceEditorView DataContext="{Binding Repeat}" />
+        </Border>
       </StackPanel>
       <StackPanel Grid.Column="2">
         <TextBlock Classes="label" Text="{l:T 'Kalender'}" />
@@ -129,6 +119,17 @@
           </ComboBox.ItemTemplate>
         </ComboBox>
       </StackPanel>
+    </Grid>
+
+    <!-- Privacy (CLASS) and called off (STATUS:CANCELLED) -->
+    <Grid ColumnDefinitions="*,12,*">
+      <StackPanel>
+        <TextBlock Classes="label" Text="{l:T 'Vertraulichkeit'}" />
+        <ComboBox ItemsSource="{x:Static vm:PrivacyOption.All}" SelectedItem="{Binding Privacy}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}"
+                  ToolTip.Tip="{l:T 'Privat und vertraulich: Wer den Kalender mit Ihnen teilt, sieht nur, dass die Zeit belegt ist.'}" />
+      </StackPanel>
+      <CheckBox Grid.Column="2" Content="{l:T 'Abgesagt'}" IsChecked="{Binding IsCancelled}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Bottom"
+                ToolTip.Tip="{l:T 'Der Termin bleibt durchgestrichen im Kalender stehen.'}" />
     </Grid>
 
     <!-- Categories: colour lines on the right of the entry in the calendar, names in its tooltip -->

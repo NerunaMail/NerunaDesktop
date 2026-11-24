@@ -124,6 +124,8 @@
                                   <TextBlock Text="!" Foreground="#C42B1C" FontWeight="Bold" IsVisible="{Binding IsHigh}" ToolTip.Tip="{l:T 'Hohe Priorität'}" />
                                   <TextBlock Text="{Binding Title}" TextDecorations="{Binding Decorations}" TextTrimming="CharacterEllipsis" />
                                   <TextBlock Classes="subtle" Text="✎" FontSize="11" IsVisible="{Binding HasNotes}" ToolTip.Tip="{l:T 'Mit Notiz'}" VerticalAlignment="Center" />
+                                  <TextBlock Classes="subtle" Text="↻" FontSize="12" IsVisible="{Binding HasRepeats}" ToolTip.Tip="{Binding RepeatsText}" VerticalAlignment="Center" />
+                                  <PathIcon Data="{StaticResource IconClock}" Width="11" Height="11" Opacity="0.6" IsVisible="{Binding HasReminder}" ToolTip.Tip="{Binding ReminderText}" VerticalAlignment="Center" />
                                 </StackPanel>
                               </Button>
                               <TextBlock Grid.Column="2" Text="{Binding DueText}" Classes="subtle" Classes.error="{Binding IsOverdue}" FontSize="12" VerticalAlignment="Center" Margin="12,0" />
@@ -152,12 +154,28 @@
               <SelectableTextBlock Text="{Binding SelectedTask.Title, FallbackValue=''}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"
                                    TextDecorations="{Binding SelectedTask.Decorations, FallbackValue={x:Null}}" />
               <TextBlock Classes="subtle" Text="{Binding SelectedTask.CompletedText, FallbackValue=''}" IsVisible="{Binding SelectedTask.IsCompleted, FallbackValue=False}" />
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource HyperlinkButtonForeground}" Text="{Binding SelectedTask.StateText, FallbackValue=''}"
+                           IsVisible="{Binding SelectedTask.HasState, FallbackValue=False}" />
+                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding SelectedTask.HasPrivacy, FallbackValue=False}">
+                  <PathIcon Data="{StaticResource IconLock}" Width="12" Height="12" Opacity="0.7" VerticalAlignment="Center" />
+                  <TextBlock Classes="subtle" Text="{Binding SelectedTask.PrivacyText, FallbackValue=''}" VerticalAlignment="Center" />
+                </StackPanel>
+              </StackPanel>
             </StackPanel>
             <ScrollViewer Grid.Row="1" Margin="0,8,0,0">
               <StackPanel Spacing="2">
+                <TextBlock Classes="label" Text="{l:T 'Beginnt am'}" IsVisible="{Binding SelectedTask.HasStart, FallbackValue=False}" />
+                <TextBlock Text="{Binding SelectedTask.StartText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasStart, FallbackValue=False}" />
                 <TextBlock Classes="label" Text="{l:T 'Fällig am'}" IsVisible="{Binding SelectedTask.HasDue, FallbackValue=False}" />
                 <TextBlock Text="{Binding SelectedTask.DueLongText, FallbackValue=''}" Classes.error="{Binding SelectedTask.IsOverdue, FallbackValue=False}"
                            IsVisible="{Binding SelectedTask.HasDue, FallbackValue=False}" />
+                <TextBlock Classes="label" Text="{l:T 'Erinnerung'}" IsVisible="{Binding SelectedTask.HasReminder, FallbackValue=False}" />
+                <TextBlock Text="{Binding SelectedTask.ReminderText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasReminder, FallbackValue=False}" />
+                <TextBlock Classes="label" Text="{l:T 'Wiederholung'}" IsVisible="{Binding SelectedTask.HasRepeats, FallbackValue=False}" />
+                <TextBlock Text="{Binding SelectedTask.RepeatsText, FallbackValue=''}" TextWrapping="Wrap" IsVisible="{Binding SelectedTask.HasRepeats, FallbackValue=False}" />
+                <TextBlock Classes="label" Text="{l:T 'Ort'}" IsVisible="{Binding SelectedTask.HasLocation, FallbackValue=False}" />
+                <ctl:LinkedText Linked="{Binding SelectedTask.Location, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasLocation, FallbackValue=False}" />
                 <TextBlock Classes="label" Text="{l:T 'Priorität'}" IsVisible="{Binding SelectedTask.HasPriority, FallbackValue=False}" />
                 <TextBlock Text="{Binding SelectedTask.PriorityText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasPriority, FallbackValue=False}" />
                 <TextBlock Classes="label" Text="{l:T 'Liste'}" />
@@ -166,6 +184,12 @@
                   <TextBlock Text="{Binding SelectedTask.ListName, FallbackValue=''}" />
                   <TextBlock Classes="subtle" Text="{l:T 'schreibgeschützt'}" IsVisible="{Binding SelectedTask.IsReadOnly, FallbackValue=False}" />
                 </StackPanel>
+                <TextBlock Classes="label" Text="{l:T 'Kategorien'}" IsVisible="{Binding SelectedTask.HasCategories, FallbackValue=False}" />
+                <TextBlock Text="{Binding SelectedTask.CategoriesText, FallbackValue=''}" TextWrapping="Wrap" IsVisible="{Binding SelectedTask.HasCategories, FallbackValue=False}" />
+                <TextBlock Classes="label" Text="{l:T 'Link'}" IsVisible="{Binding SelectedTask.HasUrl, FallbackValue=False}" />
+                <ctl:LinkedText Linked="{Binding SelectedTask.Url, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasUrl, FallbackValue=False}" />
+                <TextBlock Classes="label" Text="{l:T 'Anhänge'}" IsVisible="{Binding SelectedTask.HasLinks, FallbackValue=False}" />
+                <ctl:LinkedText Linked="{Binding SelectedTask.Links, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasLinks, FallbackValue=False}" />
                 <TextBlock Classes="label" Text="{l:T 'Notizen'}" IsVisible="{Binding SelectedTask.HasNotes, FallbackValue=False}" />
                 <ctl:LinkedText Linked="{Binding SelectedTask.Notes, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasNotes, FallbackValue=False}" />
               </StackPanel>

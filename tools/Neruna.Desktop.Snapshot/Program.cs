@@ -507,7 +507,7 @@ internal static class Snapshots
         // "Verschieben nach …" / "Kopieren nach …" (and a quick action asking): all accounts as a tree.
         var pickerInbox = vm.MailPage.Accounts[0].Folders.First(f => f.Folder.Role == Neruna.Core.Mail.FolderRole.Inbox);
         var folderPicker = new FolderPickerViewModel(vm.MailPage.Accounts, pickerInbox, "In welchen Ordner verschieben?");
-        var pickerWindow = new Window { Width = 440, Height = 560, Content = new FolderPickerView { DataContext = folderPicker, Margin = new Thickness(20, 16) } };
+        var pickerWindow = new Window { Width = 600, Height = 600, Content = new FolderPickerView { DataContext = folderPicker, Margin = new Thickness(20, 16) } };
         pickerWindow.Bind(Window.BackgroundProperty, pickerWindow.GetResourceObservable("PaneBackgroundBrush"));
         pickerWindow.Show();
         await SaveAsync(pickerWindow, output, "quick-action-folder-picker.png");
@@ -1281,12 +1281,30 @@ internal static class Snapshots
             {
                 Attendees = [],
                 Recurrence = Neruna.Core.Calendar.RecurrenceKind.Weekly,
+                Repeat = new Neruna.Core.Calendar.RecurrenceSpec(Neruna.Core.Calendar.RecurrenceFrequency.Weekly, 2) { Weekdays = [DayOfWeek.Monday, DayOfWeek.Thursday] },
                 RecurrenceUntil = meeting.Start.Date.AddMonths(2),
+                Privacy = Neruna.Core.Calendar.EventPrivacy.Private,
                 Url = "https://messe.example.com/2026",
                 Links = [new Uri("https://example.com/hallenplan.pdf")],
             },
             (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com");
         await SaveAsync(window, output, "event-series-end.png");
+        // Monthly on the n-th weekday, ending after a number of times.
+        vm.Overlay = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal],
+            meeting with
+            {
+                Attendees = [],
+                Recurrence = Neruna.Core.Calendar.RecurrenceKind.Monthly,
+                Repeat = new Neruna.Core.Calendar.RecurrenceSpec(Neruna.Core.Calendar.RecurrenceFrequency.Monthly)
+                {
+                    Position = Neruna.Core.Calendar.RecurrenceSpec.PositionOf(meeting.Start),
+                    Weekdays = [meeting.Start.DayOfWeek],
+                    Count = 6,
+                },
+                IsCancelled = true,
+            },
+            (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com");
+        await SaveAsync(window, output, "event-series-monthly.png");
         // Categories chosen in the editor, the list open.
         var categoryEditor = new EventEditorViewModel(calendarController, services.GetRequiredService<Neruna.Core.Calendar.InvitationService>(), [personal],
             meeting with { Categories = ["Besprechung", "Projekt"] }, (personal, "personal-2@demo.neruna"), _ => "anna.muster@example.com")
@@ -1482,6 +1500,44 @@ internal static class Snapshots
         firstTask.EditCommand.Execute(null);
         await Task.Delay(300);
         await SaveAsync(window, output, "tasks-editor.png");
+
+        // A task with start, reminder, repetition, place, link and attachments: in the editor and the reading pane.
+        var taskController = services.GetRequiredService<Neruna.Core.Calendar.TaskController>();
+        var taskList = firstTask.Item.List;
+        var detailed = new Neruna.Core.Calendar.TaskDraft("Monatsabschluss vorbereiten", "Belege unter https://example.com/belege sammeln.",
+            DateTime.Today.AddDays(3), false, Neruna.Core.Calendar.TaskPriority.High, false)
+        {
+            Details = new Neruna.Core.Calendar.TaskDetails
+            {
+                Start = DateTime.Today,
+                ReminderAt = DateTime.Today.AddDays(2).AddHours(8),
+                Recurrence = Neruna.Core.Calendar.RecurrenceKind.Monthly,
+                Repeat = new Neruna.Core.Calendar.RecurrenceSpec(Neruna.Core.Calendar.RecurrenceFrequency.Monthly),
+                Location = "Büro Luzern",
+                Privacy = Neruna.Core.Calendar.EventPrivacy.Confidential,
+                Url = "https://example.com/abschluss",
+                Links = [new Uri("https://example.com/vorlage.xlsx")],
+                Categories = ["Projekt"],
+                State = Neruna.Core.Calendar.TaskState.InProgress,
+            },
+        };
+        vm.Overlay = new TaskEditorViewModel(taskController, calendarController, services.GetRequiredService<Neruna.Core.ISettingsStore>(), [taskList], detailed, null, taskList,
+            await services.GetRequiredService<Neruna.Core.Calendar.CalendarCategoryService>().GetAllAsync());
+        await Task.Delay(300);
+        await SaveAsync(window, output, "tasks-editor-details.png");
+        vm.Overlay = null;
+        try
+        {
+            await taskController.SaveAsync(taskList, detailed);
+            await vm.TasksPage.ReloadAsync();
+            vm.TasksPage.Groups.SelectMany(g => g.Rows).First(r => r.Title == "Monatsabschluss vorbereiten").SelectCommand.Execute(null);
+            await Task.Delay(300);
+            await SaveAsync(window, output, "tasks-reading-details.png");
+        }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException)
+        {
+            Console.WriteLine("Detailed task not saved: " + ex.Message);
+        }
 
         vm.Overlay = null;
         var demoTasks = vm.TasksPage.ListGroups.SelectMany(g => g.Lists).First(l => l.Info.RemoteId == "tasks");
