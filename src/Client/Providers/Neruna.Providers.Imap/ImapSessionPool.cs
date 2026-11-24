@@ -84,6 +84,14 @@ public sealed class ImapSessionPool : IDisposable
                 list.RemoveAt(list.Count - 1);
             }
 
+            // Waited too long (the sweep had no chance: the computer was asleep): after standby the connection is
+            // dead, and asking it would only cost the check's seconds.
+            if (_time.GetUtcNow() - candidate.Since > IdleTime)
+            {
+                Drop(candidate.Client);
+                continue;
+            }
+
             if (await AnswersAsync(candidate.Client, cancellationToken))
             {
                 return candidate.Client;

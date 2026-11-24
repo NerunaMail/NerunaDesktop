@@ -746,6 +746,7 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
         _servicesStarted = true;
         await RestoreCalendarWindowAsync();
         _timer.Start();
+        StartWakeWatch();
         SettingsPage.Updates.Start();
 
         // Out of office: what was known shows at once; the servers are asked alongside the first sync, not after it.

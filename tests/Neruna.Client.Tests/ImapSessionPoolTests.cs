@@ -135,6 +135,42 @@ public class ImapSessionPoolTests
         Assert.Equal(2, check.Inbox.Count);
     }
 
+    private sealed class MovableClock : TimeProvider
+    {
+        public TimeSpan Ahead { get; set; }
+
+        public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + Ahead;
+    }
+
+    [Fact]
+    public async Task After_standby_a_kept_connection_is_not_handed_out_again()
+    {
+        Assert.SkipWhen(Host is null, "NERUNA_TEST_SIEVE_HOST not set");
+        var ct = TestContext.Current.CancellationToken;
+        await using var env = await TestEnvironment.CreateAsync();
+        var clock = new MovableClock();
+        using var pool = new ImapSessionPool(NullLogger<ImapSessionPool>.Instance, clock);
+        var user = NewUser();
+        await using var proxy = new CuttableProxy(Host!, Port);
+        var account = await AccountAsync(env, pool, user, proxy.Port);
+        account = account with { Settings = account.Settings with { ImapHost = "127.0.0.1" } };
+
+        await using (var provider = account.Provider())
+        {
+            await provider.GetFoldersAsync(ct);
+        }
+
+        await WaitForIdleAsync(pool, 1, ct);
+        clock.Ahead = TimeSpan.FromHours(10); // the night in standby: the sweep never ran
+
+        await using (var provider = account.Provider())
+        {
+            Assert.Contains(await provider.GetFoldersAsync(ct), f => f.Role == FolderRole.Inbox);
+        }
+
+        Assert.Equal(2, proxy.Accepted); // connected anew instead of asking the old one
+    }
+
     [Fact]
     public async Task A_connection_the_server_dropped_meanwhile_is_replaced_without_an_error()
     {
