@@ -64,18 +64,48 @@ public sealed record RecipientEntry(string Name, IReadOnlyList<MailAddress> Addr
             : $"{name} <{address.Address}>";
     }
 
-    /// <summary>Best matches first; ties alphabetically.</summary>
+    /// <summary>Best matches first; ties alphabetically. With <paramref name="usage"/>, addresses written to often and
+    /// lately come before all others.</summary>
     /// <param name="startsOnly">Only names, words or addresses starting with the query (while typing an address:
     /// "le" should find Lea, not every "example.com").</param>
-    public static IReadOnlyList<RecipientEntry> Find(IEnumerable<RecipientEntry> all, string query, int max = int.MaxValue, bool startsOnly = false)
+    /// <param name="usage">Address → weight (see <see cref="RecipientUsage"/>); groups have none.</param>
+    public static IReadOnlyList<RecipientEntry> Find(IEnumerable<RecipientEntry> all, string query, int max = int.MaxValue, bool startsOnly = false,
+        IReadOnlyDictionary<string, double>? usage = null)
     {
         ArgumentNullException.ThrowIfNull(all);
         return all.Select(e => (Entry: e, Score: e.Score(query)))
             .Where(x => x.Score > (startsOnly ? 2 : 0))
-            .OrderByDescending(x => x.Score)
+            .OrderByDescending(x => usage is null || x.Entry.IsGroup ? 0 : usage.GetValueOrDefault(x.Entry.Addresses[0].Address))
+            .ThenByDescending(x => x.Score)
             .ThenBy(x => x.Entry.Name, StringComparer.CurrentCultureIgnoreCase)
             .Take(max)
             .Select(x => x.Entry)
             .ToList();
+    }
+}
+
+/// <summary>
+/// How much the user writes to each address: every sent message counts, the newer the more (half of it after
+/// <see cref="HalfLife"/>), so someone written to last week comes before someone written to often a year ago.
+/// </summary>
+public static class RecipientUsage
+{
+    /// <summary>Sent messages older than this are not counted.</summary>
+    public static readonly TimeSpan Period = TimeSpan.FromDays(365);
+
+    public static readonly TimeSpan HalfLife = TimeSpan.FromDays(60);
+
+    /// <summary>Address (any case) → sum of the weights of the messages sent to it.</summary>
+    public static IReadOnlyDictionary<string, double> Weigh(IEnumerable<(string Address, DateTimeOffset Date)> sent, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(sent);
+        var weights = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (address, date) in sent)
+        {
+            var age = Math.Max(0, (now - date).TotalDays);
+            weights[address] = weights.GetValueOrDefault(address) + Math.Pow(0.5, age / HalfLife.TotalDays);
+        }
+
+        return weights;
     }
 }

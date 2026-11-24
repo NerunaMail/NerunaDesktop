@@ -125,6 +125,11 @@ public class CloudTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/server-certificate", StringComparison.Ordinal))
+            {
+                return Json(System.Net.HttpStatusCode.OK, TestServerCertificate.For([request.RequestUri.Host]));
+            }
+
             if (path.EndsWith("/enrollment", StringComparison.Ordinal))
             {
                 return Interlocked.Increment(ref EnrollmentCalls) == 1

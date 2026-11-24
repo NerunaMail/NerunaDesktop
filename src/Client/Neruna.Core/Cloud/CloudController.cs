@@ -189,6 +189,12 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(device);
+        // Only a Neruna server: its certificate must name this address.
+        if (await FetchServerCertificateAsync(server, cancellationToken) != ServerCertificateStatus.Valid)
+        {
+            throw new CloudException(NotVerifiedCode, F("{0} ist kein Neruna-Server mit gültigem Zertifikat. Bitte die Serveradresse prüfen.", server.Host));
+        }
+
         using var key = DeviceKey.Create();
         var request = new EnrollmentRequest(code.Trim(), pin.Trim(), key.PublicKeyPem, device.Name, device.AppVersion, device.OsName, device.OsVersion, device.OsUser);
         var response = await SendAsync<EnrollmentResponse>(() => new HttpRequestMessage(HttpMethod.Post, new Uri(server, "api/v1/enrollment"))
@@ -431,14 +437,109 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
     {
         await credentials.DeleteSecretAsync(connection.DeviceKeyId, cancellationToken);
         await credentials.DeleteSecretAsync(connection.EncryptionKeyId, cancellationToken);
-        foreach (var key in new[] { SettingKeys.CloudOrganizationSigningKey, SettingKeys.CloudCertificates, SettingKeys.CloudAccountsState })
+        foreach (var key in new[] { SettingKeys.CloudOrganizationSigningKey, SettingKeys.CloudCertificates, SettingKeys.CloudAccountsState, SettingKeys.CloudServerUnverifiedSince })
         {
             await settings.SetAsync(connection.SettingKey(key), null, cancellationToken);
         }
 
         await SaveAsync([.. (await GetConnectionsAsync(cancellationToken)).Where(c => c.Id != connection.Id)], cancellationToken);
         _tokens.TryRemove(connection.Id, out _);
+        _verified.TryRemove(connection.Id, out _);
         ConnectionsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The answer when a server shows no valid server certificate (connecting, or syncing after <see cref="UnverifiedGrace"/>).</summary>
+    public const string NotVerifiedCode = "server_not_verified";
+
+    /// <summary>How long a connected server without a valid certificate is still synced with.</summary>
+    public static readonly TimeSpan UnverifiedGrace = TimeSpan.FromDays(30);
+
+    // A valid certificate is asked for again after this long; one missing at each sign-in, so syncing resumes as soon as it is back.
+    private static readonly TimeSpan VerifyEvery = TimeSpan.FromHours(6);
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset> _verified = new();
+
+    /// <summary>The server's certificate was found missing, or valid again (the Cloud page shows it).</summary>
+    public event EventHandler<CloudConnection>? ServerStatusChanged;
+
+    /// <summary>Since when the connection's server has shown no valid certificate; null: it has one.</summary>
+    public async Task<DateTimeOffset?> GetUnverifiedSinceAsync(CloudConnection connection, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        return DateTimeOffset.TryParse(await settings.GetAsync(connection.SettingKey(SettingKeys.CloudServerUnverifiedSince), cancellationToken),
+            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var since) ? since : null;
+    }
+
+    /// <summary>For the settings: the connection's server shows no valid certificate – until when it is synced with, or that it is stopped; null: all well.</summary>
+    public async Task<string?> GetServerWarningAsync(CloudConnection connection, CancellationToken cancellationToken = default)
+    {
+        var stops = (await GetUnverifiedSinceAsync(connection, cancellationToken))?.Add(UnverifiedGrace);
+        return stops is null ? null
+            : stops <= DateTimeOffset.UtcNow
+                ? F("{0} hat kein gültiges Neruna-Serverzertifikat. Der Abgleich ist angehalten und läuft wieder, sobald der Server eines hat.", connection.Server.Host)
+                : F("{0} hat kein gültiges Neruna-Serverzertifikat. Ohne Zertifikat hält der Abgleich am {1:d} an.", connection.Server.Host, stops.Value.LocalDateTime);
+    }
+
+    /// <summary>The server's certificate, checked for its address; throws "unreachable" without an answer.</summary>
+    private async Task<ServerCertificateStatus> FetchServerCertificateAsync(Uri server, CancellationToken cancellationToken)
+    {
+        using var response = await SendPatientlyAsync(() => Task.FromResult(new HttpRequestMessage(HttpMethod.Get, new Uri(server, "api/v1/server-certificate"))), cancellationToken);
+        var json = response.IsSuccessStatusCode ? await response.Content.ReadAsStringAsync(cancellationToken) : null;
+        return ServerCertificate.Check(json, server, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// Before signing in: the server still shows a valid certificate. Without one, syncing goes on for
+    /// <see cref="UnverifiedGrace"/> (the Cloud page says so), then stops until it has one again. Unreachable: nothing
+    /// is decided (the sign-in itself fails).
+    /// </summary>
+    private async Task VerifyServerAsync(CloudConnection connection, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (_verified.TryGetValue(connection.Id, out var at) && now - at < VerifyEvery)
+        {
+            return;
+        }
+
+        ServerCertificateStatus status;
+        try
+        {
+            status = await FetchServerCertificateAsync(connection.Server, cancellationToken);
+        }
+        catch (Exception ex) when (ex is CloudException { Code: "unreachable" } || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            return;
+        }
+
+        var key = connection.SettingKey(SettingKeys.CloudServerUnverifiedSince);
+        var since = await GetUnverifiedSinceAsync(connection, cancellationToken);
+        if (status == ServerCertificateStatus.Valid)
+        {
+            _verified[connection.Id] = now;
+            if (since is not null)
+            {
+                await settings.SetAsync(key, null, cancellationToken);
+                logger.LogInformation("{Server} shows a valid server certificate again", connection.Server.Host);
+                ServerStatusChanged?.Invoke(this, connection);
+            }
+
+            return;
+        }
+
+        _verified.TryRemove(connection.Id, out _);
+        if (since is null)
+        {
+            since = now;
+            await settings.SetAsync(key, now.ToString("O", System.Globalization.CultureInfo.InvariantCulture), cancellationToken);
+            logger.LogWarning("{Server} shows no valid server certificate ({Status})", connection.Server.Host, status);
+            ServerStatusChanged?.Invoke(this, connection);
+        }
+
+        if (now - since >= UnverifiedGrace)
+        {
+            throw new CloudException(NotVerifiedCode, F("{0} hat kein gültiges Neruna-Serverzertifikat mehr. Der Abgleich mit {1} ist angehalten und läuft wieder, sobald der Server eines hat.",
+                connection.Server.Host, connection.OrganizationName));
+        }
     }
 
     private async Task EndOnServerAsync(CloudConnection connection, CancellationToken cancellationToken)
@@ -519,6 +620,7 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
 
     private async Task<string> NewTokenAsync(CloudConnection connection, CancellationToken cancellationToken)
     {
+        await VerifyServerAsync(connection, cancellationToken);
         var secret = await credentials.GetSecretAsync(connection.DeviceKeyId, cancellationToken)
                      ?? throw new CloudException("no_key", T("Der Geräteschlüssel fehlt. Bitte die Cloud-Verbindung neu einrichten."));
         using var key = DeviceKey.Import(secret);

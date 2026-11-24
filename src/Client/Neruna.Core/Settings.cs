@@ -63,6 +63,12 @@ public static class SettingKeys
     /// <summary>Was: the organisation whose chat was shown (before each one had its own tab); only removed now.</summary>
     public const string CloudChatConnection = "cloud.chatConnection";
 
+    /// <summary>
+    /// Since when the server of a connection has shown no valid server certificate (ISO 8601; none: it has one). Per
+    /// connection (<see cref="Cloud.CloudConnection.SettingKey"/>).
+    /// </summary>
+    public const string CloudServerUnverifiedSince = "cloud.serverUnverifiedSince";
+
     /// <summary>Id of the connection that keeps the personal backups (none: the first).</summary>
     public const string CloudBackupConnection = "cloud.backupConnection";
 

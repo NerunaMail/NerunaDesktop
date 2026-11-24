@@ -87,6 +87,19 @@ public sealed class SqliteMailStore(IDbContextFactory<NerunaDbContext> contexts,
         return [.. found.Select(x => (x.ConnectionId, x.Folder, x.RemoteId))];
     }
 
+    public async Task<IReadOnlyList<(string Address, DateTimeOffset Date)>> GetSentRecipientsAsync(DateTimeOffset since, CancellationToken cancellationToken = default)
+    {
+        var from = since.ToUnixTimeMilliseconds();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var sent = await db.Messages.AsNoTracking()
+            .Join(db.MailFolders.Where(f => f.Role == FolderRole.Sent), m => m.FolderId, f => f.Id, (m, _) => new { m.ToJson, m.DateUnixMs })
+            .Where(x => x.DateUnixMs >= from)
+            .ToListAsync(cancellationToken);
+        return [.. sent.SelectMany(x => (JsonSerializer.Deserialize<List<MailAddress>>(x.ToJson) ?? [])
+            .Where(a => !string.IsNullOrWhiteSpace(a.Address))
+            .Select(a => (a.Address, DateTimeOffset.FromUnixTimeMilliseconds(x.DateUnixMs))))];
+    }
+
     public async Task ApplySyncResultAsync(MailFolder folder, FolderSyncResult result, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(folder);

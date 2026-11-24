@@ -353,6 +353,16 @@ public sealed class MailController(
         return null;
     }
 
+    /// <summary>
+    /// How much each address was written to lately (from the sent folders of the past year), for ordering the
+    /// suggestions while typing a recipient: see <see cref="Contacts.RecipientUsage"/>.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, double>> GetRecipientUsageAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return Contacts.RecipientUsage.Weigh(await store.GetSentRecipientsAsync(now - Contacts.RecipientUsage.Period, cancellationToken), now);
+    }
+
     /// <summary>The mail folders – without the notes folder, which belongs to the notes page.</summary>
     public async Task<IReadOnlyList<MailFolder>> GetFoldersAsync(Guid connectionId, CancellationToken cancellationToken = default) =>
         Notes.NoteFolders.WithoutNotes(await store.GetFoldersAsync(connectionId, cancellationToken));

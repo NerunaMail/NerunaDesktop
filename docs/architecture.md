@@ -324,6 +324,12 @@ die App mit einer signierten JWT-Assertion (ES256, wie OAuth private_key_jwt) an
 Verbindung (Server, Geräte-ID, Organisation) steht in den Einstellungen `cloud.connection`; die Kontoeinrichtung fragt
 zuerst die Server der verbundenen Organisationen (`AccountDiscovery.OrganizationServers`). Nur HTTPS, ausser
 `localhost` zum Entwickeln. Vertrag: `server/contract/openapi.yaml` (enrollment, token, me).
+**Serverzertifikat:** Vor dem Verbinden holt die App `GET /api/v1/server-certificate` (`ServerCertificate`): von Neruna
+signiert (Ed25519, öffentlicher Schlüssel in der App), nennt die Hostnamen des Servers. Ohne gültiges Zertifikat für die
+eingegebene Adresse wird nicht verbunden. Bei bestehenden Verbindungen prüft `CloudController` vor der Anmeldung (gültig:
+alle 6 Stunden, sonst jedes Mal); fehlt es, steht der Zeitpunkt in `cloud.serverUnverifiedSince`, die Einstellungen
+zeigen einen Hinweis, und nach 30 Tagen hält der Abgleich an, bis der Server wieder eines zeigt. Nicht erreichbar zählt
+nicht. Debug-Builds nehmen `localhost` ohne Zertifikat; Tests vertrauen einem eigenen Testschlüssel.
 **Link zum Verbinden:** `neruna://connect?server=…&code=…` (`CloudConnectLink`) füllt Server und Code aus, die PIN
 fragt das Formular; verbunden wird erst nach der Bestätigung. Das Portal und die Mail verlinken eine https-Seite des
 Servers, die diesen Link öffnet (Code im Fragment); öffnet sich nichts, kopiert ihr Download-Knopf den Link,

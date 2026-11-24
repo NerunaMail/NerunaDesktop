@@ -3030,5 +3030,9 @@
  "«{0}» enthält keinen PGP-Schlüssel.": "“{0}” contains no PGP key.",
  "Öffentlichen PGP-Schlüssel exportieren": "Export public PGP key",
  "Öffentlichen Schlüssel (.asc) speichern, z. B. um ihn weiterzugeben": "Save the public key (.asc), e.g. to pass it on",
- "Öffentlicher PGP-Schlüssel exportiert (enthält keinen privaten Schlüssel).": "Public PGP key exported (contains no private key)."
+ "Öffentlicher PGP-Schlüssel exportiert (enthält keinen privaten Schlüssel).": "Public PGP key exported (contains no private key).",
+ "{0} ist kein Neruna-Server mit gültigem Zertifikat. Bitte die Serveradresse prüfen.": "{0} is not a Neruna server with a valid certificate. Please check the server address.",
+ "{0} hat kein gültiges Neruna-Serverzertifikat mehr. Der Abgleich mit {1} ist angehalten und läuft wieder, sobald der Server eines hat.": "{0} no longer has a valid Neruna server certificate. Syncing with {1} is paused and resumes as soon as the server has one.",
+ "{0} hat kein gültiges Neruna-Serverzertifikat. Der Abgleich ist angehalten und läuft wieder, sobald der Server eines hat.": "{0} has no valid Neruna server certificate. Syncing is paused and resumes as soon as the server has one.",
+ "{0} hat kein gültiges Neruna-Serverzertifikat. Ohne Zertifikat hält der Abgleich am {1:d} an.": "{0} has no valid Neruna server certificate. Without one, syncing pauses on {1:d}."
 }

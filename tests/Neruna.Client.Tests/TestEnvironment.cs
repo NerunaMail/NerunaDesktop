@@ -108,6 +108,9 @@ internal sealed class StubHttpHandler : HttpMessageHandler
 
     public List<string> Requested { get; } = [];
 
+    /// <summary>Every server shows a valid certificate (signed with the test key) unless set here or in <see cref="Responses"/>.</summary>
+    public bool NoServerCertificate { get; set; }
+
     public List<string> UserAgents { get; } = [];
 
     /// <summary>The Authorization header of each request ("" without one).</summary>
@@ -135,7 +138,40 @@ internal sealed class StubHttpHandler : HttpMessageHandler
             Sent.Add((request.Method.Method, url, await request.Content.ReadAsStringAsync(cancellationToken)));
         }
 
-        var (status, body) = Responses.TryGetValue(url, out var r) ? r : (HttpStatusCode.NotFound, string.Empty);
+        var (status, body) = Responses.TryGetValue(url, out var r) ? r
+            : url.EndsWith("/api/v1/server-certificate", StringComparison.Ordinal) && !NoServerCertificate
+                ? (HttpStatusCode.OK, TestServerCertificate.For([request.RequestUri.Host]))
+                : (HttpStatusCode.NotFound, string.Empty);
         return new HttpResponseMessage(status) { Content = new StringContent(body) };
+    }
+}
+
+/// <summary>
+/// Server certificates as Neruna signs them, with the test key of the contract fixture (seed 32 × 0x2a) – trusted by
+/// the apps in this test run instead of Neruna's.
+/// </summary>
+internal static class TestServerCertificate
+{
+    private static readonly Org.BouncyCastle.Crypto.Parameters.Ed25519PrivateKeyParameters Key = new(Enumerable.Repeat((byte)0x2a, 32).ToArray(), 0);
+
+    public static byte[] PublicKey => Key.GeneratePublicKey().GetEncoded();
+
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void TrustTestKey() => Neruna.Core.Cloud.ServerCertificate.TrustedKey = PublicKey;
+
+    public static string For(IEnumerable<string> hosts, DateTimeOffset? expires = null)
+    {
+        var data = System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["v"] = 1,
+            ["instance"] = "test",
+            ["hosts"] = hosts.ToArray(),
+            ["issued_at"] = DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+            ["expires_at"] = (expires ?? DateTimeOffset.UtcNow.AddMonths(6)).ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+        }));
+        var signer = new Org.BouncyCastle.Crypto.Signers.Ed25519Signer();
+        signer.Init(true, Key);
+        signer.BlockUpdate(data, 0, data.Length);
+        return System.Text.Json.JsonSerializer.Serialize(new { data = Convert.ToBase64String(data), signature = Convert.ToBase64String(signer.GenerateSignature()) });
     }
 }

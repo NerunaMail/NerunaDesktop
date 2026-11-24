@@ -3030,5 +3030,9 @@
  "«{0}» enthält keinen PGP-Schlüssel.": "«{0}» non contiene alcuna chiave PGP.",
  "Öffentlichen PGP-Schlüssel exportieren": "Esporta la chiave PGP pubblica",
  "Öffentlichen Schlüssel (.asc) speichern, z. B. um ihn weiterzugeben": "Salva la chiave pubblica (.asc), ad es. per inoltrarla",
- "Öffentlicher PGP-Schlüssel exportiert (enthält keinen privaten Schlüssel).": "Chiave PGP pubblica esportata (non contiene alcuna chiave privata)."
+ "Öffentlicher PGP-Schlüssel exportiert (enthält keinen privaten Schlüssel).": "Chiave PGP pubblica esportata (non contiene alcuna chiave privata).",
+ "{0} ist kein Neruna-Server mit gültigem Zertifikat. Bitte die Serveradresse prüfen.": "{0} non è un server Neruna con un certificato valido. Controlli l’indirizzo del server.",
+ "{0} hat kein gültiges Neruna-Serverzertifikat mehr. Der Abgleich mit {1} ist angehalten und läuft wieder, sobald der Server eines hat.": "{0} non ha più un certificato server Neruna valido. La sincronizzazione con {1} è sospesa e riprende appena il server ne ha uno.",
+ "{0} hat kein gültiges Neruna-Serverzertifikat. Der Abgleich ist angehalten und läuft wieder, sobald der Server eines hat.": "{0} non ha un certificato server Neruna valido. La sincronizzazione è sospesa e riprende appena il server ne ha uno.",
+ "{0} hat kein gültiges Neruna-Serverzertifikat. Ohne Zertifikat hält der Abgleich am {1:d} an.": "{0} non ha un certificato server Neruna valido. Senza certificato, la sincronizzazione si ferma il {1:d}."
 }

@@ -106,6 +106,9 @@
             <TextBlock Text="{Binding Address}" />
             <TextBlock Text="{Binding OrganizationContact}" Classes="subtle" />
           </StackPanel>
+          <!-- The server shows no valid server certificate: syncing stops after a while -->
+          <TextBlock Text="{Binding ServerWarning}" TextWrapping="Wrap" Foreground="#CA5010"
+                     IsVisible="{Binding ServerWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           <!-- Waiting for approval or a changed organisation key: in the warning colour -->
           <TextBlock Text="{Binding CertificatesText}" TextWrapping="Wrap" IsVisible="{Binding CertificatesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                      Classes.attention="{Binding CertificatesNeedAttention}">

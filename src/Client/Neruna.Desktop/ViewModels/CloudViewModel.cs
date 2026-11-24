@@ -730,6 +730,7 @@ internal sealed partial class CloudViewModel(
             }
 
             UpdateCertificateStatus();
+            _ = UpdateServerWarningAsync();
             if (!_loadingConnections && newValue is not null)
             {
                 _ = ShowSelectedAsync();
@@ -757,9 +758,32 @@ internal sealed partial class CloudViewModel(
         await backups;
     }
 
+    /// <summary>The selected connection's server shows no valid server certificate: until when it is synced with, or that it is stopped.</summary>
+    [ObservableProperty]
+    public partial string? ServerWarning { get; set; }
+
+    private bool _watchingServers;
+
+    private async Task UpdateServerWarningAsync()
+    {
+        var connection = Connection;
+        var warning = connection is null ? null : await cloud.GetServerWarningAsync(connection);
+        if (connection?.Id == Connection?.Id) // not another one selected meanwhile
+        {
+            ServerWarning = warning;
+        }
+    }
+
     public async Task ReloadAsync()
     {
+        if (!_watchingServers)
+        {
+            _watchingServers = true;
+            cloud.ServerStatusChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = UpdateServerWarningAsync());
+        }
+
         await LoadConnectionsAsync();
+        await UpdateServerWarningAsync();
         if (Connection is not null && Profile is null)
         {
             await RefreshAsync();

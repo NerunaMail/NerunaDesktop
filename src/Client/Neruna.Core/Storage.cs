@@ -58,6 +58,9 @@ public interface IMailStore
     /// </summary>
     Task<IReadOnlyList<(string RemoteId, long Size)>> GetMessagesWithoutContentAsync(Guid connectionId, string folderRemoteId, DateTimeOffset? since, int take, CancellationToken cancellationToken = default);
 
+    /// <summary>The recipients (To) of the messages in the sent folders of all accounts dated on or after <paramref name="since"/>, with the message's date.</summary>
+    Task<IReadOnlyList<(string Address, DateTimeOffset Date)>> GetSentRecipientsAsync(DateTimeOffset since, CancellationToken cancellationToken = default);
+
     /// <summary>Removes the downloaded content of messages dated before <paramref name="before"/>; they stay in the list.</summary>
     Task<int> RemoveMessageContentBeforeAsync(Guid connectionId, string folderRemoteId, DateTimeOffset before, CancellationToken cancellationToken = default);
 }

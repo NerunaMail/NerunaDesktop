@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging;
 using Neruna.Core.Contacts;
+using Neruna.Core.Mail;
 
 namespace Neruna.Desktop.Infrastructure;
 
@@ -6,13 +8,15 @@ namespace Neruna.Desktop.Infrastructure;
 /// The address books as recipients (contacts and groups), for An/Cc completion and the contact picker. Read once in the
 /// background and kept briefly, so typing does not parse every vCard again. Used from the UI thread only.
 /// </summary>
-internal sealed class RecipientDirectory(ContactController contacts)
+internal sealed class RecipientDirectory(ContactController contacts, MailController mail, ILogger<RecipientDirectory> logger)
 {
     private static readonly TimeSpan KeepFor = TimeSpan.FromMinutes(2);
     private Task<IReadOnlyList<RecipientEntry>>? _load;
     private DateTime _loadedAt;
     private Task<Dictionary<string, ContactCard>>? _cards;
     private DateTime _cardsAt;
+    private Task<IReadOnlyDictionary<string, double>>? _usage;
+    private DateTime _usageAt;
 
     /// <summary>The contact with this address (the first one found, one with a picture first), for the placeholders of text templates and the sender's picture.</summary>
     public async Task<ContactCard?> FindContactAsync(string email)
@@ -48,6 +52,7 @@ internal sealed class RecipientDirectory(ContactController contacts)
     {
         _load = null;
         _cards = null;
+        _usage = null;
     }
 
     public Task<IReadOnlyList<RecipientEntry>> GetAllAsync()
@@ -62,11 +67,32 @@ internal sealed class RecipientDirectory(ContactController contacts)
     }
 
     /// <summary>Suggestions while typing: names/addresses starting with <paramref name="query"/>, without addresses
-    /// already in the field.</summary>
+    /// already in the field; those written to often and lately first.</summary>
     public async Task<IReadOnlyList<RecipientEntry>> SuggestAsync(string query, string field, int max) =>
         RecipientEntry.Find(
             (await GetAllAsync()).Where(e => e.IsGroup || !field.Contains(e.Addresses[0].Address, StringComparison.OrdinalIgnoreCase)),
             query,
             max,
-            startsOnly: true);
+            startsOnly: true,
+            await GetUsageAsync());
+
+    // From the sent folders; without them (not readable) the suggestions are just alphabetical.
+    private async Task<IReadOnlyDictionary<string, double>?> GetUsageAsync()
+    {
+        if (_usage is null || _usage.IsFaulted || _usage.IsCanceled || DateTime.UtcNow - _usageAt > KeepFor)
+        {
+            _usageAt = DateTime.UtcNow;
+            _usage = Task.Run(() => mail.GetRecipientUsageAsync());
+        }
+
+        try
+        {
+            return await _usage;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Sent recipients not readable for the suggestions");
+            return null;
+        }
+    }
 }
