@@ -182,6 +182,7 @@ internal static class AppServices
         services.AddSingleton<Neruna.Core.Cloud.CloudSignatureSync>();
         services.AddSingleton<Neruna.Core.Cloud.CloudTextTemplateSync>();
         services.AddSingleton<Neruna.Core.Cloud.CloudMailTagSync>();
+        services.AddSingleton<Neruna.Core.Cloud.CloudQuickActionSync>();
         services.AddSingleton<Neruna.Core.Mail.MailTagService>();
         services.AddSingleton<Neruna.Core.Calendar.CalendarCategoryService>();
         services.AddSingleton<Neruna.Core.Cloud.CloudCertificateSync>();

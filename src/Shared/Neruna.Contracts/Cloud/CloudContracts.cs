@@ -68,6 +68,18 @@ public sealed record TextTemplatesResponse(bool Available, IReadOnlyList<CloudTe
 /// <param name="Shortcut">Typed with "::" while writing (may be null).</param>
 public sealed record CloudTextTemplate(string Id, string Name, string? Shortcut, string Html, string Text, DateTimeOffset UpdatedAt);
 
+/// <summary>Response of <c>GET /api/v1/quick-actions</c>: quick actions shared in the organisation (older servers: 404).</summary>
+/// <param name="CanShare">This person may share and change shared actions (set in the portal).</param>
+public sealed record QuickActionsResponse(bool Available, bool CanShare, IReadOnlyList<CloudQuickAction> Actions);
+
+/// <param name="Id">The action's id in the apps (a GUID).</param>
+/// <param name="Content">The app's export file of this one action ("neruna.quickactions").</param>
+/// <param name="UpdatedBy">Who changed it last after sharing; null until then.</param>
+public sealed record CloudQuickAction(string Id, string Label, string Content, string SharedBy, string? UpdatedBy, DateTimeOffset UpdatedAt);
+
+/// <summary>Body of <c>PUT /api/v1/quick-actions/{id}</c>: share, or a new version of a shared action.</summary>
+public sealed record ShareQuickActionRequest(string Label, string Content);
+
 /// <summary>Response of <c>GET /api/v1/mail-tags</c>: the organisation's tags for mails (older servers: 404).</summary>
 public sealed record MailTagsResponse(bool Available, IReadOnlyList<CloudMailTag> Tags);
 

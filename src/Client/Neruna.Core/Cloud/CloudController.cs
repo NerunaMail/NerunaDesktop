@@ -268,6 +268,27 @@ public sealed class CloudController(HttpClient http, ISettingsStore settings, IC
         }
     }
 
+    /// <summary>Quick actions shared in the organisation; null when the server has none yet (older version: 404).</summary>
+    public async Task<QuickActionsResponse?> GetQuickActionsAsync(CloudConnection connection, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAuthorizedAsync(connection, HttpMethod.Get, "api/v1/quick-actions", cancellationToken);
+        return response.StatusCode == HttpStatusCode.NotFound ? null : await ReadAsync<QuickActionsResponse>(response, cancellationToken);
+    }
+
+    /// <summary>Shares a quick action, or saves a new version of a shared one; returns it as stored.</summary>
+    public async Task<CloudQuickAction> ShareQuickActionAsync(CloudConnection connection, string id, ShareQuickActionRequest request, CancellationToken cancellationToken = default) =>
+        await AuthorizedAsync<CloudQuickAction>(connection, HttpMethod.Put, $"api/v1/quick-actions/{Uri.EscapeDataString(id)}", request, cancellationToken);
+
+    /// <summary>Stops sharing a quick action (gone for everyone); already gone counts as done.</summary>
+    public async Task UnshareQuickActionAsync(CloudConnection connection, string id, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendAuthorizedAsync(connection, HttpMethod.Delete, $"api/v1/quick-actions/{Uri.EscapeDataString(id)}", cancellationToken);
+        if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound)
+        {
+            await ReadAsync<CloudError>(response, cancellationToken);
+        }
+    }
+
     /// <summary>The person's scheduling polls; null when the server has none yet (older version: 404).</summary>
     public async Task<PollsResponse?> GetPollsAsync(CloudConnection connection, CancellationToken cancellationToken = default)
     {

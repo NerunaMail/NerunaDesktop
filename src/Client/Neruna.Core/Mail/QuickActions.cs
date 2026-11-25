@@ -59,6 +59,12 @@ public sealed record QuickActionCondition
     public string? FolderRemoteId { get; init; }
 
     public string? FolderName { get; init; }
+
+    /// <summary>
+    /// Shared for an account (by its address) that is not set up here: the button never appears – rather than for every
+    /// account (as an imported file would).
+    /// </summary>
+    public string? MissingAccount { get; init; }
 }
 
 public enum QuickActionStepKind
@@ -140,6 +146,12 @@ public sealed record QuickAction(Guid Id, string Label, string Color, QuickActio
     /// </summary>
     public bool IsSuggested { get; init; }
 
+    /// <summary>Shared in the organisation (Neruna Cloud); null: only here.</summary>
+    public QuickActionShare? Shared { get; init; }
+
+    /// <summary>Switched off here (a shared action one does not want): kept, but its button never appears.</summary>
+    public bool IsOff { get; init; }
+
     /// <summary>Shortcuts Neruna itself uses while reading and writing – not for actions.</summary>
     public static IReadOnlySet<string> ReservedShortcuts { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -147,6 +159,10 @@ public sealed record QuickAction(Guid Id, string Label, string Color, QuickActio
         "Ctrl+A", "Ctrl+Z", "Ctrl+Y", "Ctrl+P", "Ctrl+B", "Ctrl+I", "Ctrl+U", "Ctrl+K", "Delete", "F1", "F5", "Alt+F4",
     };
 }
+
+/// <summary>Where a shared quick action comes from: the connection, who shared it and who changed it last.</summary>
+/// <param name="Source">The cloud connection's <see cref="Cloud.CloudConnection.Source"/>.</param>
+public sealed record QuickActionShare(string Source, string SharedBy, string? UpdatedBy, DateTimeOffset UpdatedAt);
 
 /// <summary>An attachment of the open mail, as far as the conditions need it.</summary>
 public sealed record QuickActionAttachment(string FileName, string MimeType);
@@ -230,6 +246,9 @@ public sealed class QuickActionService(ISettingsStore settings)
     public Task SetStampNameAsync(string? name, CancellationToken cancellationToken = default) =>
         settings.SetAsync(StampNameKey, string.IsNullOrWhiteSpace(name) ? null : name.Trim(), cancellationToken);
 
+    /// <summary>Whether both are the same in every part (to save only what changed).</summary>
+    public static bool Same(QuickAction a, QuickAction b) => JsonSerializer.Serialize(a, Json) == JsonSerializer.Serialize(b, Json);
+
     private static T? Read<T>(string? json)
         where T : class
     {
@@ -274,7 +293,7 @@ public sealed class QuickActionService(ISettingsStore settings)
         var usedStamps = actions.SelectMany(a => a.Steps).Select(s => s.StampId).OfType<Guid>().ToHashSet();
         var usedAccounts = actions.Select(a => a.When.AccountId).Concat(actions.SelectMany(a => a.Steps).Select(s => s.FromAccountId)).OfType<Guid>().ToHashSet();
         var usedTemplates = actions.SelectMany(a => a.Steps).Select(s => s.TemplateId).OfType<Guid>().ToHashSet();
-        var file = new ExportFile(FileFormat, 1, actions,
+        var file = new ExportFile(FileFormat, 1, [.. actions.Select(a => a with { Shared = null, IsOff = false })],
             [.. stamps.Where(s => usedStamps.Contains(s.Id))],
             accounts.Where(a => usedAccounts.Contains(a.Key)).ToDictionary(),
             templates.Where(t => usedTemplates.Contains(t.Key)).ToDictionary());
@@ -287,7 +306,9 @@ public sealed class QuickActionService(ISettingsStore settings)
     /// the ones here (a newer version of the same file).
     /// </summary>
     /// <exception cref="FormatException">Not a file of Neruna quick actions.</exception>
-    public static (IReadOnlyList<QuickAction> Actions, IReadOnlyList<PdfStamp> Stamps) Import(string json, IReadOnlyDictionary<Guid, string> accounts, IReadOnlyDictionary<Guid, string> templates)
+    /// <param name="shared">From the organisation: an action for an account not set up here stays for that account
+    /// (<see cref="QuickActionCondition.MissingAccount"/>, never shown) instead of applying to all.</param>
+    public static (IReadOnlyList<QuickAction> Actions, IReadOnlyList<PdfStamp> Stamps) Import(string json, IReadOnlyDictionary<Guid, string> accounts, IReadOnlyDictionary<Guid, string> templates, bool shared = false)
     {
         ArgumentNullException.ThrowIfNull(accounts);
         ArgumentNullException.ThrowIfNull(templates);
@@ -319,11 +340,15 @@ public sealed class QuickActionService(ISettingsStore settings)
         var actions = file.Actions.Select(action =>
         {
             var account = Account(action.When.AccountId);
+            var missing = shared && account is null && action.When.AccountId is { } wanted ? file.Accounts?.GetValueOrDefault(wanted) : null;
             return action with
             {
+                Shared = null,
+                IsOff = false,
                 When = action.When with
                 {
                     AccountId = account,
+                    MissingAccount = missing,
                     FolderRemoteId = account is null ? null : action.When.FolderRemoteId,
                     FolderName = account is null ? null : action.When.FolderName,
                 },
@@ -341,7 +366,7 @@ public sealed class QuickActionService(ISettingsStore settings)
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(message);
         var when = action.When;
-        if (when.AccountId is { } account && account != message.AccountId)
+        if (action.IsOff || when.MissingAccount is not null || (when.AccountId is { } account && account != message.AccountId))
         {
             return false;
         }

@@ -60,7 +60,7 @@ internal sealed partial class CalendarViewModel
         }
 
         CalendarSearchHit Hit(CalendarOccurrence o) => new(
-            new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0], known),
+            new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0], known, BackgroundFromCategory),
             names.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? string.Empty);
 
         var today = now.LocalDateTime.Date;

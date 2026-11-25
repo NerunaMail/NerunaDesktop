@@ -17,8 +17,10 @@ internal sealed record Choice<T>(T Value, string Title)
 
 /// <summary>Settings → E-Mail → Schnellaktionen: the actions (button, conditions, steps) and the PDF stamps.</summary>
 internal sealed partial class QuickActionsViewModel(QuickActionService service, IAccountStore accounts, MailController mail, TextTemplateService templates, IFileService files,
-    QuickActionSuggestions? suggestions = null) : ViewModelBase
+    QuickActionSuggestions? suggestions = null, Neruna.Core.Cloud.CloudQuickActionSync? cloudActions = null) : ViewModelBase
 {
+    private bool _followsCloud;
+
     /// <summary>"Schnellaktionen vorschlagen": after the third mail of a sender moved by hand into the same folder.</summary>
     [ObservableProperty]
     public partial bool SuggestEnabled { get; set; } = true;
@@ -91,6 +93,17 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
 
     public async Task ReloadAsync()
     {
+        // Shared actions arrived, changed or went: the list here follows.
+        if (cloudActions is not null && !_followsCloud)
+        {
+            _followsCloud = true;
+            cloudActions.Changed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+            {
+                _actions = [.. await service.GetActionsAsync()];
+                ShowActions();
+            });
+        }
+
         _actions = [.. await service.GetActionsAsync()];
         ShowActions();
 
@@ -124,7 +137,11 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         Actions.Clear();
         foreach (var action in _actions)
         {
-            Actions.Add(new QuickActionItem(action, Describe(action), Warn(action)));
+            Actions.Add(new QuickActionItem(action, Describe(action), Warn(action))
+            {
+                CanEdit = action.When.MissingAccount is null && (cloudActions?.CanEdit(action) ?? action.Shared is null),
+                CanShare = action.Shared is null && cloudActions?.CanShareAny == true,
+            });
         }
 
         OnPropertyChanged(nameof(HasActions));
@@ -318,6 +335,8 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         var index = _actions.FindIndex(a => a.Id == action.Id);
         if (index >= 0)
         {
+            // What only the list knows: where it is shared, switched off here.
+            action = action with { Shared = _actions[index].Shared, IsOff = _actions[index].IsOff };
             _actions[index] = action;
         }
         else
@@ -328,11 +347,82 @@ internal sealed partial class QuickActionsViewModel(QuickActionService service, 
         await service.SaveActionsAsync(_actions);
         Editing = null;
         ShowActions();
+
+        // Shared: the new version goes to everyone.
+        if (action.Shared is not null && cloudActions is not null)
+        {
+            await CloudAsync(() => cloudActions.ShareAsync(action), F("«{0}» ist für alle aktualisiert.", action.Label));
+        }
+    }
+
+    /// <summary>"In der Cloud teilen": to everyone (or the groups the portal set for this person).</summary>
+    [RelayCommand]
+    private async Task ShareAsync(QuickActionItem? item)
+    {
+        if (item is not null && cloudActions is not null)
+        {
+            await CloudAsync(() => cloudActions.ShareAsync(item.Action), F("«{0}» ist geteilt – die anderen erhalten sie beim nächsten Abgleich.", item.Label));
+        }
+    }
+
+    /// <summary>"Nicht mehr teilen": gone for the others, stays here.</summary>
+    [RelayCommand]
+    private async Task UnshareAsync(QuickActionItem? item)
+    {
+        if (item is not null && cloudActions is not null)
+        {
+            await CloudAsync(() => cloudActions.UnshareAsync(item.Action), F("«{0}» ist nicht mehr geteilt.", item.Label));
+        }
+    }
+
+    /// <summary>A shared action one does not want: off here (its button no longer appears), on again any time.</summary>
+    [RelayCommand]
+    private async Task ToggleOffAsync(QuickActionItem? item)
+    {
+        var index = item is null ? -1 : _actions.FindIndex(a => a.Id == item.Action.Id);
+        if (index >= 0)
+        {
+            _actions[index] = _actions[index] with { IsOff = !_actions[index].IsOff };
+            await service.SaveActionsAsync(_actions);
+            ShowActions();
+        }
+    }
+
+    private async Task CloudAsync(Func<Task<QuickAction>> call, string done)
+    {
+        try
+        {
+            await call();
+            Notice = done;
+        }
+        catch (Exception ex) when (ex is Neruna.Core.Cloud.CloudException or HttpRequestException or TaskCanceledException)
+        {
+            Notice = F("Teilen nicht möglich: {0}", ex.Message);
+        }
+
+        _actions = [.. await service.GetActionsAsync()];
+        ShowActions();
     }
 
     [RelayCommand]
     private async Task DeleteAsync(QuickActionItem? item)
     {
+        // Shared: deleted for everyone (only who may change it sees the button).
+        if (item?.Action.Shared is not null && cloudActions is not null)
+        {
+            try
+            {
+                await cloudActions.UnshareAsync(item.Action);
+            }
+            catch (Exception ex) when (ex is Neruna.Core.Cloud.CloudException or HttpRequestException or TaskCanceledException)
+            {
+                Notice = F("Teilen nicht möglich: {0}", ex.Message);
+                return;
+            }
+
+            _actions = [.. await service.GetActionsAsync()];
+        }
+
         if (item is not null && _actions.RemoveAll(a => a.Id == item.Action.Id) > 0)
         {
             await service.SaveActionsAsync(_actions);
@@ -469,6 +559,43 @@ internal sealed record QuickActionItem(QuickAction Action, string Summary, strin
     public string Color => Action.Color;
 
     public bool IsSuggested => Action.IsSuggested;
+
+    /// <summary>Own, or shared and this person may change shared ones.</summary>
+    public bool CanEdit { get; init; } = true;
+
+    /// <summary>Own and this person may share.</summary>
+    public bool CanShare { get; init; }
+
+    public bool IsShared => Action.Shared is not null;
+
+    /// <summary>Shared and may be changed here: "Nicht mehr teilen".</summary>
+    public bool CanUnshare => IsShared && CanEdit;
+
+    /// <summary>Deleting: own ones, and shared ones by who may change them (then for everyone).</summary>
+    public bool CanDelete => !IsShared || CanEdit;
+
+    public bool IsOff => Action.IsOff;
+
+    /// <summary>"Geteilt von Anna Muster · zuletzt geändert von Bea Beispiel".</summary>
+    public string? SharedText => Action.Shared is not { } shared
+        ? null
+        : shared.UpdatedBy is { } updated && updated != shared.SharedBy
+            ? F("Geteilt von {0} · zuletzt geändert von {1}", shared.SharedBy, updated)
+            : F("Geteilt von {0}", shared.SharedBy);
+
+    /// <summary>Shared for an account not set up here.</summary>
+    public string? MissingAccountText => Action.When.MissingAccount is { } address
+        ? F("Für das Konto {0}, das hier nicht eingerichtet ist – erscheint deshalb nicht.", address)
+        : null;
+
+    public bool HasMissingAccount => MissingAccountText is not null;
+
+    public string OffLabel => IsOff ? T("Bei mir einschalten") : T("Bei mir ausschalten");
+
+    public string DeleteLabel => IsShared ? T("Für alle löschen") : T("Löschen");
+
+    /// <summary>Switched off here: shown faded.</summary>
+    public double Opacity => IsOff ? 0.55 : 1;
 }
 
 internal sealed record EditorOptions(

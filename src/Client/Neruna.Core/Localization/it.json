@@ -3102,5 +3102,21 @@
  "Bei «{0}:»-Links nicht mehr fragen": "Non chiedere più per i link «{0}:»",
  "Der Link öffnet eine Datei oder einen Ordner.": "Il link apre un file o una cartella.",
  "Der Link öffnet ein anderes Programm («{0}:»).": "Il link apre un altro programma («{0}:»).",
- "Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt.": "Apritelo solo se sapete dove porta."
+ "Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt.": "Apritelo solo se sapete dove porta.",
+ "«{0}» ist für alle aktualisiert.": "«{0}» è aggiornata per tutti.",
+ "«{0}» ist geteilt – die anderen erhalten sie beim nächsten Abgleich.": "«{0}» è condivisa – gli altri la ricevono alla prossima sincronizzazione.",
+ "«{0}» ist nicht mehr geteilt.": "«{0}» non è più condivisa.",
+ "Teilen nicht möglich: {0}": "Condivisione non possibile: {0}",
+ "Geteilt von {0} · zuletzt geändert von {1}": "Condivisa da {0} · modificata l’ultima volta da {1}",
+ "Geteilt von {0}": "Condivisa da {0}",
+ "Für das Konto {0}, das hier nicht eingerichtet ist – erscheint deshalb nicht.": "Per l’account {0}, che qui non è configurato – perciò non compare.",
+ "Bei mir einschalten": "Attivare per me",
+ "Bei mir ausschalten": "Disattivare per me",
+ "Bei mir ausgeschaltet": "Disattivata per me",
+ "Für alle löschen": "Eliminare per tutti",
+ "Nicht mehr teilen": "Non condividere più",
+ "Hintergrund der Termine": "Sfondo degli appuntamenti",
+ "Farbe des Kalenders": "Colore del calendario",
+ "Farbe der Kategorie": "Colore della categoria",
+ "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "Il colore del calendario resta come linea a sinistra, le categorie come linee a destra. Se un appuntamento ha più categorie, vale il colore del calendario."
 }

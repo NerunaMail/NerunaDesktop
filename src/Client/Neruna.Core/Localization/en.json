@@ -3102,5 +3102,21 @@
  "Bei «{0}:»-Links nicht mehr fragen": "Don't ask again for «{0}:» links",
  "Der Link öffnet eine Datei oder einen Ordner.": "The link opens a file or folder.",
  "Der Link öffnet ein anderes Programm («{0}:»).": "The link opens another program («{0}:»).",
- "Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt.": "Only open it if you know where it leads."
+ "Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt.": "Only open it if you know where it leads.",
+ "«{0}» ist für alle aktualisiert.": "«{0}» is updated for everyone.",
+ "«{0}» ist geteilt – die anderen erhalten sie beim nächsten Abgleich.": "«{0}» is shared – the others get it at the next sync.",
+ "«{0}» ist nicht mehr geteilt.": "«{0}» is no longer shared.",
+ "Teilen nicht möglich: {0}": "Sharing not possible: {0}",
+ "Geteilt von {0} · zuletzt geändert von {1}": "Shared by {0} · last changed by {1}",
+ "Geteilt von {0}": "Shared by {0}",
+ "Für das Konto {0}, das hier nicht eingerichtet ist – erscheint deshalb nicht.": "For the account {0}, which is not set up here – so it does not appear.",
+ "Bei mir einschalten": "Switch on for me",
+ "Bei mir ausschalten": "Switch off for me",
+ "Bei mir ausgeschaltet": "Switched off for me",
+ "Für alle löschen": "Delete for everyone",
+ "Nicht mehr teilen": "Stop sharing",
+ "Hintergrund der Termine": "Event background",
+ "Farbe des Kalenders": "Colour of the calendar",
+ "Farbe der Kategorie": "Colour of the category",
+ "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "The calendar’s colour stays as a line on the left, the categories as lines on the right. If an event has several categories, the calendar’s colour applies."
 }

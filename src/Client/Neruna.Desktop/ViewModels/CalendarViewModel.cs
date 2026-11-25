@@ -439,6 +439,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         PlanningPeopleText = await settings.GetAsync(SettingKeys.CalendarPlanningPeople) ?? string.Empty;
         _loadingSettings = false;
         GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
+        BackgroundFromCategory = await settings.GetAsync(SettingKeys.CalendarEventBackground) == "category";
         SetVisibleRange(
             int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleFrom), out var from) ? from : 7,
             int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleTo), out var to) ? to : 21);
@@ -1173,6 +1174,19 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     private async Task<IReadOnlyList<CalendarOccurrence>> OccurrencesAsync(IReadOnlyList<CalendarInfo> shown, DateTimeOffset from, DateTimeOffset to) =>
         await tasks.AddToCalendarAsync(await calendar.GetOccurrencesAsync(shown, from, to), shown, from, to, includeTaskLists: !_solo.IsActive);
 
+    /// <summary>Einstellungen → Kalender: events with one coloured category are filled in its colour (else the calendar's).</summary>
+    public bool BackgroundFromCategory { get; private set; }
+
+    /// <summary>The setting changed: the shown events take the new colours.</summary>
+    public async Task SetBackgroundFromCategoryAsync(bool value)
+    {
+        if (BackgroundFromCategory != value)
+        {
+            BackgroundFromCategory = value;
+            await LoadWeekAsync();
+        }
+    }
+
     private async Task LoadWeekAsync(bool dataChanged = false)
     {
         var visible = Calendars.Where(IsShown).ToList();
@@ -1197,7 +1211,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
                 .Where(o => o.Start.LocalDateTime.Date <= day && (o.End.LocalDateTime > day || o.Start.LocalDateTime.Date == day))
                 .OrderByDescending(o => o.IsAllDay)
                 .ThenBy(o => o.Start)
-                .Select(o => new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0], known))
+                .Select(o => new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0], known, BackgroundFromCategory))
                 .ToList();
             Days.Add(new CalendarDay(day, events, month is { } m && day.Month != m, MonthEventLimit));
         }
@@ -1367,8 +1381,11 @@ internal sealed class CalendarDay(DateTime date, IReadOnlyList<CalendarEventItem
 }
 
 /// <param name="categories">The categories offered: those of the event show as colour lines on the right.</param>
-internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string color, IReadOnlyList<CalendarCategory>? categories = null)
+/// <param name="backgroundFromCategory">Filled in the colour of its category when it has exactly one with a colour; the
+/// calendar's colour stays as line on the left (with several categories: the calendar's colour).</param>
+internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string color, IReadOnlyList<CalendarCategory>? categories = null, bool backgroundFromCategory = false)
 {
+
     public CalendarOccurrence Occurrence { get; } = occurrence;
 
     /// <summary>The title as the views show it: called-off events say so.</summary>
@@ -1385,7 +1402,8 @@ internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string co
 
     public IBrush Brush { get; } = Avalonia.Media.Brush.Parse(color);
 
-    public IBrush Background { get; } = new SolidColorBrush(Avalonia.Media.Color.Parse(color), 0.14);
+    public IBrush Background { get; } = new SolidColorBrush(Avalonia.Media.Color.Parse(
+        backgroundFromCategory && CalendarCategoryService.Of(occurrence.Categories, categories ?? []) is [var only] ? only.Color : color), 0.14);
 
     public string TimeText => Occurrence.IsAllDay
         ? T("Ganztägig")

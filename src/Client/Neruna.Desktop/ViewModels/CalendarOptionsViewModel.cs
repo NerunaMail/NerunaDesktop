@@ -30,6 +30,28 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         set => TimeGrid = !value;
     }
 
+    /// <summary>"Hintergrund der Termine": the colour of the category (one with a colour) instead of the calendar's.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CalendarBackground))]
+    public partial bool CategoryBackground { get; set; }
+
+    public bool CalendarBackground
+    {
+        get => !CategoryBackground;
+        set => CategoryBackground = !value;
+    }
+
+    partial void OnCategoryBackgroundChanged(bool value)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _ = calendarPage.SetBackgroundFromCategoryAsync(value);
+        _ = settings.SetAsync(SettingKeys.CalendarEventBackground, value ? "category" : null);
+    }
+
     /// <summary>Time grid subdivision: 60, 30 or 15 minutes.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Grid60), nameof(Grid30), nameof(Grid15))]
@@ -166,6 +188,7 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
             TwoMonths = await settings.GetAsync(SettingKeys.CalendarNavigatorMonths) == "2";
             TimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) != "list"; // default: time grid
             GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
+            CategoryBackground = await settings.GetAsync(SettingKeys.CalendarEventBackground) == "category";
             var from = int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleFrom), out var f) ? Math.Clamp(f, 0, 23) : 7;
             var to = int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleTo), out var t) ? Math.Clamp(t, from + 1, 24) : 21;
             VisibleFrom = HourOptions[from];

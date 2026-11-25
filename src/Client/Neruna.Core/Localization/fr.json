@@ -3102,5 +3102,21 @@
  "Bei «{0}:»-Links nicht mehr fragen": "Ne plus demander pour les liens «{0}:»",
  "Der Link öffnet eine Datei oder einen Ordner.": "Le lien ouvre un fichier ou un dossier.",
  "Der Link öffnet ein anderes Programm («{0}:»).": "Le lien ouvre un autre programme («{0}:»).",
- "Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt.": "Ne l'ouvrez que si vous savez où il mène."
+ "Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt.": "Ne l'ouvrez que si vous savez où il mène.",
+ "«{0}» ist für alle aktualisiert.": "«{0}» est mise à jour pour tous.",
+ "«{0}» ist geteilt – die anderen erhalten sie beim nächsten Abgleich.": "«{0}» est partagée – les autres la reçoivent à la prochaine synchronisation.",
+ "«{0}» ist nicht mehr geteilt.": "«{0}» n’est plus partagée.",
+ "Teilen nicht möglich: {0}": "Partage impossible : {0}",
+ "Geteilt von {0} · zuletzt geändert von {1}": "Partagée par {0} · modifiée en dernier par {1}",
+ "Geteilt von {0}": "Partagée par {0}",
+ "Für das Konto {0}, das hier nicht eingerichtet ist – erscheint deshalb nicht.": "Pour le compte {0}, qui n’est pas configuré ici – elle n’apparaît donc pas.",
+ "Bei mir einschalten": "Activer pour moi",
+ "Bei mir ausschalten": "Désactiver pour moi",
+ "Bei mir ausgeschaltet": "Désactivée pour moi",
+ "Für alle löschen": "Supprimer pour tous",
+ "Nicht mehr teilen": "Ne plus partager",
+ "Hintergrund der Termine": "Arrière-plan des rendez-vous",
+ "Farbe des Kalenders": "Couleur du calendrier",
+ "Farbe der Kategorie": "Couleur de la catégorie",
+ "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "La couleur du calendrier reste une ligne à gauche, les catégories des lignes à droite. Si un rendez-vous a plusieurs catégories, la couleur du calendrier s’applique."
 }

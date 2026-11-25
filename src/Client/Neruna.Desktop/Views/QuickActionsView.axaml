@@ -85,7 +85,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:QuickActionItem">
               <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="6" Padding="14,10" Margin="0,0,0,8">
-                <Grid ColumnDefinitions="Auto,*,Auto">
+                <Grid ColumnDefinitions="Auto,*,Auto" Opacity="{Binding Opacity}">
                   <!-- The button as it appears in the bar -->
                   <Border Background="{Binding Color, Converter={x:Static l:Converters.ColorBrush}}" CornerRadius="4" Padding="10,4" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Label}" Foreground="White" FontWeight="SemiBold" />
@@ -94,19 +94,26 @@
                     <TextBlock Text="{Binding Summary}" Classes="subtle" TextWrapping="Wrap" />
                     <TextBlock Text="{l:T 'Automatisch erstellt (aus einem Vorschlag)'}" Classes="subtle" FontSize="11" FontStyle="Italic" IsVisible="{Binding IsSuggested}" />
                     <TextBlock Text="{Binding Warning}" Foreground="{DynamicResource ErrorBrush}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
+                    <!-- Shared in the organisation: by whom; off here; for an account not set up here -->
+                    <TextBlock Text="{Binding SharedText}" Classes="subtle" FontSize="11" IsVisible="{Binding IsShared}" />
+                    <TextBlock Text="{l:T 'Bei mir ausgeschaltet'}" Classes="subtle" FontSize="11" FontStyle="Italic" IsVisible="{Binding IsOff}" />
+                    <TextBlock Text="{Binding MissingAccountText}" Classes="subtle" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding HasMissingAccount}" />
                   </StackPanel>
                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                    <Button Content="{l:T 'Bearbeiten'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" />
+                    <Button Content="{l:T 'Bearbeiten'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}" IsVisible="{Binding CanEdit}" />
                     <Button Padding="8,6" ToolTip.Tip="{l:T 'Weitere Aktionen'}">
                       <TextBlock Text="⋯" FontWeight="Bold" />
                       <Button.Flyout>
                         <MenuFlyout Placement="BottomEdgeAlignedRight">
+                          <MenuItem Header="{l:T 'Teilen'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).ShareCommand}" CommandParameter="{Binding}" IsVisible="{Binding CanShare}" />
+                          <MenuItem Header="{l:T 'Nicht mehr teilen'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).UnshareCommand}" CommandParameter="{Binding}" IsVisible="{Binding CanUnshare}" />
+                          <MenuItem Header="{Binding OffLabel}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).ToggleOffCommand}" CommandParameter="{Binding}" IsVisible="{Binding IsShared}" />
                           <MenuItem Header="{l:T 'Exportieren …'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).ExportOneCommand}" CommandParameter="{Binding}" />
                           <Separator />
                           <MenuItem Header="{l:T 'Nach oben'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
                           <MenuItem Header="{l:T 'Nach unten'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).MoveDownCommand}" CommandParameter="{Binding}" />
                           <Separator />
-                          <MenuItem Header="{l:T 'Löschen'}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).DeleteCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="{Binding DeleteLabel}" Command="{Binding $parent[UserControl].((vm:QuickActionsViewModel)DataContext).DeleteCommand}" CommandParameter="{Binding}" IsVisible="{Binding CanDelete}" />
                         </MenuFlyout>
                       </Button.Flyout>
                     </Button>

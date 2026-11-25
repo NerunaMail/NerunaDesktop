@@ -87,6 +87,17 @@ public class CloudContractTests
     }
 
     [Fact]
+    public void Client_reads_the_shared_quick_actions()
+    {
+        var response = JsonSerializer.Deserialize<QuickActionsResponse>(ContractFixtures.Read("quick-actions-example.json"), NerunaJson.Options)!;
+
+        Assert.True(response.CanShare);
+        var action = Assert.Single(response.Actions);
+        Assert.Equal(("Rechnung ablegen", "Anna Muster", "Bea Beispiel"), (action.Label, action.SharedBy, action.UpdatedBy));
+        Assert.Contains("\"Format\":\"neruna.quickactions\"", action.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Client_reads_the_calendar_categories()
     {
         var response = JsonSerializer.Deserialize<CalendarCategoriesResponse>(ContractFixtures.Read("calendar-categories-example.json"), NerunaJson.Options)!;

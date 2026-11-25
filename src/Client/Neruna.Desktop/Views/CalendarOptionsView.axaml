@@ -43,6 +43,15 @@
         <RadioButton GroupName="GridMinutes" Content="{l:T '15 Minuten'}" IsChecked="{Binding Grid15}" />
       </StackPanel>
 
+      <!-- Lines stay: the calendar's colour on the left, the categories' on the right; only the fill changes -->
+      <TextBlock Text="{l:T 'Hintergrund der Termine'}" FontSize="16" FontWeight="SemiBold" />
+      <StackPanel Spacing="6" Margin="0,0,0,14">
+        <RadioButton GroupName="EventBackground" Content="{l:T 'Farbe des Kalenders'}" IsChecked="{Binding CalendarBackground}" />
+        <RadioButton GroupName="EventBackground" Content="{l:T 'Farbe der Kategorie'}" IsChecked="{Binding CategoryBackground}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.'}" />
+      </StackPanel>
+
       <TextBlock Text="{l:T 'Sichtbereich im Zeitraster'}" FontSize="16" FontWeight="SemiBold" />
       <TextBlock Classes="subtle" TextWrapping="Wrap"
                  Text="{l:T 'Diese Stunden füllen die Höhe des Fensters; was davor und danach liegt, erreichen Sie mit Scrollen. Ganztägige Termine stehen immer oben.'}" />

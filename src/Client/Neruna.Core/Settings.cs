@@ -150,6 +150,9 @@ public static class SettingKeys
     /// <summary>Week view: "timegrid" (hourly time grid, default) or "list" (events per day).</summary>
     public const string CalendarLayout = "calendar.layout";
 
+    /// <summary>"category": an event with one coloured category is filled in its colour (the calendar's stays as line on the left); else the calendar's colour.</summary>
+    public const string CalendarEventBackground = "calendar.eventBackground";
+
     /// <summary>Time grid subdivision in minutes: 60, 30 (default) or 15.</summary>
     public const string CalendarGridMinutes = "calendar.gridMinutes";
 

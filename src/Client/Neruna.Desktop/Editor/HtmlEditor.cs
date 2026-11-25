@@ -540,6 +540,25 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
         }
     }
 
+    private void ReturnKeyboardToWindow()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (OperatingSystem.IsWindows() && top?.TryGetPlatformHandle() is { } handle && handle.Handle != IntPtr.Zero)
+        {
+            _ = NativeFocus.SetFocus(handle.Handle);
+        }
+        else if (top is Window window)
+        {
+            window.Activate();
+        }
+    }
+
+    private static class NativeFocus
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        internal static extern IntPtr SetFocus(IntPtr window);
+    }
+
     public void FocusEditor(int caret = -1)
     {
         if (_fallback is not null)
@@ -785,7 +804,13 @@ internal sealed class HtmlEditor : UserControl, IHtmlEditor
                 SaveRequested?.Invoke(this, EventArgs.Empty);
                 break;
             case "focusBack":
-                FocusBackRequested?.Invoke(this, EventArgs.Empty);
+                // The web view is a window of its own that keeps the keyboard: give it back to the app's window first,
+                // else the field before shows a caret but gets no keys (until clicked).
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    ReturnKeyboardToWindow();
+                    FocusBackRequested?.Invoke(this, EventArgs.Empty);
+                });
                 break;
             case "changed":
                 ContentChanged?.Invoke(this, EventArgs.Empty);
