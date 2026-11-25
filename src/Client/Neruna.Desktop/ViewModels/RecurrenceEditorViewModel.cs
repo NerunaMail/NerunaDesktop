@@ -11,21 +11,6 @@ internal sealed record MonthlyChoice(int? Position, DayOfWeek Day, string Label)
     public override string ToString() => Label;
 }
 
-/// <summary>"Normal", "Privat", "Vertraulich" (iCalendar CLASS) for events and tasks.</summary>
-internal sealed record PrivacyOption(EventPrivacy Value, string Label)
-{
-    public static IReadOnlyList<PrivacyOption> All { get; } =
-    [
-        new(EventPrivacy.Public, T("Normal")),
-        new(EventPrivacy.Private, T("Privat")),
-        new(EventPrivacy.Confidential, T("Vertraulich")),
-    ];
-
-    public static PrivacyOption Of(EventPrivacy value) => All.First(o => o.Value == value);
-
-    public override string ToString() => Label;
-}
-
 /// <summary>
 /// "Wiederholung" of events and tasks: how often (daily … yearly, every n), on which weekdays, on which day of the
 /// month, and until when (never, a day, a number of times). A rule from elsewhere that holds more than this is shown as
@@ -61,7 +46,7 @@ internal sealed partial class RecurrenceEditorViewModel : ObservableObject
     public IReadOnlyList<RecurrenceOption> Options { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasDetails), nameof(IsWeekly), nameof(HasMonthly), nameof(UnitText), nameof(IsCustom), nameof(HasEnd))]
+    [NotifyPropertyChangedFor(nameof(HasDetails), nameof(IsWeekly), nameof(HasMonthly), nameof(UnitText), nameof(IsCustom))]
     public partial RecurrenceOption Selected { get; set; }
 
     partial void OnSelectedChanged(RecurrenceOption value)
@@ -80,9 +65,6 @@ internal sealed partial class RecurrenceEditorViewModel : ObservableObject
     public bool HasDetails => Selected.Kind is not (RecurrenceKind.None or RecurrenceKind.Custom);
 
     public bool IsCustom => Selected.Kind == RecurrenceKind.Custom;
-
-    /// <summary>The end is part of what is edited (a rule kept unchanged keeps its end too).</summary>
-    public bool HasEnd => HasDetails;
 
     public bool IsWeekly => Selected.Kind == RecurrenceKind.Weekly;
 
@@ -136,32 +118,24 @@ internal sealed partial class RecurrenceEditorViewModel : ObservableObject
         var start = _start().Date;
         var previous = keep is { Position: { } p } && keep.Weekdays.Count > 0 ? (int?)p : Monthly?.Position;
         var yearly = Selected.Kind == RecurrenceKind.Yearly;
-        var month = Culture.DateTimeFormat.GetMonthName(start.Month);
-        var dayName = Culture.DateTimeFormat.GetDayName(start.DayOfWeek);
+        MonthlyChoice Choice(int? position, DayOfWeek day) => new(position, day, RecurrenceSpec.OnDay(yearly, position, day, start));
         MonthlyChoices.Clear();
-        MonthlyChoices.Add(new MonthlyChoice(null, start.DayOfWeek, yearly ? F("am {0}", start.ToString("d. MMMM", Culture)) : F("am {0}.", start.Day)));
+        MonthlyChoices.Add(Choice(null, start.DayOfWeek));
         var position = RecurrenceSpec.PositionOf(start);
         if (position <= 4)
         {
-            MonthlyChoices.Add(new MonthlyChoice(position, start.DayOfWeek, yearly
-                ? F("am {0} {1} im {2}", RecurrenceSpec.Ordinal(position), dayName, month)
-                : F("am {0} {1}", RecurrenceSpec.Ordinal(position), dayName)));
+            MonthlyChoices.Add(Choice(position, start.DayOfWeek));
         }
 
         if (RecurrenceSpec.IsLastOfMonth(start))
         {
-            MonthlyChoices.Add(new MonthlyChoice(-1, start.DayOfWeek, yearly
-                ? F("am {0} {1} im {2}", RecurrenceSpec.Ordinal(-1), dayName, month)
-                : F("am {0} {1}", RecurrenceSpec.Ordinal(-1), dayName)));
+            MonthlyChoices.Add(Choice(-1, start.DayOfWeek));
         }
 
         // A rule read from the server on another weekday than the start's stays choosable.
         if (keep is { Position: { } kept } && keep.Weekdays.Count > 0 && MonthlyChoices.All(c => c.Position != kept || c.Day != keep.Weekdays[0]))
         {
-            var name = Culture.DateTimeFormat.GetDayName(keep.Weekdays[0]);
-            MonthlyChoices.Add(new MonthlyChoice(kept, keep.Weekdays[0], yearly
-                ? F("am {0} {1} im {2}", RecurrenceSpec.Ordinal(kept), name, month)
-                : F("am {0} {1}", RecurrenceSpec.Ordinal(kept), name)));
+            MonthlyChoices.Add(Choice(kept, keep.Weekdays[0]));
         }
 
         Monthly = keep is { Position: { } k } && keep.Weekdays.Count > 0

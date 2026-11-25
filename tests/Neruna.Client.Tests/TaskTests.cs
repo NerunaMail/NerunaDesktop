@@ -42,6 +42,7 @@ public class TaskTests
             Links = [new Uri("https://example.com/datei.pdf")],
             Categories = ["Projekt X"],
             State = TaskState.InProgress,
+            Percent = 40,
         };
         var data = (new TaskDraft("Rapport", null, new DateTime(2026, 11, 4), false, TaskPriority.None, false) { Details = details }).ToICalendar(null);
         Assert.Contains("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO", data, StringComparison.Ordinal);
@@ -55,6 +56,7 @@ public class TaskTests
         Assert.True(details.Repeat.SameAs(read.Repeat));
         Assert.Equal(details.Links, read.Links);
         Assert.Equal(details.Categories, read.Categories);
+        Assert.Equal(40, read.Percent);
 
         // Ticked done: two weeks later, open again, reminder moved along.
         var done = (TaskDraft.FromItem(item) with { IsCompleted = true }).ToICalendar(data);

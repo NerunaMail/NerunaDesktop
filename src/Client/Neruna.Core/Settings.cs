@@ -263,6 +263,9 @@ public static class SettingKeys
     /// <summary>The task list new tasks go to ("connectionId|remoteId").</summary>
     public const string TasksDefaultList = "tasks.defaultList";
 
+    /// <summary>Link kinds (schemes such as "zoommtg") opened without asking ("Nicht mehr fragen").</summary>
+    public const string TrustedLinkSchemes = "links.trustedSchemes";
+
     /// <summary>Crash reports to Neruna: null = ask (default), "always", "never".</summary>
     public const string CrashReports = "crash.reports";
 

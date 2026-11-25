@@ -43,7 +43,7 @@
       </ComboBox.ItemTemplate>
     </ComboBox>
 
-    <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding HasEnd}">
+    <Grid ColumnDefinitions="Auto,8,*" IsVisible="{Binding HasDetails}">
       <ComboBox ItemsSource="{Binding EndModes}" SelectedIndex="{Binding EndMode}" MinWidth="120" />
       <CalendarDatePicker Grid.Column="2" SelectedDate="{Binding EndDate}" HorizontalAlignment="Stretch" IsVisible="{Binding EndsOnDate}" />
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding EndsAfterCount}">

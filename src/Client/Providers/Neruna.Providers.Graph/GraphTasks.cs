@@ -56,8 +56,21 @@ internal static class GraphTasks
             throw new RemoteConflictException();
         }
 
-        return ToObject(await graph.SendJsonAsync(HttpMethod.Patch, $"{path}/{item.RemoteId}", body, cancellationToken));
+        // Only what changed: a field To Do does not take for this task (or keeps richer, like a formatted note) is
+        // then not touched by an unrelated change.
+        var changes = Changed(ToGraph(ToICalendar(current)), body);
+        if (changes.Count == 0)
+        {
+            return ToObject(current);
+        }
+
+        return ToObject(await graph.SendJsonAsync(HttpMethod.Patch, $"{path}/{item.RemoteId}", changes, cancellationToken));
     }
+
+    /// <summary>The fields of <paramref name="wanted"/> that differ from <paramref name="current"/>.</summary>
+    internal static Dictionary<string, object?> Changed(Dictionary<string, object?> current, Dictionary<string, object?> wanted) =>
+        wanted.Where(w => !current.TryGetValue(w.Key, out var now) || JsonSerializer.Serialize(now) != JsonSerializer.Serialize(w.Value))
+            .ToDictionary(w => w.Key, w => w.Value);
 
     public static Task DeleteAsync(CalendarInfo list, CalendarObject item, GraphClient graph, CancellationToken cancellationToken) =>
         graph.SendJsonAsync(HttpMethod.Delete, $"me/todo/lists/{ListId(list)}/tasks/{item.RemoteId}", null, cancellationToken);

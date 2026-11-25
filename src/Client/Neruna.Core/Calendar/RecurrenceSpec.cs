@@ -183,14 +183,28 @@ public sealed record RecurrenceSpec(RecurrenceFrequency Frequency, int Interval 
         var on = Frequency switch
         {
             RecurrenceFrequency.Weekly => F("am {0}", string.Join(", ", days.OrderBy(d => ((int)d + 6) % 7).Select(d => culture.DateTimeFormat.GetAbbreviatedDayName(d)))),
-            RecurrenceFrequency.Monthly when Position is { } p => F("am {0} {1}", Ordinal(p), culture.DateTimeFormat.GetDayName(days[0])),
-            RecurrenceFrequency.Monthly => F("am {0}.", start.Day),
-            RecurrenceFrequency.Yearly when Position is { } p => F("am {0} {1} im {2}", Ordinal(p), culture.DateTimeFormat.GetDayName(days[0]), culture.DateTimeFormat.GetMonthName(start.Month)),
-            RecurrenceFrequency.Yearly => F("am {0}", start.ToString("d. MMMM", culture)),
-            _ => null,
+            _ => OnDay(Frequency == RecurrenceFrequency.Yearly, Position, days[0], start),
         };
         var end = Count is { } count ? F("{0} Mal", count) : until is { } last ? F("bis {0}", last.ToString("d. MMMM yyyy", culture)) : null;
         return string.Join(" ", new[] { every, on, end }.Where(s => !string.IsNullOrEmpty(s)));
+    }
+
+    /// <summary>
+    /// Monthly or yearly: "am 14." / "am 14. März" (<paramref name="position"/> null) or "am zweiten Dienstag" /
+    /// "am zweiten Dienstag im März" – in the editor's choices and in the reading views alike.
+    /// </summary>
+    public static string OnDay(bool yearly, int? position, DayOfWeek day, DateTime start)
+    {
+        var culture = Culture;
+        if (position is not { } p)
+        {
+            return yearly ? F("am {0}", start.ToString("d. MMMM", culture)) : F("am {0}.", start.Day);
+        }
+
+        var name = culture.DateTimeFormat.GetDayName(day);
+        return yearly
+            ? F("am {0} {1} im {2}", Ordinal(p), name, culture.DateTimeFormat.GetMonthName(start.Month))
+            : F("am {0} {1}", Ordinal(p), name);
     }
 
     /// <summary>"ersten" … "letzten" for "am zweiten Dienstag".</summary>

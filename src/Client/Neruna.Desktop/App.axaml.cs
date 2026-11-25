@@ -128,6 +128,7 @@ internal sealed partial class App : Application
             }
 
             await Appearance.LoadAsync(_services.GetRequiredService<Neruna.Core.ISettingsStore>());
+            Infrastructure.LinkOpener.Settings = _services.GetRequiredService<Neruna.Core.ISettingsStore>();
             MailExport.Settings = _services.GetRequiredService<Neruna.Core.ISettingsStore>();
             Neruna.Core.Privacy.PrivacyStatistics.Current = _services.GetRequiredService<Neruna.Core.Privacy.PrivacyStatistics>();
             Editor.HtmlEditor.PlainTextOnly = await Neruna.Core.SettingsStoreExtensions.GetBoolAsync(_services.GetRequiredService<Neruna.Core.ISettingsStore>(), Neruna.Core.SettingKeys.ComposePlainText);

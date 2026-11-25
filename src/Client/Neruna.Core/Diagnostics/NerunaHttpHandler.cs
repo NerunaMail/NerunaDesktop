@@ -26,7 +26,9 @@ public sealed partial class NerunaHttpHandler(string userAgent, ILogger? logger 
         }
 
         var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (logger is not null && (response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500))
+        if (logger is not null && (response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500
+            // A rejected change (not a read, not a lost race): says why saving or deleting failed.
+            || (request.Method.Method is "POST" or "PUT" or "PATCH" or "DELETE" or "MOVE" && (int)response.StatusCode >= 400 && response.StatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.PreconditionFailed or HttpStatusCode.Unauthorized))))
         {
             await LogAsync(logger, request, response, cancellationToken).ConfigureAwait(false);
         }

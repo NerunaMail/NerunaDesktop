@@ -541,9 +541,16 @@ internal sealed partial class MessageBodyView : UserControl
             return;
         }
 
-        // Only web links leave the mail (an anchor within it, "about:", "data:" stay where they are).
-        if (!Uri.TryCreate(link, UriKind.Absolute, out var web) || web.Scheme is not ("https" or "http"))
+        // Web links are checked below; a link into another program only after asking (an anchor within the mail,
+        // "about:", "data:", "javascript:" stay where they are).
+        if (!Uri.TryCreate(link, UriKind.Absolute, out var web) || Neruna.Core.Security.LinkKinds.IsBlocked(web))
         {
+            return;
+        }
+
+        if (web.Scheme is not ("https" or "http"))
+        {
+            _ = Infrastructure.LinkOpener.OpenAsync(this, web);
             return;
         }
 

@@ -1519,6 +1519,7 @@ internal static class Snapshots
                 Links = [new Uri("https://example.com/vorlage.xlsx")],
                 Categories = ["Projekt"],
                 State = Neruna.Core.Calendar.TaskState.InProgress,
+                Percent = 40,
             },
         };
         vm.Overlay = new TaskEditorViewModel(taskController, calendarController, services.GetRequiredService<Neruna.Core.ISettingsStore>(), [taskList], detailed, null, taskList,

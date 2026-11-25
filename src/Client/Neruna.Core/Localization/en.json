@@ -3094,5 +3094,13 @@
  "{0} Mal": "{0} times",
  "Gespeichert, aber das Original in «{0}» konnte nicht gelöscht werden ({1}). Bitte dort von Hand löschen.": "Saved, but the original in “{0}” could not be deleted ({1}). Please delete it there by hand.",
  "«{0}» gelöscht": "“{0}” deleted",
- "Aufgabe konnte nicht gelöscht werden: {0}": "The task could not be deleted: {0}"
+ "Aufgabe konnte nicht gelöscht werden: {0}": "The task could not be deleted: {0}",
+ "In diese Liste kommen neue Aufgaben": "New tasks go into this list",
+ "Fortschritt": "Progress",
+ "{0} % erledigt": "{0} % done",
+ "Status / Fortschritt": "Status / progress",
+ "Bei «{0}:»-Links nicht mehr fragen": "Don't ask again for «{0}:» links",
+ "Der Link öffnet eine Datei oder einen Ordner.": "The link opens a file or folder.",
+ "Der Link öffnet ein anderes Programm («{0}:»).": "The link opens another program («{0}:»).",
+ "Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt.": "Only open it if you know where it leads."
 }

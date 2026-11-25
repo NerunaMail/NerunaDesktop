@@ -3094,5 +3094,13 @@
  "{0} Mal": "{0} fois",
  "Gespeichert, aber das Original in «{0}» konnte nicht gelöscht werden ({1}). Bitte dort von Hand löschen.": "Enregistré, mais l’original dans « {0} » n’a pas pu être supprimé ({1}). Supprime-le là-bas manuellement.",
  "«{0}» gelöscht": "« {0} » supprimée",
- "Aufgabe konnte nicht gelöscht werden: {0}": "La tâche n’a pas pu être supprimée : {0}"
+ "Aufgabe konnte nicht gelöscht werden: {0}": "La tâche n’a pas pu être supprimée : {0}",
+ "In diese Liste kommen neue Aufgaben": "Les nouvelles tâches vont dans cette liste",
+ "Fortschritt": "Progression",
+ "{0} % erledigt": "{0} % terminé",
+ "Status / Fortschritt": "Statut / progression",
+ "Bei «{0}:»-Links nicht mehr fragen": "Ne plus demander pour les liens «{0}:»",
+ "Der Link öffnet eine Datei oder einen Ordner.": "Le lien ouvre un fichier ou un dossier.",
+ "Der Link öffnet ein anderes Programm («{0}:»).": "Le lien ouvre un autre programme («{0}:»).",
+ "Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt.": "Ne l'ouvrez que si vous savez où il mène."
 }

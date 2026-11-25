@@ -9,9 +9,30 @@
              x:DataType="vm:TasksViewModel">
 
   <UserControl.Styles>
+    <Style Selector="TextBlock.detailKey">
+      <Setter Property="Margin" Value="0,3,0,5" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector=":is(Control).detailValue">
+      <Setter Property="Margin" Value="0,0,0,5" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
     <Style Selector="Border.taskrow">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.taskstate">
+      <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource AccentButtonForeground}" />
+    </Style>
+    <Style Selector="Border.taskstate.cancelled">
+      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+    </Style>
+    <!-- On the selected (blue) row the chip keeps an edge, so it does not melt into it -->
+    <Style Selector="Border.taskrow.selected Border.taskstate">
+      <Setter Property="BorderBrush" Value="{DynamicResource PaneBackgroundBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Border.taskrow:pointerover">
       <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}" />
@@ -23,27 +44,33 @@
 
   <Grid RowDefinitions="Auto,*">
 
-    <!-- Command bar: new task, quick add, filter, search -->
+    <!-- Command bar: new task, quick add and the list new tasks go into -->
     <Border Classes="pane" Padding="8,6" Margin="0,0,0,6">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-        <Button Classes="accent pageNew" Command="{Binding NewTaskCommand}" Padding="12,6" Margin="0,0,8,0" ToolTip.Tip="Ctrl+N">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Classes="accent pageNew" Command="{Binding NewTaskCommand}" Padding="12,6" ToolTip.Tip="Ctrl+N">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" />
             <TextBlock Text="{l:T 'Neue Aufgabe'}" />
           </StackPanel>
         </Button>
-        <TextBox Grid.Column="1" Text="{Binding NewTitle}" PlaceholderText="{l:T 'Aufgabe eintippen und Enter drücken'}" MaxWidth="520" HorizontalAlignment="Stretch">
+        <TextBox Text="{Binding NewTitle}" PlaceholderText="{l:T 'Aufgabe eintippen und Enter drücken'}" Width="420" VerticalAlignment="Center">
           <TextBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding QuickAddCommand}" />
           </TextBox.KeyBindings>
         </TextBox>
-        <ComboBox Grid.Column="2" ItemsSource="{Binding Filters}" SelectedIndex="{Binding FilterIndex}" MinWidth="230" Margin="12,0,8,0" VerticalAlignment="Center" />
-        <TextBox ctl:SearchBox.Clearable="True" Classes="pageSearch" Grid.Column="3" Text="{Binding Search}" PlaceholderText="{l:T 'Suchen (Ctrl+F)'}" Width="200" VerticalAlignment="Center">
-          <TextBox.InnerLeftContent>
-            <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
-          </TextBox.InnerLeftContent>
-        </TextBox>
-      </Grid>
+        <ComboBox ItemsSource="{Binding Targets}" SelectedItem="{Binding Target}" MinWidth="220" MaxWidth="320" VerticalAlignment="Center"
+                  ToolTip.Tip="{l:T 'In diese Liste kommen neue Aufgaben'}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:TaskTarget">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Width="10" Height="10" CornerRadius="5" Background="{Binding Brush}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="subtle" FontSize="11" Text="{Binding Account}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </StackPanel>
     </Border>
 
     <!-- The task list keeps its width (draggable, as with mails); the reading pane takes the rest -->
@@ -53,9 +80,11 @@
       <Border Classes="pane" Padding="12,10">
         <ScrollViewer>
           <StackPanel Spacing="4">
-            <TextBlock Text="{l:T 'Aufgabenlisten'}" FontWeight="SemiBold" />
-            <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasLists}"
-                       Text="{l:T 'Wählen Sie, welche Listen hier erscheinen. Über den Farbpunkt legen Sie fest, ob eine Liste auch im Kalender erscheint.'}" Margin="0,0,0,6" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{l:T 'Aufgabenlisten'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <PathIcon Data="{StaticResource IconInfo}" Width="13" Height="13" Opacity="0.6" VerticalAlignment="Center" Background="Transparent" IsVisible="{Binding HasLists}"
+                        ToolTip.Tip="{l:T 'Wählen Sie, welche Listen hier erscheinen. Über den Farbpunkt legen Sie fest, ob eine Liste auch im Kalender erscheint.'}" />
+            </StackPanel>
             <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HasLists}"
                        Text="{l:T 'Noch keine Aufgabenlisten. Aufgaben kommen aus CalDAV-Kalendern, die Aufgaben speichern, und aus Microsoft To Do (Microsoft-Konten, die vor Version 0.1.14 eingerichtet wurden: einmal unter Einstellungen → Konten → Bearbeiten neu anmelden).'}" />
             <ItemsControl ItemsSource="{Binding ListGroups}">
@@ -103,10 +132,19 @@
 
       <!-- The tasks, grouped by due date -->
       <Border Grid.Column="2" Classes="pane" Padding="16,10">
-        <Grid RowDefinitions="Auto,*">
-          <TextBlock Classes="subtle" Text="{Binding Summary}" Margin="0,0,0,6" />
-          <TextBlock Grid.Row="1" Classes="subtle" IsVisible="{Binding IsEmpty}" Text="{l:T 'Keine Aufgaben für diese Auswahl.'}" />
-          <ScrollViewer Grid.Row="1">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <!-- Filter and search over the list they act on -->
+          <Grid ColumnDefinitions="*,8,*" Margin="0,0,0,8">
+            <ComboBox ItemsSource="{Binding Filters}" SelectedIndex="{Binding FilterIndex}" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+            <TextBox ctl:SearchBox.Clearable="True" Classes="pageSearch" Grid.Column="2" Text="{Binding Search}" PlaceholderText="{l:T 'Suchen (Ctrl+F)'}" VerticalAlignment="Center">
+              <TextBox.InnerLeftContent>
+                <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource SubtleTextBrush}" />
+              </TextBox.InnerLeftContent>
+            </TextBox>
+          </Grid>
+          <TextBlock Grid.Row="1" Classes="subtle" Text="{Binding Summary}" Margin="0,0,0,6" />
+          <TextBlock Grid.Row="2" Classes="subtle" IsVisible="{Binding IsEmpty}" Text="{l:T 'Keine Aufgaben für diese Auswahl.'}" />
+          <ScrollViewer Grid.Row="2">
             <ItemsControl ItemsSource="{Binding Groups}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:TaskGroup">
@@ -122,27 +160,40 @@
                           <!-- The whole row reacts: a click shows the task, a double click edits it -->
                           <Border Classes="taskrow" Classes.selected="{Binding IsSelected}" Padding="6,6" CornerRadius="4"
                                   Tapped="OnRowTapped" DoubleTapped="OnRowDoubleTapped" ToolTip.Tip="{l:T 'Doppelklick: bearbeiten'}">
-                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+                            <Panel>
+                            <!-- Progress: the row filled as far as the task is done -->
+                            <ProgressBar Value="{Binding Percent}" Maximum="100" IsVisible="{Binding HasPercent}" IsHitTestVisible="False"
+                                         MinHeight="0" MinWidth="0" VerticalAlignment="Stretch" Margin="-6" CornerRadius="4"
+                                         Background="Transparent" Foreground="{DynamicResource SystemControlHighlightAccentBrush}" Opacity="0.18"
+                                         ToolTip.Tip="{Binding PercentText}" />
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
                               <CheckBox Grid.RowSpan="2" IsChecked="{Binding IsCompleted}" MinWidth="0" MinHeight="0" Padding="0" Margin="0,1,10,0"
                                         VerticalAlignment="Top" ToolTip.Tip="{l:T 'Erledigt'}">
                                 <CheckBox.RenderTransform>
                                   <ScaleTransform ScaleX="0.85" ScaleY="0.85" />
                                 </CheckBox.RenderTransform>
                               </CheckBox>
-                              <!-- The title takes what is left and is cut with "…" -->
+                              <!-- First line: the title gets all the room, then the due date and the list's colour -->
                               <DockPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock DockPanel.Dock="Left" Text="!" Foreground="#C42B1C" FontWeight="Bold" Margin="0,0,6,0" IsVisible="{Binding IsHigh}" ToolTip.Tip="{l:T 'Hohe Priorität'}" />
-                                <PathIcon DockPanel.Dock="Right" Data="{StaticResource IconClock}" Width="11" Height="11" Opacity="0.6" Margin="6,0,0,0"
-                                          IsVisible="{Binding HasReminder}" ToolTip.Tip="{Binding ReminderText}" VerticalAlignment="Center" />
-                                <TextBlock DockPanel.Dock="Right" Classes="subtle" Text="↻" FontSize="12" Margin="6,0,0,0" IsVisible="{Binding HasRepeats}" ToolTip.Tip="{Binding RepeatsText}" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding Title}" TextDecorations="{Binding Decorations}" TextTrimming="CharacterEllipsis" />
                               </DockPanel>
-                              <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="4" Classes="subtle" FontSize="12" Text="{Binding NotePreview}"
-                                         IsVisible="{Binding HasNotes}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
-                              <TextBlock Grid.Column="2" Text="{Binding DueText}" Classes="subtle" Classes.error="{Binding IsOverdue}" FontSize="12" VerticalAlignment="Center" Margin="12,0" />
-                              <Border Grid.Column="3" Width="8" Height="8" CornerRadius="4" Background="{Binding Brush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                              <TextBlock Grid.Column="4" Classes="subtle" FontSize="12" Text="{Binding ListName}" VerticalAlignment="Center" MaxWidth="160" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="2" Text="{Binding DueText}" Classes="subtle" Classes.error="{Binding IsOverdue}" FontSize="12" VerticalAlignment="Center" Margin="12,0,8,0" />
+                              <Border Grid.Column="3" Width="8" Height="8" CornerRadius="4" Background="{Binding Brush}" VerticalAlignment="Center" ToolTip.Tip="{Binding ListName}" />
+                              <!-- Second line: state, repeat, reminder, then the note's first line -->
+                              <DockPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3">
+                                <Border DockPanel.Dock="Left" Classes="taskstate" Classes.cancelled="{Binding IsCancelledState}" IsVisible="{Binding HasState}"
+                                        CornerRadius="8" Padding="6,0" Margin="0,3,6,0" VerticalAlignment="Center" ToolTip.Tip="{Binding PercentText}">
+                                  <TextBlock Text="{Binding StateLabel}" FontSize="11" />
+                                </Border>
+                                <TextBlock DockPanel.Dock="Left" Classes="subtle" Text="↻" FontSize="12" Margin="0,3,6,0" IsVisible="{Binding HasRepeats}" ToolTip.Tip="{Binding RepeatsText}" VerticalAlignment="Center" />
+                                <PathIcon DockPanel.Dock="Left" Data="{StaticResource IconClock}" Width="11" Height="11" Opacity="0.6" Margin="0,3,6,0"
+                                          IsVisible="{Binding HasReminder}" ToolTip.Tip="{Binding ReminderText}" VerticalAlignment="Center" />
+                                <TextBlock Classes="subtle" FontSize="12" Text="{Binding NotePreview}" IsVisible="{Binding HasNotes}" TextTrimming="CharacterEllipsis"
+                                           Margin="0,3,0,0" VerticalAlignment="Center" />
+                              </DockPanel>
                             </Grid>
+                            </Panel>
                           </Border>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
@@ -187,6 +238,7 @@
               <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock FontWeight="SemiBold" Foreground="{DynamicResource HyperlinkButtonForeground}" Text="{Binding SelectedTask.StateText, FallbackValue=''}"
                            IsVisible="{Binding SelectedTask.HasState, FallbackValue=False}" />
+                <TextBlock Classes="subtle" Text="{Binding SelectedTask.PercentText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasPercent, FallbackValue=False}" />
                 <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding SelectedTask.HasPrivacy, FallbackValue=False}">
                   <PathIcon Data="{StaticResource IconLock}" Width="12" Height="12" Opacity="0.7" VerticalAlignment="Center" />
                   <TextBlock Classes="subtle" Text="{Binding SelectedTask.PrivacyText, FallbackValue=''}" VerticalAlignment="Center" />
@@ -194,34 +246,38 @@
               </StackPanel>
             </StackPanel>
             <ScrollViewer Grid.Row="1" Margin="0,8,0,0">
-              <StackPanel Spacing="2">
-                <TextBlock Classes="label" Text="{l:T 'Beginnt am'}" IsVisible="{Binding SelectedTask.HasStart, FallbackValue=False}" />
-                <TextBlock Text="{Binding SelectedTask.StartText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasStart, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Fällig am'}" IsVisible="{Binding SelectedTask.HasDue, FallbackValue=False}" />
-                <TextBlock Text="{Binding SelectedTask.DueLongText, FallbackValue=''}" Classes.error="{Binding SelectedTask.IsOverdue, FallbackValue=False}"
-                           IsVisible="{Binding SelectedTask.HasDue, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Erinnerung'}" IsVisible="{Binding SelectedTask.HasReminder, FallbackValue=False}" />
-                <TextBlock Text="{Binding SelectedTask.ReminderText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasReminder, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Wiederholung'}" IsVisible="{Binding SelectedTask.HasRepeats, FallbackValue=False}" />
-                <TextBlock Text="{Binding SelectedTask.RepeatsText, FallbackValue=''}" TextWrapping="Wrap" IsVisible="{Binding SelectedTask.HasRepeats, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Ort'}" IsVisible="{Binding SelectedTask.HasLocation, FallbackValue=False}" />
-                <ctl:LinkedText Linked="{Binding SelectedTask.Location, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasLocation, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Priorität'}" IsVisible="{Binding SelectedTask.HasPriority, FallbackValue=False}" />
-                <TextBlock Text="{Binding SelectedTask.PriorityText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasPriority, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Liste'}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Border Width="10" Height="10" CornerRadius="5" Background="{Binding SelectedTask.Brush, FallbackValue={x:Null}}" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding SelectedTask.ListName, FallbackValue=''}" />
-                  <TextBlock Classes="subtle" Text="{l:T 'schreibgeschützt'}" IsVisible="{Binding SelectedTask.IsReadOnly, FallbackValue=False}" />
+              <StackPanel Spacing="12">
+                <!-- Label left, value right: everything at a glance; the notes below in full width -->
+                <Grid ColumnDefinitions="Auto,16,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                  <TextBlock Grid.Row="0" Classes="label detailKey" Text="{l:T 'Beginnt am'}" IsVisible="{Binding SelectedTask.HasStart, FallbackValue=False}" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" Classes="detailValue" Text="{Binding SelectedTask.StartText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasStart, FallbackValue=False}" />
+                  <TextBlock Grid.Row="1" Classes="label detailKey" Text="{l:T 'Fällig am'}" IsVisible="{Binding SelectedTask.HasDue, FallbackValue=False}" />
+                  <TextBlock Grid.Row="1" Grid.Column="2" Classes="detailValue" Text="{Binding SelectedTask.DueLongText, FallbackValue=''}" Classes.error="{Binding SelectedTask.IsOverdue, FallbackValue=False}" IsVisible="{Binding SelectedTask.HasDue, FallbackValue=False}" />
+                  <TextBlock Grid.Row="2" Classes="label detailKey" Text="{l:T 'Erinnerung'}" IsVisible="{Binding SelectedTask.HasReminder, FallbackValue=False}" />
+                  <TextBlock Grid.Row="2" Grid.Column="2" Classes="detailValue" Text="{Binding SelectedTask.ReminderText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasReminder, FallbackValue=False}" />
+                  <TextBlock Grid.Row="3" Classes="label detailKey" Text="{l:T 'Wiederholung'}" IsVisible="{Binding SelectedTask.HasRepeats, FallbackValue=False}" />
+                  <TextBlock Grid.Row="3" Grid.Column="2" Classes="detailValue" Text="{Binding SelectedTask.RepeatsText, FallbackValue=''}" TextWrapping="Wrap" IsVisible="{Binding SelectedTask.HasRepeats, FallbackValue=False}" />
+                  <TextBlock Grid.Row="4" Classes="label detailKey" Text="{l:T 'Ort'}" IsVisible="{Binding SelectedTask.HasLocation, FallbackValue=False}" />
+                  <ctl:LinkedText Grid.Row="4" Grid.Column="2" Classes="detailValue" Linked="{Binding SelectedTask.Location, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasLocation, FallbackValue=False}" />
+                  <TextBlock Grid.Row="5" Classes="label detailKey" Text="{l:T 'Priorität'}" IsVisible="{Binding SelectedTask.HasPriority, FallbackValue=False}" />
+                  <TextBlock Grid.Row="5" Grid.Column="2" Classes="detailValue" Text="{Binding SelectedTask.PriorityText, FallbackValue=''}" IsVisible="{Binding SelectedTask.HasPriority, FallbackValue=False}" />
+                  <TextBlock Grid.Row="6" Classes="label detailKey" Text="{l:T 'Liste'}" />
+                  <StackPanel Grid.Row="6" Grid.Column="2" Classes="detailValue" Orientation="Horizontal" Spacing="8">
+                    <Border Width="10" Height="10" CornerRadius="5" Background="{Binding SelectedTask.Brush, FallbackValue={x:Null}}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding SelectedTask.ListName, FallbackValue=''}" />
+                    <TextBlock Classes="subtle" Text="{l:T 'schreibgeschützt'}" IsVisible="{Binding SelectedTask.IsReadOnly, FallbackValue=False}" />
+                  </StackPanel>
+                  <TextBlock Grid.Row="7" Classes="label detailKey" Text="{l:T 'Kategorien'}" IsVisible="{Binding SelectedTask.HasCategories, FallbackValue=False}" />
+                  <TextBlock Grid.Row="7" Grid.Column="2" Classes="detailValue" Text="{Binding SelectedTask.CategoriesText, FallbackValue=''}" TextWrapping="Wrap" IsVisible="{Binding SelectedTask.HasCategories, FallbackValue=False}" />
+                  <TextBlock Grid.Row="8" Classes="label detailKey" Text="{l:T 'Link'}" IsVisible="{Binding SelectedTask.HasUrl, FallbackValue=False}" />
+                  <ctl:LinkedText Grid.Row="8" Grid.Column="2" Classes="detailValue" Linked="{Binding SelectedTask.Url, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasUrl, FallbackValue=False}" />
+                  <TextBlock Grid.Row="9" Classes="label detailKey" Text="{l:T 'Anhänge'}" IsVisible="{Binding SelectedTask.HasLinks, FallbackValue=False}" />
+                  <ctl:LinkedText Grid.Row="9" Grid.Column="2" Classes="detailValue" Linked="{Binding SelectedTask.Links, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasLinks, FallbackValue=False}" />
+                </Grid>
+                <StackPanel Spacing="2" IsVisible="{Binding SelectedTask.HasNotes, FallbackValue=False}">
+                  <TextBlock Classes="label" Text="{l:T 'Notizen'}" />
+                  <ctl:LinkedText Linked="{Binding SelectedTask.Notes, FallbackValue={x:Null}}" />
                 </StackPanel>
-                <TextBlock Classes="label" Text="{l:T 'Kategorien'}" IsVisible="{Binding SelectedTask.HasCategories, FallbackValue=False}" />
-                <TextBlock Text="{Binding SelectedTask.CategoriesText, FallbackValue=''}" TextWrapping="Wrap" IsVisible="{Binding SelectedTask.HasCategories, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Link'}" IsVisible="{Binding SelectedTask.HasUrl, FallbackValue=False}" />
-                <ctl:LinkedText Linked="{Binding SelectedTask.Url, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasUrl, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Anhänge'}" IsVisible="{Binding SelectedTask.HasLinks, FallbackValue=False}" />
-                <ctl:LinkedText Linked="{Binding SelectedTask.Links, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasLinks, FallbackValue=False}" />
-                <TextBlock Classes="label" Text="{l:T 'Notizen'}" IsVisible="{Binding SelectedTask.HasNotes, FallbackValue=False}" />
-                <ctl:LinkedText Linked="{Binding SelectedTask.Notes, FallbackValue={x:Null}}" IsVisible="{Binding SelectedTask.HasNotes, FallbackValue=False}" />
               </StackPanel>
             </ScrollViewer>
           </Grid>

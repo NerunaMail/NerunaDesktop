@@ -800,7 +800,9 @@ public sealed partial class MessageContent
     /// Where the web addresses are in a plain text (to show them clickable in it): position, length and address, in
     /// order, each place where one stands.
     /// </summary>
-    public static IReadOnlyList<(int Start, int Length, Uri Uri)> FindLinkRanges(string? text)
+    /// <param name="otherSchemes">Also links of other kinds (mailto:, tel:, ftp://, links into programs) – opened only after
+    /// asking, see <see cref="Security.LinkKinds"/>; never script or data links.</param>
+    public static IReadOnlyList<(int Start, int Length, Uri Uri)> FindLinkRanges(string? text, bool otherSchemes = false)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -808,10 +810,11 @@ public sealed partial class MessageContent
         }
 
         var ranges = new List<(int, int, Uri)>();
-        foreach (Match match in PlainUrl().Matches(text))
+        foreach (Match match in (otherSchemes ? AnyUrl() : PlainUrl()).Matches(text))
         {
             var value = match.Value.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? "https://" + match.Value : match.Value;
-            if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+            if (Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                && (uri.Scheme is "http" or "https" || (otherSchemes && !Security.LinkKinds.IsBlocked(uri))))
             {
                 ranges.Add((match.Index, match.Length, uri));
             }
@@ -823,6 +826,10 @@ public sealed partial class MessageContent
     // Trailing punctuation belongs to the sentence, not the link ("siehe https://example.com.").
     [GeneratedRegex(@"(?:https?://|www\.)[^\s<>""]*[^\s<>"".,;:!?)\]']", RegexOptions.IgnoreCase)]
     private static partial Regex PlainUrl();
+
+    // Besides web links: any "scheme://…" and the usual links without slashes (mail, phone, chat). Not "Hinweis:Text".
+    [GeneratedRegex(@"(?<![\w.+-])(?:https?://|www\.|[a-z][a-z0-9+.-]{1,30}://|(?:mailto|tel|sip|sips|callto|xmpp|skype|facetime|geo|magnet):(?=\S))[^\s<>""]*[^\s<>"".,;:!?)\]']", RegexOptions.IgnoreCase)]
+    private static partial Regex AnyUrl();
 
     [GeneratedRegex(@"<pre\b((?:\s+(?:class|id|dir|lang)=""[^""]*"")*)[^>]*>(.*?)</pre>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex PreBlock();

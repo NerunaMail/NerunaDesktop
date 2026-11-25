@@ -18,6 +18,7 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
     private readonly TaskItem? _existing;
     private readonly CalendarController _calendar;
     private readonly IReadOnlyList<string> _categories;
+    private readonly int _readPercent;
 
     public TaskEditorViewModel(TaskController tasks, CalendarController calendar, ISettingsStore settings, IReadOnlyList<CalendarInfo> lists, TaskDraft draft,
         TaskItem? existing, CalendarInfo target, IReadOnlyList<CalendarCategory> knownCategories)
@@ -38,6 +39,8 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
         DueTime = draft.Due is { } due && draft.DueHasTime ? due.TimeOfDay : new TimeSpan(9, 0, 0);
         PriorityIndex = (int)draft.Priority;
         StateIndex = draft.IsCompleted ? 2 : details.State switch { TaskState.InProgress => 1, TaskState.Cancelled => 3, _ => 0 };
+        Percent = details.Percent;
+        _readPercent = details.Percent;
         HasStart = details.Start is not null;
         StartDate = details.Start ?? DateTime.Today;
         HasReminder = details.ReminderAt is not null;
@@ -73,7 +76,7 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
     /// <summary>Which fields the chosen list keeps; until known, all are shown.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowStart), nameof(ShowReminder), nameof(ShowRecurrence), nameof(ShowCategories), nameof(ShowLocation),
-        nameof(ShowPrivacy), nameof(ShowLinks), nameof(States), nameof(StateChoice), nameof(HasFewFields))]
+        nameof(ShowPrivacy), nameof(ShowLinks), nameof(ShowPercent), nameof(StatusLabel), nameof(States), nameof(StateChoice), nameof(HasFewFields))]
     public partial TaskFields Fields { get; set; } = TaskFields.All;
 
     public bool ShowStart => Fields.HasFlag(TaskFields.Start);
@@ -89,6 +92,41 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
     public bool ShowPrivacy => Fields.HasFlag(TaskFields.Privacy);
 
     public bool ShowLinks => Fields.HasFlag(TaskFields.Links);
+
+    public bool ShowPercent => Fields.HasFlag(TaskFields.Percent);
+
+    public string StatusLabel => ShowPercent ? T("Status / Fortschritt") : T("Status");
+
+    /// <summary>"Fortschritt" in percent; done means 100.</summary>
+    [ObservableProperty]
+    public partial decimal? Percent { get; set; }
+
+    partial void OnPercentChanged(decimal? value)
+    {
+        // Some progress on an open task: it is being worked on.
+        if (value is > 0 and < 100 && StateIndex == 0 && Fields.HasFlag(TaskFields.InProgress))
+        {
+            StateIndex = 1;
+        }
+        else if (value >= 100 && StateIndex != 2)
+        {
+            // Fully done is done.
+            StateIndex = 2;
+        }
+    }
+
+    partial void OnStateIndexChanged(int value)
+    {
+        // Done means 100 %; reopened, it no longer is.
+        if (value == 2 && Percent is not >= 100)
+        {
+            Percent = 100;
+        }
+        else if (value != 2 && Percent >= 100)
+        {
+            Percent = 0;
+        }
+    }
 
     /// <summary>The list's service keeps fewer fields: say so, so nobody looks for the others.</summary>
     public bool HasFewFields => Fields != TaskFields.All;
@@ -273,6 +311,7 @@ internal sealed partial class TaskEditorViewModel : ViewModelBase
             // Without a list (no categories set up) the task keeps its own.
             Categories = CategoryChoices.Count > 0 ? [.. SelectedCategories.Select(c => c.Name)] : _categories,
             State = StateIndex switch { 1 => TaskState.InProgress, 3 => TaskState.Cancelled, _ => TaskState.Open },
+            Percent = ShowPercent ? Math.Clamp((int)(Percent ?? 0), 0, 100) : _readPercent,
         };
         var draft = new TaskDraft(Summary, Notes, due, HasDue && HasTime, (TaskPriority)Math.Clamp(PriorityIndex, 0, 3), StateIndex == 2)
         {

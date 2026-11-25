@@ -119,6 +119,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
                             // Ticking a list ends "only this list": the ticks are the selection again.
                             _solo.Set(null, AllLists);
                             await tasks.SetListVisibleAsync(item.Info, item.IsVisible);
+                            await RefreshTargetsAsync();
                             Rebuild();
                         }
                         else if (e.PropertyName == nameof(TaskListItem.ShowTasks))
@@ -133,6 +134,8 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
             }
 
             OnPropertyChanged(nameof(HasLists));
+            _accounts = accounts;
+            await RefreshTargetsAsync();
             Rebuild();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -168,6 +171,7 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
     private void ToggleSolo(TaskListItem item)
     {
         _solo.Toggle(item, AllLists);
+        _ = RefreshTargetsAsync();
         Rebuild();
     }
 
@@ -302,14 +306,62 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
         }
     }
 
+    /// <summary>The lists a new task can go into (beside the quick-add box), with their account.</summary>
+    public ObservableCollection<TaskTarget> Targets { get; } = [];
+
+    // While the choices are refilled, the selection is not a choice of the user's.
+    private bool _refreshingTargets;
+
+    /// <summary>Where new tasks go (quick add and "Neue Aufgabe"); kept as the default list.</summary>
+    [ObservableProperty]
+    public partial TaskTarget? Target { get; set; }
+
+    partial void OnTargetChanged(TaskTarget? value)
+    {
+        if (!_refreshingTargets && value is not null)
+        {
+            _ = settings.SetAsync(SettingKeys.TasksDefaultList, CalendarController.CalendarKey(value.Info));
+        }
+    }
+
+    private IReadOnlyDictionary<Guid, string> _accounts = new Dictionary<Guid, string>();
+
+    // Only lists shown on the left: a new task never lands where it cannot be seen (all, when none is shown).
+    private async Task RefreshTargetsAsync()
+    {
+        _refreshingTargets = true;
+        try
+        {
+            var chosen = await DefaultListAsync(fromChoice: false);
+            var writable = AllLists.Where(l => !l.Info.IsReadOnly).ToList();
+            var shown = writable.Where(l => IsShown(l.Info)).ToList();
+            Targets.Clear();
+            foreach (var item in shown.Count > 0 ? shown : writable)
+            {
+                Targets.Add(new TaskTarget(item.Info, item.Brush, _accounts.GetValueOrDefault(item.Info.ConnectionId) ?? string.Empty));
+            }
+
+            Target = Targets.FirstOrDefault(t => chosen is not null && Same(t.Info, chosen)) ?? Targets.FirstOrDefault();
+        }
+        finally
+        {
+            _refreshingTargets = false;
+        }
+    }
+
     private IReadOnlyList<CalendarInfo> WritableLists() =>
         [.. ListGroups.SelectMany(g => g.Lists).Select(l => l.Info).Where(l => !l.IsReadOnly)];
 
-    private async Task<CalendarInfo?> DefaultListAsync()
+    private async Task<CalendarInfo?> DefaultListAsync(bool fromChoice = true)
     {
+        if (fromChoice && Target is { } target)
+        {
+            return target.Info;
+        }
+
         var writable = WritableLists();
         var chosen = await settings.GetAsync(SettingKeys.TasksDefaultList);
-        return writable.FirstOrDefault(l => CalendarController.CalendarKey(l) == chosen)
+        return writable.FirstOrDefault(l => CalendarController.CalendarKey(l) == chosen && IsShown(l))
                ?? writable.FirstOrDefault(IsShown)
                ?? writable.FirstOrDefault();
     }
@@ -370,6 +422,14 @@ internal sealed partial class TasksViewModel(CalendarController calendar, TaskCo
         var editor = new TaskEditorViewModel(tasks, calendar, settings, lists, draft, existing, target, await categories.GetAllAsync());
         EditorRequested?.Invoke(this, editor);
     }
+}
+
+/// <summary>A list new tasks can go into, for the choice beside the quick-add box.</summary>
+internal sealed record TaskTarget(CalendarInfo Info, Avalonia.Media.IBrush Brush, string Account)
+{
+    public string Name => Info.Name;
+
+    public override string ToString() => Info.Name;
 }
 
 /// <summary>The task lists of one account in the side pane.</summary>
@@ -479,6 +539,18 @@ internal sealed partial class TaskRow : ObservableObject
     };
 
     public bool HasState => StateText is not null;
+
+    /// <summary>The state chip in the list: "In Bearbeitung · 40 %".</summary>
+    public string? StateLabel => StateText is null ? null : HasPercent ? $"{StateText} · {Percent} %" : StateText;
+
+    public bool IsCancelledState => !Item.IsCompleted && Details.State == TaskState.Cancelled;
+
+    /// <summary>How far along (0–100); the row is filled that far.</summary>
+    public int Percent => Item.IsCompleted ? 0 : Details.Percent;
+
+    public bool HasPercent => Percent > 0;
+
+    public string? PercentText => HasPercent ? F("{0} % erledigt", Percent) : null;
 
     public string? Location => Details.Location;
 

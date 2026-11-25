@@ -153,5 +153,54 @@ internal static class LinkDialog
         return open;
     }
 
+    /// <summary>A link into another program (or a file): open it? With "nicht mehr fragen" for this kind of link.</summary>
+    /// <returns>Open, and whether not to ask again for this kind.</returns>
+    public static async Task<(bool Open, bool Remember)> ShowOtherAsync(Window owner, Uri uri, bool canRemember)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(uri);
+        var open = false;
+        var dialog = new Window
+        {
+            Title = T("Link öffnen"),
+            Width = 480,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Icon = owner.Icon,
+        };
+        dialog.Bind(Window.BackgroundProperty, dialog.GetResourceObservable("PaneBackgroundBrush"));
+        var remember = new CheckBox { Content = F("Bei «{0}:»-Links nicht mehr fragen", uri.Scheme), IsVisible = canRemember };
+        var openButton = new Button { Content = T("Öffnen"), MinWidth = 90 };
+        openButton.Click += (_, _) =>
+        {
+            open = true;
+            dialog.Close();
+        };
+        var cancel = new Button { Content = T("Abbrechen"), MinWidth = 90, IsDefault = true, IsCancel = true, Classes = { "accent" } };
+        cancel.Click += (_, _) => dialog.Close();
+        var text = uri.IsFile ? uri.LocalPath : uri.OriginalString;
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(24, 20),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "⚠ " + (uri.IsFile ? T("Der Link öffnet eine Datei oder einen Ordner.") : F("Der Link öffnet ein anderes Programm («{0}:»).", uri.Scheme)),
+                    FontWeight = FontWeight.SemiBold, Foreground = MediumBrush, TextWrapping = TextWrapping.Wrap,
+                },
+                new SelectableTextBlock { Text = text.Length > 300 ? text[..300] + "…" : text, FontSize = 12, Classes = { "subtle" }, TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = T("Öffnen Sie ihn nur, wenn Sie wissen, wohin er führt."), TextWrapping = TextWrapping.Wrap },
+                remember,
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0), Children = { openButton, cancel } },
+            },
+        };
+        await dialog.ShowDialog(owner);
+        return (open, open && remember.IsChecked == true);
+    }
+
     private static TextBlock Label(string text) => new() { Text = text, FontSize = 12, Classes = { "subtle" }, Margin = new Thickness(0, 4, 0, 0) };
 }

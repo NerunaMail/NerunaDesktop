@@ -44,8 +44,15 @@
         <ComboBox ItemsSource="{Binding Priorities}" SelectedIndex="{Binding PriorityIndex}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}" />
       </StackPanel>
       <StackPanel Grid.Column="2">
-        <TextBlock Classes="label" Text="{l:T 'Status'}" />
-        <ComboBox ItemsSource="{Binding States}" SelectedIndex="{Binding StateChoice}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}" />
+        <TextBlock Classes="label" Text="{Binding StatusLabel}" />
+        <Grid ColumnDefinitions="*,8,Auto">
+          <ComboBox ItemsSource="{Binding States}" SelectedIndex="{Binding StateChoice}" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEdit}" />
+          <!-- Progress in percent, where the list keeps it -->
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" IsVisible="{Binding ShowPercent}">
+            <NumericUpDown Value="{Binding Percent}" Minimum="0" Maximum="100" Increment="10" FormatString="0" Width="110" IsEnabled="{Binding CanEdit}" />
+            <TextBlock Text="%" VerticalAlignment="Center" />
+          </StackPanel>
+        </Grid>
       </StackPanel>
     </Grid>
 

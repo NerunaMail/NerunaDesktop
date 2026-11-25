@@ -64,6 +64,9 @@ public sealed record TaskDetails
 
     public TaskState State { get; init; }
 
+    /// <summary>How far along, 0–100 (iCalendar PERCENT-COMPLETE).</summary>
+    public int Percent { get; init; }
+
     /// <summary>The day a recurrence counts from: the start, else the due day, else today.</summary>
     public static DateTime SeriesStart(DateTime? start, DateTime? due) => (start ?? due ?? DateTime.Today).Date;
 
@@ -86,6 +89,7 @@ public sealed record TaskDetails
             Url = todo.Url is { IsAbsoluteUri: true } url ? url.OriginalString : null,
             Links = [.. todo.Attachments.Where(a => a.Uri is { IsAbsoluteUri: true }).Select(a => a.Uri!).Distinct()],
             Categories = [.. todo.Categories.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)],
+            Percent = Math.Clamp(todo.PercentComplete, 0, 100),
             State = todo.Status?.ToUpperInvariant() switch
             {
                 "IN-PROCESS" => TaskState.InProgress,
@@ -382,6 +386,11 @@ public sealed record TaskDraft(string Summary, string? Notes, DateTime? Due, boo
             {
                 todo.Attachments.Add(new Attachment { Uri = link });
             }
+        }
+
+        if (read.Percent != details.Percent)
+        {
+            todo.PercentComplete = Math.Clamp(details.Percent, 0, 100);
         }
 
         if (!read.Categories.SequenceEqual(details.Categories))

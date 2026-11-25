@@ -8,7 +8,7 @@ using Neruna.Core.Mail;
 namespace Neruna.Desktop.Controls;
 
 /// <summary>
-/// A plain text to read (notes of a task, description of an event) with its web addresses clickable right where they
+/// A plain text to read (notes of a task, description of an event) with its links clickable right where they
 /// stand; the text stays selectable for copying. A click opens a link only when nothing was selected by it.
 /// </summary>
 internal sealed class LinkedText : SelectableTextBlock
@@ -42,7 +42,7 @@ internal sealed class LinkedText : SelectableTextBlock
 
     private void Build(string text)
     {
-        _links = MessageContent.FindLinkRanges(text);
+        _links = MessageContent.FindLinkRanges(text, otherSchemes: true);
         var inlines = new InlineCollection();
         var at = 0;
         foreach (var (start, length, _) in _links)
@@ -101,9 +101,9 @@ internal sealed class LinkedText : SelectableTextBlock
     {
         base.OnPointerReleased(e);
         if (e.InitialPressMouseButton == MouseButton.Left && SelectionStart == SelectionEnd
-            && LinkAt(e.GetPosition(this)) is { } uri && TopLevel.GetTopLevel(this) is { } top)
+            && LinkAt(e.GetPosition(this)) is { } uri)
         {
-            _ = top.Launcher.LaunchUriAsync(uri);
+            _ = Infrastructure.LinkOpener.OpenAsync(this, uri);
             e.Handled = true;
         }
     }

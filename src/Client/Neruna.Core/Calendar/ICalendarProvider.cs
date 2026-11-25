@@ -80,7 +80,8 @@ public enum TaskFields
     Privacy = 64,
     Links = 128,
     Cancelled = 256,
-    All = Start | Reminder | Recurrence | Categories | InProgress | Location | Privacy | Links | Cancelled,
+    Percent = 512,
+    All = Start | Reminder | Recurrence | Categories | InProgress | Location | Privacy | Links | Cancelled | Percent,
 }
 
 /// <summary>Optional, for task services with fewer fields than iCalendar (without it: <see cref="TaskFields.All"/>).</summary>

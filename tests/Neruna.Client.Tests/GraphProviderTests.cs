@@ -302,13 +302,18 @@ public class GraphProviderTests
         Assert.False(offer.DueHasTime);
         Assert.Equal(["GONE"], synced.RemovedRemoteIds);
 
-        // Done in Neruna: PATCH with status completed.
-        http2.Routes["GET /v1.0/me/todo/lists/L1/tasks/T1"] = """{"id":"T1","lastModifiedDateTime":"2026-10-10T08:00:00Z"}""";
+        // Done in Neruna: PATCH with status completed – only that, the unchanged fields are left alone.
+        http2.Routes["GET /v1.0/me/todo/lists/L1/tasks/T1"] = """
+            {"id":"T1","title":"Offerte schicken","status":"notStarted","importance":"high","lastModifiedDateTime":"2026-10-10T08:00:00Z",
+             "body":{"content":"An Marco","contentType":"text"},"dueDateTime":{"dateTime":"2026-10-14T00:00:00.0000000","timeZone":"UTC"}}
+            """;
         http2.Routes["PATCH /v1.0/me/todo/lists/L1/tasks/T1"] = """{"id":"T1","title":"Offerte schicken","status":"completed","lastModifiedDateTime":"2026-10-10T09:00:00Z"}""";
         var data = (TaskDraft.FromItem(offer) with { IsCompleted = true }).ToICalendar(synced.AddedOrChanged[0].ICalendarData);
         var saved = await provider.SaveAsync(list, synced.AddedOrChanged[0] with { ICalendarData = data }, ct);
         Assert.Contains("\"status\":\"completed\"", http2.Bodies.Last(), StringComparison.Ordinal);
-        Assert.Contains("\"importance\":\"high\"", http2.Bodies.Last(), StringComparison.Ordinal);
+        Assert.DoesNotContain("importance", http2.Bodies.Last(), StringComparison.Ordinal);
+        Assert.DoesNotContain("startDateTime", http2.Bodies.Last(), StringComparison.Ordinal);
+        Assert.DoesNotContain("title", http2.Bodies.Last(), StringComparison.Ordinal);
         Assert.Equal("2026-10-10T09:00:00Z", saved.ETag);
     }
 
