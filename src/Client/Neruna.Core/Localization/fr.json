@@ -3118,5 +3118,16 @@
  "Hintergrund der Termine": "Arrière-plan des rendez-vous",
  "Farbe des Kalenders": "Couleur du calendrier",
  "Farbe der Kategorie": "Couleur de la catégorie",
- "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "La couleur du calendrier reste une ligne à gauche, les catégories des lignes à droite. Si un rendez-vous a plusieurs catégories, la couleur du calendrier s’applique."
+ "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "La couleur du calendrier reste une ligne à gauche, les catégories des lignes à droite. Si un rendez-vous a plusieurs catégories, la couleur du calendrier s’applique.",
+ "Fingerabdruck": "Empreinte",
+ "Ausgestellt von": "Émis par",
+ "Gültig ab": "Valable dès",
+ "noch nicht gültig": "pas encore valable",
+ "Seriennummer": "Numéro de série",
+ "Fingerabdruck (SHA-256)": "Empreinte (SHA-256)",
+ "Fingerabdruck (SHA-1)": "Empreinte (SHA-1)",
+ "Inhaber (vollständig)": "Titulaire (complet)",
+ "Aussteller (vollständig)": "Émetteur (complet)",
+ "Signiert am": "Signé le",
+ "Zertifikat anzeigen": "Afficher le certificat"
 }

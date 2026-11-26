@@ -3118,5 +3118,16 @@
  "Hintergrund der Termine": "Event background",
  "Farbe des Kalenders": "Colour of the calendar",
  "Farbe der Kategorie": "Colour of the category",
- "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "The calendar’s colour stays as a line on the left, the categories as lines on the right. If an event has several categories, the calendar’s colour applies."
+ "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "The calendar’s colour stays as a line on the left, the categories as lines on the right. If an event has several categories, the calendar’s colour applies.",
+ "Fingerabdruck": "Fingerprint",
+ "Ausgestellt von": "Issued by",
+ "Gültig ab": "Valid from",
+ "noch nicht gültig": "not yet valid",
+ "Seriennummer": "Serial number",
+ "Fingerabdruck (SHA-256)": "Fingerprint (SHA-256)",
+ "Fingerabdruck (SHA-1)": "Fingerprint (SHA-1)",
+ "Inhaber (vollständig)": "Holder (full)",
+ "Aussteller (vollständig)": "Issuer (full)",
+ "Signiert am": "Signed on",
+ "Zertifikat anzeigen": "Show certificate"
 }

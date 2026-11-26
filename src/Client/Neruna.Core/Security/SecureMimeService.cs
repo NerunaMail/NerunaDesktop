@@ -33,7 +33,11 @@ public sealed record SignatureInfo(
     bool EmailMatchesSender,
     DateTimeOffset? SignedAt,
     string? Detail,
-    bool IsPgp = false);
+    bool IsPgp = false)
+{
+    /// <summary>S/MIME: the signer's certificate (DER), to show its details from the mail.</summary>
+    public byte[]? Certificate { get; init; }
+}
 
 /// <summary>
 /// The result of checking a clear-signed mail, kept so it need not be checked again (only signed ones; the content of
@@ -319,7 +323,8 @@ public sealed partial class SecureMimeService(CertificateManager certificates, I
             return await OpenCoreAsync(message, cancellationToken);
         }
 
-        var key = await HashAsync(signed, cancellationToken);
+        // "2:": checks kept since the signer's certificate is part of the result (older ones are checked anew).
+        var key = "2:" + await HashAsync(signed, cancellationToken);
         var sender = message.From.Mailboxes.FirstOrDefault()?.Address;
         var now = clock.GetUtcNow();
         try
@@ -653,7 +658,10 @@ public sealed partial class SecureMimeService(CertificateManager certificates, I
             }
 
             var matches = sender is not null && emails.Contains(sender, StringComparer.OrdinalIgnoreCase);
-            result.Add(new SignatureInfo(name, emails, issuer, status, matches, signature.CreationDate == default ? null : new DateTimeOffset(signature.CreationDate, TimeSpan.Zero), detail));
+            result.Add(new SignatureInfo(name, emails, issuer, status, matches, signature.CreationDate == default ? null : new DateTimeOffset(signature.CreationDate, TimeSpan.Zero), detail)
+            {
+                Certificate = certificate?.GetEncoded(),
+            });
 
             // Only a trusted certificate of the sender itself may go to the sender's (shared) contact.
             if (status != SignatureStatus.Invalid && certificate is not null

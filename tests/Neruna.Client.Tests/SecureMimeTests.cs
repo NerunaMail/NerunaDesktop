@@ -130,6 +130,9 @@ public class SecureMimeTests
         Assert.Equal(SignatureStatus.Valid, signature.Status);
         Assert.True(signature.EmailMatchesSender);
         Assert.Equal("Anna Muster", signature.SignerName);
+        // The signer's certificate comes along, for its details from the mail.
+        var signer = new Org.BouncyCastle.X509.X509CertificateParser().ReadCertificate(signature.Certificate);
+        Assert.Contains("Anna Muster", signer.SubjectDN.ToString(), StringComparison.Ordinal);
         Assert.Contains("12 %", MessageContent.From(opened.Readable).PlainText, StringComparison.Ordinal);
 
         // Bob now has Anna's certificate and could answer encrypted.

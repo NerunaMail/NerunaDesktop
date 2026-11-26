@@ -294,8 +294,36 @@
           <Style Selector="Border.warn PathIcon"><Setter Property="Foreground" Value="#BC4B09" /></Style>
           <Style Selector="Border.bad PathIcon"><Setter Property="Foreground" Value="#C50F1F" /></Style>
         </Border.Styles>
-        <Grid ColumnDefinitions="Auto,*">
+        <Grid ColumnDefinitions="Auto,*,Auto">
           <PathIcon Data="{StaticResource IconCertificate}" Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0" />
+          <!-- The signer's certificate (or PGP key) in detail, right from the mail -->
+          <Button Grid.Column="2" IsVisible="{Binding HasSigners}" Classes="command" Padding="4" VerticalAlignment="Top" Margin="8,-2,0,0"
+                  ToolTip.Tip="{l:T 'Zertifikat anzeigen'}">
+            <PathIcon Data="{StaticResource IconInfo}" Width="16" Height="16" />
+            <Button.Flyout>
+              <Flyout Placement="BottomEdgeAlignedRight">
+                <ItemsControl ItemsSource="{Binding Signers}" MaxWidth="560">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SignerDetails">
+                      <StackPanel Spacing="4" Margin="4,2,4,10">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding Rows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DetailRow">
+                              <Grid ColumnDefinitions="170,*" Margin="0,1">
+                                <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" />
+                                <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" TextWrapping="Wrap" />
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
           <StackPanel Grid.Column="1">
             <TextBlock Text="{Binding SecurityText}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" />
             <TextBlock Text="{Binding SecurityDetail}" TextWrapping="Wrap" FontSize="11" Classes="subtle" IsVisible="{Binding HasSecurityDetail}" />

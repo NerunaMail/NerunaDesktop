@@ -3118,5 +3118,16 @@
  "Hintergrund der Termine": "Sfondo degli appuntamenti",
  "Farbe des Kalenders": "Colore del calendario",
  "Farbe der Kategorie": "Colore della categoria",
- "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "Il colore del calendario resta come linea a sinistra, le categorie come linee a destra. Se un appuntamento ha più categorie, vale il colore del calendario."
+ "Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.": "Il colore del calendario resta come linea a sinistra, le categorie come linee a destra. Se un appuntamento ha più categorie, vale il colore del calendario.",
+ "Fingerabdruck": "Impronta",
+ "Ausgestellt von": "Emesso da",
+ "Gültig ab": "Valido da",
+ "noch nicht gültig": "non ancora valido",
+ "Seriennummer": "Numero di serie",
+ "Fingerabdruck (SHA-256)": "Impronta (SHA-256)",
+ "Fingerabdruck (SHA-1)": "Impronta (SHA-1)",
+ "Inhaber (vollständig)": "Titolare (completo)",
+ "Aussteller (vollständig)": "Emittente (completo)",
+ "Signiert am": "Firmato il",
+ "Zertifikat anzeigen": "Mostra certificato"
 }

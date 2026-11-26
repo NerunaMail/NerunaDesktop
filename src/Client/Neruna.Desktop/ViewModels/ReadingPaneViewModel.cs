@@ -687,13 +687,19 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
         Security = security;
         (SecurityLevel, SecurityText, SecurityDetail) = Describe(security);
         foreach (var name in new[] { nameof(Security), nameof(SecurityLevel), nameof(SecurityText), nameof(SecurityDetail), nameof(HasSecurity), nameof(HasSecurityDetail),
-            nameof(IsSecurityGood), nameof(IsSecurityWarning), nameof(IsSecurityBad), nameof(CanConfirmPgpKey), nameof(PgpFingerprintText) })
+            nameof(IsSecurityGood), nameof(IsSecurityWarning), nameof(IsSecurityBad), nameof(CanConfirmPgpKey), nameof(PgpFingerprintText),
+            nameof(Signers), nameof(HasSigners) })
         {
             OnPropertyChanged(name);
         }
     }
 
     public bool HasSecurity => SecurityLevel != SecurityLevel.None;
+
+    /// <summary>The info button in the status: the signers' certificates (or PGP keys) with their details.</summary>
+    public IReadOnlyList<SignerDetails> Signers => [.. Security.Signatures.Select(SignerDetails.From)];
+
+    public bool HasSigners => Security.Signatures.Count > 0;
 
     public bool HasSecurityDetail => !string.IsNullOrEmpty(SecurityDetail);
 
