@@ -701,6 +701,10 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     public bool HasSigners => Security.Signatures.Count > 0;
 
+    /// <summary>The info button: the signers' certificates in a window of their own.</summary>
+    [RelayCommand]
+    private Task ShowSignersAsync() => Views.SignerDetailsDialog.ShowInFrontAsync(Signers);
+
     public bool HasSecurityDetail => !string.IsNullOrEmpty(SecurityDetail);
 
     public bool IsSecurityGood => SecurityLevel == SecurityLevel.Good;

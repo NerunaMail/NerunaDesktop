@@ -1012,6 +1012,29 @@ internal static class Snapshots
 
         await question;
 
+        // The info button at a signed mail's status: the signer's certificate in a window of its own.
+        var signerDialog = SignerDetailsDialog.ShowAsync(window, [new Neruna.Desktop.ViewModels.SignerDetails("Lea Keller", [
+            new("E-Mail", "lea.keller@example.ch"),
+            new("Ausgestellt von", "Example S/MIME CA 2026"),
+            new("Gültig ab", "3. März 2026"),
+            new("Gültig bis", "3. März 2027"),
+            new("Verwendung", "Signieren, Verschlüsseln"),
+            new("Seriennummer", "5A1F0C3D9E2B7744A1C0"),
+            new("Fingerabdruck (SHA-256)", "3F2A 9C11 07BE 44D2 8A61 F0C3 5D7E 2B19 C4A8 6E03 9F51 D2B7 1A8C 44E0 7B6D 2F95"),
+            new("Fingerabdruck (SHA-1)", "A1B2 C3D4 E5F6 0718 293A 4B5C 6D7E 8F90 1A2B 3C4D"),
+            new("Inhaber (vollständig)", "E=lea.keller@example.ch,CN=Lea Keller,O=Keller Treuhand AG,L=Bern,C=CH"),
+            new("Aussteller (vollständig)", "CN=Example S/MIME CA 2026,O=Example Trust AG,C=CH"),
+            new("Signiert am", "26.11.2026 09:14"),
+        ])]);
+        Dispatcher.UIThread.RunJobs();
+        if (SignerDetailsDialog.Open is { } certificateDialog)
+        {
+            await SaveAsync(certificateDialog, output, "signer-details.png");
+            certificateDialog.Close();
+        }
+
+        await signerDialog;
+
         // Before deleting a contact (also events and tasks): with "Nicht mehr fragen".
         var deleteQuestion = ChoiceDialog.ShowWithCheckAsync(window, "«Lea Keller» löschen",
             "Der Kontakt wird auch auf dem Server gelöscht und lässt sich nicht wiederherstellen.", "Beim Löschen von Kontakten nicht mehr fragen",
