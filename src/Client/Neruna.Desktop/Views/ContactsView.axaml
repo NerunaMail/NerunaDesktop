@@ -232,6 +232,27 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                    <TextBlock Classes="label" Text="{l:T 'Adresse'}" IsVisible="{Binding HasAddresses}" />
+                    <ItemsControl ItemsSource="{Binding Addresses}" IsVisible="{Binding HasAddresses}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LabeledValue">
+                          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                            <SelectableTextBlock Text="{Binding Value}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Label}" Classes="subtle" FontSize="12" VerticalAlignment="Top" IsVisible="{Binding HasLabel}" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Classes="label" Text="{l:T 'Webseite'}" IsVisible="{Binding HasWebsites}" />
+                    <ItemsControl ItemsSource="{Binding Websites}" IsVisible="{Binding HasWebsites}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LabeledValue">
+                          <SelectableTextBlock Text="{Binding Value}" Foreground="{DynamicResource AccentTextBrush}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
                     <TextBlock Classes="label" Text="{l:T 'Geburtstag'}" IsVisible="{Binding HasBirthday}" />
                     <SelectableTextBlock Text="{Binding Birthday}" IsVisible="{Binding HasBirthday}" />
                     <TextBlock Classes="label" Text="{l:T 'Notiz'}" IsVisible="{Binding HasNote}" />

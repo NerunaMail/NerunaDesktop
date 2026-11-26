@@ -3134,5 +3134,20 @@
   "In {0} Kalendern: {1}": "Dans {0} calendriers : {1}",
   "Gleiche Termine": "Rendez-vous identiques",
   "Gleiche Termine aus mehreren Kalendern zusammenfassen": "Regrouper les rendez-vous identiques de plusieurs calendriers",
-  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "Si le même rendez-vous figure dans plusieurs calendriers affichés (la même invitation, ou le même titre à la même heure), il n'apparaît qu'une fois : une ligne par calendrier à gauche, avec le nombre."
+  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "Si le même rendez-vous figure dans plusieurs calendriers affichés (la même invitation, ou le même titre à la même heure), il n'apparaît qu'une fois : une ligne par calendrier à gauche, avec le nombre.",
+  "Kontakt ergänzen": "Compléter le contact",
+  "Kontakt nicht gefunden.": "Contact introuvable.",
+  "Webseite": "Site web",
+  "Aus der Signatur der E-Mail übernommen: {0}. Bitte vor dem Speichern prüfen.": "Repris de la signature de l'e-mail : {0}. Veuillez vérifier avant d'enregistrer.",
+  "Oder einen bestehenden Kontakt ergänzen:": "Ou compléter un contact existant :",
+  "Kontakt suchen (Name, Firma, E-Mail)": "Rechercher un contact (nom, entreprise, e-mail)",
+  "Diesen Kontakt ergänzen": "Compléter ce contact",
+  "gleicher Name": "même nom",
+  "Neue Angaben aus der E-Mail kommen dazu; bestehende bleiben. Was nicht mehr stimmt, vor dem Speichern entfernen.": "Les nouvelles informations de l'e-mail s'ajoutent ; les existantes restent. Supprimez ce qui n'est plus correct avant d'enregistrer.",
+  "Doch neuer Kontakt": "Plutôt un nouveau contact",
+  "+ Adresse": "+ Adresse",
+  "Strasse und Nr.": "Rue et n°",
+  "PLZ": "NPA",
+  "+ Webseite": "+ Site web",
+  "Weitere Angaben aus anderen Programmen bleiben beim Speichern unverändert erhalten.": "Les autres informations provenant d'autres programmes restent inchangées lors de l'enregistrement."
 }

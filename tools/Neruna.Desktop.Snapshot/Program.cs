@@ -1726,6 +1726,7 @@ internal static class Snapshots
 
         vm.NavigateCommand.Execute(Section.Contacts);
         await SaveAsync(window, output, "contacts.png");
+        await CheckContactFromMailAsync(services, output);
         vm.ContactsPage.Selected = vm.ContactsPage.Items.First(i => i.IsGroup);
         await Task.Delay(300);
         await SaveAsync(window, output, "contacts-group.png");
@@ -2595,6 +2596,49 @@ internal static class Snapshots
         tabs.SelectedIndex = 2;
         await SaveAsync(window, output, "settings-certificates-authorities.png");
         Console.WriteLine($"Certificates: {vm.SettingsPage.Certificates.OwnHeader}, {vm.SettingsPage.Certificates.ContactsHeader}, {vm.SettingsPage.Certificates.AuthoritiesHeader}");
+    }
+
+    // "Absender als Kontakt speichern" from a mail with a signature: the window beside the mail, the signature's data
+    // filled in; then an existing contact with the same name completed instead (the demo's books are read-only, so the
+    // editor gets them as writable here).
+    private static async Task CheckContactFromMailAsync(IServiceProvider services, string output)
+    {
+        var contacts = services.GetRequiredService<Neruna.Core.Contacts.ContactController>();
+        var books = (await contacts.GetAddressBooksAsync()).Select(b => b with { IsReadOnly = false }).ToList();
+        var message = new MimeKit.MimeMessage();
+        message.From.Add(new MimeKit.MailboxAddress("Peter Brunner", "p.brunner@brunner-bau.example"));
+        message.Body = new MimeKit.TextPart("plain")
+        {
+            Text = "Grüezi\n\nDie Pläne sind im Anhang.\n\nFreundliche Grüsse\n\nPeter Brunner\nProjektleiter\nBrunner Bau AG\nIndustriestrasse 8\n6010 Kriens\nTel. +41 41 320 55 10\nMobil +41 79 412 33 21\nwww.brunner-bau.example\n",
+        };
+        var found = Neruna.Core.Contacts.SignatureContact.Read(message, "Peter Brunner", "p.brunner@brunner-bau.example");
+        var person = Neruna.Core.Contacts.ContactDraft.Empty with
+        {
+            GivenName = "Peter", FamilyName = "Brunner", Emails = [new Neruna.Core.Contacts.ContactField("p.brunner@brunner-bau.example")],
+        };
+        var fromMail = person.CompletedWith(found);
+        var editor = new ContactEditorViewModel(contacts, services.GetRequiredService<IFileService>(), books, fromMail, null, fromMail);
+        editor.DescribeSignature(found);
+        await editor.LoadCandidatesAsync();
+        Console.WriteLine($"Contact from mail: {editor.Phones.Count} phones, address '{editor.Addresses.FirstOrDefault()?.City}', org '{editor.Organization}', title '{editor.Title}', "
+            + $"suggested: {string.Join(", ", editor.ExistingMatches.Select(m => m.Name))}");
+        var shown = services.GetRequiredService<IWindowService>().ShowContactEditorAsync(editor);
+        await Task.Delay(300);
+        if (WindowService.OpenContactWindow is { } contactWindow)
+        {
+            await SaveAsync(contactWindow, output, "contact-from-mail.png");
+            if (editor.ExistingMatches.FirstOrDefault() is { } match)
+            {
+                await editor.ChooseExistingCommand.ExecuteAsync(match);
+                await Task.Delay(200);
+                Console.WriteLine($"Completed existing: '{editor.Heading}', emails {string.Join(", ", editor.Emails.Select(e => e.Value))}");
+                await SaveAsync(contactWindow, output, "contact-from-mail-existing.png");
+            }
+
+            editor.CancelCommand.Execute(null);
+        }
+
+        Console.WriteLine($"Contact window cancelled: saved={await shown}");
     }
 
     private static async Task CheckLayoutAsync(MainWindowViewModel vm, MainWindow window, ISettingsStore settings)

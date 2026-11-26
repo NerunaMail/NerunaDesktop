@@ -21,6 +21,12 @@ internal interface IWindowService
     /// <summary>An event in a window of its own (from a mail being written); true if it was saved or deleted.</summary>
     Task<bool> ShowEventEditorAsync(EventEditorViewModel editor);
 
+    /// <summary>
+    /// A contact in a window of its own beside the main window (from a mail: the mail stays readable to copy from its
+    /// signature); true once saved.
+    /// </summary>
+    Task<bool> ShowContactEditorAsync(ContactEditorViewModel editor);
+
     /// <summary>"In welchen Ordner verschieben?" above the active window; null when cancelled.</summary>
     Task<MailFolderNode?> ShowFolderPickerAsync(FolderPickerViewModel picker);
 
@@ -97,6 +103,61 @@ internal sealed class WindowService(UiLayout layout) : IWindowService
 
         return changed;
     }
+
+    public async Task<bool> ShowContactEditorAsync(ContactEditorViewModel editor)
+    {
+        ArgumentNullException.ThrowIfNull(editor);
+        var saved = false;
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime;
+        var owner = lifetime?.Windows.FirstOrDefault(w => w.IsActive) ?? lifetime?.MainWindow;
+        var window = new Window
+        {
+            Title = editor.Heading,
+            Icon = owner?.Icon,
+            Width = 640,
+            Height = 780,
+            MinWidth = 480,
+            MinHeight = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new ScrollViewer { Content = new ContactEditorView { DataContext = editor, Margin = new Avalonia.Thickness(24, 18) } },
+        };
+        window.Bind(Window.BackgroundProperty, window.GetResourceObservable("PaneBackgroundBrush"));
+        editor.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ContactEditorViewModel.Heading))
+            {
+                window.Title = editor.Heading;
+            }
+        };
+        editor.Finished += (_, changed) =>
+        {
+            saved = changed;
+            window.Close();
+        };
+
+        // Not modal: the mail beside it can still be read, scrolled and copied from. Owned, so it stays in front.
+        OpenContactWindow = window;
+        var closed = new TaskCompletionSource();
+        window.Closed += (_, _) =>
+        {
+            OpenContactWindow = null;
+            closed.TrySetResult();
+        };
+        if (owner is not null)
+        {
+            window.Show(owner);
+        }
+        else
+        {
+            window.Show();
+        }
+
+        await closed.Task;
+        return saved;
+    }
+
+    /// <summary>The contact window on screen, if any (the snapshot tool photographs it).</summary>
+    public static Window? OpenContactWindow { get; private set; }
 
     public async Task<bool> ShowPollEditorAsync(PollEditorViewModel editor)
     {

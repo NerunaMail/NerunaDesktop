@@ -3134,5 +3134,20 @@
   "In {0} Kalendern: {1}": "In {0} calendari: {1}",
   "Gleiche Termine": "Appuntamenti identici",
   "Gleiche Termine aus mehreren Kalendern zusammenfassen": "Raggruppare gli appuntamenti identici di più calendari",
-  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "Se lo stesso appuntamento si trova in più calendari visualizzati (lo stesso invito, o lo stesso titolo alla stessa ora), appare una sola volta: a sinistra una linea per calendario, con il numero."
+  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "Se lo stesso appuntamento si trova in più calendari visualizzati (lo stesso invito, o lo stesso titolo alla stessa ora), appare una sola volta: a sinistra una linea per calendario, con il numero.",
+  "Kontakt ergänzen": "Completare il contatto",
+  "Kontakt nicht gefunden.": "Contatto non trovato.",
+  "Webseite": "Sito web",
+  "Aus der Signatur der E-Mail übernommen: {0}. Bitte vor dem Speichern prüfen.": "Ripreso dalla firma dell'e-mail: {0}. Si prega di verificare prima di salvare.",
+  "Oder einen bestehenden Kontakt ergänzen:": "Oppure completare un contatto esistente:",
+  "Kontakt suchen (Name, Firma, E-Mail)": "Cerca contatto (nome, azienda, e-mail)",
+  "Diesen Kontakt ergänzen": "Completare questo contatto",
+  "gleicher Name": "stesso nome",
+  "Neue Angaben aus der E-Mail kommen dazu; bestehende bleiben. Was nicht mehr stimmt, vor dem Speichern entfernen.": "Le nuove informazioni dell'e-mail si aggiungono; quelle esistenti restano. Rimuovere ciò che non è più corretto prima di salvare.",
+  "Doch neuer Kontakt": "Meglio un nuovo contatto",
+  "+ Adresse": "+ Indirizzo",
+  "Strasse und Nr.": "Via e n.",
+  "PLZ": "NPA",
+  "+ Webseite": "+ Sito web",
+  "Weitere Angaben aus anderen Programmen bleiben beim Speichern unverändert erhalten.": "Le altre informazioni provenienti da altri programmi restano invariate al salvataggio."
 }

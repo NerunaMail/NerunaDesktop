@@ -234,13 +234,21 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     private void NewContact() =>
         EditorRequested?.Invoke(this, new ContactEditorViewModel(contacts, files, Writable(), ContactDraft.Empty, null));
 
-    /// <summary>A new contact for someone a mail came from (the "+" beside the sender).</summary>
-    public void NewContactFrom(MailAddress address)
+    /// <summary>
+    /// The contact window for someone from a mail (the "+" beside the sender or a recipient): a new contact with the
+    /// name, the address and what the signature of <paramref name="message"/> shows, or an existing one completed with it.
+    /// </summary>
+    public async Task<ContactEditorViewModel> EditorFromMailAsync(MailAddress address, MimeKit.MimeMessage? message)
     {
         ArgumentNullException.ThrowIfNull(address);
         var (given, family) = AddressCollector.SplitName(address.Name);
-        EditorRequested?.Invoke(this, new ContactEditorViewModel(contacts, files, Writable(),
-            ContactDraft.Empty with { GivenName = given, FamilyName = family, Emails = [new ContactField(address.Address)] }, null));
+        var person = ContactDraft.Empty with { GivenName = given, FamilyName = family, Emails = [new ContactField(address.Address)] };
+        var found = message is null ? ContactDraft.Empty : await Task.Run(() => SignatureContact.Read(message, address.Name, address.Address));
+        var fromMail = person.CompletedWith(found);
+        var editor = new ContactEditorViewModel(contacts, files, Writable(), fromMail, null, fromMail);
+        editor.DescribeSignature(found);
+        await editor.LoadCandidatesAsync();
+        return editor;
     }
 
     [RelayCommand(CanExecute = nameof(HasAddressBooks))]
@@ -260,7 +268,7 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
         EditorRequested?.Invoke(this, entry.Card.IsGroup
             ? new GroupEditorViewModel(contacts, Writable(), _all, GroupDraft.FromVCard(stored.VCardData), (entry.AddressBook, entry.RemoteId))
             : new ContactEditorViewModel(contacts, files, Writable(),
-                ContactDraft.FromVCard(stored.VCardData) with { Certificates = ContactCertificates.Read(stored.VCardData), PgpKeys = ContactPgpKeys.Read(stored.VCardData) }, (entry.AddressBook, entry.RemoteId)));
+                ContactDraft.FromVCardWithAddresses(stored.VCardData) with { Certificates = ContactCertificates.Read(stored.VCardData), PgpKeys = ContactPgpKeys.Read(stored.VCardData) }, (entry.AddressBook, entry.RemoteId)));
     }
 
     [RelayCommand(CanExecute = nameof(CanWriteMail))]
@@ -433,6 +441,15 @@ internal sealed class ContactItem(ContactEntry entry, string color)
     public IReadOnlyList<LabeledValue> Emails => Entry.Card.Emails.Select(e => new LabeledValue(e.Value, Label(e.Kind))).ToList();
 
     public IReadOnlyList<LabeledValue> Phones => Entry.Card.Phones.Select(p => new LabeledValue(p.Value, Label(p.Kind))).ToList();
+
+    /// <summary>Postal addresses, each as written on an envelope.</summary>
+    public IReadOnlyList<LabeledValue> Addresses => Entry.Card.Addresses.Select(a => new LabeledValue(a.Text, Label(a.Kind))).ToList();
+
+    public bool HasAddresses => !IsGroup && Entry.Card.Addresses.Count > 0;
+
+    public IReadOnlyList<LabeledValue> Websites => Entry.Card.Websites.Select(w => new LabeledValue(w.Value, Label(w.Kind))).ToList();
+
+    public bool HasWebsites => !IsGroup && Entry.Card.Websites.Count > 0;
 
     public string AddressBook => Entry.AddressBook.Name;
 

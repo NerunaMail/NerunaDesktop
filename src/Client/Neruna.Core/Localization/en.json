@@ -3134,5 +3134,20 @@
   "In {0} Kalendern: {1}": "In {0} calendars: {1}",
   "Gleiche Termine": "Identical events",
   "Gleiche Termine aus mehreren Kalendern zusammenfassen": "Combine identical events from several calendars",
-  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "If the same event is in several shown calendars (the same invitation, or the same title at the same time), it appears only once: one line per calendar on the left, plus the count."
+  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "If the same event is in several shown calendars (the same invitation, or the same title at the same time), it appears only once: one line per calendar on the left, plus the count.",
+  "Kontakt ergänzen": "Complete contact",
+  "Kontakt nicht gefunden.": "Contact not found.",
+  "Webseite": "Website",
+  "Aus der Signatur der E-Mail übernommen: {0}. Bitte vor dem Speichern prüfen.": "Taken from the e-mail's signature: {0}. Please check before saving.",
+  "Oder einen bestehenden Kontakt ergänzen:": "Or complete an existing contact:",
+  "Kontakt suchen (Name, Firma, E-Mail)": "Search contact (name, company, e-mail)",
+  "Diesen Kontakt ergänzen": "Complete this contact",
+  "gleicher Name": "same name",
+  "Neue Angaben aus der E-Mail kommen dazu; bestehende bleiben. Was nicht mehr stimmt, vor dem Speichern entfernen.": "New details from the e-mail are added; existing ones stay. Remove what is no longer correct before saving.",
+  "Doch neuer Kontakt": "New contact instead",
+  "+ Adresse": "+ Address",
+  "Strasse und Nr.": "Street and no.",
+  "PLZ": "Postcode",
+  "+ Webseite": "+ Website",
+  "Weitere Angaben aus anderen Programmen bleiben beim Speichern unverändert erhalten.": "Other details from other programs are kept unchanged when saving."
 }

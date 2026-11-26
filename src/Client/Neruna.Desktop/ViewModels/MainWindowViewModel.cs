@@ -270,7 +270,17 @@ internal sealed partial class MainWindowViewModel : ViewModelBase
             await ContactsPage.ReloadAsync();
             MailPage.ContactsChanged(); // a sender just saved as a contact loses its "+"
         });
-        MailPage.AddContactRequested += (_, sender) => ContactsPage.NewContactFrom(sender);
+        MailPage.AddContactRequested += async (_, request) =>
+        {
+            var editor = await ContactsPage.EditorFromMailAsync(request.Address, request.Message);
+            if (await MailPage.ShowContactEditorAsync(editor))
+            {
+                request.Saved();
+                StatusText = F("Gespeichert um {0:t}", DateTime.Now);
+                await ContactsPage.ReloadAsync();
+                MailPage.ContactsChanged();
+            }
+        };
         MailPage.ShowContactRequested += async (_, address) =>
         {
             CurrentPage = ContactsPage;

@@ -16,6 +16,8 @@ internal sealed record FieldKind(string? Value, string Label)
     public static IReadOnlyList<FieldKind> PhoneKinds { get; } =
         [new(null, "—"), new("work", T("Geschäftlich")), new("home", T("Privat")), new("cell", T("Mobil")), new("fax", T("Fax"))];
 
+    public static IReadOnlyList<FieldKind> AddressKinds { get; } = [new(null, "—"), new("work", T("Geschäftlich")), new("home", T("Privat"))];
+
     public static FieldKind Find(IReadOnlyList<FieldKind> kinds, string? value) =>
         kinds.FirstOrDefault(k => string.Equals(k.Value, value, StringComparison.OrdinalIgnoreCase)) ?? new FieldKind(value, value ?? "—");
 }
@@ -31,6 +33,49 @@ internal sealed partial class EditableField(IReadOnlyList<FieldKind> kinds, stri
     public partial FieldKind Kind { get; set; } = FieldKind.Find(kinds, kind);
 
     public ContactField ToField() => new(Value.Trim(), Kind.Value);
+}
+
+/// <summary>A postal address in the editor; post office box, extended part and region it does not show are kept.</summary>
+internal sealed partial class EditableAddress(ContactAddress original) : ObservableObject
+{
+    public ContactAddress Original { get; } = original;
+
+    public IReadOnlyList<FieldKind> Kinds { get; } = FieldKind.AddressKinds;
+
+    [ObservableProperty]
+    public partial string Street { get; set; } = original.Street ?? string.Empty;
+
+    [ObservableProperty]
+    public partial string PostalCode { get; set; } = original.PostalCode ?? string.Empty;
+
+    [ObservableProperty]
+    public partial string City { get; set; } = original.City ?? string.Empty;
+
+    [ObservableProperty]
+    public partial string Country { get; set; } = original.Country ?? string.Empty;
+
+    [ObservableProperty]
+    public partial FieldKind Kind { get; set; } = FieldKind.Find(FieldKind.AddressKinds, original.Kind);
+
+    public ContactAddress ToAddress() => Original with
+    {
+        Street = Value(Street),
+        PostalCode = Value(PostalCode),
+        City = Value(City),
+        Country = Value(Country),
+        Kind = Kind.Value,
+    };
+
+    private static string? Value(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+}
+
+/// <summary>An existing contact to complete with the sender of a mail.</summary>
+internal sealed record ContactChoiceRow(ContactEntry Entry, bool IsSuggested)
+{
+    public string Name => Entry.Card.DisplayName;
+
+    public string Detail => string.Join(" · ", new[] { Entry.Card.Organization, Entry.Card.Emails.FirstOrDefault()?.Value, Entry.AddressBook.Name }
+        .Where(part => !string.IsNullOrWhiteSpace(part)));
 }
 
 /// <summary>An S/MIME certificate kept with the contact: whose, until when, and whether it can be used to encrypt.</summary>
@@ -111,30 +156,46 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
 {
     private readonly ContactController _contacts;
     private readonly IFileService _files;
-    private readonly (AddressBookInfo AddressBook, string RemoteId)? _existing;
+    private (AddressBookInfo AddressBook, string RemoteId)? _existing;
+    private IReadOnlyList<ContactAddress> _loadedAddresses = [];
+    private IReadOnlyList<ContactField> _loadedWebsites = [];
+    private bool _showsAddresses;
+    private readonly ContactDraft? _fromMail;
+    private IReadOnlyList<ContactEntry> _candidates = [];
     private ContactPhoto? _photo;
     private bool _photoChanged;
     private bool _certificatesChanged;
     private bool _pgpKeysChanged;
 
+    /// <param name="fromMail">Opened from a mail ("Absender als Kontakt speichern"): the sender and what its signature
+    /// shows. A new contact starts with it, or an existing one is chosen and completed with it.</param>
     public ContactEditorViewModel(
         ContactController contacts,
         IFileService files,
         IReadOnlyList<AddressBookInfo> writableAddressBooks,
         ContactDraft draft,
-        (AddressBookInfo AddressBook, string RemoteId)? existing)
+        (AddressBookInfo AddressBook, string RemoteId)? existing,
+        ContactDraft? fromMail = null)
     {
         _contacts = contacts;
         _files = files;
-        _existing = existing;
-        _photo = draft.Photo;
-        Photo = ContactPhotoBitmap.From(_photo);
+        _fromMail = fromMail;
 
         IsReadOnly = existing?.AddressBook.IsReadOnly ?? false;
         AddressBooks = IsReadOnly ? [existing!.Value.AddressBook] : writableAddressBooks;
+        Load(draft, existing);
+    }
+
+    /// <summary>Shows <paramref name="draft"/> (the contact or the new one); <paramref name="existing"/> is where it is saved.</summary>
+    private void Load(ContactDraft draft, (AddressBookInfo AddressBook, string RemoteId)? existing)
+    {
+        _existing = existing;
+        _photo = draft.Photo;
+        _photoChanged = false;
+        Photo = ContactPhotoBitmap.From(_photo);
         SelectedAddressBook = existing is { } e
             ? AddressBooks.FirstOrDefault(b => b.ConnectionId == e.AddressBook.ConnectionId && b.RemoteId == e.AddressBook.RemoteId) ?? AddressBooks.FirstOrDefault()
-            : AddressBooks.FirstOrDefault();
+            : SelectedAddressBook ?? AddressBooks.FirstOrDefault();
 
         GivenName = draft.GivenName ?? string.Empty;
         FamilyName = draft.FamilyName ?? string.Empty;
@@ -143,23 +204,48 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
         Note = draft.Note ?? string.Empty;
         Birthday = draft.Birthday?.ToInput(Neruna.Core.Localization.Texts.Culture) ?? string.Empty;
 
+        Emails.Clear();
         foreach (var email in draft.Emails.DefaultIfEmpty(new ContactField(string.Empty)))
         {
             Emails.Add(new EditableField(FieldKind.EmailKinds, email.Value, email.Kind));
         }
 
+        Phones.Clear();
         foreach (var phone in draft.Phones.DefaultIfEmpty(new ContactField(string.Empty)))
         {
             Phones.Add(new EditableField(FieldKind.PhoneKinds, phone.Value, phone.Kind));
         }
 
+        // Addresses and web addresses: those of the card (unchanged ones stay exactly as written there).
+        _showsAddresses = draft.Addresses is not null || draft.Websites is not null || existing is null;
+        _loadedAddresses = existing is null ? [] : draft.Addresses ?? [];
+        _loadedWebsites = existing is null ? [] : draft.Websites ?? [];
+        Addresses.Clear();
+        foreach (var address in draft.Addresses ?? [])
+        {
+            Addresses.Add(new EditableAddress(address));
+        }
+
+        Websites.Clear();
+        foreach (var site in draft.Websites ?? [])
+        {
+            Websites.Add(new EditableField(FieldKind.AddressKinds, site.Value, site.Kind));
+        }
+
         _certificateDers = [.. draft.Certificates ?? []];
+        _certificatesChanged = false;
         ShowCertificates();
         _pgpKeyData = [.. draft.PgpKeys ?? []];
+        _pgpKeysChanged = false;
         ShowPgpKeys();
+
+        OnPropertyChanged(nameof(IsExisting));
+        OnPropertyChanged(nameof(Heading));
+        OnPropertyChanged(nameof(CompletesExisting));
+        OnPropertyChanged(nameof(HasAddresses));
     }
 
-    private List<byte[]> _pgpKeyData;
+    private List<byte[]> _pgpKeyData = [];
 
     /// <summary>Public PGP keys kept with the contact (vCard KEY): they count as confirmed for this person.</summary>
     public ObservableCollection<ContactPgpKeyRow> PgpKeys { get; } = [];
@@ -220,7 +306,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
         OnPropertyChanged(nameof(NoPgpKeys));
     }
 
-    private List<byte[]> _certificateDers;
+    private List<byte[]> _certificateDers = [];
 
     /// <summary>S/MIME certificates kept with the contact (vCard KEY; Exchange/Microsoft 365: the contact's certificates).</summary>
     public ObservableCollection<ContactCertificateRow> Certificates { get; } = [];
@@ -295,13 +381,160 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
 
     public bool IsExisting => _existing is not null;
 
-    public string Heading => IsReadOnly ? T("Kontakt (schreibgeschützt)") : IsExisting ? T("Kontakt bearbeiten") : T("Neuer Kontakt");
+    public string Heading => IsReadOnly ? T("Kontakt (schreibgeschützt)") : CompletesExisting ? T("Kontakt ergänzen") : IsExisting ? T("Kontakt bearbeiten") : T("Neuer Kontakt");
 
     public bool NoAddressBook => AddressBooks.Count == 0;
 
     public ObservableCollection<EditableField> Emails { get; } = [];
 
     public ObservableCollection<EditableField> Phones { get; } = [];
+
+    public ObservableCollection<EditableAddress> Addresses { get; } = [];
+
+    public bool HasAddresses => Addresses.Count > 0;
+
+    public ObservableCollection<EditableField> Websites { get; } = [];
+
+    /// <summary>Opened from a mail: a new contact, or an existing one to complete (chosen at the top).</summary>
+    public bool OffersExisting => _fromMail is not null && !IsReadOnly;
+
+    /// <summary>An existing contact is being completed with the sender.</summary>
+    public bool CompletesExisting => OffersExisting && _existing is not null;
+
+    public bool CreatesNew => OffersExisting && _existing is null;
+
+    /// <summary>What the signature of the mail added ("bitte prüfen"), or null.</summary>
+    public string? SignatureText { get; private set; }
+
+    public bool HasSignatureText => SignatureText is not null;
+
+    /// <summary>Search for the contact to complete: by name, organisation or address.</summary>
+    [ObservableProperty]
+    public partial string ExistingQuery { get; set; } = string.Empty;
+
+    /// <summary>Contacts with the sender's name first (without a search), else those the search finds.</summary>
+    public ObservableCollection<ContactChoiceRow> ExistingMatches { get; } = [];
+
+    public bool HasExistingMatches => ExistingMatches.Count > 0;
+
+    partial void OnExistingQueryChanged(string value) => ShowMatches();
+
+    /// <summary>Opened from a mail: the contacts in writable address books, for choosing one to complete.</summary>
+    public async Task LoadCandidatesAsync()
+    {
+        if (!OffersExisting)
+        {
+            return;
+        }
+
+        var writable = AddressBooks.Select(b => (b.ConnectionId, b.RemoteId)).ToHashSet();
+        _candidates = [.. (await _contacts.SearchAsync(null)).Where(c => !c.Card.IsGroup && writable.Contains((c.AddressBook.ConnectionId, c.AddressBook.RemoteId)))];
+        ShowMatches();
+    }
+
+    private void ShowMatches()
+    {
+        ExistingMatches.Clear();
+        var query = ExistingQuery.Trim();
+        var name = $"{_fromMail?.GivenName} {_fromMail?.FamilyName}".Trim();
+        var rows = query.Length == 0
+            ? _candidates.Where(c => name.Length > 0 && SameName(c.Card, name)).Select(c => new ContactChoiceRow(c, IsSuggested: true))
+            : _candidates.Where(c => Matches(c.Card, query)).Take(8).Select(c => new ContactChoiceRow(c, IsSuggested: false));
+        foreach (var row in rows)
+        {
+            ExistingMatches.Add(row);
+        }
+
+        OnPropertyChanged(nameof(HasExistingMatches));
+    }
+
+    private static bool SameName(ContactCard card, string name)
+    {
+        static string Normal(string s) => string.Join(' ', s.ToLowerInvariant().Split([' ', ',', '.', '"'], StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal));
+        return Normal(card.DisplayName) == Normal(name) || Normal($"{card.GivenName} {card.FamilyName}") == Normal(name);
+    }
+
+    private static bool Matches(ContactCard card, string query) =>
+        card.DisplayName.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+        || (card.Organization?.Contains(query, StringComparison.CurrentCultureIgnoreCase) ?? false)
+        || card.Emails.Any(e => e.Value.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Complete this contact: its fields with the sender's address and the signature's data added.</summary>
+    [RelayCommand]
+    private async Task ChooseExistingAsync(ContactChoiceRow? row)
+    {
+        if (row is null || _fromMail is null)
+        {
+            return;
+        }
+
+        var stored = await _contacts.GetContactAsync(row.Entry.AddressBook, row.Entry.RemoteId);
+        if (stored is null)
+        {
+            Error = T("Kontakt nicht gefunden.");
+            return;
+        }
+
+        Error = null;
+        var current = ContactDraft.FromVCardWithAddresses(stored.VCardData) with
+        {
+            Certificates = ContactCertificates.Read(stored.VCardData),
+            PgpKeys = ContactPgpKeys.Read(stored.VCardData),
+        };
+        Load(current.CompletedWith(_fromMail), (row.Entry.AddressBook, row.Entry.RemoteId));
+        // The loaded keys are the card's: unchanged, so they are not written again.
+        ExistingQuery = string.Empty;
+        OnPropertyChanged(nameof(CreatesNew));
+    }
+
+    /// <summary>Back to a new contact with the sender's data.</summary>
+    [RelayCommand]
+    private void ChooseNew()
+    {
+        if (_fromMail is null)
+        {
+            return;
+        }
+
+        Load(_fromMail, null);
+        OnPropertyChanged(nameof(CreatesNew));
+    }
+
+    /// <summary>Opened from a mail: which fields the signature filled in.</summary>
+    public void DescribeSignature(ContactDraft found)
+    {
+        ArgumentNullException.ThrowIfNull(found);
+        var what = new[]
+        {
+            found.Phones.Count > 0 ? T("Telefon") : null,
+            found.Addresses is { Count: > 0 } ? T("Adresse") : null,
+            found.Websites is { Count: > 0 } ? T("Webseite") : null,
+            !string.IsNullOrEmpty(found.Organization) ? T("Firma") : null,
+            !string.IsNullOrEmpty(found.Title) ? T("Funktion") : null,
+        }.OfType<string>().ToList();
+        SignatureText = what.Count == 0 ? null : F("Aus der Signatur der E-Mail übernommen: {0}. Bitte vor dem Speichern prüfen.", string.Join(", ", what));
+        OnPropertyChanged(nameof(SignatureText));
+        OnPropertyChanged(nameof(HasSignatureText));
+    }
+
+    [RelayCommand]
+    private void AddAddress()
+    {
+        Addresses.Add(new EditableAddress(new ContactAddress(null, null, null, null, "work")));
+        OnPropertyChanged(nameof(HasAddresses));
+    }
+
+    [RelayCommand]
+    private void RemoveAddress(EditableAddress? address)
+    {
+        if (address is not null && Addresses.Remove(address))
+        {
+            OnPropertyChanged(nameof(HasAddresses));
+        }
+    }
+
+    [RelayCommand]
+    private void AddWebsite() => Websites.Add(new EditableField(FieldKind.AddressKinds, string.Empty, null));
 
     [ObservableProperty]
     public partial AddressBookInfo? SelectedAddressBook { get; set; }
@@ -381,6 +614,7 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
     {
         Emails.Remove(field);
         Phones.Remove(field);
+        Websites.Remove(field);
     }
 
     [RelayCommand(CanExecute = nameof(CanSave))]
@@ -415,6 +649,19 @@ internal sealed partial class ContactEditorViewModel : ViewModelBase
             Certificates = _certificatesChanged ? _certificateDers : null,
             PgpKeys = _pgpKeysChanged ? _pgpKeyData : null,
         };
+
+        // Written only when changed here: otherwise the card's lines stay as they are (also details not shown here).
+        var addresses = Addresses.Select(a => a.ToAddress()).Where(a => !a.IsEmpty).ToList();
+        var websites = Websites.Select(w => w.ToField()).Where(w => w.Value.Length > 0).ToList();
+        if (_showsAddresses && !addresses.SequenceEqual(_loadedAddresses))
+        {
+            draft = draft with { Addresses = addresses };
+        }
+
+        if (_showsAddresses && !websites.SequenceEqual(_loadedWebsites))
+        {
+            draft = draft with { Websites = websites };
+        }
 
         if (draft.DisplayName.Length == 0)
         {

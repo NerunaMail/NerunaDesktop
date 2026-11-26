@@ -54,6 +54,12 @@ public sealed record ContactCard(
 
     public ContactBirthday? Birthday { get; init; }
 
+    /// <summary>Postal addresses (ADR).</summary>
+    public IReadOnlyList<ContactAddress> Addresses { get; init; } = [];
+
+    /// <summary>Web addresses (URL), with their kind.</summary>
+    public IReadOnlyList<ContactField> Websites { get; init; } = [];
+
     /// <summary>The UID as used in group member references ("urn:uuid:" stripped).</summary>
     public string MemberUid => NormalizeUid(Uid);
 
@@ -78,6 +84,8 @@ public static class VCardReader
         var kind = ContactKind.Individual;
         ContactPhoto? photo = null;
         ContactBirthday? birthday = null;
+        var addresses = new List<ContactAddress>();
+        var websites = new List<ContactField>();
 
         foreach (var property in VCardProperty.Parse(vcard))
         {
@@ -114,6 +122,29 @@ public static class VCardReader
                 case "BDAY":
                     birthday ??= ContactBirthday.Parse(property.Value);
                     break;
+                case "ADR":
+                    var adr = SplitComponents(property.Value);
+                    var address = new ContactAddress(NullIfEmpty(adr.ElementAtOrDefault(2)), NullIfEmpty(adr.ElementAtOrDefault(5)),
+                        NullIfEmpty(adr.ElementAtOrDefault(3)), NullIfEmpty(adr.ElementAtOrDefault(6)), property.Kind)
+                    {
+                        PoBox = NullIfEmpty(adr.ElementAtOrDefault(0)),
+                        Extended = NullIfEmpty(adr.ElementAtOrDefault(1)),
+                        Region = NullIfEmpty(adr.ElementAtOrDefault(4)),
+                    };
+                    if (!address.IsEmpty)
+                    {
+                        addresses.Add(address);
+                    }
+
+                    break;
+                case "URL":
+                    var url = Unescape(property.Value).Trim();
+                    if (url.Length > 0)
+                    {
+                        websites.Add(new ContactField(url, property.Kind));
+                    }
+
+                    break;
             }
         }
 
@@ -125,6 +156,8 @@ public static class VCardReader
             Members = members,
             Photo = photo,
             Birthday = birthday,
+            Addresses = addresses,
+            Websites = websites,
         };
     }
 

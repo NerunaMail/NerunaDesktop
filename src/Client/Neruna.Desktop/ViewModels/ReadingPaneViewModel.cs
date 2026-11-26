@@ -149,7 +149,8 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     public Action<Neruna.Core.Mail.MailAddress>? ShowContact { get; set; }
 
-    public Action<Neruna.Core.Mail.MailAddress>? AddContact { get; set; }
+    /// <summary>"Als Kontakt speichern" for a recipient; the action given is called once the contact was saved.</summary>
+    public Action<Neruna.Core.Mail.MailAddress, Action>? AddContact { get; set; }
 
     [RelayCommand]
     private void MailToRecipient(RecipientItem? recipient)
@@ -174,8 +175,8 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
     {
         if (recipient is not null)
         {
-            recipient.CanAdd = false;
-            AddContact?.Invoke(recipient.Mail);
+            // Hidden once saved – after "Abbrechen" it stays.
+            AddContact?.Invoke(recipient.Mail, () => recipient.CanAdd = false);
         }
     }
 
@@ -438,15 +439,12 @@ internal sealed partial class ReadingPaneViewModel : ViewModelBase
 
     public bool HasSenderPhoto => SenderPhoto is not null;
 
-    /// <summary>Opens the contact editor with name and address of the sender.</summary>
-    public Action? AddSender { get; set; }
+    /// <summary>Opens the contact editor with the sender; the action given is called once the contact was saved.</summary>
+    public Action<Action>? AddSender { get; set; }
 
     [RelayCommand]
-    private void AddSenderContact()
-    {
-        CanAddSender = false;
-        AddSender?.Invoke();
-    }
+    private void AddSenderContact() => AddSender?.Invoke(() => CanAddSender = false); // hidden once saved, not on "Abbrechen"
+
 
     /// <summary>The note "kein Spamfilter" in the check; hidden, an "i" next to the title shows it again.</summary>
     [ObservableProperty]

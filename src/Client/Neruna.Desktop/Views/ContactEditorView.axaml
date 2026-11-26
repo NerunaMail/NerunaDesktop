@@ -35,6 +35,39 @@
     <TextBlock Classes="error" Margin="0,8,0,0" IsVisible="{Binding NoAddressBook}"
                Text="{l:T 'Kein beschreibbares Adressbuch vorhanden. Bitte ein Konto mit CardDAV hinzufügen.'}" />
 
+    <!-- From a mail: a new contact, or an existing one completed with the sender (same name suggested first) -->
+    <Border IsVisible="{Binding OffersExisting}" Background="{DynamicResource InfoBackgroundBrush}" CornerRadius="6" Padding="12,10" Margin="0,12,0,4">
+      <StackPanel Spacing="6">
+        <StackPanel IsVisible="{Binding CreatesNew}" Spacing="6">
+          <TextBlock Text="{l:T 'Oder einen bestehenden Kontakt ergänzen:'}" FontWeight="SemiBold" />
+          <TextBox Text="{Binding ExistingQuery}" PlaceholderText="{l:T 'Kontakt suchen (Name, Firma, E-Mail)'}" />
+          <ItemsControl ItemsSource="{Binding ExistingMatches}" IsVisible="{Binding HasExistingMatches}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ContactChoiceRow">
+                <Button Classes="command" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="8,4" Margin="0,0,0,2"
+                        Command="{Binding $parent[UserControl].((vm:ContactEditorViewModel)DataContext).ChooseExistingCommand}" CommandParameter="{Binding}"
+                        ToolTip.Tip="{l:T 'Diesen Kontakt ergänzen'}">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Detail}" Classes="subtle" FontSize="12" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{l:T 'gleicher Name'}" Classes="subtle" FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0" IsVisible="{Binding IsSuggested}" />
+                  </Grid>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding CompletesExisting}">
+          <TextBlock Text="{l:T 'Neue Angaben aus der E-Mail kommen dazu; bestehende bleiben. Was nicht mehr stimmt, vor dem Speichern entfernen.'}"
+                     TextWrapping="Wrap" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="{l:T 'Doch neuer Kontakt'}" Command="{Binding ChooseNewCommand}" Margin="12,0,0,0" VerticalAlignment="Center" />
+        </Grid>
+        <TextBlock Text="{Binding SignatureText}" IsVisible="{Binding HasSignatureText}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
     <Grid ColumnDefinitions="*,12,*">
       <StackPanel>
         <TextBlock Classes="label" Text="{l:T 'Vorname'}" />
@@ -85,6 +118,51 @@
         <DataTemplate x:DataType="vm:EditableField">
           <Grid ColumnDefinitions="*,8,140,Auto" Margin="0,0,0,4">
             <TextBox Text="{Binding Value}" />
+            <ComboBox Grid.Column="2" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" />
+            <Button Grid.Column="3" Classes="command" Padding="6" ToolTip.Tip="{l:T 'Entfernen'}"
+                    Command="{Binding $parent[UserControl].((vm:ContactEditorViewModel)DataContext).RemoveFieldCommand}" CommandParameter="{Binding}">
+              <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
+            </Button>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+      <TextBlock Classes="label" Text="{l:T 'Adresse'}" />
+      <Button Grid.Column="1" Classes="command" Content="{l:T '+ Adresse'}" Command="{Binding AddAddressCommand}" Padding="6,2" FontSize="12" IsVisible="{Binding !IsReadOnly}" />
+    </Grid>
+    <ItemsControl ItemsSource="{Binding Addresses}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:EditableAddress">
+          <Border BorderBrush="{DynamicResource DividerBrush}" BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,6">
+            <Grid ColumnDefinitions="*,8,140,Auto" RowDefinitions="Auto,Auto,Auto">
+              <TextBox Text="{Binding Street}" PlaceholderText="{l:T 'Strasse und Nr.'}" />
+              <ComboBox Grid.Column="2" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" />
+              <Button Grid.Column="3" Classes="command" Padding="6" ToolTip.Tip="{l:T 'Entfernen'}"
+                      Command="{Binding $parent[UserControl].((vm:ContactEditorViewModel)DataContext).RemoveAddressCommand}" CommandParameter="{Binding}">
+                <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" Margin="0" />
+              </Button>
+              <Grid Grid.Row="1" ColumnDefinitions="100,8,*" Margin="0,4,0,0">
+                <TextBox Text="{Binding PostalCode}" PlaceholderText="{l:T 'PLZ'}" />
+                <TextBox Grid.Column="2" Text="{Binding City}" PlaceholderText="{l:T 'Ort'}" />
+              </Grid>
+              <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding Country}" PlaceholderText="{l:T 'Land'}" Margin="0,4,0,0" />
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+      <TextBlock Classes="label" Text="{l:T 'Webseite'}" />
+      <Button Grid.Column="1" Classes="command" Content="{l:T '+ Webseite'}" Command="{Binding AddWebsiteCommand}" Padding="6,2" FontSize="12" IsVisible="{Binding !IsReadOnly}" />
+    </Grid>
+    <ItemsControl ItemsSource="{Binding Websites}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:EditableField">
+          <Grid ColumnDefinitions="*,8,140,Auto" Margin="0,0,0,4">
+            <TextBox Text="{Binding Value}" PlaceholderText="https://" />
             <ComboBox Grid.Column="2" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" />
             <Button Grid.Column="3" Classes="command" Padding="6" ToolTip.Tip="{l:T 'Entfernen'}"
                     Command="{Binding $parent[UserControl].((vm:ContactEditorViewModel)DataContext).RemoveFieldCommand}" CommandParameter="{Binding}">
@@ -159,7 +237,7 @@
     <ComboBox ItemsSource="{Binding AddressBooks}" SelectedItem="{Binding SelectedAddressBook}" HorizontalAlignment="Stretch" IsEnabled="{Binding !IsReadOnly}" />
 
     <TextBlock Classes="label" Margin="0,8,0,0" FontSize="11"
-               Text="{l:T 'Felder wie Adresse oder Geburtstag bleiben beim Speichern unverändert erhalten.'}" />
+               Text="{l:T 'Weitere Angaben aus anderen Programmen bleiben beim Speichern unverändert erhalten.'}" />
 
     <TextBlock Classes="error" Text="{Binding Error}" Margin="0,12,0,0"
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />

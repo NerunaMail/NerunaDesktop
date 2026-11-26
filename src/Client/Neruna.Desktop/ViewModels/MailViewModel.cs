@@ -1038,8 +1038,11 @@ internal sealed partial class MailViewModel(
     /// <summary>A contact was saved or changed: completion and the sender check read the address books again.</summary>
     public void ContactsChanged() => recipients.Forget();
 
-    /// <summary>"+" beside a sender that is no contact yet: the contact editor opens with name and address.</summary>
-    public event EventHandler<MailAddress>? AddContactRequested;
+    /// <summary>"+" beside a sender (or a recipient) that is no contact yet: the contact window opens.</summary>
+    public event EventHandler<ContactFromMail>? AddContactRequested;
+
+    /// <summary>The contact window beside the mail (not modal: the mail stays readable to copy from).</summary>
+    public Task<bool> ShowContactEditorAsync(ContactEditorViewModel editor) => windows.ShowContactEditorAsync(editor);
 
     // The "+" beside the sender shows when the sender is in no address book and is no own address; a contact's
     // picture replaces the initials.
@@ -1054,7 +1057,7 @@ internal sealed partial class MailViewModel(
             To = address.Name is { Length: > 0 } name ? $"{name} <{address.Address}>" : address.Address,
         }, ComposeKind.New);
         pane.ShowContact = address => ShowContactRequested?.Invoke(this, address);
-        pane.AddContact = address => AddContactRequested?.Invoke(this, address);
+        pane.AddContact = (address, saved) => AddContactRequested?.Invoke(this, new ContactFromMail(address, null, saved));
         pane.ConfirmPgpKeyAction = async fingerprint =>
         {
             await secureMime.ConfirmPgpKeyAsync(fingerprint);
@@ -1071,7 +1074,8 @@ internal sealed partial class MailViewModel(
             var own = Accounts.Any(a => a.Account.Owns(sender.Address));
             if (!own)
             {
-                pane.AddSender = () => AddContactRequested?.Invoke(this, sender);
+                // The sender's signature may give phone, address and more.
+                pane.AddSender = saved => AddContactRequested?.Invoke(this, new ContactFromMail(sender, pane.Message, saved));
             }
 
             _ = CheckSenderAsync(pane, sender.Address, offerContact: !own);
@@ -2839,3 +2843,7 @@ internal sealed record SearchScope(string Label, MailAccountNode Account, MailFo
     private static IEnumerable<MailFolderNode> Descendants(MailFolderNode folder) =>
         folder.Children.SelectMany(c => (IEnumerable<MailFolderNode>)[c, .. Descendants(c)]);
 }
+
+/// <summary>Save someone from a mail as a contact: the address, the mail (for its signature; null for a recipient) and
+/// what to do once saved.</summary>
+internal sealed record ContactFromMail(MailAddress Address, MimeKit.MimeMessage? Message, Action Saved);
