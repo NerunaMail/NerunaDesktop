@@ -306,7 +306,7 @@ internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvide
     public Task<IReadOnlyList<CalendarInfo>> GetCalendarsAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<CalendarInfo>>(
         [
-            new CalendarInfo(connectionId, "personal", "Kalender", "#0F6CBD", IsReadOnly: true, Content: CalendarContent.Events | CalendarContent.Tasks),
+            new CalendarInfo(connectionId, "personal", "Kalender", "#0F6CBD", IsReadOnly: true, Content: CalendarContent.Events | CalendarContent.Tasks, IsDefault: true),
             new CalendarInfo(connectionId, "team", "Team (geteilt)", "#C239B3", IsReadOnly: true),
             new CalendarInfo(connectionId, "tasks", "Aufgaben", "#0B6A0B", IsReadOnly: false, Content: CalendarContent.Tasks),
         ]);
@@ -399,6 +399,14 @@ internal sealed class DemoCalendarProvider(Guid connectionId) : ICalendarProvide
         var allDay = calendar.RemoteId == "personal" ? (Day: 4, Days: 1, Title: "Brückentag") : (Day: 2, Days: 2, Title: "Messe Bern");
         items.Add(new CalendarObject($"{calendar.RemoteId}-allday@demo.neruna", null, string.Create(CultureInfo.InvariantCulture,
             $"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Neruna//Demo//DE\r\nBEGIN:VEVENT\r\nUID:{calendar.RemoteId}-allday@demo.neruna\r\nDTSTAMP:20260101T000000Z\r\nDTSTART;VALUE=DATE:{monday.AddDays(allDay.Day):yyyyMMdd}\r\nDTEND;VALUE=DATE:{monday.AddDays(allDay.Day + allDay.Days):yyyyMMdd}\r\nSUMMARY:{allDay.Title}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")));
+
+        // One invitation in both calendars (the same UID): shown as one block with a line per calendar.
+        if (calendar.RemoteId is "personal" or "team")
+        {
+            var meeting = monday.AddDays(3).AddHours(16);
+            items.Add(new CalendarObject("projekt-webshop@demo.neruna", null, string.Create(CultureInfo.InvariantCulture,
+                $"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Neruna//Demo//DE\r\nBEGIN:VEVENT\r\nUID:projekt-webshop@demo.neruna\r\nDTSTAMP:20260101T000000Z\r\nDTSTART:{meeting:yyyyMMdd'T'HHmmss}\r\nDTEND:{meeting.AddHours(1):yyyyMMdd'T'HHmmss}\r\nSUMMARY:Projektsitzung Webshop\r\nLOCATION:Sitzungszimmer Rigi\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")));
+        }
 
         // A task kept in the mixed personal calendar (as some servers do).
         if (calendar.RemoteId == "personal")

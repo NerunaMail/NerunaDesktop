@@ -3130,5 +3130,9 @@
  "Aussteller (vollständig)": "Emittente (completo)",
  "Signiert am": "Firmato il",
  "Zertifikat anzeigen": "Mostra certificato",
- "Zertifikat": "Certificato"
+ "Zertifikat": "Certificato",
+  "In {0} Kalendern: {1}": "In {0} calendari: {1}",
+  "Gleiche Termine": "Appuntamenti identici",
+  "Gleiche Termine aus mehreren Kalendern zusammenfassen": "Raggruppare gli appuntamenti identici di più calendari",
+  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "Se lo stesso appuntamento si trova in più calendari visualizzati (lo stesso invito, o lo stesso titolo alla stessa ora), appare una sola volta: a sinistra una linea per calendario, con il numero."
 }

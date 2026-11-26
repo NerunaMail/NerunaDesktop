@@ -52,6 +52,14 @@
                    Text="{l:T 'Die Farbe des Kalenders bleibt als Linie links, die Kategorien als Linien rechts. Hat ein Termin mehrere Kategorien, gilt die Farbe des Kalenders.'}" />
       </StackPanel>
 
+      <!-- One invitation to several people of the team, whose calendars are all shown: one block (CalendarEventItem.Merge) -->
+      <TextBlock Text="{l:T 'Gleiche Termine'}" FontSize="16" FontWeight="SemiBold" />
+      <StackPanel Spacing="6" Margin="0,0,0,14">
+        <CheckBox Content="{l:T 'Gleiche Termine aus mehreren Kalendern zusammenfassen'}" IsChecked="{Binding MergeSameEvents}" />
+        <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap"
+                   Text="{l:T 'Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.'}" />
+      </StackPanel>
+
       <TextBlock Text="{l:T 'Sichtbereich im Zeitraster'}" FontSize="16" FontWeight="SemiBold" />
       <TextBlock Classes="subtle" TextWrapping="Wrap"
                  Text="{l:T 'Diese Stunden füllen die Höhe des Fensters; was davor und danach liegt, erreichen Sie mit Scrollen. Ganztägige Termine stehen immer oben.'}" />

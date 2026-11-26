@@ -3130,5 +3130,9 @@
  "Aussteller (vollständig)": "Issuer (full)",
  "Signiert am": "Signed on",
  "Zertifikat anzeigen": "Show certificate",
- "Zertifikat": "Certificate"
+ "Zertifikat": "Certificate",
+  "In {0} Kalendern: {1}": "In {0} calendars: {1}",
+  "Gleiche Termine": "Identical events",
+  "Gleiche Termine aus mehreren Kalendern zusammenfassen": "Combine identical events from several calendars",
+  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "If the same event is in several shown calendars (the same invitation, or the same title at the same time), it appears only once: one line per calendar on the left, plus the count."
 }

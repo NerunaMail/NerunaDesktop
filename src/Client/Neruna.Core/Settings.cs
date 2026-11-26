@@ -153,6 +153,9 @@ public static class SettingKeys
     /// <summary>"category": an event with one coloured category is filled in its colour (the calendar's stays as line on the left); else the calendar's colour.</summary>
     public const string CalendarEventBackground = "calendar.eventBackground";
 
+    /// <summary>The same event in several shown calendars (one invitation, or the same title at the same time) as one block; default true.</summary>
+    public const string CalendarMergeSameEvents = "calendar.mergeSameEvents";
+
     /// <summary>Time grid subdivision in minutes: 60, 30 (default) or 15.</summary>
     public const string CalendarGridMinutes = "calendar.gridMinutes";
 

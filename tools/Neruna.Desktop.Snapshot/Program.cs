@@ -1182,6 +1182,13 @@ internal static class Snapshots
         vm.CalendarPage.NavigatorMonthCount = 1;
         vm.CalendarPage.IsTimeGrid = true;
         await SaveAsync(window, output, "calendar-timegrid.png");
+        // The same invitation in two shown calendars: one block with a line per calendar; the setting shows both again.
+        var merged = vm.CalendarPage.Days.SelectMany(d => d.Events).Where(e => e.Title == "Projektsitzung Webshop").ToList();
+        Console.WriteLine($"Merged: {merged.Count} block(s), {merged.FirstOrDefault()?.CopiesText}, tooltip: {merged.FirstOrDefault()?.Tooltip.Replace('\n', '|')}");
+        await vm.CalendarPage.SetMergeSameEventsAsync(false);
+        Console.WriteLine($"Not merged: {vm.CalendarPage.Days.SelectMany(d => d.Events).Count(e => e.Title == "Projektsitzung Webshop")} blocks");
+        await SaveAsync(window, output, "calendar-not-merged.png");
+        await vm.CalendarPage.SetMergeSameEventsAsync(true);
         var categorized = vm.CalendarPage.Days.SelectMany(d => d.Events).First(e => e.CategoryBrushes.Count > 2);
         Console.WriteLine($"Category tooltip: {categorized.Tooltip.Replace('\n', '|')}");
 

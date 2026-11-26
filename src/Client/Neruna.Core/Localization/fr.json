@@ -3130,5 +3130,9 @@
  "Aussteller (vollständig)": "Émetteur (complet)",
  "Signiert am": "Signé le",
  "Zertifikat anzeigen": "Afficher le certificat",
- "Zertifikat": "Certificat"
+ "Zertifikat": "Certificat",
+  "In {0} Kalendern: {1}": "Dans {0} calendriers : {1}",
+  "Gleiche Termine": "Rendez-vous identiques",
+  "Gleiche Termine aus mehreren Kalendern zusammenfassen": "Regrouper les rendez-vous identiques de plusieurs calendriers",
+  "Steht derselbe Termin in mehreren angezeigten Kalendern (dieselbe Einladung, oder gleicher Titel zur gleichen Zeit), erscheint er nur einmal: links eine Linie pro Kalender, dazu die Anzahl.": "Si le même rendez-vous figure dans plusieurs calendriers affichés (la même invitation, ou le même titre à la même heure), il n'apparaît qu'une fois : une ligne par calendrier à gauche, avec le nombre."
 }

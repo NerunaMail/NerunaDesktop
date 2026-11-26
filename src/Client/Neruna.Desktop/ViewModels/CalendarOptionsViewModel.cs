@@ -52,6 +52,21 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
         _ = settings.SetAsync(SettingKeys.CalendarEventBackground, value ? "category" : null);
     }
 
+    /// <summary>"Gleiche Termine zusammenfassen": the same event in several calendars as one block.</summary>
+    [ObservableProperty]
+    public partial bool MergeSameEvents { get; set; } = true;
+
+    partial void OnMergeSameEventsChanged(bool value)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _ = calendarPage.SetMergeSameEventsAsync(value);
+        _ = settings.SetBoolAsync(SettingKeys.CalendarMergeSameEvents, value);
+    }
+
     /// <summary>Time grid subdivision: 60, 30 or 15 minutes.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Grid60), nameof(Grid30), nameof(Grid15))]
@@ -189,6 +204,7 @@ internal sealed partial class CalendarOptionsViewModel(ISettingsStore settings, 
             TimeGrid = await settings.GetAsync(SettingKeys.CalendarLayout) != "list"; // default: time grid
             GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
             CategoryBackground = await settings.GetAsync(SettingKeys.CalendarEventBackground) == "category";
+            MergeSameEvents = await settings.GetBoolAsync(SettingKeys.CalendarMergeSameEvents, fallback: true);
             var from = int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleFrom), out var f) ? Math.Clamp(f, 0, 23) : 7;
             var to = int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleTo), out var t) ? Math.Clamp(t, from + 1, 24) : 21;
             VisibleFrom = HourOptions[from];

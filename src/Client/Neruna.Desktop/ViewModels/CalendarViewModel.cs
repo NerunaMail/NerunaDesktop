@@ -440,6 +440,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         _loadingSettings = false;
         GridMinutes = int.TryParse(await settings.GetAsync(SettingKeys.CalendarGridMinutes), out var minutes) && minutes is 60 or 30 or 15 ? minutes : 30;
         BackgroundFromCategory = await settings.GetAsync(SettingKeys.CalendarEventBackground) == "category";
+        MergeSameEvents = await settings.GetBoolAsync(SettingKeys.CalendarMergeSameEvents, fallback: true);
         SetVisibleRange(
             int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleFrom), out var from) ? from : 7,
             int.TryParse(await settings.GetAsync(SettingKeys.CalendarVisibleTo), out var to) ? to : 21);
@@ -1177,6 +1178,19 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
     /// <summary>Einstellungen → Kalender: events with one coloured category are filled in its colour (else the calendar's).</summary>
     public bool BackgroundFromCategory { get; private set; }
 
+    /// <summary>The same event in several shown calendars as one block (Einstellungen → Kalender; default on).</summary>
+    public bool MergeSameEvents { get; private set; } = true;
+
+    /// <summary>The setting changed: the shown events are grouped (or single) again.</summary>
+    public async Task SetMergeSameEventsAsync(bool value)
+    {
+        if (MergeSameEvents != value)
+        {
+            MergeSameEvents = value;
+            await LoadWeekAsync();
+        }
+    }
+
     /// <summary>The setting changed: the shown events take the new colours.</summary>
     public async Task SetBackgroundFromCategoryAsync(bool value)
     {
@@ -1198,6 +1212,7 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
         var version = ++_weekVersion;
         var occurrences = await Task.Run(() => OccurrencesAsync(shown, from, until));
         var known = await categories.GetAllAsync();
+        var standardKey = await settings.GetAsync(SettingKeys.CalendarDefaultCalendar);
         if (version != _weekVersion)
         {
             return; // A newer load (other week, calendars changed) is under way; an older result must not overwrite it.
@@ -1213,6 +1228,11 @@ internal sealed partial class CalendarViewModel(CalendarController calendar, Tas
                 .ThenBy(o => o.Start)
                 .Select(o => new CalendarEventItem(o, colors.GetValueOrDefault((o.Calendar.ConnectionId, o.Calendar.RemoteId)) ?? Palette[0], known, BackgroundFromCategory))
                 .ToList();
+            if (MergeSameEvents)
+            {
+                events = [.. CalendarEventItem.Merge(events, standardKey)];
+            }
+
             Days.Add(new CalendarDay(day, events, month is { } m && day.Month != m, MonthEventLimit));
         }
 
@@ -1419,8 +1439,86 @@ internal sealed class CalendarEventItem(CalendarOccurrence occurrence, string co
 
     public bool HasCategories => CategoryBrushes.Count > 0;
 
-    /// <summary>Hover text: title, location (if any), time and categories (also those without colour), one per line.</summary>
-    public string Tooltip => string.Join('\n', new[] { Title, Location, TimeText, string.Join(", ", Occurrence.Categories) }.Where(line => !string.IsNullOrWhiteSpace(line)));
+    /// <summary>
+    /// The same event in other shown calendars (an invitation to several people of the team, or the same title at the
+    /// same time), shown as this one block; see <see cref="Merge"/>.
+    /// </summary>
+    public IReadOnlyList<CalendarEventItem> Copies { get; private set; } = [];
+
+    public bool HasCopies => Copies.Count > 0;
+
+    /// <summary>Grouped: one colour line per calendar on the left instead of the border.</summary>
+    public IReadOnlyList<IBrush> CalendarBrushes => [Brush, .. Copies.Select(c => c.Brush)];
+
+    public Avalonia.Thickness StripeThickness => new(HasCopies ? 0 : 3, 0, 0, 0);
+
+    /// <summary>"×3": in how many calendars.</summary>
+    public string CopiesText => $"×{Copies.Count + 1}";
+
+    /// <summary>Hover text: title, location (if any), time and categories (also those without colour), one per line;
+    /// grouped: the calendars too.</summary>
+    public string Tooltip => string.Join('\n', new[]
+    {
+        Title, Location, TimeText, string.Join(", ", Occurrence.Categories),
+        HasCopies ? F("In {0} Kalendern: {1}", Copies.Count + 1, string.Join(", ", new[] { Occurrence.Calendar.Name }.Concat(Copies.Select(c => c.Occurrence.Calendar.Name)))) : null,
+    }.Where(line => !string.IsNullOrWhiteSpace(line)));
+
+    /// <summary>
+    /// The same event in several calendars as one item ("Gleiche Termine zusammenfassen"): the same start and end and
+    /// either the same UID (one invitation) or the same title. The item shown and opened is the copy in an own
+    /// calendar (its colour fills the block, its line comes first): the standard calendar, the server's default one,
+    /// then one not shared by someone else (may be changed first), then one that may be changed, else the first; the
+    /// others are its <see cref="Copies"/>. Tasks stay single.
+    /// </summary>
+    /// <param name="standardKey">The standard calendar (Kalender verwalten), <see cref="CalendarController.CalendarKey"/>.</param>
+    public static IReadOnlyList<CalendarEventItem> Merge(IReadOnlyList<CalendarEventItem> items, string? standardKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        var groups = new List<List<CalendarEventItem>>();
+        foreach (var item in items)
+        {
+            var group = item.Occurrence.IsTask ? null : groups.FirstOrDefault(g => g.Any(other => SameEvent(item.Occurrence, other.Occurrence)));
+            if (group is null)
+            {
+                groups.Add([item]);
+            }
+            else
+            {
+                group.Add(item);
+            }
+        }
+
+        return [.. groups.Select(group =>
+        {
+            var primary = group.OrderBy(i => i.Occurrence.Calendar switch
+            {
+                var c when standardKey is not null && CalendarController.CalendarKey(c) == standardKey => 0,
+                { IsDefault: true } => 1,
+                { SharedBy: null, IsReadOnly: false } => 2,
+                { SharedBy: null } => 3,
+                { IsReadOnly: false } => 4,
+                _ => 5,
+            }).First();
+            primary.Copies = [.. group.Where(i => !ReferenceEquals(i, primary))];
+            return primary;
+        })];
+    }
+
+    private static bool SameEvent(CalendarOccurrence a, CalendarOccurrence b)
+    {
+        if (b.IsTask || a.Start != b.Start || a.End != b.End || a.IsAllDay != b.IsAllDay)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(a.Uid) && a.Uid == b.Uid)
+        {
+            return true;
+        }
+
+        var title = a.Summary.Trim();
+        return title.Length > 0 && string.Equals(title, b.Summary.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 /// <summary>An event placed in the time grid of one day: vertical position from its time, column from overlaps.</summary>
