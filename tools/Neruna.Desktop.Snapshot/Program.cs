@@ -2603,6 +2603,13 @@ internal static class Snapshots
     // editor gets them as writable here).
     private static async Task CheckContactFromMailAsync(IServiceProvider services, string output)
     {
+        // Saving a sender before the contacts page was ever shown: the address books are read first.
+        var fresh = ActivatorUtilities.CreateInstance<ContactsViewModel>(services);
+        var early = await fresh.EditorFromMailAsync(new Neruna.Core.Mail.MailAddress("Peter Brunner", "p.brunner@brunner-bau.example"), null);
+        Console.WriteLine($"Contact from mail before the contacts page: {fresh.AddressBooks.Count} address books loaded"
+            + (fresh.AddressBooks.Count == 0 ? " – FAILED" : string.Empty));
+        _ = early;
+
         var contacts = services.GetRequiredService<Neruna.Core.Contacts.ContactController>();
         var books = (await contacts.GetAddressBooksAsync()).Select(b => b with { IsReadOnly = false }).ToList();
         var message = new MimeKit.MimeMessage();

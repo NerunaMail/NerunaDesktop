@@ -33,6 +33,9 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
     private static readonly string[] Palette = ["#0F6CBD", "#C239B3", "#0B6A0B", "#CA5010", "#8764B8", "#038387"];
 
     private IReadOnlyList<ContactEntry> _all = [];
+
+    // The address books are read when the page is first shown; saving a sender from the mail may come before that.
+    private bool _booksLoaded;
     private HashSet<string> _hidden = [];
 
     /// <summary>The shell shows contact and group editors as overlay and reloads when they report a change.</summary>
@@ -154,6 +157,7 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
         }
 
         HasAddressBooks = AddressBooks.Count > 0;
+        _booksLoaded = true;
         Filter();
     }
 
@@ -245,6 +249,11 @@ internal sealed partial class ContactsViewModel(ContactController contacts, ISet
         var person = ContactDraft.Empty with { GivenName = given, FamilyName = family, Emails = [new ContactField(address.Address)] };
         var found = message is null ? ContactDraft.Empty : await Task.Run(() => SignatureContact.Read(message, address.Name, address.Address));
         var fromMail = person.CompletedWith(found);
+        if (!_booksLoaded)
+        {
+            await ReloadAsync();
+        }
+
         var editor = new ContactEditorViewModel(contacts, files, Writable(), fromMail, null, fromMail);
         editor.DescribeSignature(found);
         await editor.LoadCandidatesAsync();
